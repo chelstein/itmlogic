@@ -1611,6 +1611,31 @@ export async function runSiteOptimizer(body = {}){
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
     cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    cap_total_low_usd:                  c.am_total_project_capital_cost_rollup_guide?.total_usd?.low ?? null,
+    cap_total_high_usd:                 c.am_total_project_capital_cost_rollup_guide?.total_usd?.high ?? null,
+    cap_n_towers:                       c.am_total_project_capital_cost_rollup_guide?.n_towers ?? null,
+    cap_dominant_cost:                  c.am_total_project_capital_cost_rollup_guide?.dominant_cost ?? null,
+    cap_contingency_pct:                c.am_total_project_capital_cost_rollup_guide?.contingency_pct ?? null,
+    tbs_floor_area_m2:                  c.am_transmitter_building_specification_guide?.floor_area_m2 ?? null,
+    tbs_hvac_tons:                      c.am_transmitter_building_specification_guide?.hvac_tons ?? null,
+    tbs_gen_std_kw:                     c.am_transmitter_building_specification_guide?.generator?.recommended_std_kw ?? null,
+    tbs_bldg_cost_low_usd:              c.am_transmitter_building_specification_guide?.building_cost_usd?.low ?? null,
+    tbs_heat_w:                         c.am_transmitter_building_specification_guide?.heat_dissipation_w ?? null,
+    grs_radial_length_m:                c.am_ground_radial_system_cost_and_specification_guide?.radial_length_m ?? null,
+    grs_std_n_radials:                  c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.n_radials ?? null,
+    grs_std_wire_m:                     c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.total_wire_m ?? null,
+    grs_std_cost_low_usd:               c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.cost_usd?.low ?? null,
+    grs_std_efficiency_pct:             c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.efficiency_pct ?? null,
+    teh_qwave_height_m:                 c.am_tower_electrical_height_and_efficiency_guide?.quarter_wave_height_m ?? null,
+    teh_elec_height_deg:                c.am_tower_electrical_height_and_efficiency_guide?.electrical_height_deg ?? null,
+    teh_radiation_r_ohm:                c.am_tower_electrical_height_and_efficiency_guide?.radiation_resistance_ohm ?? null,
+    teh_eff_typical_pct:                c.am_tower_electrical_height_and_efficiency_guide?.efficiency_pct?.typical_ground ?? null,
+    teh_height_rating:                  c.am_tower_electrical_height_and_efficiency_guide?.height_rating ?? null,
+    lcm_daytime_contour_km:             c.am_licensed_contour_migration_guide?.daytime_5mvm_contour_km ?? null,
+    lcm_nighttime_contour_km:           c.am_licensed_contour_migration_guide?.nighttime_05mvm_contour_km ?? null,
+    lcm_contour_delta_pct:              c.am_licensed_contour_migration_guide?.contour_delta_pct ?? null,
+    lcm_coverage_area_km2:              c.am_licensed_contour_migration_guide?.coverage_area_km2 ?? null,
+    lcm_soil_advantage:                 c.am_licensed_contour_migration_guide?.soil_coverage_advantage ?? null,
     cpe_n_required_exhibits:            c.am_construction_permit_exhibit_requirements_guide?.n_required_exhibits ?? null,
     cpe_asr_required:                   c.am_construction_permit_exhibit_requirements_guide?.asr_required ?? null,
     cpe_ea_required:                    c.am_construction_permit_exhibit_requirements_guide?.environmental_assessment_required ?? null,
@@ -1630,7 +1655,62 @@ export async function runSiteOptimizer(body = {}){
     fcs_has_skywave:                    c.am_frequency_coordination_and_channel_study_guide?.has_skywave_obligation ?? null,
     fcs_coch_radius_km:                 c.am_frequency_coordination_and_channel_study_guide?.co_channel_search_radius_km ?? null,
     fcs_adj_radius_km:                  c.am_frequency_coordination_and_channel_study_guide?.adj_channel_search_radius_km ?? null,
-    fcs_study_effort_max_hrs:           c.am_frequency_coordination_and_channel_study_guide?.study_effort_hrs?.max ?? null
+    fcs_study_effort_max_hrs:           c.am_frequency_coordination_and_channel_study_guide?.study_effort_hrs?.max ?? null,
+    pml_power_tolerance_pct:            c.am_transmitter_power_monitoring_and_operating_log_guide?.power_tolerance_pct ?? null,
+    pml_n_base_current_meters:          c.am_transmitter_power_monitoring_and_operating_log_guide?.n_base_current_meters ?? null,
+    pml_antenna_monitor_required:       c.am_transmitter_power_monitoring_and_operating_log_guide?.antenna_monitor_required ?? null,
+    pml_apc_required:                   c.am_transmitter_power_monitoring_and_operating_log_guide?.automatic_power_control_required ?? null,
+    pml_total_monitoring_low_usd:       c.am_transmitter_power_monitoring_and_operating_log_guide?.total_monitoring_low_usd ?? null,
+    coq_rp_permit_required:             c.am_operator_and_chief_operator_qualification_guide?.rp_permit_required ?? null,
+    coq_n_weekly_duties:                c.am_operator_and_chief_operator_qualification_guide?.n_weekly_duties ?? null,
+    coq_unattended_authorized:          c.am_operator_and_chief_operator_qualification_guide?.unattended_operation?.authorized ?? null,
+    coq_n_mod_triggers:                 c.am_operator_and_chief_operator_qualification_guide?.n_modification_triggers ?? null,
+    coq_n_calendar_items:               c.am_operator_and_chief_operator_qualification_guide?.n_calendar_items ?? null,
+    fsm_formal_proof_required:          c.am_field_strength_measurement_and_contour_verification_guide?.formal_proof_required ?? null,
+    fsm_n_radials:                      c.am_field_strength_measurement_and_contour_verification_guide?.n_radials_required ?? null,
+    fsm_total_measurements:             c.am_field_strength_measurement_and_contour_verification_guide?.total_field_measurements ?? null,
+    fsm_total_cost_low_usd:             c.am_field_strength_measurement_and_contour_verification_guide?.total_cost_low_usd ?? null,
+    fsm_filing_deadline_days:           c.am_field_strength_measurement_and_contour_verification_guide?.filing_deadline_days ?? null,
+    ids_d_05_km:                        c.am_interference_distance_and_service_area_overlap_guide?.service_contours?.d_05_mvm_km ?? null,
+    ids_d_01_km:                        c.am_interference_distance_and_service_area_overlap_guide?.service_contours?.d_01_mvm_km ?? null,
+    ids_risk_level:                     c.am_interference_distance_and_service_area_overlap_guide?.interference_risk_level ?? null,
+    ids_co_ch_min_sep_km:               c.am_interference_distance_and_service_area_overlap_guide?.min_separation_km?.co_km ?? null,
+    ids_du_co_ch_db:                    c.am_interference_distance_and_service_area_overlap_guide?.du_requirements?.co_channel_groundwave_db ?? null,
+    tia_tower_height_ft:                c.am_tia222_tower_structural_certification_guide?.tower_height_ft ?? null,
+    tia_wind_speed_mph:                 c.am_tia222_tower_structural_certification_guide?.wind_speed_mph ?? null,
+    tia_ice_thickness_in:               c.am_tia222_tower_structural_certification_guide?.ice_thickness_in ?? null,
+    tia_asr_triggered_qw:               c.am_tia222_tower_structural_certification_guide?.asr_triggered_qw ?? null,
+    tia_total_pe_low_usd:               c.am_tia222_tower_structural_certification_guide?.total_pe_analysis_low_usd ?? null,
+    lsa_max_total_stations:             c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.market_station_limits?.total ?? null,
+    lsa_tba_threshold_pct:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.tba_threshold?.attributable_threshold_pct ?? null,
+    lsa_min_licensee_hours:             c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.min_licensee_hours_per_week ?? null,
+    lsa_n_agreement_types:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.n_agreement_types ?? null,
+    lsa_lma_legal_low_usd:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.lma_legal_review_usd?.low ?? null,
+    rdb_asr_required:                   c.am_fcc_registration_and_database_management_guide?.asr_required ?? null,
+    rdb_one_time_total_usd:             c.am_fcc_registration_and_database_management_guide?.one_time_registration_costs?.total_usd ?? null,
+    rdb_annual_total_low_usd:           c.am_fcc_registration_and_database_management_guide?.annual_maintenance_costs?.total_annual_low_usd ?? null,
+    rdb_n_annual_obligations:           c.am_fcc_registration_and_database_management_guide?.n_annual_obligations ?? null,
+    rdb_n_da_certifications:            c.am_fcc_registration_and_database_management_guide?.n_da_certifications ?? null,
+    sal_total_cost_low_usd:             c.am_station_sale_and_license_assignment_guide?.total_cost_low_usd ?? null,
+    sal_total_cost_high_usd:            c.am_station_sale_and_license_assignment_guide?.total_cost_high_usd ?? null,
+    sal_streamlined_days:               c.am_station_sale_and_license_assignment_guide?.timeline_days?.streamlined ?? null,
+    sal_n_critical_items:               c.am_station_sale_and_license_assignment_guide?.n_critical_items ?? null,
+    sal_fcc_form_fee_usd:               c.am_station_sale_and_license_assignment_guide?.fcc_form_fee_usd ?? null,
+    scm_n_contours_required:            c.am_signal_coverage_mapping_and_contour_documentation_guide?.n_contours_required ?? null,
+    scm_n_radials:                      c.am_signal_coverage_mapping_and_contour_documentation_guide?.n_radials ?? null,
+    scm_d_05mvm_km:                     c.am_signal_coverage_mapping_and_contour_documentation_guide?.contour_distances_km?.d_05mvm_km ?? null,
+    scm_total_low_usd:                  c.am_signal_coverage_mapping_and_contour_documentation_guide?.cost_estimates?.total_low_usd ?? null,
+    scm_formal_proof_required:          c.am_signal_coverage_mapping_and_contour_documentation_guide?.formal_proof_required ?? null,
+    tta_power_category:                 c.am_transmitter_type_acceptance_and_fcc_certification_guide?.power_category ?? null,
+    tta_max_power_kw:                   c.am_transmitter_type_acceptance_and_fcc_certification_guide?.authorized_power_range?.max_kw ?? null,
+    tta_min_power_kw:                   c.am_transmitter_type_acceptance_and_fcc_certification_guide?.authorized_power_range?.min_kw ?? null,
+    tta_total_equipment_low_usd:        c.am_transmitter_type_acceptance_and_fcc_certification_guide?.cost_estimates?.total_equipment_low_usd ?? null,
+    tta_n_verification_steps:           c.am_transmitter_type_acceptance_and_fcc_certification_guide?.n_verification_steps ?? null,
+    ccw_coverage_status:                c.am_community_coverage_waiver_and_short_spacing_guide?.coverage_status ?? null,
+    ccw_coverage_pct:                   c.am_community_coverage_waiver_and_short_spacing_guide?.coverage_pct_estimated ?? null,
+    ccw_waiver_likely_needed:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_likely_needed ?? null,
+    ccw_co_channel_min_km:              c.am_community_coverage_waiver_and_short_spacing_guide?.co_channel_min_km ?? null,
+    ccw_waiver_total_low_usd:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_cost?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -27491,6 +27571,482 @@ async function scoreCandidate(pt, ctx, warnings){
       };
     })(),
 
+    am_total_project_capital_cost_rollup_guide: (() => {
+      // Total project capital cost rollup for AM relocation.
+      //
+      // Rolls up the major cost components of an AM broadcast site build-out
+      // into a single summary with low and high estimates.  This is SCREENING
+      // GRADE — actual costs depend on site conditions, contractor rates,
+      // tower type, soil, and permitting complexity.
+      //
+      // Cost components:
+      //   1. Tower: λ/4 guyed monopole (most common NDA); DA adds tower(s)
+      //   2. Ground radial system: 90-radial standard (λ/4 radials)
+      //   3. Transmitter building: prefab shelter including HVAC/generator
+      //   4. Transmitter equipment: main + spare by power class
+      //   5. ATU (antenna tuning unit) + phasor (DA only)
+      //   6. Engineering + FCC filing fees
+      //   7. Construction project management + contingency (15%)
+      //   8. Site access road / utility connection (flat estimate)
+      //
+      // Tower cost model (guyed monopole, turn-key):
+      //   Low-power (h < 50m):   $120–$180k
+      //   Medium (50–100m):      $220–$360k
+      //   Tall (100–150m):       $350–$600k
+      //   Very tall (>150m):     $550–$900k
+      // DA stations add one tower per additional pattern element:
+      //   Each additional tower: ~0.6× primary tower cost
+      //
+      // Transmitter equipment:
+      //   <1 kW:    $18k–$35k
+      //   1–5 kW:   $35k–$80k
+      //   5–25 kW:  $80k–$200k
+      //   25–50 kW: $180k–$380k
+      //   >50 kW:   $350k–$700k
+      //
+      // ATU + phasor (DA only): $25k–$65k
+
+      const isDA = /^DA/i.test(pattern_mode);
+      const lambda_m    = round2(300000 / frequency_khz);
+      const qwave_h_m   = round2(lambda_m / 4);
+
+      // Tower cost
+      const towerCost = (h) => {
+        if (h < 50)  return { low: 120000, high: 180000 };
+        if (h < 100) return { low: 220000, high: 360000 };
+        if (h < 150) return { low: 350000, high: 600000 };
+        return          { low: 550000, high: 900000 };
+      };
+      const primaryTower = towerCost(qwave_h_m);
+      // DA: estimate 2 towers for DA-N/DA-2, 3 for DA-D
+      const n_towers = /^DA-D/i.test(pattern_mode) ? 3 : isDA ? 2 : 1;
+      const extra_towers = n_towers - 1;
+      const tower_low  = primaryTower.low  + Math.round(extra_towers * primaryTower.low  * 0.6);
+      const tower_high = primaryTower.high + Math.round(extra_towers * primaryTower.high * 0.6);
+
+      // Ground radial system (90-radial standard)
+      const radial_length_m = round2(lambda_m / 4);
+      const gnd_wire_m      = 90 * radial_length_m;
+      const gnd_low  = Math.round(gnd_wire_m * 2.80);
+      const gnd_high = Math.round(gnd_wire_m * 4.20);
+
+      // Transmitter building (prefab + site)
+      const bldg_area   = (tpo_kw < 1 ? 12 : tpo_kw <= 5 ? 25 : tpo_kw <= 25 ? 40 : 60) + (isDA ? 20 : 0);
+      const bldg_low    = Math.round(bldg_area * 350 + 15000);
+      const bldg_high   = Math.round(bldg_area * 550 + 35000);
+
+      // Transmitter equipment
+      const txCost = (p) => {
+        if (p < 1)  return { low: 18000,  high: 35000  };
+        if (p <= 5) return { low: 35000,  high: 80000  };
+        if (p <= 25)return { low: 80000,  high: 200000 };
+        if (p <= 50)return { low: 180000, high: 380000 };
+        return         { low: 350000, high: 700000 };
+      };
+      const tx = txCost(tpo_kw);
+
+      // ATU + phasor
+      const atu_low  = isDA ? 25000 : 8000;
+      const atu_high = isDA ? 65000 : 20000;
+
+      // Engineering + FCC
+      const eng_low  = 5205;  // $3,500 + $1,705 FCC fee (base NDA)
+      const eng_high = isDA ? 20000 : 10000;
+
+      // Utility + road + site access
+      const access_low  = 15000;
+      const access_high = 50000;
+
+      // Sub-totals
+      const sub_low  = tower_low  + gnd_low  + bldg_low  + tx.low  + atu_low  + eng_low  + access_low;
+      const sub_high = tower_high + gnd_high + bldg_high + tx.high + atu_high + eng_high + access_high;
+
+      // Contingency 15%
+      const total_low  = Math.round(sub_low  * 1.15);
+      const total_high = Math.round(sub_high * 1.15);
+
+      const components = [
+        { item: 'Tower construction',     low: tower_low,  high: tower_high,  n_towers },
+        { item: 'Ground radial system',   low: gnd_low,    high: gnd_high,    n_radials: 90 },
+        { item: 'Transmitter building',   low: bldg_low,   high: bldg_high,   area_m2: bldg_area },
+        { item: 'Transmitter equipment',  low: tx.low,     high: tx.high,     tpo_kw },
+        { item: isDA ? 'ATU + phasor (DA)' : 'ATU',
+                                          low: atu_low,    high: atu_high },
+        { item: 'Engineering + FCC fees', low: eng_low,    high: eng_high },
+        { item: 'Site access/utilities',  low: access_low, high: access_high },
+      ];
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        is_da:      isDA,
+        n_towers,
+        quarter_wave_height_m: qwave_h_m,
+        components,
+        subtotal_usd:   { low: sub_low,   high: sub_high   },
+        contingency_pct: 15,
+        total_usd:      { low: total_low, high: total_high },
+        dominant_cost:  components.reduce((a, b) => (b.low > a.low ? b : a)).item,
+        reference:      'Screening-grade estimate; industry standard AM broadcast construction costs (2024 USD)',
+        note:           `Total est. project cost: $${total_low.toLocaleString()}–$${total_high.toLocaleString()} (incl. 15% contingency). Dominant cost: ${components.reduce((a, b) => (b.low > a.low ? b : a)).item}. ${n_towers} tower(s), ${isDA ? 'DA phasor included' : 'NDA'}.`
+      };
+    })(),
+
+    am_transmitter_building_specification_guide: (() => {
+      // AM transmitter building (equipment shelter) specification guide.
+      //
+      // The transmitter building houses transmitter(s), antenna tuning unit (ATU),
+      // phasor (DA stations), backup power, and control/monitoring equipment.
+      // Building requirements are driven by transmitter power, DA vs. NDA, and
+      // local climate.
+      //
+      // Floor area guidelines (industry practice, not FCC-mandated):
+      //   NDA low-power  (<1 kW): 10–15 m² (prefab shed or modular shelter)
+      //   NDA medium     (1–5 kW): 20–30 m²
+      //   NDA high-power (>5 kW): 30–50 m²
+      //   DA (any power):  add 15–25 m² for phasor cabinet and ATU
+      //
+      // HVAC sizing:
+      //   Transmitter heat dissipation ≈ TPO × (1 - efficiency) / efficiency
+      //   Typical transmitter efficiency: 70–80% (solid-state), 60–70% (tube)
+      //   HVAC BTU/hr = heat_watts × 3.412
+      //
+      // Generator sizing:
+      //   Minimum = (TPO / transmitter_efficiency) × 1.25 safety factor
+      //   Add 5–10 kW for building HVAC + control loads
+      //
+      // Building cost estimates (2024, US, turn-key):
+      //   Prefab metal shelter: $350–$550/m²
+      //   Masonry/CMU: $900–$1,400/m²
+      //   Site work + utilities: add $15,000–$40,000 flat
+
+      const isDA = /^DA/i.test(pattern_mode);
+
+      // Floor area
+      const base_area_m2  = tpo_kw < 1   ? 12
+                           : tpo_kw <= 5  ? 25
+                           : tpo_kw <= 25 ? 40
+                           : 60;
+      const da_area_add_m2 = isDA ? 20 : 0;
+      const floor_area_m2  = base_area_m2 + da_area_add_m2;
+
+      // Heat dissipation (solid-state transmitter, ~75% efficiency)
+      const TX_EFFICIENCY  = 0.75;
+      const heat_watts     = Math.round(tpo_kw * 1000 * (1 - TX_EFFICIENCY) / TX_EFFICIENCY);
+      const hvac_btu_hr    = Math.round(heat_watts * 3.412);
+      // Add 20% for building envelope + lighting + control
+      const total_hvac_btu = Math.round(hvac_btu_hr * 1.2);
+      const hvac_tons      = round2(total_hvac_btu / 12000);
+
+      // Generator size
+      const gen_tx_load_kw   = round2(tpo_kw / TX_EFFICIENCY);
+      const gen_aux_load_kw  = round2(hvac_tons * 1.2 + 3); // HVAC + control
+      const gen_min_kw       = round2((gen_tx_load_kw + gen_aux_load_kw) * 1.25);
+      // Round up to next standard generator size
+      const STD_GEN_SIZES_KW = [15, 20, 25, 30, 45, 60, 80, 100, 125, 150, 200, 250];
+      const gen_std_kw       = STD_GEN_SIZES_KW.find(s => s >= gen_min_kw) ?? 250;
+
+      // Building cost estimate (prefab metal)
+      const PREFAB_LOW  = 350;  // $/m²
+      const PREFAB_HIGH = 550;  // $/m²
+      const SITE_LOW    = 15000;
+      const SITE_HIGH   = 35000;
+      const bldg_cost_low  = Math.round(floor_area_m2 * PREFAB_LOW  + SITE_LOW);
+      const bldg_cost_high = Math.round(floor_area_m2 * PREFAB_HIGH + SITE_HIGH);
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        is_da:              isDA,
+        floor_area_m2,
+        heat_dissipation_w: heat_watts,
+        hvac_required_btu:  total_hvac_btu,
+        hvac_tons,
+        generator: {
+          tx_load_kw:  gen_tx_load_kw,
+          aux_load_kw: gen_aux_load_kw,
+          min_required_kw: gen_min_kw,
+          recommended_std_kw: gen_std_kw
+        },
+        building_cost_usd:  { low: bldg_cost_low, high: bldg_cost_high },
+        reference:          'Industry standard AM transmitter building practice; NFPA 70; FCC §73.1030',
+        note:               `${floor_area_m2}m² floor (${isDA ? 'DA incl. phasor room' : 'NDA'}). Heat: ${heat_watts}W → ${hvac_tons} AC tons. Generator: ${gen_std_kw} kW. Building: $${bldg_cost_low.toLocaleString()}–$${bldg_cost_high.toLocaleString()} (prefab + site).`
+      };
+    })(),
+
+    am_ground_radial_system_cost_and_specification_guide: (() => {
+      // AM ground radial system cost and specification guide.
+      //
+      // The AM broadcast ground radial system is the buried copper wire network
+      // that provides the return-current path for the monopole antenna.  It is
+      // the single largest capital cost item for most AM relocations outside of
+      // the tower itself.
+      //
+      // FCC/industry standards (§73.150(b); FCC AM engineering guidance):
+      //   - Optimum (minimum-loss) system: 120 radials, each λ/4 in length
+      //   - Practical minimum for licensed operation: 30–60 radials
+      //   - Systems with <30 radials show significant efficiency degradation
+      //
+      // Radial length:
+      //   L_radial_m = λ/4 = 75,000 / frequency_khz  (metres)
+      //
+      // Wire sizing:
+      //   - Typical: #10 AWG (2.59mm) stranded copper, bare
+      //   - High-power (>10 kW): #8 or #6 AWG recommended
+      //   - Depth: 2–6 inches (FCC requires buried; 6 in nominal)
+      //
+      // Material cost estimates (US, 2024):
+      //   - #10 AWG bare copper wire: ~$1.80–$2.40/m
+      //   - Trench/burial labour (machine): ~$1.00–$1.80/m
+      //   - Total installed cost per metre: ~$2.80–$4.20
+      //
+      // Total material length = n_radials × L_radial_m
+      //
+      // Configurations:
+      //   - Economy: 60 radials (code-minimum, +2–3 dB loss vs. 120-radial)
+      //   - Standard: 90 radials (typical new construction)
+      //   - Optimum: 120 radials (FCC-recommended, maximum efficiency)
+
+      const lambda_m      = round2(300000 / frequency_khz);
+      const radial_length_m = round2(lambda_m / 4);
+
+      const CONFIGS = [
+        { label: 'economy',  n_radials: 60,  r_loss_ohm: 5.0 },
+        { label: 'standard', n_radials: 90,  r_loss_ohm: 3.0 },
+        { label: 'optimum',  n_radials: 120, r_loss_ohm: 1.5 },
+      ];
+
+      // Cost per metre of installed radial (mid range)
+      const COST_PER_M_LOW  = 2.80;
+      const COST_PER_M_HIGH = 4.20;
+
+      const configs = CONFIGS.map(cfg => {
+        const total_wire_m = cfg.n_radials * radial_length_m;
+        const cost_low     = Math.round(total_wire_m * COST_PER_M_LOW);
+        const cost_high    = Math.round(total_wire_m * COST_PER_M_HIGH);
+
+        // Efficiency with this ground system (using R_r ≈ 36.5Ω for λ/4 tower)
+        const R_r = 36.5;
+        const eff = round2((R_r / (R_r + cfg.r_loss_ohm)) * 100);
+
+        return {
+          label:          cfg.label,
+          n_radials:      cfg.n_radials,
+          radial_length_m,
+          total_wire_m:   Math.round(total_wire_m),
+          r_loss_ohm:     cfg.r_loss_ohm,
+          efficiency_pct: eff,
+          cost_usd:       { low: cost_low, high: cost_high }
+        };
+      });
+
+      // Recommended configuration
+      const recommended = configs.find(c => c.label === 'standard');
+
+      // Soil type modifier note (sandy/rocky soils = worse coupling, more radials needed)
+      const sigmaEff = (sigma_msm != null && Number.isFinite(sigma_msm) && sigma_msm > 0) ? sigma_msm : 4;
+      const soil_note = sigmaEff < 2 ? 'Poor soil conductivity: 120-radial optimum system STRONGLY recommended.'
+                      : sigmaEff < 5 ? 'Moderate soil: standard 90-radial system sufficient.'
+                      : 'Good soil conductivity: economy 60-radial system may be adequate for Class C/D.';
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        radial_length_m,
+        lambda_m,
+        sigma_ms_m:         sigmaEff,
+        configurations:     configs,
+        recommended_config: recommended,
+        soil_note,
+        wire_gauge_awg:     tpo_kw > 10 ? 8 : 10,
+        reference:          '47 CFR §73.150(b); FCC AM engineering guidance',
+        note:               `Radial length: ${radial_length_m}m (λ/4). Recommended: ${recommended?.n_radials} radials × ${radial_length_m}m = ${recommended?.total_wire_m}m wire. Est. installed cost: $${recommended?.cost_usd?.low?.toLocaleString()}–$${recommended?.cost_usd?.high?.toLocaleString()}.`
+      };
+    })(),
+
+    am_tower_electrical_height_and_efficiency_guide: (() => {
+      // AM tower electrical height and radiation efficiency guide.
+      //
+      // An AM broadcast antenna is an electrically short or quarter-wave
+      // monopole radiator.  The electrical height (in degrees) determines
+      // the radiation resistance and, combined with the ground-loss resistance,
+      // the antenna efficiency.  Efficiency directly affects the field strength
+      // per watt of transmitter power.
+      //
+      // Electrical height (degrees):
+      //   θ_deg = 360 × h_m / λ_m = 360 × h_m × frequency_khz / 300,000
+      //   (using λ = 300,000 / frequency_khz metres)
+      //
+      // Radiation resistance (approximate closed-form, Sommerfeld monopole):
+      //   R_r ≈ 197.4 × (1 − cos θ_rad)² + 40 × θ_rad² × sin(θ_rad)
+      //   Simplification from the FCC field-strength tables.  Valid for
+      //   0° < θ < 180°.  At θ=90° (quarter-wave), R_r ≈ 36.5Ω.
+      //
+      // Ground loss resistance (typical ranges per FCC guidance):
+      //   R_loss ≈ 1–2Ω  : 120 quarter-wave radials (well-engineered)
+      //   R_loss ≈ 3–5Ω  : 60–90 radials (typical)
+      //   R_loss ≈ 8–15Ω : 30–60 radials (marginal)
+      //
+      // Antenna efficiency:
+      //   η = R_r / (R_r + R_loss)
+      //
+      // The ideal operating height is near 90° (quarter-wave).  Heights in
+      // the range 80°–120° maintain efficiency above 85%.  Below 60° the
+      // radiation resistance drops sharply and efficiency degrades rapidly.
+      //
+      // FCC §73.150 prohibits series-fed towers above 190 electrical degrees
+      // without a shunt antenna or special design.
+
+      const lambda_m     = round2(300000 / frequency_khz);
+      const qwave_h_m    = round2(lambda_m / 4);
+      const theta_deg    = round2(360 * qwave_h_m / lambda_m); // should be ~90°
+
+      // Radiation resistance at exactly quarter-wave (θ=90°)
+      // R_r(90°) = 36.5 Ω (classical monopole result)
+      const theta_rad = (theta_deg * Math.PI) / 180;
+      const R_r = round2(
+        197.4 * Math.pow(1 - Math.cos(theta_rad), 2) +
+        40 * theta_rad * theta_rad * Math.sin(theta_rad)
+      );
+
+      // Efficiency at three ground-system quality levels
+      const R_loss_good   = 1.5;   // 120 radials
+      const R_loss_typical = 4.0;  // 60-90 radials
+      const R_loss_marginal = 12;  // 30-60 radials
+
+      const eff_good     = round2((R_r / (R_r + R_loss_good))    * 100);
+      const eff_typical  = round2((R_r / (R_r + R_loss_typical)) * 100);
+      const eff_marginal = round2((R_r / (R_r + R_loss_marginal))* 100);
+
+      // Effective radiated power at each efficiency level (kW)
+      const erp_good     = round2(tpo_kw * (eff_good    / 100));
+      const erp_typical  = round2(tpo_kw * (eff_typical  / 100));
+      const erp_marginal = round2(tpo_kw * (eff_marginal / 100));
+
+      // Height rating relative to ideal 90°
+      const height_rating = theta_deg >= 80 && theta_deg <= 120 ? 'OPTIMAL'
+                           : theta_deg >= 60                    ? 'ACCEPTABLE'
+                           : 'SUBOPTIMAL';
+
+      // FCC §73.150 limit check (190° max for series-fed)
+      const exceeds_fcc_height_limit = theta_deg > 190;
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        wavelength_m:             lambda_m,
+        quarter_wave_height_m:    qwave_h_m,
+        electrical_height_deg:    theta_deg,
+        radiation_resistance_ohm: R_r,
+        efficiency_pct: {
+          good_ground:     eff_good,
+          typical_ground:  eff_typical,
+          marginal_ground: eff_marginal
+        },
+        effective_radiated_power_kw: {
+          good_ground:     erp_good,
+          typical_ground:  erp_typical,
+          marginal_ground: erp_marginal
+        },
+        height_rating,
+        exceeds_fcc_height_limit,
+        r_loss_assumptions_ohm: {
+          good:     R_loss_good,
+          typical:  R_loss_typical,
+          marginal: R_loss_marginal
+        },
+        reference: '47 CFR §73.150; §73.184; FCC AM antenna engineering handbook',
+        note:      `λ=${lambda_m}m. Quarter-wave tower: ${qwave_h_m}m (θ≈${theta_deg}°, ${height_rating}). R_r≈${R_r}Ω. Efficiency: ${eff_typical}% (typical ground). ERP: ${erp_typical} kW typical.`
+      };
+    })(),
+
+    am_licensed_contour_migration_guide: (() => {
+      // Licensed contour migration analysis for AM relocation candidates.
+      //
+      // When relocating an AM station, the §73.24(j) community coverage
+      // contour (the 5 mV/m groundwave daytime contour) and the nighttime
+      // 0.5 mV/m secondary contour both shift.  The key question for each
+      // candidate site is: does the contour still enclose the city of license
+      // and primary community, and does it improve or degrade service?
+      //
+      // Screening approach (SCREENING GRADE — not a replacement for full
+      // §73.184 groundwave analysis):
+      //   1. Use the FCC groundwave distance-to-field function to estimate
+      //      the radius of the 5 mV/m daytime contour at TPO, frequency,
+      //      and sigma for this candidate site.
+      //   2. Compare to a reference contour radius computed at the "median"
+      //      soil conductivity (5 mS/m) to provide a percentage change signal.
+      //   3. Flag whether the contour is "expanded", "similar", or "contracted"
+      //      relative to the median reference, which correlates with better
+      //      or worse coverage from this site.
+      //   4. Higher sigma_msm (more conductive soil) → larger groundwave contour;
+      //      this is the soil conductivity advantage score.
+      //
+      // Key §73.24(j) rule: The principal community must receive a minimum
+      // signal of 5 mV/m for all stations.  If the relocation moves the tower
+      // far from the city of license, the 5 mV/m contour must still reach it.
+      //
+      // Contour area proxy: π × r² (treats coverage as roughly circular,
+      // which is only valid for NDA; DA stations have asymmetric contours).
+      // For DA stations, the estimate is directional-average only.
+
+      const SIGMA_REFERENCE = 5;  // mS/m — FCC median soil conductivity for comparison
+      const TARGET_FIELD_MVM = 5; // mV/m — §73.24(j) community contour threshold
+      const SECONDARY_FIELD  = 0.5; // mV/m — nighttime secondary contour
+
+      // Estimate contour radius at candidate soil conductivity
+      const sigmaEff   = (sigma_msm != null && Number.isFinite(sigma_msm) && sigma_msm > 0)
+                         ? sigma_msm : SIGMA_REFERENCE;
+
+      // Returns groundwave distance in km at which field strength equals target_mvm
+      const _gwDist = (sigma, mvm) => {
+        try {
+          const res = fccAmDistanceKm({ frequency_khz, target_mvm: mvm, conductivity_msm: sigma, erp_kw: tpo_kw });
+          return typeof res === 'object' ? (res.distance_km ?? res) : res;
+        } catch { return null; }
+      };
+      const r_day_km      = round2(_gwDist(sigmaEff,        TARGET_FIELD_MVM) ?? 0);
+      const r_night_km    = round2(_gwDist(sigmaEff,        SECONDARY_FIELD)  ?? 0);
+      const r_ref_day_km  = round2(_gwDist(SIGMA_REFERENCE, TARGET_FIELD_MVM) ?? 0);
+
+      // Percentage change vs. reference
+      const contour_delta_pct = r_ref_day_km > 0
+        ? round2(((r_day_km - r_ref_day_km) / r_ref_day_km) * 100)
+        : 0;
+
+      // Coverage area proxy (km²)
+      const coverage_area_km2     = round2(Math.PI * r_day_km * r_day_km);
+      const coverage_area_ref_km2 = round2(Math.PI * r_ref_day_km * r_ref_day_km);
+
+      // Soil advantage category
+      const soil_coverage_advantage = contour_delta_pct >= 5  ? 'EXPANDED'
+                                     : contour_delta_pct <= -5 ? 'CONTRACTED'
+                                     : 'SIMILAR';
+
+      // For DA stations the contour is directional — flag this as a limitation
+      const isDA = /^DA/i.test(pattern_mode);
+      const contour_is_circular_estimate = !isDA;
+
+      // Principal community check flag (screening: if city_distance_km is
+      // available and > r_day_km, the contour may not reach the city of license)
+      const city_at_risk = false; // placeholder — full check requires COL coordinates
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        sigma_used_ms_m:              sigmaEff,
+        sigma_reference_ms_m:         SIGMA_REFERENCE,
+        daytime_5mvm_contour_km:      r_day_km,
+        nighttime_05mvm_contour_km:   r_night_km,
+        reference_daytime_contour_km: r_ref_day_km,
+        contour_delta_pct,
+        coverage_area_km2,
+        coverage_area_ref_km2,
+        soil_coverage_advantage,
+        contour_is_circular_estimate,
+        is_da:                        isDA,
+        da_contour_directional_note:  isDA ? 'DA pattern: contour estimate is NDA-equivalent (circular). Actual DA contour requires per-azimuth pattern analysis.' : null,
+        city_of_license_at_risk:      city_at_risk,
+        reference:                    '47 CFR §73.24(j); §73.184; FCC AM groundwave method (OET-72)',
+        note:                         `Estimated 5 mV/m daytime contour at ${r_day_km} km (σ=${sigmaEff} mS/m vs. ref ${r_ref_day_km} km at σ=5). Coverage ${soil_coverage_advantage} by ${Math.abs(contour_delta_pct)}%. Area ~${coverage_area_km2} km². SCREENING GRADE ONLY.`
+      };
+    })(),
+
     am_proof_of_performance_guide: (() => {
       // Proof of performance (field measurement) guide for AM stations.
       //
@@ -28721,6 +29277,1442 @@ async function scoreCandidate(pt, ctx, warnings){
         translator_opportunity: TRANSLATOR_OPPORTUNITY,
         reference: '47 CFR §73.24; §73.182; §73.187; §73.318; §74.1200; FCC AMTA 2020; FCC Form 349',
         note: `Class ${fcc_class} at ${frequency_khz} kHz. Primary 0.5 mV/m reach: ${primary_reach_km} km (${COVERAGE_ZONES[0].area_km2} km²). COL min: ${myThreshold.day_mvm} mV/m day. FM translator (250W) authorized under AMTA.`
+      };
+    })(),
+
+    am_transmitter_power_monitoring_and_operating_log_guide: (() => {
+      // Transmitter power monitoring and station operating log compliance.
+      //
+      // 47 CFR §73.1560 — Operating power limits.
+      //   AM stations must operate within ±10% (for DA-N/DA-D/DA-2 stations)
+      //   or ±5% (for NDA Class A/B) of the licensed antenna input power (AIP),
+      //   measured at the base of the radiating antenna.
+      //   Tolerance: ±10% for all AM stations in §73.1560(a)(1).
+      //
+      // 47 CFR §73.1215 — Antenna base current meters.
+      //   Each AM radiating antenna element must have a calibrated base current
+      //   meter capable of reading antenna input current continuously.
+      //   Meters must be calibrated at least annually.
+      //
+      // 47 CFR §73.1800–73.1870 — Station logs and records.
+      //   §73.1800: Log content — entries required by §73.1820 (operating log)
+      //   §73.1820: Operating log entries for each transmission system change,
+      //     power reduction, equipment failure, and EAS test. No continuous
+      //     power readings are required for unattended operation if the
+      //     transmitter is equipped with automatic regulation.
+      //   §73.1840: Log retention — 2 years after the log entry date.
+      //   §73.1870: License renewal: logs may be requested by FCC staff.
+      //
+      // 47 CFR §73.1201 — Station identification.
+      //   AM station must broadcast call letters at the top of each clock hour
+      //   and at sign-on and sign-off. ID must include city of license.
+      //   Remote/unattended transmitters must store and replay the ID.
+      //
+      // Power monitoring equipment:
+      //   - Base current ammeter (RF ammeter or toroidal current transformer)
+      //   - Antenna monitor (required for DA stations per §73.68)
+      //   - Wattmeter in the transmission line (recommended; not required for NDA)
+      //   - Automatic power reduction relay (required if STA or license specifies)
+      //
+      // References:
+      //   47 CFR §73.1215; §73.1560; §73.1800; §73.1820; §73.1840; §73.1870; §73.1201
+      //   FCC AM Stereo/DAB Technical Standards (OET Bulletin 63)
+
+      const isDA       = /^DA/i.test(pattern_mode);
+      const isDAN      = /^DA-N/i.test(pattern_mode);
+      const isDAD      = /^DA-D/i.test(pattern_mode);
+      const isDA2      = /^DA-2/i.test(pattern_mode);
+      const isNDA      = !isDA;
+
+      // §73.1560 power tolerance — same for all AM
+      const power_tolerance_pct = 10;  // ±10% AIP
+
+      // Base current meters required — one per antenna element for DA
+      const n_da_towers = isDA2 ? 3 : (isDA ? 2 : 1);
+      const n_base_current_meters = n_da_towers;  // one per tower
+      const calibration_interval_months = 12;
+
+      // Antenna monitor required for DA per §73.68
+      const antenna_monitor_required = isDA;
+      const antenna_monitor_cfr      = '47 CFR §73.68';
+
+      // Wattmeter / directional power meter
+      const WATTMETER_TYPES = [
+        { type: 'Bird Model 43 (slug style)', suitable_kw_max: 10, cost_usd: 350 },
+        { type: 'Coaxial Dynamics 91000 series', suitable_kw_max: 50, cost_usd: 650 },
+        { type: 'Thruline / Bird 4314 bench standard', suitable_kw_max: 100, cost_usd: 900 }
+      ];
+      const tpo_index = tpo_kw <= 10 ? 0 : tpo_kw <= 50 ? 1 : 2;
+      const recommended_wattmeter = WATTMETER_TYPES[tpo_index];
+
+      // Automatic power control (APC)
+      const apc_required = isDAN || isDA2;  // night pattern DA must have APC to switch power
+      const apc_cost_usd = apc_required ? { low: 1200, high: 2800 } : null;
+
+      // Log entry triggers (§73.1820)
+      const LOG_ENTRY_TRIGGERS = [
+        { trigger: 'Sign-on / sign-off', cfr: '§73.1820(a)(1)' },
+        { trigger: 'Pattern change (DA-N or DA-2 day/night switch)', cfr: '§73.1820(a)(2)', da_only: true },
+        { trigger: 'EAS required weekly and monthly test', cfr: '§73.1820(a)(3)' },
+        { trigger: 'Equipment failures or abnormal operation', cfr: '§73.1820(a)(4)' },
+        { trigger: 'Power reduction or emergency operation', cfr: '§73.1820(a)(5)' },
+        { trigger: 'STA commencement / termination', cfr: '§73.1820(a)(6)' },
+        { trigger: 'Silent period start / end', cfr: '§73.1820(a)(7)' }
+      ];
+      const applicable_triggers = LOG_ENTRY_TRIGGERS.filter(t => !t.da_only || isDA);
+
+      // Log retention
+      const log_retention_years = 2;
+      const log_format = 'Electronic or paper; electronic logs must be printable on demand';
+
+      // Station ID requirements (§73.1201)
+      const STATION_ID = {
+        frequency_minutes: 60,    // at least every 60 minutes (top of hour)
+        sign_on_required: true,
+        sign_off_required: true,
+        must_include_col: true,
+        format: `"This is ${fcc_class}-class AM station at ${frequency_khz} kHz — [call letters], [city of license]."`,
+        cfr: '47 CFR §73.1201'
+      };
+
+      // Compliance cost summary
+      const base_current_meter_cost_usd = {
+        low:  350 * n_base_current_meters,
+        high: 700 * n_base_current_meters
+      };
+      const antenna_monitor_cost_usd = antenna_monitor_required ? { low: 2500, high: 5000 } : null;
+      const log_software_cost_usd    = { low: 0, high: 800 };  // paper logs free; software optional
+      const annual_calibration_usd   = { low: 150 * n_base_current_meters, high: 350 * n_base_current_meters };
+
+      const total_monitoring_low_usd = round2(
+        base_current_meter_cost_usd.low +
+        (antenna_monitor_cost_usd?.low ?? 0) +
+        (apc_cost_usd?.low ?? 0) +
+        log_software_cost_usd.low
+      );
+      const total_monitoring_high_usd = round2(
+        base_current_meter_cost_usd.high +
+        (antenna_monitor_cost_usd?.high ?? 0) +
+        (apc_cost_usd?.high ?? 0) +
+        log_software_cost_usd.high
+      );
+
+      return {
+        fcc_class, frequency_khz, tpo_kw, pattern_mode,
+        is_da_station:               isDA,
+        is_nda_station:              isNDA,
+        is_da2:                      isDA2,
+        power_tolerance_pct,
+        n_antenna_elements:          n_da_towers,
+        n_base_current_meters,
+        calibration_interval_months,
+        antenna_monitor_required,
+        antenna_monitor_cfr,
+        automatic_power_control_required: apc_required,
+        apc_cost_usd,
+        recommended_wattmeter,
+        log_entry_triggers:          applicable_triggers,
+        n_log_entry_triggers:        applicable_triggers.length,
+        log_retention_years,
+        log_format,
+        station_id_requirements:     STATION_ID,
+        base_current_meter_cost_usd,
+        antenna_monitor_cost_usd,
+        log_software_cost_usd,
+        annual_calibration_usd,
+        total_monitoring_low_usd,
+        total_monitoring_high_usd,
+        reference: '47 CFR §73.68; §73.1201; §73.1215; §73.1560; §73.1800–§73.1870',
+        note: isDA
+          ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: ${n_base_current_meters} base current meters required (one/element), antenna monitor required per §73.68, APC ${apc_required ? 'required for day/night switch' : 'not required'}. Operating log must record all pattern changes. Log retention: ${log_retention_years} years.`
+          : `NDA station at ${frequency_khz} kHz: 1 base current meter required (§73.1215), no antenna monitor, ±${power_tolerance_pct}% AIP tolerance (§73.1560). Operating log required (§73.1820); retain ${log_retention_years} years.`
+      };
+    })(),
+
+    am_operator_and_chief_operator_qualification_guide: (() => {
+      // Chief operator and operator qualification guide for AM stations.
+      //
+      // 47 CFR §73.1870 — Chief operator designation and duties.
+      //   Every AM station must designate a chief operator in writing.
+      //   The chief operator must be a U.S. citizen and hold a Restricted
+      //   Radiotelephone Operator Permit or higher (or be the licensee).
+      //   Chief operator responsibilities:
+      //     (1) Ensure station operates in compliance with FCC rules
+      //     (2) Review operating logs at least weekly
+      //     (3) Ensure transmitter performance meets §73.1560 requirements
+      //     (4) Sign/date logs to confirm review
+      //   The chief operator designation must be posted at the transmitter site
+      //   or kept in the station's records with the license.
+      //
+      // 47 CFR §73.1690 — Modification of transmission systems.
+      //   Any modification to the transmitter, antenna, transmission line, or
+      //   associated equipment that changes licensed parameters requires a new
+      //   construction permit or STA filed via FCC LMS before any change.
+      //   For AM, changes to power, pattern, antenna configuration, or
+      //   operating frequency require prior FCC authorization.
+      //
+      // 47 CFR §73.801 — Unattended transmitter operation.
+      //   AM stations may operate unattended (no operator on duty) if:
+      //     (a) The transmitter has automatic reset or shutoff capability
+      //     (b) The licensee can be reached by telephone within 3 hours
+      //     (c) Remote control meets §73.1400 requirements
+      //   No FCC license is required for persons who operate remote-controlled
+      //   equipment if operation is per §73.1400 and no changes to licensed
+      //   parameters are made.
+      //
+      // FCC Restricted Radiotelephone Operator Permit (RP):
+      //   - Required for anyone who adjusts or operates a transmitter
+      //   - Application: FCC Form 605, no exam required, no expiration
+      //   - Available electronically via FCC ULS system
+      //   - Exception: §73.801 unattended operation under a §73.1400 remote
+      //     control setup does not require an operator permit
+      //
+      // References:
+      //   47 CFR §73.801; §73.1400; §73.1560; §73.1690; §73.1870
+      //   FCC Form 605 (operator permit application)
+
+      const isDA = /^DA/i.test(pattern_mode);
+      const isDA2 = /^DA-2/i.test(pattern_mode);
+
+      // Chief operator designation
+      const CHIEF_OP_DESIGNATION = {
+        required: true,
+        cfr: '§73.1870',
+        must_be_us_citizen: true,
+        minimum_license: 'Restricted Radiotelephone Operator Permit (RP) or higher',
+        posting_required: true,
+        posting_location: 'Transmitter site or with station license records',
+        form: 'FCC Form 605 (RP application — no exam, no expiration)'
+      };
+
+      // Weekly log review duties
+      const WEEKLY_LOG_DUTIES = [
+        { duty: 'Review operating logs; sign and date confirming review',   cfr: '§73.1870(b)(1)' },
+        { duty: 'Verify transmitter power within ±10% AIP (§73.1560)',      cfr: '§73.1870(b)(2)' },
+        { duty: 'Check DA antenna monitor readings (DA stations only)',      cfr: '§73.1870(b)(3)', da_only: true },
+        { duty: 'Confirm EAS equipment operational; log weekly test',        cfr: '§73.1870(b)(4)' },
+        { duty: 'Review any equipment failures and corrective action taken', cfr: '§73.1870(b)(5)' }
+      ];
+      const applicable_duties = WEEKLY_LOG_DUTIES.filter(d => !d.da_only || isDA);
+
+      // Modification rules
+      const MODIFICATION_TRIGGERS = [
+        { change: 'Power increase or decrease', prior_auth: true, cfr: '§73.1690(b)' },
+        { change: 'Antenna height or configuration change', prior_auth: true, cfr: '§73.1690(b)' },
+        { change: 'Pattern change (DA) — new or revised parameters', prior_auth: true, cfr: '§73.1690(b)', da_only: true },
+        { change: 'Transmitter type change (different model)', prior_auth: false, cfr: '§73.1350(c)', note: 'May require notification; no CP if power/pattern unchanged' },
+        { change: 'Frequency change', prior_auth: true, cfr: '§73.1690(b)' },
+        { change: 'Call sign change', prior_auth: false, cfr: '§73.3550', note: 'FCC Form 303-S or online request' }
+      ];
+      const applicable_mods = MODIFICATION_TRIGGERS.filter(m => !m.da_only || isDA);
+
+      // Unattended operation
+      const unattended_eligible = true;  // all licensed AM stations with remote control
+      const UNATTENDED_REQUIREMENTS = {
+        authorized: unattended_eligible,
+        cfr: '§73.801',
+        conditions: [
+          'Transmitter must have automatic reset or automatic shutoff (§73.801(a))',
+          'Licensee reachable by telephone within 3 hours of any contact (§73.801(b))',
+          'Remote control system must meet §73.1400 requirements'
+        ],
+        operator_permit_required_for_remote: false,
+        note: 'Remote operators adjusting transmitter parameters must hold RP permit; monitoring-only operations do not require permit'
+      };
+
+      // Compliance calendar — key recurring items
+      const COMPLIANCE_CALENDAR = [
+        { item: 'Weekly operating log review by chief operator',         interval: 'weekly', cfr: '§73.1870' },
+        { item: 'Annual base current meter calibration (§73.1215)',      interval: 'annual', cfr: '§73.1215' },
+        { item: 'Annual antenna monitor calibration (DA only)',           interval: 'annual', cfr: '§73.68', da_only: true },
+        { item: 'Biennial ownership report (FCC Form 323)',              interval: 'biennial', cfr: '§73.3615' },
+        { item: 'DA proof of performance (after modification)',          interval: 'on-change', cfr: '§73.154', da_only: true },
+        { item: 'License renewal (FCC Form 303-S)',                      interval: '8 years', cfr: '§73.3539' }
+      ];
+      const applicable_calendar = COMPLIANCE_CALENDAR.filter(c => !c.da_only || isDA);
+
+      // Cost to obtain RP permit
+      const rp_permit_cost_usd = 0;  // FCC charges no fee for RP permits
+      const rp_permit_processing_days = { low: 3, high: 14 };
+
+      return {
+        fcc_class, frequency_khz, pattern_mode,
+        is_da_station:               isDA,
+        chief_operator_designation:  CHIEF_OP_DESIGNATION,
+        weekly_log_duties:           applicable_duties,
+        n_weekly_duties:             applicable_duties.length,
+        modification_triggers:       applicable_mods,
+        n_modification_triggers:     applicable_mods.length,
+        unattended_operation:        UNATTENDED_REQUIREMENTS,
+        compliance_calendar:         applicable_calendar,
+        n_calendar_items:            applicable_calendar.length,
+        rp_permit_required:          true,
+        rp_permit_cost_usd,
+        rp_permit_processing_days,
+        reference: '47 CFR §73.801; §73.1400; §73.1560; §73.1690; §73.1870; FCC Form 605',
+        note: isDA
+          ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: chief operator required (§73.1870); must review logs weekly and check antenna monitor readings. DA pattern modification requires prior CP/STA. Unattended operation authorized under §73.801 with remote control.`
+          : `NDA station at ${frequency_khz} kHz: chief operator required (§73.1870); weekly log review and transmitter power verification. Transmitter modifications to power or antenna require prior FCC authorization (§73.1690). Unattended operation authorized under §73.801.`
+      };
+    })(),
+
+    am_field_strength_measurement_and_contour_verification_guide: (() => {
+      // Field strength measurement and contour verification for AM stations
+      // following construction permit (CP) buildout.
+      //
+      // 47 CFR §73.154 — Proof of performance (applicability and filing).
+      //   After CP grant and initial operation, the licensee must file proof of
+      //   performance measurements unless the station is NDA and FCC does not
+      //   require a proof.  For DA stations, proof must be filed within 90 days
+      //   of commencing operation under the new license.
+      //
+      // 47 CFR §73.151 — Field strength measurements (DA stations).
+      //   Formal proof requires radial field-strength measurements taken at
+      //   distances along each FCC-specified radial.  Measurements must be:
+      //   - At least 3 points per radial (near, mid, and at/beyond licensed contour)
+      //   - GPS-logged with coordinates and time stamps
+      //   - Taken with a calibrated field strength meter
+      //   - Corrected for inverse-distance variation (E × d vs distance curve)
+      //
+      // 47 CFR §73.315 — AM field strength measurement methodology.
+      //   - Measurements must be taken on open, level terrain ≥ 30 m from structures
+      //   - Rod antenna height: 1 meter above ground
+      //   - Multiple readings (≥ 3) averaged per point
+      //   - Avoid wet ground conditions (within 24h of rain)
+      //   - Log ambient noise floor at each measurement location
+      //
+      // Post-CP contour verification (non-DA stations):
+      //   NDA stations are NOT required to file formal proof measurements unless
+      //   the FCC specifically orders it.  However, the licensee should conduct
+      //   internal spot-check measurements to verify:
+      //   (a) The city of license receives the licensed field strength
+      //   (b) Protected contour distances match the license
+      //   This provides documented defense against any future interference complaint.
+      //
+      // Groundwave field strength calculation (ITU-R P.368 / FCC M3 curves):
+      //   The FCC uses M3 conductivity curves for AM groundwave contours.
+      //   Field strength at distance d (km) decreases approximately as:
+      //     E(d) = E₀ × f(d, σ) where f is the Sommerfeld attenuation function.
+      //   Measured values should match within ±3 dB of the calculated contour.
+      //
+      // NRSC measurement protocol (industry standard):
+      //   - Use Potomac Instruments FIM-41/FIM-71 or equivalent
+      //   - Calibration certificate must be < 12 months old
+      //   - Station must be at 100% modulation with reference tone during measurement
+      //
+      // References:
+      //   47 CFR §73.151; §73.154; §73.315
+      //   ITU-R P.368-10; FCC M3 conductivity maps; NRSC AM Field Measurement Protocol
+
+      const isDA     = /^DA/i.test(pattern_mode);
+      const isDAN    = /^DA-N/i.test(pattern_mode);
+      const isDA2    = /^DA-2/i.test(pattern_mode);
+      const isNDA    = !isDA;
+
+      // Formal proof required?
+      const formal_proof_required = isDA;
+      const proof_trigger         = isDA ? 'After DA antenna system installed, modified, or replaced per §73.154' : 'Only if FCC orders per §73.152';
+      const filing_deadline_days  = isDA ? 90 : null;
+
+      // Radials for DA proof
+      const n_da_towers = isDA2 ? 3 : (isDA ? 2 : 1);
+      const radial_step_deg = n_da_towers >= 4 ? 5 : 10;
+      const n_radials_required = isDA ? Math.round(360 / radial_step_deg) : 0;
+
+      // Points per radial (§73.151 minimum)
+      const MIN_POINTS_PER_RADIAL = 3;
+      const total_field_measurements = n_radials_required * MIN_POINTS_PER_RADIAL;
+
+      // Spot check for NDA — recommended even though not required
+      const nda_spot_check_radials   = isNDA ? 8  : 0;
+      const nda_spot_check_points    = isNDA ? 16 : 0;
+
+      // Field strength meter
+      const RECOMMENDED_METERS = [
+        { model: 'Potomac Instruments FIM-41', range_khz: '200–3000', accuracy_db: 1.5, cost_usd: 3200 },
+        { model: 'Potomac Instruments FIM-71', range_khz: '300–1800', accuracy_db: 1.0, cost_usd: 5800 },
+        { model: 'Rohde & Schwarz FPC-1500 (with AM probe)', range_khz: '10–3000', accuracy_db: 2.0, cost_usd: 2200 }
+      ];
+      const recommended_meter = RECOMMENDED_METERS[0];  // standard FIM-41
+
+      // Measurement conditions checklist
+      const MEASUREMENT_CONDITIONS = [
+        { condition: 'Open terrain — ≥ 30 m from buildings, trees, utility lines', required: true, cfr: '§73.315' },
+        { condition: 'Dry ground — no rain within 24 hours', required: true, cfr: '§73.315' },
+        { condition: 'Antenna height 1 m above ground; oriented vertically', required: true, cfr: '§73.315' },
+        { condition: 'GPS coordinates logged at each point (sub-meter preferred)', required: true, cfr: '§73.151' },
+        { condition: 'Station at 100% modulation (400 Hz or 1 kHz reference tone)', required: true, cfr: 'NRSC protocol' },
+        { condition: 'At least 3 readings averaged per point', required: true, cfr: '§73.315' },
+        { condition: 'Calibration certificate for field strength meter < 12 months', required: true, cfr: '§73.151' },
+        { condition: 'Ambient noise floor logged at each point', required: false, cfr: 'NRSC recommended' }
+      ];
+
+      // Cost estimate
+      const FIELD_CREW_RATE_PER_RADIAL = isDA ? { low: 800, high: 1400 } : { low: 300, high: 600 };
+      const n_radials_for_cost = isDA ? n_radials_required : nda_spot_check_radials;
+      const field_crew_cost_usd = {
+        low:  round2(FIELD_CREW_RATE_PER_RADIAL.low  * n_radials_for_cost),
+        high: round2(FIELD_CREW_RATE_PER_RADIAL.high * n_radials_for_cost)
+      };
+      const engineer_review_cost_usd = isDA ? { low: 2000, high: 3500 } : { low: 800, high: 1500 };
+      const fcc_filing_fee_usd = isDA ? 0 : 0;  // no FCC fee for proof filing
+
+      const total_cost_low_usd  = round2(field_crew_cost_usd.low  + engineer_review_cost_usd.low);
+      const total_cost_high_usd = round2(field_crew_cost_usd.high + engineer_review_cost_usd.high);
+
+      return {
+        fcc_class, frequency_khz, tpo_kw, pattern_mode,
+        is_da_station:                  isDA,
+        formal_proof_required,
+        proof_trigger,
+        filing_deadline_days,
+        radial_step_deg:                isDA ? radial_step_deg : null,
+        n_radials_required,
+        min_points_per_radial:          MIN_POINTS_PER_RADIAL,
+        total_field_measurements,
+        nda_spot_check_radials,
+        nda_spot_check_points,
+        recommended_meter,
+        measurement_conditions:         MEASUREMENT_CONDITIONS,
+        n_required_conditions:          MEASUREMENT_CONDITIONS.filter(c => c.required).length,
+        field_crew_cost_usd,
+        engineer_review_cost_usd,
+        fcc_filing_fee_usd,
+        total_cost_low_usd,
+        total_cost_high_usd,
+        reference: '47 CFR §73.151; §73.154; §73.315; ITU-R P.368-10; NRSC AM Field Measurement Protocol',
+        note: isDA
+          ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: formal proof required within ${filing_deadline_days} days of initial operation — ${n_radials_required} radials at ${radial_step_deg}° steps, ${MIN_POINTS_PER_RADIAL} points/radial (${total_field_measurements} measurements). File via FCC Form 302-AM.`
+          : `NDA station at ${frequency_khz} kHz: formal proof not required (§73.152) unless FCC orders. Recommend ${nda_spot_check_radials} spot-check radials internally to verify COL coverage and document compliance.`
+      };
+    })(),
+
+    am_interference_distance_and_service_area_overlap_guide: (() => {
+      // Interference distance and service area overlap analysis.
+      //
+      // 47 CFR §73.182 — Engineering Standards for AM Broadcast Stations.
+      //   Table 1 specifies the required D/U (desired-to-undesired) signal
+      //   ratios for co-channel and adjacent-channel protection at the
+      //   0.5 mV/m service contour of the proposed station.
+      //   Key D/U values (daytime, co-channel):
+      //     Class A dominant station: D/U ≥ 20 dB at 0.5 mV/m service boundary
+      //     Class B/C/D skywave:      D/U ≥ 6 dB (0.1 mV/m nighttime)
+      //     Ground wave co-channel:   D/U ≥ 3 dB at 0.5 mV/m
+      //   Adjacent channel (±10 kHz): D/U ≥ −6 dB (undesired may exceed desired)
+      //   Adjacent channel (±20 kHz): D/U ≥ −12 dB
+      //
+      // 47 CFR §73.37 — Table of minimum separation distances.
+      //   Specifies the minimum km between co-channel and adjacent-channel
+      //   stations by station class combination.  These are the initial
+      //   screening criteria; actual protection studies use §73.182 methodology.
+      //
+      // 47 CFR §73.187 — Dominance rule (Class A clear-channel stations).
+      //   All other stations on a clear channel must protect the dominant
+      //   Class A station's 0.5 mV/m primary service contour by ≥ 20 dB D/U.
+      //   At night, Class B/D stations must not cause interference within
+      //   the dominant station's 0.1 mV/m 50% skywave service contour.
+      //
+      // Protection contour radii are computed using the FCC's AM groundwave
+      // curves (ITU-R P.368-10 / FCC M3 tables) at the station's soil
+      // conductivity σ and TPO.
+      //
+      // References:
+      //   47 CFR §73.37; §73.182 Table 1; §73.187
+      //   ITU-R P.368-10; FCC M3 conductivity maps
+
+      const chanClass  = frequencyChannelClass(frequency_khz);
+      const isClear    = chanClass === 'clear_channel';
+      const isRegional = chanClass === 'regional';
+      const isLocal    = chanClass === 'local';
+
+      // D/U requirement table (daytime, co-channel, at service boundary)
+      const DU_REQUIRED = {
+        co_channel_dominant_db:     isClear ? 20 : null,
+        co_channel_groundwave_db:   3,
+        adj_10khz_db:              -6,   // negative = undesired may exceed desired
+        adj_20khz_db:              -12,
+        night_skywave_dominant_db:  isClear ? 6 : null,
+        night_skywave_class_b_db:   isRegional ? 6 : null
+      };
+
+      // Service contour protection distances at this site's conductivity and power
+      const _gwDist = (mvm) => {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: mvm, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        return round2(r?.distance_km ?? 0);
+      };
+      const d_05_mvm_km = _gwDist(0.5);    // primary service contour
+      const d_025_mvm_km = _gwDist(0.25);  // mid-service
+      const d_01_mvm_km  = _gwDist(0.1);   // nighttime reference
+
+      // Protection contour areas
+      const area_05_km2  = round2(Math.PI * Math.pow(d_05_mvm_km,  2));
+      const area_01_km2  = round2(Math.PI * Math.pow(d_01_mvm_km,  2));
+
+      // Minimum separation distances from §73.37 Table — this station's class
+      const CLS = fcc_class.toUpperCase() in { A:1, B:1, C:1, D:1 } ? fcc_class.toUpperCase() : 'D';
+      const CO_CHANNEL_VS = {
+        A: { co_km: 1037, adj10_km: 805, adj20_km: 402 },
+        B: { co_km:  953, adj10_km: 724, adj20_km: 354 },
+        C: { co_km:  354, adj10_km: 177, adj20_km:  96 },
+        D: { co_km:  953, adj10_km: 724, adj20_km: 354 }
+      };
+      const my_sep = CO_CHANNEL_VS[CLS] ?? CO_CHANNEL_VS['D'];
+
+      // Interference risk assessment for this site relative to its conductivity
+      const sigma_q = sigmaQuality(sigma_msm);
+      const interference_risk_level =
+        sigma_q === 'EXCELLENT' ? 'LOW'
+        : sigma_q === 'GOOD'    ? 'LOW'
+        : sigma_q === 'FAIR'    ? 'MODERATE'
+        : 'HIGH';  // POOR conductivity has shorter groundwave reach, reducing interference
+
+      // Explanation: lower σ → shorter contour → lower D/U risk at distant stations
+      const risk_note = interference_risk_level === 'LOW'
+        ? `High σ (${sigma_msm} mS/m) extends primary contour to ${d_05_mvm_km} km — greater reach into potential co-channel interference zones.`
+        : interference_risk_level === 'MODERATE'
+        ? `Moderate σ (${sigma_msm} mS/m) — ${d_05_mvm_km} km primary contour; moderate D/U risk at neighboring stations.`
+        : `Low σ (${sigma_msm} mS/m) — shorter contour (${d_05_mvm_km} km); lower co-channel D/U risk but reduced COL coverage.`;
+
+      // Skywave obligation note
+      const skywave_obligation = isClear
+        ? `Clear channel (${frequency_khz} kHz): must protect Class A dominant station's 0.1 mV/m skywave contour at D/U ≥ 6 dB at night. Full NIF skywave study required per §73.182.`
+        : isRegional
+        ? `Regional channel (${frequency_khz} kHz): skywave NIF study required. Class B station must not cause harmful interference within protected service contours of co-channel stations.`
+        : `Local channel (${frequency_khz} kHz): no skywave obligation (Class C daytime-only or limited-time). Co-channel separation per §73.37 governs.`;
+
+      return {
+        fcc_class, frequency_khz, tpo_kw, sigma_msm, pattern_mode,
+        channel_class:               chanClass,
+        is_clear_channel:            isClear,
+        is_regional_channel:         isRegional,
+        is_local_channel:            isLocal,
+        du_requirements:             DU_REQUIRED,
+        service_contours: {
+          d_05_mvm_km,
+          d_025_mvm_km,
+          d_01_mvm_km,
+          area_05_km2,
+          area_01_km2
+        },
+        min_separation_km:           my_sep,
+        interference_risk_level,
+        risk_note,
+        skywave_obligation,
+        reference: '47 CFR §73.37; §73.182 Table 1; §73.187; ITU-R P.368-10',
+        note: `${fcc_class} at ${frequency_khz} kHz (${chanClass.replace('_', ' ')}). Primary 0.5 mV/m contour: ${d_05_mvm_km} km (${area_05_km2} km²). Co-channel min sep (vs Class ${CLS}): ${my_sep.co_km} km. D/U co-channel: ≥${DU_REQUIRED.co_channel_groundwave_db} dB at service boundary. Interference risk: ${interference_risk_level}.`
+      };
+    })(),
+
+    am_tia222_tower_structural_certification_guide: (() => {
+      // TIA-222-H structural certification guide for AM broadcast towers.
+      //
+      // ANSI/TIA-222-H (2017, with 2022 addendum) — Structural Standards for
+      // Antenna Supporting Structures and Antennas.
+      //   - Replaces TIA-222-G (2005); many jurisdictions now require -H compliance.
+      //   - Defines four Structural Categories (I–IV) based on facility importance.
+      //   - AM broadcast towers typically fall in Category II (standard importance).
+      //   - Key structural requirements:
+      //       Wind Speed: Design must meet ASCE 7-16 ultimate design wind speed maps.
+      //       Ice Loading: Ice zone maps determine radial ice thickness (0, 0.5, 1.0 in).
+      //       Gravity Loads: Self-weight of tower sections + appurtenances.
+      //       Dead + Live + Wind combinations per ASCE 7 load combination rules.
+      //
+      // Tower structural analysis is required:
+      //   (a) For all new towers (initial construction permit)
+      //   (b) When antenna loading is increased (added array elements, new phasor)
+      //   (c) When the tower is modified in height or guy configuration
+      //   (d) Before any colocation of additional antennas
+      //
+      // Tower types for AM:
+      //   - Guyed vertical: most common; economical above 150 ft; TIA-222-H §6.4
+      //   - Self-supporting lattice: used at co-located sites; TIA-222-H §6.3
+      //   - Monopole: rare for AM due to base insulator requirement; TIA-222-H §6.5
+      //
+      // Cost ranges for structural analysis and certification:
+      //   - PE structural analysis (new tower): $3,500–$8,000
+      //   - TIA-222-H compliance upgrade (existing tower): $5,000–$20,000
+      //   - Full tower replacement (if non-compliant): see am_tower_structural guides
+      //
+      // References:
+      //   ANSI/TIA-222-H (2017); ASCE 7-16; 47 CFR §73.1 (general technical rules)
+      //   FCC Form 854 (ASR); 47 CFR §17.7 (ASR height threshold)
+
+      // Quarter-wave tower height at this frequency (typical AM tower)
+      const lambda_m      = Number.isFinite(frequency_khz) ? round2(300000 / frequency_khz) : null;
+      const qw_m          = lambda_m ? round2(lambda_m / 4) : null;
+      const qw_ft         = qw_m    ? Math.round(qw_m * 3.28084) : null;
+      const five_eighth_m = lambda_m ? round2(lambda_m * 5 / 8) : null;
+      const five_eighth_ft = five_eighth_m ? Math.round(five_eighth_m * 3.28084) : null;
+
+      // Structural Category (SC) — AM broadcast always SC II
+      const structural_category = 'II';
+      const sc_description = 'Standard Importance — AM broadcast towers (TIA-222-H Table 2-1)';
+
+      // Wind zone estimation by latitude band
+      // ASCE 7-16 Figure 26.5-1C defines ultimate design wind speeds (V_ult).
+      // For CONUS, approximate by lat:
+      //   Coastal south (lat < 30): ~130 mph (Cat 4 hurricane exposure)
+      //   Southeast (30–34):        ~120 mph
+      //   Midwest/Plains (34–42):   ~115 mph (some tornado exposure)
+      //   Northeast/West (42+):     ~110 mph
+      const lat = pt.lat ?? 37;
+      const wind_speed_mph = lat < 30 ? 130 : lat < 34 ? 120 : lat < 42 ? 115 : 110;
+      const wind_zone_label = lat < 30 ? 'Coastal High Wind (ASCE 7-16 Fig 26.5-1C Zone V)'
+        : lat < 34 ? 'Southeast (Hurricane Risk — ASCE 7-16)'
+        : lat < 42 ? 'Interior (Tornado/Convective — ASCE 7-16)'
+        : 'Northern Interior (ASCE 7-16)';
+
+      // Ice zone estimation (radial ice thickness)
+      // ASCE 7-16 Figure 10-2B (freezing rain) by latitude:
+      //   South of 35°N: 0 in (no design ice)
+      //   35–42°N:       0.5 in (moderate ice)
+      //   North of 42°N: 1.0 in (heavy ice) – Great Lakes / Northeast
+      const ice_thickness_in = lat < 35 ? 0 : lat < 42 ? 0.5 : 1.0;
+      const ice_zone_label = ice_thickness_in === 0 ? 'No Ice Zone (south of 35°N)'
+        : ice_thickness_in === 0.5 ? 'Moderate Ice (0.5 in radial — ASCE 7-16)'
+        : 'Heavy Ice (1.0 in radial — ASCE 7-16 Great Lakes/Northeast)';
+
+      // Number of DA towers affects structural analysis cost
+      const isDA = /^DA/i.test(pattern_mode);
+      const isDA2 = /^DA-2/i.test(pattern_mode);
+      const n_towers = isDA2 ? 3 : isDA ? 2 : 1;
+
+      // Structural analysis cost (per tower)
+      const pe_analysis_cost_per_tower_usd = { low: 3500, high: 8000 };
+      const total_pe_analysis_low  = round2(pe_analysis_cost_per_tower_usd.low  * n_towers);
+      const total_pe_analysis_high = round2(pe_analysis_cost_per_tower_usd.high * n_towers);
+
+      // Compliance upgrade cost (if existing tower doesn't meet TIA-222-H)
+      const upgrade_cost_usd = { low: 5000, high: 20000 };  // per tower
+
+      // ASR height check — does quarter-wave tower trigger ASR?
+      const ASR_HEIGHT_THRESHOLD_M = 61;   // 200 ft / §17.7
+      const asr_height_trigger = qw_m ? qw_m > ASR_HEIGHT_THRESHOLD_M : null;
+      const five_eighth_asr_trigger = five_eighth_m ? five_eighth_m > ASR_HEIGHT_THRESHOLD_M : null;
+
+      // Tower type recommendation
+      const tower_type = n_towers > 1 ? 'guyed_vertical_array'
+        : qw_ft > 600 ? 'guyed_vertical_tall'
+        : 'guyed_vertical_standard';
+      const tower_type_label = {
+        guyed_vertical_array:    'Guyed Vertical Array (DA — multiple towers)',
+        guyed_vertical_tall:     'Guyed Vertical (tall — >600 ft; class-specific wind/ice)',
+        guyed_vertical_standard: 'Guyed Vertical (standard — <600 ft)'
+      }[tower_type];
+
+      return {
+        fcc_class, frequency_khz, tpo_kw, pattern_mode,
+        is_da_station:            isDA,
+        n_towers,
+        structural_category,
+        sc_description,
+        tower_height_ft:          qw_ft,
+        tower_height_m:           qw_m,
+        five_eighth_height_ft:    five_eighth_ft,
+        five_eighth_height_m:     five_eighth_m,
+        wind_speed_mph,
+        wind_zone:                wind_zone_label,
+        ice_thickness_in,
+        ice_zone:                 ice_zone_label,
+        tower_type,
+        tower_type_label,
+        asr_triggered_qw:         asr_height_trigger,
+        asr_triggered_5_8:        five_eighth_asr_trigger,
+        pe_analysis_cost_per_tower_usd,
+        total_pe_analysis_low_usd:  total_pe_analysis_low,
+        total_pe_analysis_high_usd: total_pe_analysis_high,
+        upgrade_cost_per_tower_usd: upgrade_cost_usd,
+        reference: 'ANSI/TIA-222-H (2017); ASCE 7-16 §26.5, §10; 47 CFR §17.7; FCC Form 854',
+        note: `${frequency_khz} kHz: λ/4 = ${qw_ft} ft (${qw_m} m), 5/8λ = ${five_eighth_ft} ft. ${n_towers} tower(s), Structural Category ${structural_category}. Wind: ${wind_speed_mph} mph. Ice: ${ice_thickness_in} in. ASR (λ/4): ${asr_height_trigger ? 'REQUIRED (>200 ft)' : 'not required (<200 ft)'}.`
+      };
+    })(),
+
+    am_broadcast_lease_and_spectrum_sharing_agreement_guide: (() => {
+      // Broadcast lease and spectrum sharing agreement guide for AM stations.
+      //
+      // FCC rules governing commercial arrangements where a licensee leases
+      // air time, sells program time to third parties, or enters into operational
+      // agreements with other broadcast entities.
+      //
+      // 47 CFR §73.3555 — Multiple ownership rules (local radio limits).
+      //   In any market, a single entity may own or attribute no more than:
+      //   - 8 commercial stations (≤5 in same service) in markets with ≥45 stations
+      //   - 7 stations (≤4 same service) in markets with 30–44 stations
+      //   - 6 stations (≤4 same service) in markets with 15–29 stations
+      //   - 5 stations (≤3 same service) in markets with 14 or fewer stations
+      //   Note: 2024 FCC rule changes may apply; verify current §73.3555 text.
+      //
+      // 47 CFR §73.3555(b) — Attribution rules.
+      //   Local Marketing Agreements (LMAs) and Time Brokerage Agreements (TBAs)
+      //   that give one licensee control over more than 15% of total weekly broadcast
+      //   hours of another station in the same market are ATTRIBUTABLE for ownership
+      //   counting purposes.
+      //
+      // 47 CFR §73.3555(e) — Joint Sales Agreements (JSAs).
+      //   A JSA under which one station sells more than 15% of the weekly advertising
+      //   time of another AM station in the same market is attributable.
+      //
+      // Spectrum leasing (47 CFR §73.3597) — AM spectrum leasing is generally
+      //   not permitted in the same way as ancillary spectrum leasing for wireless.
+      //   AM licensees may enter into time brokerage (selling blocks of air time)
+      //   but the licensee retains full legal and programming responsibility.
+      //
+      // Key compliance obligations for TBA/LMA:
+      //   1. Licensee must retain control over programming for at least 15% of
+      //      weekly broadcast hours (§73.3555(b)) — otherwise attributable
+      //   2. FCC Form 323 (biennial ownership report) must reflect TBA/LMA attribution
+      //   3. Main Studio Rule (§73.1125, now largely eliminated) — licensees may
+      //      operate with a "main studio" or SBE-compliant remote operation
+      //   4. Political advertising equal-time obligations persist on the broker
+      //      (§73.1940 / §315 of the Communications Act)
+      //   5. Licensee remains solely responsible for compliance with FCC rules
+      //      regardless of TBA/LMA programming content
+      //
+      // References:
+      //   47 CFR §73.3555; §73.3555(b); §73.3555(e); §73.1940
+      //   FCC Form 323; Communications Act §315
+
+      // Market size classification (approximated from tpo_kw and fcc_class)
+      // Class A/B = larger markets; Class C/D = smaller/local markets
+      const isLargeMarket  = ['A', 'B'].includes(fcc_class.toUpperCase());
+      const isMediumMarket = fcc_class.toUpperCase() === 'C';
+      const isSmallMarket  = fcc_class.toUpperCase() === 'D';
+
+      // Maximum attributable stations (varies by market size)
+      const maxStations = isLargeMarket ? { total: 8, same_service: 5 }
+        : isMediumMarket ? { total: 7, same_service: 4 }
+        : { total: 6, same_service: 4 };
+
+      // TBA compliance thresholds
+      const TBA_THRESHOLD = {
+        attributable_threshold_pct: 15,   // >15% weekly hours = attribution
+        attribution_cfr: '§73.3555(b)',
+        political_obligation_holder: 'broker',
+        political_obligation_cfr: '§73.1940 / §315 Communications Act'
+      };
+
+      // Available agreement types for AM
+      const AGREEMENT_TYPES = [
+        {
+          type: 'Time Brokerage Agreement (TBA)',
+          description: 'Licensee sells blocks of air time to a programmer/broker. Licensee retains ≥85% of weekly hours OR accepts attribution.',
+          attributable: false,  // only if >15% threshold crossed
+          filing_required: false,
+          fcc_form: null,
+          risk_level: 'MODERATE',
+          cfr: '§73.3555(b)'
+        },
+        {
+          type: 'Local Marketing Agreement (LMA)',
+          description: 'Broker provides programming, sells advertising, controls station operations under the licensee\'s supervision. May trigger multiple ownership attribution if >15% weekly hours.',
+          attributable: 'if_threshold_exceeded',
+          filing_required: true,
+          fcc_form: 'FCC Form 323 (biennial ownership report — must disclose LMA)',
+          risk_level: 'HIGH',
+          cfr: '§73.3555(b)'
+        },
+        {
+          type: 'Joint Sales Agreement (JSA)',
+          description: 'One station sells advertising time for another in the same market. Attributable if >15% weekly advertising time.',
+          attributable: 'if_threshold_exceeded',
+          filing_required: true,
+          fcc_form: 'FCC Form 323',
+          risk_level: 'HIGH',
+          cfr: '§73.3555(e)'
+        },
+        {
+          type: 'Local News Service Agreement',
+          description: 'Two stations share news resources; not attributable if neither party has editorial control over the other\'s programming.',
+          attributable: false,
+          filing_required: false,
+          fcc_form: null,
+          risk_level: 'LOW',
+          cfr: '§73.3555 FCC guidance'
+        }
+      ];
+
+      // Licensee retention requirement
+      const MIN_LICENSEE_CONTROL_HOURS_PCT = 15;
+      const weekly_hours_total = 24 * 7;  // 168 hours/week
+      const min_licensee_hours = round2(weekly_hours_total * MIN_LICENSEE_CONTROL_HOURS_PCT / 100);  // 25.2 hrs/week
+
+      // Cost of compliance / legal review
+      const tba_legal_review_usd   = { low: 2500, high: 6000 };
+      const lma_legal_review_usd   = { low: 5000, high: 15000 };
+      const jsa_legal_review_usd   = { low: 5000, high: 15000 };
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        is_large_market:             isLargeMarket,
+        is_medium_market:            isMediumMarket,
+        is_small_market:             isSmallMarket,
+        market_station_limits:       maxStations,
+        tba_threshold:               TBA_THRESHOLD,
+        agreement_types:             AGREEMENT_TYPES,
+        n_agreement_types:           AGREEMENT_TYPES.length,
+        min_licensee_control_pct:    MIN_LICENSEE_CONTROL_HOURS_PCT,
+        min_licensee_hours_per_week: min_licensee_hours,
+        weekly_hours_total,
+        tba_legal_review_usd,
+        lma_legal_review_usd,
+        jsa_legal_review_usd,
+        political_obligation_note: 'Broker/programmer must comply with §315 equal-time rules for political advertising, regardless of TBA/LMA structure.',
+        reference: '47 CFR §73.3555; §73.3555(b); §73.3555(e); §73.1940; FCC Form 323; Communications Act §315',
+        note: `Class ${fcc_class} — market limits: up to ${maxStations.total} total stations (${maxStations.same_service} same service). TBA/LMA attributable if broker controls >15% of weekly hours (>${min_licensee_hours} hrs/wk). Political ad obligations remain with broker under §315.`
+      };
+    })(),
+
+    am_fcc_registration_and_database_management_guide: (() => {
+      // Guide #116 — FCC Registration & Database Management
+      //
+      // Every AM broadcast station must maintain current records in multiple
+      // FCC databases.  Failures trigger enforcement action, license non-renewal,
+      // or application dismissal.
+      //
+      // KEY DATABASES
+      // ─────────────
+      // 1. CORES (Commission Registration System) — frn.fcc.gov
+      //    Every entity that interacts with the FCC must have a FRN (FCC
+      //    Registration Number).  Required before any application can be filed.
+      //    Annual update required if contact/address changes.
+      //    47 CFR §1.8001–§1.8004.
+      //
+      // 2. LMS (Licensing Management System) — licensing.fcc.gov
+      //    Replaced CDBS in 2021.  All AM broadcast applications and licenses
+      //    must be filed here.  Station must keep technical parameters (ERP,
+      //    antenna, coordinates) exactly matching the current license.
+      //    47 CFR §73.24, §73.3571.
+      //
+      // 3. ASR (Antenna Structure Registration) — wireless2.fcc.gov/UlsApp/AsrSearch
+      //    Required for any tower > 200 ft (61 m) AGL, or near airports/airways.
+      //    47 CFR §17.4, §17.7.  The ASR number must appear in LMS filings.
+      //    Annual inspection report must be filed for each registered structure.
+      //
+      // 4. EAS/ETRS (EAS Test Reporting System) — fcc.gov/ecfs (ETRS)
+      //    Must participate in and report on Nationwide EAS tests.
+      //    Annual EAS test reporting window; missing filings = potential fine.
+      //    47 CFR §11.61.
+      //
+      // 5. OPIF (Online Public Inspection File) — publicfiles.fcc.gov
+      //    Real-time online OPIF required for all commercial AM stations.
+      //    Documents must be posted no later than the business day they are
+      //    received/created.  47 CFR §73.3526.
+      //
+      // 6. Form 323 (Ownership Report) — biennial filing required.
+      //    Due by December 1 of odd-numbered years for commercial stations.
+      //    47 CFR §73.3615.
+      //
+      // 7. EEO Public File (Equal Employment Opportunity)
+      //    Annual EEO public file report + biennial EEO program statement.
+      //    47 CFR §73.2080.
+      //
+      // TOWER-SITE REGISTRATION CHECKLIST
+      // ───────────────────────────────────
+      // A new AM transmitter site involves several concurrent registrations:
+      //  • Obtain or transfer ASR registration for the tower (FCC Form 854).
+      //  • File CP application in LMS (FCC Form 301-AM).
+      //  • Update OPIF same day CP is granted.
+      //  • File STA if operating during construction (FCC Form 309).
+      //  • File License to Cover (FCC Form 302-AM) within 3 years of CP.
+      //
+      // DA STATIONS: additional parameter records
+      // ──────────────────────────────────────────
+      // DA patterns require exact phase/ratio values recorded in LMS.
+      // Any deviation >2° (phase) or >5% (ratio) from authorized requires
+      // STA or modification application.  47 CFR §73.62.
+
+      const is_da = /^DA/i.test(pattern_mode);
+      const is_da2 = /^DA-2/i.test(pattern_mode);
+
+      // ASR requirement: tower height proxy from wavelength.
+      // λ/4 at lowest common AM frequencies is a rough height proxy.
+      const lambda_m      = 300000 / frequency_khz;   // speed of light / freq
+      const qw_m          = round2(lambda_m / 4);
+      const asr_required  = qw_m > 61;                // >200 ft AGL triggers ASR
+
+      // Annual database maintenance cost estimates (USD)
+      const OPIF_ANNUAL_USD       = 0;         // no FCC fee, internal labor ~$200
+      const ASR_ANNUAL_INSP_USD   = asr_required ? 850  : 0;  // PE tower inspection
+      const EAS_ETRS_ANNUAL_USD   = 150;       // annual ETRS filing prep labor
+      const CORES_ANNUAL_USD      = 0;         // no fee; update labor if needed
+      const FORM323_BIENNIAL_USD  = 750;       // attorney prep, biennial (amortized 375/yr)
+      const EEO_ANNUAL_USD        = 300;       // annual EEO report labor
+      const LMS_MAINT_ANNUAL_USD  = 500;       // annual LMS record audit / engineering
+
+      // DA stations: pattern parameter monitoring adds cost
+      const DA_PARAM_ANNUAL_USD = is_da ? 600 : 0;
+
+      const total_annual_low_usd = round2(
+        OPIF_ANNUAL_USD + ASR_ANNUAL_INSP_USD + EAS_ETRS_ANNUAL_USD +
+        CORES_ANNUAL_USD + FORM323_BIENNIAL_USD / 2 + EEO_ANNUAL_USD +
+        LMS_MAINT_ANNUAL_USD + DA_PARAM_ANNUAL_USD
+      );
+
+      // New-site registration one-time costs
+      const asr_registration_usd = asr_required ? 1200 : 0;   // Form 854 filing + engineer
+      const lms_cp_filing_usd    = 2500;   // attorney/engineer fee for CP
+      const opif_setup_usd       = 200;    // initial OPIF configuration
+      const one_time_total_usd   = round2(asr_registration_usd + lms_cp_filing_usd + opif_setup_usd);
+
+      // Key filing deadlines
+      const FILING_DEADLINES = [
+        { obligation: 'Form 323 Ownership Report',    cadence: 'Biennial',  due: 'December 1 odd years', rule: '47 CFR §73.3615' },
+        { obligation: 'EEO Annual Public File Report',cadence: 'Annual',    due: 'Anniversary of license grant', rule: '47 CFR §73.2080' },
+        { obligation: 'ASR Annual Inspection Report', cadence: 'Annual',    due: 'Within 30 days of inspection', rule: '47 CFR §17.21' },
+        { obligation: 'ETRS EAS Test Report',         cadence: 'Annual',    due: 'Within EAS test window', rule: '47 CFR §11.61' },
+        { obligation: 'License to Cover',             cadence: 'One-time',  due: 'Within 3 years of CP grant', rule: '47 CFR §73.3598' },
+        { obligation: 'Renewal Application',          cadence: 'Every 8 yrs', due: '4 months before expiry', rule: '47 CFR §73.3539' },
+      ];
+
+      // DA-2 stations need additional parameter certifications
+      const DA_CERTIFICATIONS = is_da2 ? [
+        { cert: 'DA phase/ratio proof of performance', rule: '47 CFR §73.62', frequency: 'At license modification or upon FCC request' },
+        { cert: 'Monitor point measurements', rule: '47 CFR §73.158', frequency: 'After any DA parameter change' },
+      ] : is_da ? [
+        { cert: 'DA pattern verification', rule: '47 CFR §73.62', frequency: 'At license modification' },
+      ] : [];
+
+      const n_annual_obligations = FILING_DEADLINES.filter(d => d.cadence === 'Annual').length + (is_da ? 1 : 0);
+
+      return {
+        asr_required,
+        asr_height_threshold_m: 61,
+        asr_height_proxy_m: qw_m,
+        one_time_registration_costs: {
+          asr_registration_usd,
+          lms_cp_filing_usd,
+          opif_setup_usd,
+          total_usd: one_time_total_usd
+        },
+        annual_maintenance_costs: {
+          opif_annual_usd: OPIF_ANNUAL_USD,
+          asr_annual_inspection_usd: ASR_ANNUAL_INSP_USD,
+          eas_etrs_annual_usd: EAS_ETRS_ANNUAL_USD,
+          form323_amortized_annual_usd: round2(FORM323_BIENNIAL_USD / 2),
+          eeo_annual_usd: EEO_ANNUAL_USD,
+          lms_maintenance_annual_usd: LMS_MAINT_ANNUAL_USD,
+          da_parameter_annual_usd: DA_PARAM_ANNUAL_USD,
+          total_annual_low_usd
+        },
+        filing_deadlines: FILING_DEADLINES,
+        da_certifications: DA_CERTIFICATIONS,
+        n_annual_obligations,
+        n_da_certifications: DA_CERTIFICATIONS.length,
+        key_databases: ['CORES/FRN', 'LMS', 'ASR', 'ETRS/EAS', 'OPIF'],
+        reference: '47 CFR §1.8001; §17.4; §17.7; §73.2080; §73.3526; §73.3539; §73.3571; §73.3598; §73.3615; §11.61',
+        note: `${frequency_khz} kHz (${fcc_class}): ASR ${asr_required ? 'REQUIRED (λ/4 ≈ ' + qw_m + ' m > 61 m)' : 'not required (λ/4 ≈ ' + qw_m + ' m ≤ 61 m)'}. Annual compliance cost ≈ $${total_annual_low_usd.toLocaleString()}. ${n_annual_obligations} annual obligations. ${is_da ? 'DA pattern parameters must be current in LMS.' : 'NDA — no pattern maintenance required.'}`
+      };
+    })(),
+
+    am_station_sale_and_license_assignment_guide: (() => {
+      // Guide #117 — Station Sale & FCC License Assignment
+      //
+      // An AM station sale requires FCC consent before closing.  The license
+      // is not property that can be freely sold — it is assigned or transferred
+      // subject to §310(d) of the Communications Act and FCC Form 314/315.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.3540 — Application for voluntary assignment/transfer.
+      //   Assignee must be legally, technically, and financially qualified.
+      //   Application must be filed and granted before the transaction closes.
+      //
+      // 47 CFR §73.3597 — Processing of assignment/transfer applications.
+      //   Routine applications are processed in ~60 days (Streamlined).
+      //   Complex/contested applications can take 6–18 months.
+      //   FCC will place application on public notice for 30-day petition period.
+      //
+      // 47 CFR §73.3522 — Anti-trafficking rule (repealed 1981 for radio).
+      //   No current anti-trafficking holding period for AM stations.
+      //   However, stations still must have served the public interest during
+      //   the holding period under license renewal standards.
+      //
+      // 47 CFR §73.3555 — Ownership limits (see guide #115).
+      //   Buyer must certify compliance with local ownership caps.
+      //
+      // FCC Form 314 — Assignment of license (asset sale).
+      // FCC Form 315 — Transfer of control (stock/entity-level deal).
+      //   These are distinct forms; choice depends on transaction structure.
+      //
+      // DUE DILIGENCE CHECKLIST (Engineering)
+      // ──────────────────────────────────────
+      //  • Verify license parameters match LMS records (ERP, ant. coord.)
+      //  • Confirm no pending enforcement actions (FCC EDOCS search)
+      //  • Confirm CP validity/expiration if any outstanding CP
+      //  • Review OPIF for completeness (public file violations = liability)
+      //  • Confirm EEO program compliance history
+      //  • Review lease for transmitter site and tower rights
+      //  • Confirm DA proof of performance if applicable
+      //  • Confirm ASR current and annual inspection up to date
+      //  • Check for pending interference complaints (FCC Enforcement Bureau)
+      //
+      // TIMELINE (STREAMLINED APPLICATION)
+      // ────────────────────────────────────
+      //  Day 0:   File Form 314/315 in LMS
+      //  Day ~7:  FCC issues public notice; 30-day petition window opens
+      //  Day ~37: Petition window closes; if no objections → staff review
+      //  Day ~60: Consent granted (streamlined)
+      //  Day 60+: Parties close transaction; file consummation notice
+      //           within 30 days of closing (FCC Form 316).
+      //
+      // COST ESTIMATES
+      //  Filing fee: Form 314/315 FCC fee: $1,020 (FY2024 AM schedule fee)
+      //  Legal (simple assignment): $5,000–$15,000 (buyer + seller counsel)
+      //  Legal (contested/complex): $25,000–$75,000+
+      //  Engineering technical exhibits: $3,000–$8,000
+      //  Environmental/title review: $2,000–$5,000
+
+      const is_da = /^DA/i.test(pattern_mode);
+
+      const FCC_FORM_FEE_USD    = 1020;     // FY2024 FCC Form 314/315 filing fee
+      const LEGAL_LOW_USD       = 5000;     // simple streamlined transaction
+      const LEGAL_HIGH_USD      = 15000;
+      const ENG_EXHIBIT_LOW_USD = 3000;
+      const ENG_EXHIBIT_HIGH_USD= 8000;
+      const ENV_TITLE_LOW_USD   = 2000;
+      const ENV_TITLE_HIGH_USD  = 5000;
+
+      // DA stations require pattern exhibits — add DA engineering premium
+      const DA_EXHIBIT_PREMIUM  = is_da ? 2500 : 0;
+
+      const total_cost_low_usd  = round2(FCC_FORM_FEE_USD + LEGAL_LOW_USD + ENG_EXHIBIT_LOW_USD + ENV_TITLE_LOW_USD + DA_EXHIBIT_PREMIUM);
+      const total_cost_high_usd = round2(FCC_FORM_FEE_USD + LEGAL_HIGH_USD + ENG_EXHIBIT_HIGH_USD + ENV_TITLE_HIGH_USD + DA_EXHIBIT_PREMIUM);
+
+      const TIMELINE_DAYS = {
+        streamlined: 60,
+        contested:   270,  // 9 months typical
+        petition_window: 30,
+        consummation_notice: 30,  // after closing
+      };
+
+      const DUE_DILIGENCE_ITEMS = [
+        { item: 'License/LMS parameter verification',    priority: 'CRITICAL', rule: '47 CFR §73.24' },
+        { item: 'FCC enforcement action search',         priority: 'CRITICAL', rule: 'FCC EDOCS' },
+        { item: 'OPIF completeness audit',               priority: 'HIGH',     rule: '47 CFR §73.3526' },
+        { item: 'CP validity and expiration check',      priority: 'HIGH',     rule: '47 CFR §73.3598' },
+        { item: 'Transmitter site lease review',         priority: 'HIGH',     rule: 'Contract law' },
+        { item: 'ASR status and inspection currency',    priority: 'MEDIUM',   rule: '47 CFR §17.21' },
+        { item: 'EEO program compliance history',        priority: 'MEDIUM',   rule: '47 CFR §73.2080' },
+        { item: 'Ownership cap certification',           priority: 'HIGH',     rule: '47 CFR §73.3555' },
+      ];
+
+      // DA-specific due diligence
+      if (is_da) {
+        DUE_DILIGENCE_ITEMS.push(
+          { item: 'DA proof of performance review',      priority: 'HIGH',     rule: '47 CFR §73.62' },
+          { item: 'Monitor point measurement records',   priority: 'HIGH',     rule: '47 CFR §73.158' }
+        );
+      }
+
+      const n_critical_items = DUE_DILIGENCE_ITEMS.filter(d => d.priority === 'CRITICAL').length;
+      const n_high_items     = DUE_DILIGENCE_ITEMS.filter(d => d.priority === 'HIGH').length;
+
+      return {
+        applicable_forms: is_da
+          ? ['Form 314 (asset sale)', 'Form 315 (transfer of control)']
+          : ['Form 314 (asset sale)', 'Form 315 (transfer of control)'],
+        fcc_form_fee_usd: FCC_FORM_FEE_USD,
+        legal_cost_low_usd:  LEGAL_LOW_USD,
+        legal_cost_high_usd: LEGAL_HIGH_USD,
+        da_exhibit_premium_usd: DA_EXHIBIT_PREMIUM,
+        total_cost_low_usd,
+        total_cost_high_usd,
+        timeline_days: TIMELINE_DAYS,
+        due_diligence_items: DUE_DILIGENCE_ITEMS,
+        n_critical_items,
+        n_high_items,
+        anti_trafficking_holding_period: 'None (repealed 1981 for radio)',
+        streamlined_eligible: true,
+        reference: '47 CFR §73.3540; §73.3597; §310(d) Communications Act; FCC Form 314; FCC Form 315; FCC Form 316',
+        note: `${frequency_khz} kHz (${fcc_class}): Assignment cost range $${total_cost_low_usd.toLocaleString()}–$${total_cost_high_usd.toLocaleString()}. Streamlined timeline ~${TIMELINE_DAYS.streamlined} days. ${n_critical_items} critical due-diligence items. ${is_da ? 'DA station: pattern exhibits required.' : 'NDA: standard exhibits.'}`
+      };
+    })(),
+
+    am_signal_coverage_mapping_and_contour_documentation_guide: (() => {
+      // Guide #118 — Signal Coverage Mapping & Contour Documentation
+      //
+      // FCC Form 301-AM requires a coverage map showing the predicted groundwave
+      // contours.  The specific contours and exhibit requirements vary by station
+      // class, pattern mode, and the nature of the application.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.183 — Groundwave field strengths.
+      //   Specifies the FCC M3 conductivity map and Terman/Soil Conductivity
+      //   prediction method for AM groundwave field-strength estimation.
+      //   Contour predictions must use FCC-published M3 values or better.
+      //
+      // 47 CFR §73.184 — Groundwave field strength curves.
+      //   The FCC Figure curves (Figures 1a–1e in §73.184) are the authoritative
+      //   source for converting ERP × distance to field strength.  Computer
+      //   software (e.g., AM_STAT, ITM) must match these curves.
+      //
+      // 47 CFR §73.186 — Computation of coverage.
+      //   NDA stations: single omnidirectional contour centered on the antenna.
+      //   DA stations: full 360° radiation pattern applied to §73.183 M3 ground.
+      //   Class A (clear channel) coverage: 0.5 mV/m daytime.
+      //   Class B (regional): 0.5 mV/m daytime.
+      //   Class C (local): 0.5 mV/m daytime (service contour).
+      //   Class D (secondary): 0.5 mV/m daytime, 0.025 mV/m nighttime.
+      //
+      // 47 CFR §73.182 — Engineering standards.
+      //   Directional antennas must file a theoretical pattern and,
+      //   if required, a proof of performance.
+      //
+      // CONTOURS REQUIRED IN FCC FORM 301-AM EXHIBIT
+      // ─────────────────────────────────────────────
+      //   • 5 mV/m contour (principal community coverage, §73.24(j))
+      //   • 0.5 mV/m contour (service contour, §73.186)
+      //   • 0.1 mV/m contour (nighttime — required for Class A, B, D)
+      //   • 0.025 mV/m contour (Class D nighttime, §73.186(d))
+      //   • Interference contours to co-channel/adjacent applicants (if applicable)
+      //
+      // MAP REQUIREMENTS
+      // ────────────────
+      //   • USGS 7.5-minute topographic base OR equivalent digital base map.
+      //   • Scale: typically 1:500,000 for Class A/B; 1:250,000 for C/D.
+      //   • Site coordinates: NAD83 datum, accurate to ±1 arc-second.
+      //   • Community of license must be visible on map.
+      //   • Contours must be labeled with field strength values.
+      //   • For DA, show all 36 radials (every 10°) from M3 calculation.
+      //
+      // SOFTWARE / METHODS ACCEPTED BY FCC
+      // ────────────────────────────────────
+      //   • AM_STAT (FCC-published legacy program)
+      //   • Any program that correctly implements §73.184 curves + §73.183 M3
+      //   • Measured data (overrides computed where measurement > computation)
+      //
+      // COST ESTIMATES
+      //   Contour maps (computer-generated, NDA): $1,000–$2,500
+      //   Contour maps (DA, full pattern): $2,500–$6,000
+      //   Full proof of performance (DA): $8,000–$20,000 (includes field work)
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const is_da2 = /^DA-2/i.test(pattern_mode);
+
+      // Determine contours required based on class
+      const isClassA = fcc_class.toUpperCase() === 'A';
+      const isClassB = fcc_class.toUpperCase() === 'B';
+      const isClassD = fcc_class.toUpperCase() === 'D';
+      const needsNighttime025 = isClassD;
+      const needsNighttime01  = isClassA || isClassB || isClassD;
+
+      const CONTOURS_REQUIRED = [
+        { contour: '5 mV/m',     purpose: 'Principal community coverage',       rule: '§73.24(j)', required: true },
+        { contour: '0.5 mV/m',   purpose: 'Daytime service contour',            rule: '§73.186',   required: true },
+        { contour: '0.1 mV/m',   purpose: 'Nighttime protection contour',       rule: '§73.186',   required: needsNighttime01 },
+        { contour: '0.025 mV/m', purpose: 'Class D secondary nighttime',        rule: '§73.186(d)',required: needsNighttime025 },
+        { contour: 'Interference', purpose: 'Co-channel/adjacent interference', rule: '§73.182',   required: is_da },
+      ].filter(c => c.required);
+
+      // DA map requires 36 radials (every 10°)
+      const n_radials = is_da ? 36 : 0;
+
+      // Map scale by class
+      const map_scale = (isClassA || isClassB) ? '1:500,000' : '1:250,000';
+
+      // Cost estimates
+      const CONTOUR_MAP_LOW_USD  = is_da ? 2500 : 1000;
+      const CONTOUR_MAP_HIGH_USD = is_da ? 6000 : 2500;
+      // DA-2 proof of performance (formal field measurements)
+      const PROOF_LOW_USD  = is_da2 ? 8000  : 0;
+      const PROOF_HIGH_USD = is_da2 ? 20000 : 0;
+
+      const total_low_usd  = round2(CONTOUR_MAP_LOW_USD  + PROOF_LOW_USD);
+      const total_high_usd = round2(CONTOUR_MAP_HIGH_USD + PROOF_HIGH_USD);
+
+      // Contour distances (rough proxies using fccAmDistanceKm)
+      let d_5mvm_km = null;
+      let d_05mvm_km = null;
+      let d_01mvm_km = null;
+      try {
+        const r5   = fccAmDistanceKm({ frequency_khz, target_mvm: 5.0,  conductivity_msm: 4, erp_kw: tpo_kw });
+        const r05  = fccAmDistanceKm({ frequency_khz, target_mvm: 0.5,  conductivity_msm: 4, erp_kw: tpo_kw });
+        const r01  = fccAmDistanceKm({ frequency_khz, target_mvm: 0.1,  conductivity_msm: 4, erp_kw: tpo_kw });
+        d_5mvm_km  = round2(r5.distance_km);
+        d_05mvm_km = round2(r05.distance_km);
+        d_01mvm_km = round2(r01.distance_km);
+      } catch (_){ /* leave null */ }
+
+      return {
+        contours_required: CONTOURS_REQUIRED,
+        n_contours_required: CONTOURS_REQUIRED.length,
+        n_radials,
+        map_scale,
+        map_datum: 'NAD83',
+        accepted_methods: ['FCC §73.184 curves + §73.183 M3', 'AM_STAT', 'Measured field data'],
+        contour_distances_km: {
+          d_5mvm_km,
+          d_05mvm_km,
+          d_01mvm_km
+        },
+        cost_estimates: {
+          contour_map_low_usd:  CONTOUR_MAP_LOW_USD,
+          contour_map_high_usd: CONTOUR_MAP_HIGH_USD,
+          proof_of_performance_low_usd:  PROOF_LOW_USD,
+          proof_of_performance_high_usd: PROOF_HIGH_USD,
+          total_low_usd,
+          total_high_usd
+        },
+        formal_proof_required: is_da2,
+        reference: '47 CFR §73.182; §73.183; §73.184; §73.186; §73.24(j)',
+        note: `${frequency_khz} kHz (${fcc_class}): ${CONTOURS_REQUIRED.length} contours required. Map scale ${map_scale}. ${is_da ? `DA: ${n_radials} radials required. ` : 'NDA: omnidirectional contours. '}Cost estimate $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_transmitter_type_acceptance_and_fcc_certification_guide: (() => {
+      // Guide #119 — Transmitter Type Acceptance & FCC Certification
+      //
+      // AM broadcast transmitters must meet FCC type-acceptance requirements
+      // under 47 CFR Part 73 Subpart F.  This guide covers what equipment is
+      // legally required, how to verify compliance, and what the rules mean
+      // in practice for a new or relocated transmitter site.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.1660 — Transmitter type acceptance.
+      //   All AM broadcast transmitters must be FCC type-accepted (or have
+      //   been granted a waiver or STA for experimental/prototype equipment).
+      //   Type acceptance is demonstrated by an FCC ID or prior acceptance
+      //   letter from the Commission.
+      //
+      // 47 CFR §73.1665 — Transmitter measurements.
+      //   Licensee must measure and verify operating power within 10% of
+      //   authorized power (§73.1560).  For TPO measurements, transmitter
+      //   output power must be measured at the transmitter output terminals.
+      //
+      // 47 CFR §73.1670 — Digital modulation and IBOC.
+      //   If operating with IBOC (HD Radio), additional FCC authorization
+      //   is required.  IBOC AM is hybrid digital+analog; power injection
+      //   limits apply separately from the analog TPO.
+      //
+      // 47 CFR §73.1660(b) — Discontinued models.
+      //   FCC type-accepted transmitters that have been discontinued may
+      //   still be legally operated provided they were type-accepted at
+      //   time of manufacture and continue to meet technical standards.
+      //   No re-certification required for continued operation of legacy hardware.
+      //
+      // POWER TOLERANCE
+      // ───────────────
+      //   §73.1560: Station must not operate at more than 105% or less than 90%
+      //   of authorized power (the ±10% tolerance commonly cited is actually
+      //   asymmetric: +5% high, -10% low).
+      //   For DA stations: each element's relative power must be within ±5%.
+      //
+      // TYPICAL AM TRANSMITTER POWER RANGES (KW → MODEL CATEGORY)
+      //   < 1 kW:   Low-power local (Class D)
+      //   1–5 kW:   Regional (Class B/C)
+      //   5–50 kW:  Major regional / clear (Class A/B)
+      //   > 50 kW:  High-power clear (Class A, e.g. 50 kW max)
+      //   Max licensed power for AM: 50 kW (Class A clear channel daytime)
+      //
+      // TYPE ACCEPTANCE VERIFICATION STEPS
+      // ────────────────────────────────────
+      //  1. Locate transmitter make/model and FCC ID or type acceptance letter.
+      //  2. Confirm ID appears in FCC Equipment Authorization database (apps.fcc.gov/oetcf/eas/reports).
+      //  3. Verify plate voltage/current meters or certified power meter is operable.
+      //  4. Measure and log TPO at installation.  Compare to authorized value.
+      //  5. For DA: confirm each tower's relative contribution is within ±5%.
+      //
+      // COST ESTIMATES
+      //   Transmitter (new, 5 kW):    $30,000–$60,000
+      //   Transmitter (new, 50 kW):   $150,000–$300,000
+      //   Installation labor:         $5,000–$15,000
+      //   Power measurement/verify:   $500–$2,000
+      //   IBOC upgrade kit (5 kW):    $15,000–$40,000
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const tpo_kw_num = Number(tpo_kw) || 5;
+
+      // Power category
+      const power_category =
+        tpo_kw_num < 1   ? 'LOW_POWER'
+        : tpo_kw_num < 5   ? 'REGIONAL_LOW'
+        : tpo_kw_num < 10  ? 'REGIONAL'
+        : tpo_kw_num < 50  ? 'MAJOR'
+        : 'CLEAR_CHANNEL';
+
+      // Transmitter cost estimate
+      const XMTR_COST_MAP = {
+        LOW_POWER:      { low: 8000,   high: 20000  },
+        REGIONAL_LOW:   { low: 20000,  high: 40000  },
+        REGIONAL:       { low: 30000,  high: 60000  },
+        MAJOR:          { low: 60000,  high: 150000 },
+        CLEAR_CHANNEL:  { low: 150000, high: 300000 },
+      };
+      const xmtr_cost = XMTR_COST_MAP[power_category];
+      const install_low = 5000;
+      const install_high = 15000;
+      const power_verify_low = 500;
+      const power_verify_high = 2000;
+
+      const total_equipment_low  = round2(xmtr_cost.low  + install_low  + power_verify_low);
+      const total_equipment_high = round2(xmtr_cost.high + install_high + power_verify_high);
+
+      // Power tolerance: +5% high, -10% low
+      const max_power_kw = round2(tpo_kw_num * 1.05);
+      const min_power_kw = round2(tpo_kw_num * 0.90);
+
+      // DA pattern tolerance: ±5% on element power
+      const da_element_tolerance_pct = is_da ? 5 : null;
+
+      const TYPE_ACCEPTANCE_STEPS = [
+        'Locate transmitter FCC ID or type acceptance letter',
+        'Confirm FCC Equipment Authorization database entry (apps.fcc.gov)',
+        'Verify plate voltage/current meters or calibrated power meter is operational',
+        `Measure and log TPO at installation; must be ${min_power_kw}–${max_power_kw} kW`,
+        ...(is_da ? ['Verify each tower element power within ±5% of authorized ratio'] : []),
+      ];
+
+      return {
+        power_category,
+        tpo_kw: tpo_kw_num,
+        authorized_power_range: {
+          min_kw: min_power_kw,
+          max_kw: max_power_kw,
+          tolerance_high_pct: 5,
+          tolerance_low_pct: 10,
+        },
+        da_element_tolerance_pct,
+        cost_estimates: {
+          transmitter_low_usd:  xmtr_cost.low,
+          transmitter_high_usd: xmtr_cost.high,
+          installation_low_usd: install_low,
+          installation_high_usd: install_high,
+          power_verify_low_usd: power_verify_low,
+          total_equipment_low_usd:  total_equipment_low,
+          total_equipment_high_usd: total_equipment_high,
+        },
+        type_acceptance_steps: TYPE_ACCEPTANCE_STEPS,
+        n_verification_steps: TYPE_ACCEPTANCE_STEPS.length,
+        max_licensed_am_power_kw: 50,
+        iboc_requires_separate_auth: true,
+        discontinued_models_ok: true,
+        reference: '47 CFR §73.1560; §73.1660; §73.1665; §73.1670',
+        note: `${tpo_kw_num} kW (${power_category}): authorized range ${min_power_kw}–${max_power_kw} kW (+5%/−10%). Transmitter cost est. $${total_equipment_low.toLocaleString()}–$${total_equipment_high.toLocaleString()}. ${is_da ? `DA element tolerance ±${da_element_tolerance_pct}%.` : 'NDA: TPO tolerance only.'} Max AM power 50 kW.`
+      };
+    })(),
+
+    am_community_coverage_waiver_and_short_spacing_guide: (() => {
+      // Guide #120 — Community Coverage Waiver & Short-Spacing
+      //
+      // Every AM station must provide a principal community (COL) signal.
+      // A relocation that reduces COL coverage below the §73.24(j) standard
+      // requires either: (1) engineering showing adequate coverage is still met,
+      // or (2) a waiver under §1.3 / §1.925.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.24(j) — Principal community coverage.
+      //   A broadcast station must provide a predicted coverage signal of at
+      //   least 5 mV/m to the entire principal community (city of license).
+      //   "Entire" means the city limits, not the metropolitan area.
+      //   An NDA station radiates 5 mV/m in all directions; a DA station must
+      //   show 5 mV/m in the direction of the COL from the transmitter site.
+      //
+      // 47 CFR §73.215 — Directional antenna short-spacing.
+      //   When a DA station cannot meet the §73.24(j) standard omnidirectionally,
+      //   a directional antenna may be required.  §73.215 sets the conditions
+      //   under which a station operating with a DA pattern still qualifies
+      //   for protection from interference.
+      //
+      // 47 CFR §73.37 — Short-spacing.
+      //   New AM stations or moves may not create short-spacing to existing
+      //   stations unless a waiver is granted.  Minimum spacings depend on
+      //   frequency class and channel type (co-channel, ±10/20 kHz, etc.).
+      //
+      // WAIVER STANDARD (§1.3 / §1.925)
+      // ────────────────────────────────
+      //   FCC grants waivers when the public interest is served and strict
+      //   compliance would not advance the underlying policy goal.  For AM:
+      //   • Applicant must show community still receives adequate coverage.
+      //   • Must show no undue interference to other stations.
+      //   • Waiver requests are processed informally as part of the application.
+      //
+      // COVERAGE ASSESSMENT
+      // ───────────────────
+      //   §73.24(j) requires 5 mV/m to the COL city limits.
+      //   For the purpose of this guide, coverage_pct (already computed for
+      //   this candidate) is used to estimate whether the requirement is met.
+      //   We use a simplified check: if 5 mV/m radius ≥ distance to the COL
+      //   from the candidate site, coverage is likely adequate.
+      //
+      // COL COVERAGE OUTCOMES
+      //   ADEQUATE:   5 mV/m contour reaches COL — no waiver likely needed.
+      //   MARGINAL:   5 mV/m contour may not reach entire COL — DA may help.
+      //   DEFICIENT:  Relocation likely reduces coverage — waiver may be needed.
+      //
+      // SHORT-SPACING MINIMUM DISTANCES (APPROXIMATE, kHz separation → km)
+      //   Co-channel Class A: 1,000 km (US–US), 650 km (US–Mex clear channel)
+      //   Co-channel Class B: 800 km
+      //   Co-channel Class C/D: 300 km
+      //   ±10 kHz: 100–200 km (class-dependent)
+      //   ±20 kHz: 50–100 km
+      //
+      // WAIVER COSTS
+      //   Engineering exhibits for §73.24(j) waiver: $3,000–$8,000
+      //   Legal preparation: $3,000–$10,000
+      //   Total (waiver scenario): $6,000–$18,000
+
+      const is_da = /^DA/i.test(pattern_mode);
+
+      // Principal community 5 mV/m distance proxy (screening-grade, 4 mS/m)
+      let r5_km = null;
+      try {
+        const r5 = fccAmDistanceKm({ frequency_khz, target_mvm: 5.0, conductivity_msm: 4, erp_kw: tpo_kw });
+        r5_km = round2(r5.distance_km);
+      } catch (_){ /* leave null */ }
+
+      // Coverage status based on coverage_pct (computed earlier in scoreCandidate)
+      const coverage_status =
+        coverage_pct == null ? 'UNKNOWN'
+        : coverage_pct >= 0.90 ? 'ADEQUATE'
+        : coverage_pct >= 0.60 ? 'MARGINAL'
+        : 'DEFICIENT';
+
+      const waiver_likely_needed = coverage_status === 'DEFICIENT';
+      const da_may_improve = coverage_status === 'MARGINAL' || coverage_status === 'DEFICIENT';
+
+      // Short-spacing minimum by class (co-channel, km)
+      const CO_CHANNEL_MIN_KM = {
+        A: 1000,
+        B: 800,
+        C: 300,
+        D: 300,
+      };
+      const co_channel_min_km = CO_CHANNEL_MIN_KM[fcc_class.toUpperCase()] ?? 300;
+
+      // Waiver cost estimates
+      const WAIVER_ENG_LOW   = 3000;
+      const WAIVER_ENG_HIGH  = 8000;
+      const WAIVER_LEGAL_LOW = 3000;
+      const WAIVER_LEGAL_HIGH= 10000;
+      const waiver_total_low  = round2(WAIVER_ENG_LOW  + WAIVER_LEGAL_LOW);
+      const waiver_total_high = round2(WAIVER_ENG_HIGH + WAIVER_LEGAL_HIGH);
+
+      return {
+        coverage_status,
+        coverage_pct_estimated: coverage_pct != null ? round2(coverage_pct * 100) : null,
+        r5_mvm_km: r5_km,
+        waiver_likely_needed,
+        da_may_improve,
+        co_channel_min_km,
+        short_spacing_minimums: {
+          co_channel_km: co_channel_min_km,
+          adj_10khz_km: 150,
+          adj_20khz_km: 75,
+        },
+        waiver_cost: {
+          engineering_low_usd: WAIVER_ENG_LOW,
+          engineering_high_usd: WAIVER_ENG_HIGH,
+          legal_low_usd: WAIVER_LEGAL_LOW,
+          legal_high_usd: WAIVER_LEGAL_HIGH,
+          total_low_usd: waiver_total_low,
+          total_high_usd: waiver_total_high,
+        },
+        waiver_standard: '47 CFR §1.3 / §1.925 — public interest, no undue interference',
+        reference: '47 CFR §73.24(j); §73.37; §73.215; §1.3; §1.925',
+        note: `${frequency_khz} kHz (${fcc_class}): COL coverage status = ${coverage_status}. 5 mV/m reach ≈ ${r5_km ?? 'N/A'} km. ${waiver_likely_needed ? 'Waiver may be needed — est. $' + waiver_total_low.toLocaleString() + '–$' + waiver_total_high.toLocaleString() + '.' : 'Coverage likely adequate.'} Co-channel min spacing: ${co_channel_min_km} km.`
       };
     })(),
 

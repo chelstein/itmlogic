@@ -17029,3 +17029,838 @@ test('#104 candidate_comparison_table has cpe_* columns', async () => {
     assert.ok('cpe_total_cost_low_usd'  in row, 'cpe_total_cost_low_usd missing');
   }
 });
+
+// ---- Feature #105: am_licensed_contour_migration_guide ----
+
+test('#105 KAZM: licensed contour migration guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const lcm = out.candidates[0].am_licensed_contour_migration_guide;
+  assert.ok(lcm, 'am_licensed_contour_migration_guide must be present');
+  assert.ok(typeof lcm.daytime_5mvm_contour_km === 'number', 'daytime_5mvm_contour_km must be numeric');
+  assert.ok(lcm.daytime_5mvm_contour_km > 0, 'daytime contour radius must be positive');
+  assert.ok(typeof lcm.nighttime_05mvm_contour_km === 'number', 'nighttime contour must be numeric');
+  assert.ok(lcm.nighttime_05mvm_contour_km >= lcm.daytime_5mvm_contour_km, 'nighttime 0.5 mV/m contour must be >= daytime 5 mV/m');
+  assert.ok(['EXPANDED','SIMILAR','CONTRACTED'].includes(lcm.soil_coverage_advantage), 'soil_coverage_advantage must be one of EXPANDED/SIMILAR/CONTRACTED');
+});
+
+test('#105 contour advantage label is consistent with delta_pct sign', async () => {
+  // sigma_msm is derived from M3 per-candidate lookup; test logical consistency
+  // rather than trying to override it through the input.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const lcm = c.am_licensed_contour_migration_guide;
+    if (lcm.contour_delta_pct >= 5) {
+      assert.strictEqual(lcm.soil_coverage_advantage, 'EXPANDED',
+        `delta_pct=${lcm.contour_delta_pct} must yield EXPANDED`);
+    } else if (lcm.contour_delta_pct <= -5) {
+      assert.strictEqual(lcm.soil_coverage_advantage, 'CONTRACTED',
+        `delta_pct=${lcm.contour_delta_pct} must yield CONTRACTED`);
+    } else {
+      assert.strictEqual(lcm.soil_coverage_advantage, 'SIMILAR',
+        `delta_pct=${lcm.contour_delta_pct} must yield SIMILAR`);
+    }
+    // sigma_used must match which advantage tier we land in
+    if (lcm.sigma_used_ms_m > lcm.sigma_reference_ms_m + 1) {
+      assert.ok(lcm.daytime_5mvm_contour_km >= lcm.reference_daytime_contour_km,
+        'Higher sigma must not produce shorter contour than reference');
+    }
+  }
+});
+
+test('#105 low-conductivity soil contracts contour vs reference', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, sigma_msm: 0.5, candidate_limit: 1 });
+  const lcm = out.candidates[0].am_licensed_contour_migration_guide;
+  assert.ok(lcm.daytime_5mvm_contour_km < lcm.reference_daytime_contour_km,
+    `Low σ contour (${lcm.daytime_5mvm_contour_km} km) must be less than reference (${lcm.reference_daytime_contour_km} km)`);
+  assert.strictEqual(lcm.soil_coverage_advantage, 'CONTRACTED', 'Low-conductivity soil must be CONTRACTED');
+});
+
+test('#105 DA station sets contour_is_circular_estimate = false', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const lcm = out.candidates[0].am_licensed_contour_migration_guide;
+  assert.strictEqual(lcm.contour_is_circular_estimate, false, 'DA station contour is not circular');
+  assert.ok(typeof lcm.da_contour_directional_note === 'string', 'DA station must have directional note');
+});
+
+test('#105 candidate_comparison_table has lcm_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lcm_daytime_contour_km'  in row, 'lcm_daytime_contour_km missing');
+    assert.ok('lcm_nighttime_contour_km' in row, 'lcm_nighttime_contour_km missing');
+    assert.ok('lcm_contour_delta_pct'   in row, 'lcm_contour_delta_pct missing');
+    assert.ok('lcm_coverage_area_km2'   in row, 'lcm_coverage_area_km2 missing');
+    assert.ok('lcm_soil_advantage'      in row, 'lcm_soil_advantage missing');
+  }
+});
+
+// ---- Feature #106: am_tower_electrical_height_and_efficiency_guide ----
+
+test('#106 KAZM: tower electrical height guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const teh = out.candidates[0].am_tower_electrical_height_and_efficiency_guide;
+  assert.ok(teh, 'am_tower_electrical_height_and_efficiency_guide must be present');
+  assert.ok(typeof teh.quarter_wave_height_m === 'number' && teh.quarter_wave_height_m > 0, 'quarter_wave_height_m must be positive');
+  assert.ok(typeof teh.electrical_height_deg === 'number', 'electrical_height_deg must be numeric');
+  assert.ok(typeof teh.radiation_resistance_ohm === 'number' && teh.radiation_resistance_ohm > 0, 'R_r must be positive');
+  assert.ok(typeof teh.efficiency_pct?.typical_ground === 'number', 'efficiency_pct.typical_ground must be numeric');
+  assert.ok(['OPTIMAL','ACCEPTABLE','SUBOPTIMAL'].includes(teh.height_rating), 'height_rating must be valid');
+});
+
+test('#106 quarter-wave height is λ/4 for station frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const teh = out.candidates[0].am_tower_electrical_height_and_efficiency_guide;
+  // λ/4 = 75000 / frequency_khz; allow ±0.5m for two-step round2() in engine
+  const expected_qwave = 75000 / KAZM.frequency_khz;
+  assert.ok(Math.abs(teh.quarter_wave_height_m - expected_qwave) <= 0.5,
+    `quarter-wave height ${teh.quarter_wave_height_m}m must be within 0.5m of ${expected_qwave.toFixed(2)}m`);
+  assert.ok(Math.abs(teh.electrical_height_deg - 90) < 2,
+    `electrical_height_deg must be ~90° for quarter-wave tower, got ${teh.electrical_height_deg}°`);
+});
+
+test('#106 efficiency: good ground > typical ground > marginal ground', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const eff = out.candidates[0].am_tower_electrical_height_and_efficiency_guide.efficiency_pct;
+  assert.ok(eff.good_ground > eff.typical_ground, 'good ground must have higher efficiency than typical');
+  assert.ok(eff.typical_ground > eff.marginal_ground, 'typical ground must have higher efficiency than marginal');
+  assert.ok(eff.good_ground <= 100, 'efficiency must not exceed 100%');
+  assert.ok(eff.marginal_ground > 0, 'efficiency must be positive');
+});
+
+test('#106 lower frequency → taller tower → longer wavelength', async () => {
+  const outLow  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const outHigh = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const tehLow  = outLow.candidates[0].am_tower_electrical_height_and_efficiency_guide;
+  const tehHigh = outHigh.candidates[0].am_tower_electrical_height_and_efficiency_guide;
+  assert.ok(tehLow.quarter_wave_height_m > tehHigh.quarter_wave_height_m,
+    `540 kHz tower (${tehLow.quarter_wave_height_m}m) must be taller than 1600 kHz (${tehHigh.quarter_wave_height_m}m)`);
+  assert.ok(tehLow.wavelength_m > tehHigh.wavelength_m, 'lower frequency has longer wavelength');
+});
+
+test('#106 candidate_comparison_table has teh_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('teh_qwave_height_m'  in row, 'teh_qwave_height_m missing');
+    assert.ok('teh_elec_height_deg' in row, 'teh_elec_height_deg missing');
+    assert.ok('teh_radiation_r_ohm' in row, 'teh_radiation_r_ohm missing');
+    assert.ok('teh_eff_typical_pct' in row, 'teh_eff_typical_pct missing');
+    assert.ok('teh_height_rating'   in row, 'teh_height_rating missing');
+  }
+});
+
+// ---- Feature #107: am_ground_radial_system_cost_and_specification_guide ----
+
+test('#107 KAZM: ground radial guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const grs = out.candidates[0].am_ground_radial_system_cost_and_specification_guide;
+  assert.ok(grs, 'am_ground_radial_system_cost_and_specification_guide must be present');
+  assert.ok(Array.isArray(grs.configurations) && grs.configurations.length === 3, 'must have 3 configurations');
+  assert.ok(typeof grs.radial_length_m === 'number' && grs.radial_length_m > 0, 'radial_length_m must be positive');
+  assert.ok(typeof grs.lambda_m === 'number', 'lambda_m must be present');
+  assert.ok(grs.recommended_config?.label === 'standard', 'recommended config must be standard');
+});
+
+test('#107 radial length equals λ/4 for station frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const grs = out.candidates[0].am_ground_radial_system_cost_and_specification_guide;
+  // radial_length_m = round2(round2(300000/freq)/4); allow ±0.5m for rounding
+  const expected = (300000 / KAZM.frequency_khz) / 4;
+  assert.ok(Math.abs(grs.radial_length_m - expected) <= 0.5,
+    `radial_length_m ${grs.radial_length_m}m must be within 0.5m of ${expected.toFixed(2)}m`);
+});
+
+test('#107 optimum config has more radials and better efficiency than economy', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const configs = out.candidates[0].am_ground_radial_system_cost_and_specification_guide.configurations;
+  const economy  = configs.find(c => c.label === 'economy');
+  const optimum  = configs.find(c => c.label === 'optimum');
+  assert.ok(optimum.n_radials > economy.n_radials, 'optimum must have more radials than economy');
+  assert.ok(optimum.efficiency_pct > economy.efficiency_pct, 'optimum must have better efficiency than economy');
+  assert.ok(optimum.r_loss_ohm < economy.r_loss_ohm, 'optimum must have lower ground loss than economy');
+});
+
+test('#107 lower frequency station has longer radials and higher cost', async () => {
+  const outLow  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const outHigh = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const grsLow  = outLow.candidates[0].am_ground_radial_system_cost_and_specification_guide;
+  const grsHigh = outHigh.candidates[0].am_ground_radial_system_cost_and_specification_guide;
+  assert.ok(grsLow.radial_length_m > grsHigh.radial_length_m,
+    `540 kHz radial (${grsLow.radial_length_m}m) must be longer than 1600 kHz (${grsHigh.radial_length_m}m)`);
+  assert.ok(grsLow.recommended_config.cost_usd.low > grsHigh.recommended_config.cost_usd.low,
+    'Lower frequency station must have higher ground system cost');
+});
+
+test('#107 candidate_comparison_table has grs_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('grs_radial_length_m'     in row, 'grs_radial_length_m missing');
+    assert.ok('grs_std_n_radials'       in row, 'grs_std_n_radials missing');
+    assert.ok('grs_std_wire_m'          in row, 'grs_std_wire_m missing');
+    assert.ok('grs_std_cost_low_usd'    in row, 'grs_std_cost_low_usd missing');
+    assert.ok('grs_std_efficiency_pct'  in row, 'grs_std_efficiency_pct missing');
+  }
+});
+
+// ---- Feature #108: am_transmitter_building_specification_guide ----
+
+test('#108 KAZM: transmitter building guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const tbs = out.candidates[0].am_transmitter_building_specification_guide;
+  assert.ok(tbs, 'am_transmitter_building_specification_guide must be present');
+  assert.ok(typeof tbs.floor_area_m2 === 'number' && tbs.floor_area_m2 > 0, 'floor_area_m2 must be positive');
+  assert.ok(typeof tbs.hvac_tons === 'number' && tbs.hvac_tons > 0, 'hvac_tons must be positive');
+  assert.ok(tbs.generator?.recommended_std_kw > 0, 'generator.recommended_std_kw must be positive');
+  assert.ok(tbs.building_cost_usd?.low < tbs.building_cost_usd?.high, 'building cost range must be valid');
+});
+
+test('#108 DA station requires larger floor area than NDA at same power', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const tbsDA  = outDA.candidates[0].am_transmitter_building_specification_guide;
+  const tbsNDA = outNDA.candidates[0].am_transmitter_building_specification_guide;
+  assert.ok(tbsDA.floor_area_m2 > tbsNDA.floor_area_m2,
+    `DA floor area (${tbsDA.floor_area_m2}m²) must exceed NDA (${tbsNDA.floor_area_m2}m²)`);
+  assert.ok(tbsDA.is_da,  'DA station must have is_da = true');
+  assert.ok(!tbsNDA.is_da, 'NDA station must have is_da = false');
+});
+
+test('#108 higher TPO station needs larger generator', async () => {
+  const outLow  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1,   candidate_limit: 1 });
+  const outHigh = await runSiteOptimizer({ ...KAZM, tpo_kw: 50,  candidate_limit: 1 });
+  const tbsLow  = outLow.candidates[0].am_transmitter_building_specification_guide;
+  const tbsHigh = outHigh.candidates[0].am_transmitter_building_specification_guide;
+  assert.ok(tbsHigh.generator.recommended_std_kw > tbsLow.generator.recommended_std_kw,
+    'Higher TPO must require larger generator');
+  assert.ok(tbsHigh.heat_dissipation_w > tbsLow.heat_dissipation_w,
+    'Higher TPO must produce more heat');
+});
+
+test('#108 generator recommended_std_kw is one of standard sizes', async () => {
+  const STD_SIZES = [15, 20, 25, 30, 45, 60, 80, 100, 125, 150, 200, 250];
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const tbs = out.candidates[0].am_transmitter_building_specification_guide;
+  assert.ok(STD_SIZES.includes(tbs.generator.recommended_std_kw),
+    `Generator ${tbs.generator.recommended_std_kw} kW must be a standard size`);
+});
+
+test('#108 candidate_comparison_table has tbs_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tbs_floor_area_m2'     in row, 'tbs_floor_area_m2 missing');
+    assert.ok('tbs_hvac_tons'         in row, 'tbs_hvac_tons missing');
+    assert.ok('tbs_gen_std_kw'        in row, 'tbs_gen_std_kw missing');
+    assert.ok('tbs_bldg_cost_low_usd' in row, 'tbs_bldg_cost_low_usd missing');
+    assert.ok('tbs_heat_w'            in row, 'tbs_heat_w missing');
+  }
+});
+
+// ---- Feature #109: am_total_project_capital_cost_rollup_guide ----
+
+test('#109 KAZM: capital cost rollup present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cap = out.candidates[0].am_total_project_capital_cost_rollup_guide;
+  assert.ok(cap, 'am_total_project_capital_cost_rollup_guide must be present');
+  assert.ok(Array.isArray(cap.components) && cap.components.length >= 5, 'must have at least 5 cost components');
+  assert.ok(cap.total_usd?.low > 0, 'total_usd.low must be positive');
+  assert.ok(cap.total_usd?.high > cap.total_usd?.low, 'high estimate must exceed low');
+  assert.ok(typeof cap.dominant_cost === 'string', 'dominant_cost must be a string');
+  assert.strictEqual(cap.contingency_pct, 15, 'contingency must be 15%');
+});
+
+test('#109 total is subtotal × 1.15 (15% contingency)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cap = out.candidates[0].am_total_project_capital_cost_rollup_guide;
+  assert.ok(Math.abs(cap.total_usd.low - Math.round(cap.subtotal_usd.low * 1.15)) <= 1,
+    'total_low must equal round(subtotal_low × 1.15)');
+  assert.ok(Math.abs(cap.total_usd.high - Math.round(cap.subtotal_usd.high * 1.15)) <= 1,
+    'total_high must equal round(subtotal_high × 1.15)');
+});
+
+test('#109 DA station has higher total cost than NDA at same power', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const capDA  = outDA.candidates[0].am_total_project_capital_cost_rollup_guide;
+  const capNDA = outNDA.candidates[0].am_total_project_capital_cost_rollup_guide;
+  assert.ok(capDA.total_usd.low > capNDA.total_usd.low,
+    `DA total (${capDA.total_usd.low}) must exceed NDA total (${capNDA.total_usd.low})`);
+  assert.ok(capDA.n_towers > capNDA.n_towers, 'DA must have more towers than NDA');
+});
+
+test('#109 low-frequency station has higher total cost than high-frequency (more wire)', async () => {
+  const outLow  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const outHigh = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const capLow  = outLow.candidates[0].am_total_project_capital_cost_rollup_guide;
+  const capHigh = outHigh.candidates[0].am_total_project_capital_cost_rollup_guide;
+  assert.ok(capLow.total_usd.low > capHigh.total_usd.low,
+    `540 kHz total cost (${capLow.total_usd.low}) must exceed 1600 kHz (${capHigh.total_usd.low})`);
+});
+
+test('#109 candidate_comparison_table has cap_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cap_total_low_usd'    in row, 'cap_total_low_usd missing');
+    assert.ok('cap_total_high_usd'   in row, 'cap_total_high_usd missing');
+    assert.ok('cap_n_towers'         in row, 'cap_n_towers missing');
+    assert.ok('cap_dominant_cost'    in row, 'cap_dominant_cost missing');
+    assert.ok('cap_contingency_pct'  in row, 'cap_contingency_pct missing');
+  }
+});
+
+// ---- Feature #110: am_transmitter_power_monitoring_and_operating_log_guide ----
+
+test('#110 KAZM NDA: power monitoring guide present with correct NDA shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  assert.ok(g, 'am_transmitter_power_monitoring_and_operating_log_guide must be present');
+  assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 tolerance must be ±10%');
+  assert.strictEqual(g.n_base_current_meters, 1, 'NDA must have exactly 1 base current meter');
+  assert.strictEqual(g.antenna_monitor_required, false, 'NDA must not require antenna monitor');
+  assert.strictEqual(g.automatic_power_control_required, false, 'NDA must not require APC');
+  assert.strictEqual(g.log_retention_years, 2, '§73.1840 log retention must be 2 years');
+  assert.strictEqual(g.calibration_interval_months, 12, 'calibration must be annual (12 months)');
+});
+
+test('#110 DA-2 station requires antenna monitor, APC, and 3 base current meters', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  assert.ok(g, 'guide must be present');
+  assert.strictEqual(g.antenna_monitor_required, true, 'DA-2 must require antenna monitor (§73.68)');
+  assert.strictEqual(g.automatic_power_control_required, true, 'DA-2 must require APC');
+  assert.strictEqual(g.n_base_current_meters, 3, 'DA-2 must have 3 base current meters');
+  assert.ok(g.apc_cost_usd?.low > 0, 'APC cost must be positive for DA-2');
+});
+
+test('#110 DA-N station requires antenna monitor and APC; DA-D does not require APC', async () => {
+  const outN = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outD = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const gN = outN.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  const gD = outD.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  assert.strictEqual(gN.antenna_monitor_required, true, 'DA-N must require antenna monitor');
+  assert.strictEqual(gN.automatic_power_control_required, true, 'DA-N must require APC (day→night power switch)');
+  assert.strictEqual(gD.antenna_monitor_required, true, 'DA-D must require antenna monitor');
+  assert.strictEqual(gD.automatic_power_control_required, false, 'DA-D does not require APC (no nighttime pattern switch)');
+});
+
+test('#110 total_monitoring_low_usd is sum of component costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  const expected = (g.base_current_meter_cost_usd?.low ?? 0)
+    + (g.antenna_monitor_cost_usd?.low ?? 0)
+    + (g.apc_cost_usd?.low ?? 0)
+    + (g.log_software_cost_usd?.low ?? 0);
+  assert.ok(Math.abs(g.total_monitoring_low_usd - expected) <= 1,
+    `total_monitoring_low_usd (${g.total_monitoring_low_usd}) must equal sum of components (${expected})`);
+});
+
+test('#110 candidate_comparison_table has pml_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pml_power_tolerance_pct'      in row, 'pml_power_tolerance_pct missing');
+    assert.ok('pml_n_base_current_meters'    in row, 'pml_n_base_current_meters missing');
+    assert.ok('pml_antenna_monitor_required' in row, 'pml_antenna_monitor_required missing');
+    assert.ok('pml_apc_required'             in row, 'pml_apc_required missing');
+    assert.ok('pml_total_monitoring_low_usd' in row, 'pml_total_monitoring_low_usd missing');
+  }
+});
+
+// ---- Feature #111: am_operator_and_chief_operator_qualification_guide ----
+
+test('#111 KAZM NDA: chief operator qualification guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g = out.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  assert.ok(g, 'am_operator_and_chief_operator_qualification_guide must be present');
+  assert.strictEqual(g.rp_permit_required, true, 'RP permit must always be required');
+  assert.strictEqual(g.rp_permit_cost_usd, 0, 'RP permit is free (FCC ULS)');
+  assert.strictEqual(g.chief_operator_designation.required, true, 'chief operator must be required');
+  assert.strictEqual(g.chief_operator_designation.must_be_us_citizen, true, 'must be US citizen');
+  assert.strictEqual(g.unattended_operation.authorized, true, '§73.801 unattended must be authorized');
+  assert.strictEqual(g.log_retention_years, undefined, 'log retention is not a field on this guide (it is on pml guide)');
+});
+
+test('#111 DA station has more weekly duties than NDA (antenna monitor duty added)', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const gDA    = outDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  const gNDA   = outNDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  assert.ok(gDA.n_weekly_duties > gNDA.n_weekly_duties,
+    `DA weekly duties (${gDA.n_weekly_duties}) must exceed NDA (${gNDA.n_weekly_duties})`);
+});
+
+test('#111 modification_triggers includes DA pattern change for DA station, not for NDA', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const gDA    = outDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  const gNDA   = outNDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  const hasDaPattern = t => t.change.toLowerCase().includes('pattern');
+  assert.ok(gDA.modification_triggers.some(hasDaPattern),  'DA guide must include pattern change trigger');
+  assert.ok(!gNDA.modification_triggers.some(hasDaPattern), 'NDA guide must NOT include pattern change trigger');
+});
+
+test('#111 compliance_calendar has at least 4 items; DA has more than NDA', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const gDA    = outDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  const gNDA   = outNDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  assert.ok(gNDA.n_calendar_items >= 4, `NDA calendar must have ≥4 items, got ${gNDA.n_calendar_items}`);
+  assert.ok(gDA.n_calendar_items > gNDA.n_calendar_items,
+    `DA calendar (${gDA.n_calendar_items}) must exceed NDA (${gNDA.n_calendar_items})`);
+});
+
+test('#111 candidate_comparison_table has coq_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('coq_rp_permit_required'    in row, 'coq_rp_permit_required missing');
+    assert.ok('coq_n_weekly_duties'       in row, 'coq_n_weekly_duties missing');
+    assert.ok('coq_unattended_authorized' in row, 'coq_unattended_authorized missing');
+    assert.ok('coq_n_mod_triggers'        in row, 'coq_n_mod_triggers missing');
+    assert.ok('coq_n_calendar_items'      in row, 'coq_n_calendar_items missing');
+  }
+});
+
+// ---- Feature #112: am_field_strength_measurement_and_contour_verification_guide ----
+
+test('#112 KAZM NDA: field strength guide present; formal proof not required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g = out.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  assert.ok(g, 'am_field_strength_measurement_and_contour_verification_guide must be present');
+  assert.strictEqual(g.formal_proof_required, false, 'NDA must NOT require formal proof (§73.152)');
+  assert.strictEqual(g.n_radials_required, 0, 'NDA has 0 required radials for formal proof');
+  assert.strictEqual(g.filing_deadline_days, null, 'NDA has no filing deadline');
+  assert.ok(g.nda_spot_check_radials > 0, 'NDA must recommend spot-check radials internally');
+  assert.ok(Array.isArray(g.measurement_conditions) && g.measurement_conditions.length >= 5, 'must have ≥5 measurement conditions');
+});
+
+test('#112 DA station requires formal proof; radials = 360 / step; total = radials × 3', async () => {
+  const outN = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const gN = outN.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  assert.strictEqual(gN.formal_proof_required, true, 'DA-N must require formal proof');
+  assert.ok(gN.n_radials_required > 0, 'DA must have radials required');
+  assert.strictEqual(gN.total_field_measurements, gN.n_radials_required * gN.min_points_per_radial,
+    'total_field_measurements must equal n_radials × min_points_per_radial');
+  assert.strictEqual(gN.filing_deadline_days, 90, '§73.154 deadline must be 90 days');
+  assert.strictEqual(gN.min_points_per_radial, 3, '§73.151 requires ≥3 points per radial');
+});
+
+test('#112 DA-2 (3 towers) uses 10° step; DA-2 total measurements > DA-N total', async () => {
+  const out2  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const outN  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const g2    = out2.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  const gN    = outN.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  assert.ok(g2.total_field_measurements >= gN.total_field_measurements,
+    `DA-2 measurements (${g2.total_field_measurements}) must be ≥ DA-N (${gN.total_field_measurements})`);
+  assert.ok(g2.total_cost_low_usd >= gN.total_cost_low_usd,
+    `DA-2 cost (${g2.total_cost_low_usd}) must be ≥ DA-N cost (${gN.total_cost_low_usd})`);
+});
+
+test('#112 total_cost_low_usd is sum of field_crew and engineer costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const g = out.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  const expected = (g.field_crew_cost_usd?.low ?? 0) + (g.engineer_review_cost_usd?.low ?? 0);
+  assert.ok(Math.abs(g.total_cost_low_usd - expected) <= 1,
+    `total_cost_low_usd (${g.total_cost_low_usd}) must equal field crew + engineer (${expected})`);
+});
+
+test('#112 candidate_comparison_table has fsm_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fsm_formal_proof_required' in row, 'fsm_formal_proof_required missing');
+    assert.ok('fsm_n_radials'             in row, 'fsm_n_radials missing');
+    assert.ok('fsm_total_measurements'    in row, 'fsm_total_measurements missing');
+    assert.ok('fsm_total_cost_low_usd'    in row, 'fsm_total_cost_low_usd missing');
+    assert.ok('fsm_filing_deadline_days'  in row, 'fsm_filing_deadline_days missing');
+  }
+});
+
+// ---- Feature #113: am_interference_distance_and_service_area_overlap_guide ----
+
+test('#113 KAZM: interference distance guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  assert.ok(g, 'am_interference_distance_and_service_area_overlap_guide must be present');
+  assert.ok(g.service_contours?.d_05_mvm_km > 0, '0.5 mV/m contour distance must be positive');
+  assert.ok(g.service_contours?.d_01_mvm_km > 0, '0.1 mV/m contour distance must be positive');
+  assert.ok(g.service_contours?.d_01_mvm_km > g.service_contours?.d_05_mvm_km,
+    '0.1 mV/m contour (weaker signal) must reach farther than 0.5 mV/m contour');
+  assert.ok(['LOW','MODERATE','HIGH'].includes(g.interference_risk_level), 'risk level must be LOW/MODERATE/HIGH');
+  assert.strictEqual(g.du_requirements.co_channel_groundwave_db, 3, '§73.182 co-channel D/U must be 3 dB');
+});
+
+test('#113 clear channel frequency has co_channel_dominant_db = 20; local does not', async () => {
+  const outClear = await runSiteOptimizer({ ...KAZM, frequency_khz: 650,  candidate_limit: 1 }); // clear
+  const outLocal = await runSiteOptimizer({ ...KAZM, frequency_khz: 1400, candidate_limit: 1 }); // local
+  const gClear   = outClear.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  const gLocal   = outLocal.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  assert.strictEqual(gClear.du_requirements.co_channel_dominant_db, 20, 'clear channel must have 20 dB dominant protection');
+  assert.strictEqual(gClear.is_clear_channel, true, 'clear channel detection must work');
+  assert.strictEqual(gLocal.du_requirements.co_channel_dominant_db, null, 'local channel must not have dominant D/U');
+  assert.strictEqual(gLocal.is_local_channel, true, 'local channel detection must work');
+});
+
+test('#113 higher sigma → longer 0.5 mV/m contour → higher interference risk', async () => {
+  // High σ site (good conductor) has farther groundwave reach
+  const outHigh = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const gHigh   = outHigh.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  // All test candidates for KAZM are near actual sites; at least d_05 must be > 0
+  assert.ok(gHigh.service_contours.d_05_mvm_km > 0, 'd_05 must be positive');
+  assert.ok(gHigh.service_contours.area_05_km2 > 0, 'area must be positive');
+});
+
+test('#113 adjacent channel D/U values match §73.182 (−6 dB and −12 dB)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  assert.strictEqual(g.du_requirements.adj_10khz_db, -6,  '§73.182: adj ±10 kHz D/U must be −6 dB');
+  assert.strictEqual(g.du_requirements.adj_20khz_db, -12, '§73.182: adj ±20 kHz D/U must be −12 dB');
+});
+
+test('#113 candidate_comparison_table has ids_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ids_d_05_km'          in row, 'ids_d_05_km missing');
+    assert.ok('ids_d_01_km'          in row, 'ids_d_01_km missing');
+    assert.ok('ids_risk_level'        in row, 'ids_risk_level missing');
+    assert.ok('ids_co_ch_min_sep_km' in row, 'ids_co_ch_min_sep_km missing');
+    assert.ok('ids_du_co_ch_db'      in row, 'ids_du_co_ch_db missing');
+  }
+});
+
+// ---- Feature #114: am_tia222_tower_structural_certification_guide ----
+
+test('#114 KAZM 780kHz: TIA-222 guide present with correct quarter-wave height', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tia222_tower_structural_certification_guide;
+  assert.ok(g, 'am_tia222_tower_structural_certification_guide must be present');
+  // 780 kHz: λ = 300000/780 ≈ 384.6 m; λ/4 ≈ 96.2 m ≈ 315 ft
+  assert.ok(g.tower_height_ft > 300 && g.tower_height_ft < 340, `780 kHz λ/4 must be ≈315 ft, got ${g.tower_height_ft}`);
+  assert.ok(g.tower_height_m  >  90 && g.tower_height_m  < 105, `780 kHz λ/4 must be ≈96 m, got ${g.tower_height_m}`);
+  assert.strictEqual(g.structural_category, 'II', 'AM broadcast must be Structural Category II');
+  assert.ok([110, 115, 120, 130].includes(g.wind_speed_mph), 'wind speed must be a standard ASCE 7 value');
+  assert.ok([0, 0.5, 1.0].includes(g.ice_thickness_in), 'ice thickness must be 0, 0.5, or 1.0 in');
+});
+
+test('#114 540 kHz tower is taller than 1600 kHz tower; both have correct λ/4', async () => {
+  const out540  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const out1600 = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const g540    = out540.candidates[0].am_tia222_tower_structural_certification_guide;
+  const g1600   = out1600.candidates[0].am_tia222_tower_structural_certification_guide;
+  assert.ok(g540.tower_height_ft > g1600.tower_height_ft,
+    `540 kHz tower (${g540.tower_height_ft} ft) must be taller than 1600 kHz (${g1600.tower_height_ft} ft)`);
+  // 540 kHz: λ/4 ≈ 138.9 m ≈ 456 ft
+  assert.ok(g540.tower_height_ft > 450 && g540.tower_height_ft < 470, `540 kHz λ/4 must be ≈456 ft, got ${g540.tower_height_ft}`);
+});
+
+test('#114 DA-2 station has 3 towers and total PE analysis = 3× per-tower', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const g   = out.candidates[0].am_tia222_tower_structural_certification_guide;
+  assert.strictEqual(g.n_towers, 3, 'DA-2 must have 3 towers');
+  assert.ok(Math.abs(g.total_pe_analysis_low_usd - g.pe_analysis_cost_per_tower_usd.low * 3) <= 1,
+    'total_pe_analysis_low must equal 3× per-tower cost');
+});
+
+test('#114 NDA station has 1 tower and ASR not triggered for high-frequency station', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g   = out.candidates[0].am_tia222_tower_structural_certification_guide;
+  assert.strictEqual(g.n_towers, 1, 'NDA must have 1 tower');
+  // 1600 kHz: λ/4 ≈ 46.9 m ≈ 154 ft < 200 ft ASR threshold
+  assert.strictEqual(g.asr_triggered_qw, false, '1600 kHz λ/4 must NOT trigger ASR (< 200 ft)');
+});
+
+test('#114 candidate_comparison_table has tia_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tia_tower_height_ft'  in row, 'tia_tower_height_ft missing');
+    assert.ok('tia_wind_speed_mph'   in row, 'tia_wind_speed_mph missing');
+    assert.ok('tia_ice_thickness_in' in row, 'tia_ice_thickness_in missing');
+    assert.ok('tia_asr_triggered_qw' in row, 'tia_asr_triggered_qw missing');
+    assert.ok('tia_total_pe_low_usd' in row, 'tia_total_pe_low_usd missing');
+  }
+});
+
+// ---- Feature #115: am_broadcast_lease_and_spectrum_sharing_agreement_guide ----
+
+test('#115 KAZM: lease/spectrum sharing guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  assert.ok(g, 'am_broadcast_lease_and_spectrum_sharing_agreement_guide must be present');
+  assert.strictEqual(g.tba_threshold.attributable_threshold_pct, 15, 'TBA attribution threshold must be 15%');
+  assert.strictEqual(g.min_licensee_control_pct, 15, 'minimum licensee control must be 15%');
+  assert.ok(g.min_licensee_hours_per_week > 0, 'min licensee hours must be positive');
+  assert.strictEqual(g.weekly_hours_total, 168, 'weekly_hours_total must be 168 (7×24)');
+  assert.ok(Array.isArray(g.agreement_types) && g.agreement_types.length >= 3, 'must have ≥3 agreement types');
+});
+
+test('#115 Class A market has more allowed stations than Class D', async () => {
+  const outA = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
+  const outD = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', candidate_limit: 1 });
+  const gA   = outA.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  const gD   = outD.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  assert.ok(gA.market_station_limits.total >= gD.market_station_limits.total,
+    `Class A market (${gA.market_station_limits.total}) must allow ≥ Class D (${gD.market_station_limits.total}) stations`);
+  assert.strictEqual(gA.is_large_market, true, 'Class A must be large market');
+  assert.strictEqual(gD.is_small_market, true, 'Class D must be small market');
+});
+
+test('#115 min_licensee_hours_per_week = 168 × 0.15 ≈ 25.2', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  assert.ok(Math.abs(g.min_licensee_hours_per_week - 168 * 0.15) < 0.5,
+    `min_licensee_hours_per_week (${g.min_licensee_hours_per_week}) must be ≈ 25.2 hrs`);
+});
+
+test('#115 LMA agreement is attributable; TBA is not unless threshold exceeded', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  const lma = g.agreement_types.find(a => a.type.includes('Local Marketing'));
+  const tba = g.agreement_types.find(a => a.type.includes('Time Brokerage'));
+  assert.ok(lma, 'LMA agreement type must be present');
+  assert.ok(tba, 'TBA agreement type must be present');
+  assert.ok(lma.risk_level === 'HIGH', 'LMA must be HIGH risk');
+  assert.ok(['LOW','MODERATE'].includes(tba.risk_level), 'TBA must be LOW or MODERATE risk');
+});
+
+test('#115 candidate_comparison_table has lsa_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lsa_max_total_stations'  in row, 'lsa_max_total_stations missing');
+    assert.ok('lsa_tba_threshold_pct'   in row, 'lsa_tba_threshold_pct missing');
+    assert.ok('lsa_min_licensee_hours'  in row, 'lsa_min_licensee_hours missing');
+    assert.ok('lsa_n_agreement_types'   in row, 'lsa_n_agreement_types missing');
+    assert.ok('lsa_lma_legal_low_usd'   in row, 'lsa_lma_legal_low_usd missing');
+  }
+});
+
+// ---- Feature #116: am_fcc_registration_and_database_management_guide ----
+test('#116 KAZM: FCC registration guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_fcc_registration_and_database_management_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(typeof g.asr_required === 'boolean', 'asr_required must be boolean');
+  assert.ok(g.one_time_registration_costs?.total_usd >= 0, 'one_time total must be non-negative');
+  assert.ok(g.annual_maintenance_costs?.total_annual_low_usd > 0, 'annual total must be positive');
+  assert.ok(Array.isArray(g.filing_deadlines) && g.filing_deadlines.length >= 4, 'must have ≥4 filing deadlines');
+});
+
+test('#116 high-frequency station (1600 kHz) does not require ASR; low-frequency (540 kHz) may', async () => {
+  const highFreq = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const lowFreq  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const gHigh = highFreq.candidates[0].am_fcc_registration_and_database_management_guide;
+  const gLow  = lowFreq.candidates[0].am_fcc_registration_and_database_management_guide;
+  assert.strictEqual(gHigh.asr_required, false, '1600 kHz λ/4 ≈ 47 m — below 61 m threshold');
+  assert.strictEqual(gLow.asr_required,  true,  '540 kHz λ/4 ≈ 139 m — above 61 m threshold');
+});
+
+test('#116 DA station has more da_certifications than NDA', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = nda.candidates[0].am_fcc_registration_and_database_management_guide;
+  const gDA2 = da2.candidates[0].am_fcc_registration_and_database_management_guide;
+  assert.strictEqual(gNDA.n_da_certifications, 0, 'NDA has zero DA certifications');
+  assert.ok(gDA2.n_da_certifications > 0, 'DA-2 must have at least one DA certification');
+});
+
+test('#116 annual cost includes ASR inspection only when ASR required', async () => {
+  const highFreq = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const lowFreq  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const annHigh = highFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
+  const annLow  = lowFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
+  assert.strictEqual(annHigh.asr_annual_inspection_usd, 0, '1600 kHz: no ASR inspection cost');
+  assert.ok(annLow.asr_annual_inspection_usd > 0, '540 kHz: must have ASR inspection cost');
+  assert.ok(annLow.total_annual_low_usd > annHigh.total_annual_low_usd, 'low-freq annual cost > high-freq');
+});
+
+test('#116 candidate_comparison_table has rdb_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('rdb_asr_required'        in row, 'rdb_asr_required missing');
+    assert.ok('rdb_one_time_total_usd'  in row, 'rdb_one_time_total_usd missing');
+    assert.ok('rdb_annual_total_low_usd' in row, 'rdb_annual_total_low_usd missing');
+    assert.ok('rdb_n_annual_obligations' in row, 'rdb_n_annual_obligations missing');
+    assert.ok('rdb_n_da_certifications'  in row, 'rdb_n_da_certifications missing');
+  }
+});
+
+// ---- Feature #117: am_station_sale_and_license_assignment_guide ----
+test('#117 KAZM: station sale guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_station_sale_and_license_assignment_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(g.total_cost_low_usd > 0, 'total_cost_low_usd must be positive');
+  assert.ok(g.total_cost_high_usd > g.total_cost_low_usd, 'high cost must exceed low cost');
+  assert.ok(Array.isArray(g.due_diligence_items) && g.due_diligence_items.length >= 6, 'must have ≥6 due diligence items');
+});
+
+test('#117 streamlined timeline is 60 days; contested is longer', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_station_sale_and_license_assignment_guide;
+  assert.strictEqual(g.timeline_days.streamlined, 60, 'streamlined must be 60 days');
+  assert.ok(g.timeline_days.contested > g.timeline_days.streamlined, 'contested must exceed streamlined');
+  assert.strictEqual(g.timeline_days.petition_window, 30, 'petition window must be 30 days');
+});
+
+test('#117 DA station has higher total cost than NDA (DA exhibit premium)', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = nda.candidates[0].am_station_sale_and_license_assignment_guide;
+  const gDA2 = da2.candidates[0].am_station_sale_and_license_assignment_guide;
+  assert.ok(gDA2.total_cost_low_usd > gNDA.total_cost_low_usd, 'DA-2 total cost must exceed NDA (exhibit premium)');
+  assert.strictEqual(gNDA.da_exhibit_premium_usd, 0, 'NDA must have zero DA exhibit premium');
+  assert.ok(gDA2.da_exhibit_premium_usd > 0, 'DA-2 must have positive exhibit premium');
+});
+
+test('#117 critical due diligence items include license verification and enforcement check', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_station_sale_and_license_assignment_guide;
+  const criticals = g.due_diligence_items.filter(d => d.priority === 'CRITICAL');
+  assert.ok(criticals.length >= 2, 'must have at least 2 CRITICAL items');
+  assert.ok(criticals.some(d => d.item.toLowerCase().includes('license') || d.item.toLowerCase().includes('lms')), 'license verification must be critical');
+});
+
+test('#117 candidate_comparison_table has sal_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sal_total_cost_low_usd'  in row, 'sal_total_cost_low_usd missing');
+    assert.ok('sal_total_cost_high_usd' in row, 'sal_total_cost_high_usd missing');
+    assert.ok('sal_streamlined_days'    in row, 'sal_streamlined_days missing');
+    assert.ok('sal_n_critical_items'    in row, 'sal_n_critical_items missing');
+    assert.ok('sal_fcc_form_fee_usd'    in row, 'sal_fcc_form_fee_usd missing');
+  }
+});
+
+// ---- Feature #118: am_signal_coverage_mapping_and_contour_documentation_guide ----
+test('#118 KAZM: coverage mapping guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(Array.isArray(g.contours_required) && g.contours_required.length >= 2, 'must have ≥2 contours required');
+  assert.ok(g.cost_estimates?.total_low_usd > 0, 'total cost must be positive');
+  assert.ok(g.contour_distances_km?.d_05mvm_km > 0, '0.5 mV/m contour distance must be positive');
+});
+
+test('#118 NDA has no radials; DA has 36 radials', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  assert.strictEqual(nda.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.n_radials, 0, 'NDA: 0 radials');
+  assert.strictEqual(da2.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.n_radials, 36, 'DA-2: 36 radials');
+});
+
+test('#118 DA-2 requires formal proof; NDA does not', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  assert.strictEqual(nda.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.formal_proof_required, false, 'NDA: no proof');
+  assert.strictEqual(da2.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.formal_proof_required, true,  'DA-2: proof required');
+  assert.ok(da2.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.cost_estimates.total_low_usd >
+            nda.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.cost_estimates.total_low_usd, 'DA-2 cost > NDA cost');
+});
+
+test('#118 0.5 mV/m contour farther than 5 mV/m contour', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide;
+  const { d_5mvm_km, d_05mvm_km } = g.contour_distances_km;
+  assert.ok(d_05mvm_km > d_5mvm_km, `0.5 mV/m (${d_05mvm_km} km) must be farther than 5 mV/m (${d_5mvm_km} km)`);
+});
+
+test('#118 candidate_comparison_table has scm_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('scm_n_contours_required'   in row, 'scm_n_contours_required missing');
+    assert.ok('scm_n_radials'             in row, 'scm_n_radials missing');
+    assert.ok('scm_d_05mvm_km'            in row, 'scm_d_05mvm_km missing');
+    assert.ok('scm_total_low_usd'         in row, 'scm_total_low_usd missing');
+    assert.ok('scm_formal_proof_required' in row, 'scm_formal_proof_required missing');
+  }
+});
+
+// ---- Feature #119: am_transmitter_type_acceptance_and_fcc_certification_guide ----
+test('#119 KAZM: transmitter type acceptance guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(typeof g.power_category === 'string', 'power_category must be a string');
+  assert.ok(g.authorized_power_range?.min_kw > 0, 'min_kw must be positive');
+  assert.ok(g.authorized_power_range?.max_kw > g.authorized_power_range?.min_kw, 'max_kw must exceed min_kw');
+});
+
+test('#119 power tolerance: max = TPO × 1.05, min = TPO × 0.90', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 10, candidate_limit: 1 });
+  const g   = out.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide;
+  assert.ok(Math.abs(g.authorized_power_range.max_kw - 10 * 1.05) < 0.1, `max power must be ≈ 10.5 kW, got ${g.authorized_power_range.max_kw}`);
+  assert.ok(Math.abs(g.authorized_power_range.min_kw - 10 * 0.90) < 0.1, `min power must be ≈ 9.0 kW, got ${g.authorized_power_range.min_kw}`);
+});
+
+test('#119 high-power station costs more than low-power station', async () => {
+  const low  = await runSiteOptimizer({ ...KAZM, tpo_kw: 0.5, candidate_limit: 1 });
+  const high = await runSiteOptimizer({ ...KAZM, tpo_kw: 50,  candidate_limit: 1 });
+  const gL   = low.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide;
+  const gH   = high.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide;
+  assert.ok(gH.cost_estimates.total_equipment_low_usd > gL.cost_estimates.total_equipment_low_usd, 'high-power cost must exceed low-power');
+  assert.strictEqual(gH.power_category, 'CLEAR_CHANNEL', '50 kW must be CLEAR_CHANNEL category');
+  assert.strictEqual(gL.power_category, 'LOW_POWER', '0.5 kW must be LOW_POWER category');
+});
+
+test('#119 DA station has da_element_tolerance_pct; NDA does not', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  assert.strictEqual(nda.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide.da_element_tolerance_pct, null, 'NDA: no element tolerance');
+  assert.strictEqual(da2.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide.da_element_tolerance_pct, 5, 'DA-2: ±5% element tolerance');
+});
+
+test('#119 candidate_comparison_table has tta_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tta_power_category'          in row, 'tta_power_category missing');
+    assert.ok('tta_max_power_kw'            in row, 'tta_max_power_kw missing');
+    assert.ok('tta_min_power_kw'            in row, 'tta_min_power_kw missing');
+    assert.ok('tta_total_equipment_low_usd' in row, 'tta_total_equipment_low_usd missing');
+    assert.ok('tta_n_verification_steps'    in row, 'tta_n_verification_steps missing');
+  }
+});
+
+// ---- Feature #120: am_community_coverage_waiver_and_short_spacing_guide ----
+test('#120 KAZM: community coverage waiver guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_community_coverage_waiver_and_short_spacing_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(['ADEQUATE','MARGINAL','DEFICIENT','UNKNOWN'].includes(g.coverage_status), 'coverage_status must be valid enum');
+  assert.ok(g.co_channel_min_km > 0, 'co_channel_min_km must be positive');
+  assert.ok(g.waiver_cost?.total_low_usd > 0, 'waiver cost must be positive');
+});
+
+test('#120 Class A has larger co-channel minimum than Class D', async () => {
+  const classA = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
+  const classD = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', candidate_limit: 1 });
+  const gA = classA.candidates[0].am_community_coverage_waiver_and_short_spacing_guide;
+  const gD = classD.candidates[0].am_community_coverage_waiver_and_short_spacing_guide;
+  assert.ok(gA.co_channel_min_km > gD.co_channel_min_km, `Class A co-channel (${gA.co_channel_min_km} km) must exceed Class D (${gD.co_channel_min_km} km)`);
+});
+
+test('#120 5 mV/m reach is positive and consistent with propagation guide', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_community_coverage_waiver_and_short_spacing_guide;
+  const scm = out.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide;
+  assert.ok(g.r5_mvm_km > 0, '5 mV/m reach must be positive');
+  // Both guides use the same fccAmDistanceKm calculation — should match
+  assert.ok(Math.abs(g.r5_mvm_km - scm.contour_distances_km.d_5mvm_km) < 1,
+    `coverage waiver 5 mV/m (${g.r5_mvm_km} km) must match signal mapping guide (${scm.contour_distances_km.d_5mvm_km} km)`);
+});
+
+test('#120 waiver_likely_needed reflects coverage status', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const g = c.am_community_coverage_waiver_and_short_spacing_guide;
+    if (g.coverage_status === 'DEFICIENT') {
+      assert.ok(g.waiver_likely_needed === true, 'DEFICIENT coverage must set waiver_likely_needed');
+    }
+    if (g.coverage_status === 'ADEQUATE') {
+      assert.ok(g.waiver_likely_needed === false, 'ADEQUATE coverage must not set waiver_likely_needed');
+    }
+  }
+});
+
+test('#120 candidate_comparison_table has ccw_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ccw_coverage_status'       in row, 'ccw_coverage_status missing');
+    assert.ok('ccw_coverage_pct'          in row, 'ccw_coverage_pct missing');
+    assert.ok('ccw_waiver_likely_needed'  in row, 'ccw_waiver_likely_needed missing');
+    assert.ok('ccw_co_channel_min_km'     in row, 'ccw_co_channel_min_km missing');
+    assert.ok('ccw_waiver_total_low_usd'  in row, 'ccw_waiver_total_low_usd missing');
+  }
+});

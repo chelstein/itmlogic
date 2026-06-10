@@ -4221,3 +4221,174 @@ test('am_construction_permit_exhibit_requirements_guide present across colocatio
     assert.ok(cpe.n_required_exhibits >= 4, 'must have at least 4 required exhibits');
   }
 });
+
+test('am_licensed_contour_migration_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const lcm = c.am_licensed_contour_migration_guide;
+    assert.ok(lcm !== undefined && lcm !== null, 'candidate missing am_licensed_contour_migration_guide');
+    assert.ok(typeof lcm.daytime_5mvm_contour_km === 'number', 'daytime_5mvm_contour_km must be numeric');
+    assert.ok(['EXPANDED','SIMILAR','CONTRACTED'].includes(lcm.soil_coverage_advantage), 'soil_coverage_advantage must be valid');
+  }
+});
+
+test('am_tower_electrical_height_and_efficiency_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const teh = c.am_tower_electrical_height_and_efficiency_guide;
+    assert.ok(teh !== undefined && teh !== null, 'candidate missing am_tower_electrical_height_and_efficiency_guide');
+    assert.ok(typeof teh.electrical_height_deg === 'number', 'electrical_height_deg must be numeric');
+    assert.ok(['OPTIMAL','ACCEPTABLE','SUBOPTIMAL'].includes(teh.height_rating), 'height_rating must be valid');
+  }
+});
+
+test('am_ground_radial_system_cost_and_specification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const grs = c.am_ground_radial_system_cost_and_specification_guide;
+    assert.ok(grs !== undefined && grs !== null, 'candidate missing am_ground_radial_system_cost_and_specification_guide');
+    assert.ok(typeof grs.radial_length_m === 'number' && grs.radial_length_m > 0, 'radial_length_m must be positive');
+    assert.ok(grs.recommended_config?.label === 'standard', 'recommended config must be standard');
+  }
+});
+
+test('am_transmitter_building_specification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const tbs = c.am_transmitter_building_specification_guide;
+    assert.ok(tbs !== undefined && tbs !== null, 'candidate missing am_transmitter_building_specification_guide');
+    assert.ok(typeof tbs.floor_area_m2 === 'number' && tbs.floor_area_m2 > 0, 'floor_area_m2 must be positive');
+    assert.ok(tbs.generator?.recommended_std_kw > 0, 'generator size must be positive');
+  }
+});
+
+test('am_total_project_capital_cost_rollup_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const cap = c.am_total_project_capital_cost_rollup_guide;
+    assert.ok(cap !== undefined && cap !== null, 'candidate missing am_total_project_capital_cost_rollup_guide');
+    assert.ok(cap.total_usd?.low > 0, 'total_usd.low must be positive');
+    assert.ok(Array.isArray(cap.components), 'components must be an array');
+  }
+});
+
+test('am_transmitter_power_monitoring_and_operating_log_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_power_monitoring_and_operating_log_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_transmitter_power_monitoring_and_operating_log_guide');
+    assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 tolerance must be 10%');
+    assert.ok(g.n_base_current_meters >= 1, 'must have at least 1 base current meter');
+    assert.ok(Array.isArray(g.log_entry_triggers) && g.log_entry_triggers.length >= 3, 'must have at least 3 log entry triggers');
+  }
+});
+
+test('am_operator_and_chief_operator_qualification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_operator_and_chief_operator_qualification_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_operator_and_chief_operator_qualification_guide');
+    assert.strictEqual(g.rp_permit_required, true, 'RP permit always required');
+    assert.ok(g.n_weekly_duties >= 4, 'must have at least 4 weekly chief operator duties');
+    assert.strictEqual(g.unattended_operation.authorized, true, 'unattended operation must be authorized');
+  }
+});
+
+test('am_field_strength_measurement_and_contour_verification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_field_strength_measurement_and_contour_verification_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_field_strength_measurement_and_contour_verification_guide');
+    assert.ok(typeof g.formal_proof_required === 'boolean', 'formal_proof_required must be boolean');
+    assert.ok(g.total_cost_low_usd > 0, 'total_cost_low_usd must be positive');
+    assert.ok(Array.isArray(g.measurement_conditions), 'measurement_conditions must be an array');
+  }
+});
+
+test('am_interference_distance_and_service_area_overlap_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_interference_distance_and_service_area_overlap_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_interference_distance_and_service_area_overlap_guide');
+    assert.ok(g.service_contours?.d_05_mvm_km > 0, 'd_05_mvm_km must be positive');
+    assert.strictEqual(g.du_requirements?.adj_10khz_db, -6, 'adj ±10 kHz must be −6 dB');
+    assert.ok(['LOW','MODERATE','HIGH'].includes(g.interference_risk_level), 'valid risk level required');
+  }
+});
+
+test('am_tia222_tower_structural_certification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tia222_tower_structural_certification_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_tia222_tower_structural_certification_guide');
+    assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+    assert.strictEqual(g.structural_category, 'II', 'structural category must be II');
+    assert.ok(g.total_pe_analysis_low_usd > 0, 'PE analysis cost must be positive');
+  }
+});
+
+test('am_broadcast_lease_and_spectrum_sharing_agreement_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_broadcast_lease_and_spectrum_sharing_agreement_guide');
+    assert.ok(typeof g.min_licensee_hours_per_week === 'number' && g.min_licensee_hours_per_week > 0, 'min_licensee_hours_per_week must be positive');
+    assert.ok(Array.isArray(g.agreement_types) && g.agreement_types.length >= 3, 'must have at least 3 agreement types');
+    assert.ok(g.market_station_limits?.total >= 6, 'market station limit must be at least 6');
+  }
+});
+
+test('am_fcc_registration_and_database_management_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_fcc_registration_and_database_management_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_fcc_registration_and_database_management_guide');
+    assert.ok(typeof g.asr_required === 'boolean', 'asr_required must be boolean');
+    assert.ok(g.annual_maintenance_costs?.total_annual_low_usd > 0, 'annual cost must be positive');
+    assert.ok(Array.isArray(g.key_databases) && g.key_databases.length >= 3, 'must have at least 3 key databases');
+  }
+});
+
+test('am_station_sale_and_license_assignment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_station_sale_and_license_assignment_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_station_sale_and_license_assignment_guide');
+    assert.ok(g.total_cost_low_usd > 0, 'total_cost_low_usd must be positive');
+    assert.ok(g.timeline_days?.streamlined === 60, 'streamlined timeline must be 60 days');
+    assert.ok(Array.isArray(g.due_diligence_items) && g.due_diligence_items.length >= 6, 'must have ≥6 due diligence items');
+  }
+});
+
+test('am_signal_coverage_mapping_and_contour_documentation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_signal_coverage_mapping_and_contour_documentation_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_signal_coverage_mapping_and_contour_documentation_guide');
+    assert.ok(Array.isArray(g.contours_required) && g.contours_required.length >= 2, 'must have ≥2 contours');
+    assert.ok(g.contour_distances_km?.d_05mvm_km > 0, '0.5 mV/m distance must be positive');
+    assert.ok(typeof g.formal_proof_required === 'boolean', 'formal_proof_required must be boolean');
+  }
+});
+
+test('am_transmitter_type_acceptance_and_fcc_certification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_type_acceptance_and_fcc_certification_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_transmitter_type_acceptance_and_fcc_certification_guide');
+    assert.ok(typeof g.power_category === 'string', 'power_category must be a string');
+    assert.ok(g.authorized_power_range?.min_kw > 0, 'min_kw must be positive');
+    assert.ok(g.cost_estimates?.total_equipment_low_usd > 0, 'equipment cost must be positive');
+  }
+});
+
+test('am_community_coverage_waiver_and_short_spacing_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_community_coverage_waiver_and_short_spacing_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_community_coverage_waiver_and_short_spacing_guide');
+    assert.ok(['ADEQUATE','MARGINAL','DEFICIENT','UNKNOWN'].includes(g.coverage_status), 'coverage_status must be valid enum');
+    assert.ok(g.co_channel_min_km > 0, 'co_channel_min_km must be positive');
+    assert.ok(typeof g.waiver_likely_needed === 'boolean', 'waiver_likely_needed must be boolean');
+  }
+});
