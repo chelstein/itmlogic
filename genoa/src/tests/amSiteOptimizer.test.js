@@ -16828,3 +16828,51 @@ test('#100 candidate_comparison_table has cos_* columns', async () => {
     assert.ok('cos_tower_density'     in row, 'cos_tower_density missing');
   }
 });
+
+// ---- Feature #101: am_frequency_coordination_and_channel_study_guide ----
+
+test('#101 KAZM (780 kHz clear-channel): channel study guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, candidate_limit: 1 });
+  const fcs = out.candidates[0].am_frequency_coordination_and_channel_study_guide;
+  assert.ok(fcs, 'am_frequency_coordination_and_channel_study_guide must be present');
+  assert.ok(typeof fcs.channel_class === 'string', 'channel_class must be a string');
+  assert.ok(typeof fcs.co_channel_search_radius_km === 'number', 'co_channel_search_radius_km must be numeric');
+  assert.ok(typeof fcs.adj_channel_search_radius_km === 'number', 'adj_channel_search_radius_km must be numeric');
+  assert.ok(Array.isArray(fcs.form_301_sections), 'form_301_sections must be an array');
+  assert.ok(typeof fcs.n_form_301_required === 'number', 'n_form_301_required must be numeric');
+});
+
+test('#101 780 kHz is CLEAR channel: large search radius, skywave obligation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, candidate_limit: 1 });
+  const fcs = out.candidates[0].am_frequency_coordination_and_channel_study_guide;
+  assert.ok(fcs.is_clear_channel, '780 kHz must be flagged as clear channel');
+  assert.ok(fcs.has_skywave_obligation, '780 kHz clear-channel must have skywave obligation');
+  assert.ok(fcs.co_channel_search_radius_km >= 800, `clear-channel search radius must be ≥ 800 km, got ${fcs.co_channel_search_radius_km}`);
+});
+
+test('#101 1240 kHz is LOCAL channel: no skywave obligation, short radius', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1240, fcc_class: 'C', candidate_limit: 1 });
+  const fcs = out.candidates[0].am_frequency_coordination_and_channel_study_guide;
+  assert.ok(fcs.is_local_channel, '1240 kHz must be flagged as local channel');
+  assert.ok(!fcs.has_skywave_obligation, 'local channel (Class C) has no skywave obligation');
+  assert.ok(fcs.co_channel_search_radius_km < 400, `local channel search radius must be < 400 km, got ${fcs.co_channel_search_radius_km}`);
+});
+
+test('#101 DA pattern triggers DA-related Form 301 section', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const fcs = out.candidates[0].am_frequency_coordination_and_channel_study_guide;
+  assert.ok(fcs.has_da_pattern, 'DA-D pattern must set has_da_pattern');
+  const daSection = fcs.form_301_sections.find(s => /directional|pattern/i.test(s.item));
+  assert.ok(daSection?.required, 'DA antenna pattern section must be required in form_301_sections');
+});
+
+test('#101 candidate_comparison_table has fcs_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fcs_channel_class'      in row, 'fcs_channel_class missing');
+    assert.ok('fcs_has_skywave'        in row, 'fcs_has_skywave missing');
+    assert.ok('fcs_coch_radius_km'     in row, 'fcs_coch_radius_km missing');
+    assert.ok('fcs_adj_radius_km'      in row, 'fcs_adj_radius_km missing');
+    assert.ok('fcs_study_effort_max_hrs' in row, 'fcs_study_effort_max_hrs missing');
+  }
+});

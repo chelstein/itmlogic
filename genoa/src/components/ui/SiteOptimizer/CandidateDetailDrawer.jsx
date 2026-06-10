@@ -2356,6 +2356,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Frequency Coordination & Channel Study Guide */}
+        {candidate.am_frequency_coordination_and_channel_study_guide && (() => {
+          const fcs = candidate.am_frequency_coordination_and_channel_study_guide;
+          const clsColor = fcs.is_clear_channel ? '#f59e0b' : fcs.is_local_channel ? '#6ee7b7' : '#93c5fd';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: clsColor }}>📡</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Frequency Coordination & Channel Study</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: clsColor, background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>{fcs.is_clear_channel ? 'CLEAR' : fcs.is_local_channel ? 'LOCAL' : 'REGIONAL'}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>Channel class: <b style={{ color: clsColor }}>{fcs.channel_class || '—'}</b></span>
+                <span>Skywave obligation: <b style={{ color: fcs.has_skywave_obligation ? '#f87171' : '#4ade80' }}>{fcs.has_skywave_obligation ? 'YES' : 'NO (Class C)'}</b></span>
+                <span>Co-channel search: <b style={{ color: '#e2e8f0' }}>{fcs.co_channel_search_radius_km} km</b></span>
+                <span>Adj-channel search: <b style={{ color: '#e2e8f0' }}>{fcs.adj_channel_search_radius_km} km</b></span>
+                <span>Study effort: <b style={{ color: '#e2e8f0' }}>{fcs.study_effort_hrs?.min}–{fcs.study_effort_hrs?.max} hrs</b></span>
+                <span>Form 301 sections: <b style={{ color: '#e2e8f0' }}>{fcs.n_form_301_required} required</b></span>
+              </div>
+              {fcs.cost_est_usd && (
+                <div style={{ fontSize: 11, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                  Est. study cost: DIY ${Number(fcs.cost_est_usd.diy_engineer).toLocaleString()} — consulting ${Number(fcs.cost_est_usd.consulting_firm).toLocaleString()}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Colocation Opportunity Score Guide */}
         {candidate.am_colocation_opportunity_score_guide && (() => {
           const cos = candidate.am_colocation_opportunity_score_guide;
