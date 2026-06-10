@@ -17092,3 +17092,57 @@ test('#105 candidate_comparison_table has lcm_* columns', async () => {
     assert.ok('lcm_soil_advantage'      in row, 'lcm_soil_advantage missing');
   }
 });
+
+// ---- Feature #106: am_tower_electrical_height_and_efficiency_guide ----
+
+test('#106 KAZM: tower electrical height guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const teh = out.candidates[0].am_tower_electrical_height_and_efficiency_guide;
+  assert.ok(teh, 'am_tower_electrical_height_and_efficiency_guide must be present');
+  assert.ok(typeof teh.quarter_wave_height_m === 'number' && teh.quarter_wave_height_m > 0, 'quarter_wave_height_m must be positive');
+  assert.ok(typeof teh.electrical_height_deg === 'number', 'electrical_height_deg must be numeric');
+  assert.ok(typeof teh.radiation_resistance_ohm === 'number' && teh.radiation_resistance_ohm > 0, 'R_r must be positive');
+  assert.ok(typeof teh.efficiency_pct?.typical_ground === 'number', 'efficiency_pct.typical_ground must be numeric');
+  assert.ok(['OPTIMAL','ACCEPTABLE','SUBOPTIMAL'].includes(teh.height_rating), 'height_rating must be valid');
+});
+
+test('#106 quarter-wave height is λ/4 for station frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const teh = out.candidates[0].am_tower_electrical_height_and_efficiency_guide;
+  // λ/4 = 75000 / frequency_khz; allow ±0.5m for two-step round2() in engine
+  const expected_qwave = 75000 / KAZM.frequency_khz;
+  assert.ok(Math.abs(teh.quarter_wave_height_m - expected_qwave) <= 0.5,
+    `quarter-wave height ${teh.quarter_wave_height_m}m must be within 0.5m of ${expected_qwave.toFixed(2)}m`);
+  assert.ok(Math.abs(teh.electrical_height_deg - 90) < 2,
+    `electrical_height_deg must be ~90° for quarter-wave tower, got ${teh.electrical_height_deg}°`);
+});
+
+test('#106 efficiency: good ground > typical ground > marginal ground', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const eff = out.candidates[0].am_tower_electrical_height_and_efficiency_guide.efficiency_pct;
+  assert.ok(eff.good_ground > eff.typical_ground, 'good ground must have higher efficiency than typical');
+  assert.ok(eff.typical_ground > eff.marginal_ground, 'typical ground must have higher efficiency than marginal');
+  assert.ok(eff.good_ground <= 100, 'efficiency must not exceed 100%');
+  assert.ok(eff.marginal_ground > 0, 'efficiency must be positive');
+});
+
+test('#106 lower frequency → taller tower → longer wavelength', async () => {
+  const outLow  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const outHigh = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const tehLow  = outLow.candidates[0].am_tower_electrical_height_and_efficiency_guide;
+  const tehHigh = outHigh.candidates[0].am_tower_electrical_height_and_efficiency_guide;
+  assert.ok(tehLow.quarter_wave_height_m > tehHigh.quarter_wave_height_m,
+    `540 kHz tower (${tehLow.quarter_wave_height_m}m) must be taller than 1600 kHz (${tehHigh.quarter_wave_height_m}m)`);
+  assert.ok(tehLow.wavelength_m > tehHigh.wavelength_m, 'lower frequency has longer wavelength');
+});
+
+test('#106 candidate_comparison_table has teh_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('teh_qwave_height_m'  in row, 'teh_qwave_height_m missing');
+    assert.ok('teh_elec_height_deg' in row, 'teh_elec_height_deg missing');
+    assert.ok('teh_radiation_r_ohm' in row, 'teh_radiation_r_ohm missing');
+    assert.ok('teh_eff_typical_pct' in row, 'teh_eff_typical_pct missing');
+    assert.ok('teh_height_rating'   in row, 'teh_height_rating missing');
+  }
+});

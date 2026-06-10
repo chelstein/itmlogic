@@ -2356,6 +2356,35 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Electrical Height & Efficiency Guide */}
+        {candidate.am_tower_electrical_height_and_efficiency_guide && (() => {
+          const teh = candidate.am_tower_electrical_height_and_efficiency_guide;
+          const ratingColor = teh.height_rating === 'OPTIMAL' ? '#4ade80'
+                            : teh.height_rating === 'ACCEPTABLE' ? '#facc15' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#c084fc' }}>📡</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Tower Electrical Height & Efficiency (§73.150)</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: ratingColor, background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {teh.height_rating}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>λ/4 tower height: <b style={{ color: '#e2e8f0' }}>{teh.quarter_wave_height_m}m ({teh.electrical_height_deg}°)</b></span>
+                <span>Wavelength: <b style={{ color: '#e2e8f0' }}>{teh.wavelength_m}m</b></span>
+                <span>Radiation resistance: <b style={{ color: '#e2e8f0' }}>{teh.radiation_resistance_ohm}Ω</b></span>
+                <span>Efficiency (typical gnd): <b style={{ color: '#e2e8f0' }}>{teh.efficiency_pct?.typical_ground}%</b></span>
+                <span>ERP (typical): <b style={{ color: '#e2e8f0' }}>{teh.effective_radiated_power_kw?.typical_ground} kW</b></span>
+                <span>Efficiency (good gnd): <b style={{ color: '#4ade80' }}>{teh.efficiency_pct?.good_ground}%</b></span>
+              </div>
+              <div style={{ fontSize: 10, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                {teh.note}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Licensed Contour Migration Guide */}
         {candidate.am_licensed_contour_migration_guide && (() => {
           const lcm = candidate.am_licensed_contour_migration_guide;
