@@ -240,10 +240,15 @@ export function buildValidationVerdictSection(exhibit){
     const haatBasisDetail = ha.filing_controlling_haat_m != null
       ? `${ha.filing_controlling_haat_m} m — basis: ${haatBasisLabel}`
       : 'Filing-controlling HAAT not resolved — see HAAT BASIS AND GOVERNANCE section';
+    // category:'haat' keeps these out of validationComponents so a HAAT
+    // governance issue does not downgrade the curve-math verdict headline.
+    // HAAT basis/review is a filing-readiness concern, not a math-validation
+    // concern — a BLOCKER here means "cannot file as-is", not "curves wrong".
     components.push({
-      name:   'HAAT basis (filing-controlling)',
-      status: ha.filing_controlling_haat_m != null ? 'PASS' : 'FAIL',
-      detail: haatBasisDetail
+      name:     'HAAT basis (filing-controlling)',
+      category: 'haat',
+      status:   ha.filing_controlling_haat_m != null ? 'PASS' : 'FAIL',
+      detail:   haatBasisDetail
     });
 
     const haatReviewStatusMap = {
@@ -253,9 +258,10 @@ export function buildValidationVerdictSection(exhibit){
     };
     const haatReview = haatReviewStatusMap[ha.haat_conflict_status] || { status: 'SKIP', detail: 'HAAT conflict status not determined.' };
     components.push({
-      name:   'HAAT review (FCC-authorized vs §73.313 computed)',
-      status: haatReview.status,
-      detail: haatReview.detail
+      name:     'HAAT review (FCC-authorized vs §73.313 computed)',
+      category: 'haat',
+      status:   haatReview.status,
+      detail:   haatReview.detail
     });
   }
 
@@ -504,11 +510,17 @@ export function buildValidationVerdictSection(exhibit){
   // ontology so a SCREENING or INCOMPLETE (= "no record attached")
   // component cannot silently be promoted past PARTIAL/MEDIUM.
 
-  const ontologyComponents = components.map(c => ({
-    name:   c.name,
-    status: mapLegacyStatusToOntology(c.status, c.detail),
-    detail: c.detail
-  }));
+  // Feed only validation-category components to verdictFor — same exclusion
+  // logic as validationComponents above.  Compliance (interference rules,
+  // HAAT governance) and HAAT components must not inflate the ontology scope
+  // or produce false UNVERIFIED headlines via the INCOMPLETE path.
+  const ontologyComponents = components
+    .filter(c => (c.category || 'validation') === 'validation')
+    .map(c => ({
+      name:   c.name,
+      status: mapLegacyStatusToOntology(c.status, c.detail),
+      detail: c.detail
+    }));
   const ov = verdictFor({ components: ontologyComponents, blockers: [], warnings: [] });
 
   // Ontology-driven invariants — apply ONLY downgrading caps so the
