@@ -11568,6 +11568,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* FCC Application Fee Budget Guide */}
+        {candidate.am_fcc_application_fee_budget_guide && (() => {
+          const g = candidate.am_fcc_application_fee_budget_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                FCC Application Fee Budget (§1.1102 / §1.1104 — FY2023 Schedule)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CLASS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.fcc_class}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FORM 301-AM FEE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>${(g.form_301_fee_usd || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL FCC FEES</span>
+                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>${(g.total_fcc_fees_usd || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>WITH CONSULTING</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_with_consulting_low_usd || 0).toLocaleString()}–${(costs.total_with_consulting_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.fee_items || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>FCC Fee Itemization</div>
+                  {g.fee_items.map((fi, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: fi.required ? '#cbd5e1' : '#64748b', fontSize: 9 }}>{fi.item}{!fi.required ? ' *' : ''}</span>
+                      <span style={{ color: '#94a3b8', fontSize: 9 }}>${(fi.fee_usd || 0).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div style={{ color: '#475569', fontSize: 9, marginTop: 2 }}>* conditional fee</div>
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
