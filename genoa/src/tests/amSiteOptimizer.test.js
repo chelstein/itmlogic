@@ -16676,3 +16676,49 @@ test('#97 candidate_comparison_table has ltc_* columns', async () => {
     assert.ok('ltc_sta_fee_usd'        in row, 'ltc_sta_fee_usd missing');
   }
 });
+
+// ---- Feature #98: am_tower_detuning_and_phasor_verification_guide ----
+
+test('#98 KAZM NDA: am_tower_detuning_and_phasor_verification_guide present, 1 active tower', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const dtv = out.candidates[0].am_tower_detuning_and_phasor_verification_guide;
+  assert.ok(dtv, 'am_tower_detuning_and_phasor_verification_guide must be present');
+  assert.strictEqual(dtv.is_da, false, 'is_da must be false for NDA station');
+  assert.strictEqual(dtv.active_towers_min, 1, 'NDA must have active_towers_min = 1');
+  assert.ok(Array.isArray(dtv.phasor_verification_triggers) && dtv.phasor_verification_triggers.length >= 5, 'must have ≥ 5 phasor triggers');
+});
+
+test('#98 DA station: active_towers_typ ≥ 2, DA proof retriggers present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const dtv = out.candidates[0].am_tower_detuning_and_phasor_verification_guide;
+  assert.strictEqual(dtv.is_da, true, 'is_da must be true for DA station');
+  assert.ok(dtv.active_towers_typ >= 2, `DA station active_towers_typ must be ≥ 2, got ${dtv.active_towers_typ}`);
+  assert.ok(dtv.da_proof_retriggers.length >= 4, 'DA must have ≥ 4 proof retrigger conditions');
+});
+
+test('#98 NDA: DA proof retriggers array is empty', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const dtv = out.candidates[0].am_tower_detuning_and_phasor_verification_guide;
+  assert.deepStrictEqual(dtv.da_proof_retriggers, [], 'NDA station must have empty da_proof_retriggers');
+});
+
+test('#98 detuning capacitor value is positive and frequency-dependent', async () => {
+  const out780  = await runSiteOptimizer({ ...KAZM, frequency_khz: 780,  candidate_limit: 1 });
+  const out1500 = await runSiteOptimizer({ ...KAZM, frequency_khz: 1500, candidate_limit: 1 });
+  const pf780   = out780.candidates[0].am_tower_detuning_and_phasor_verification_guide.detuning_cap_pf;
+  const pf1500  = out1500.candidates[0].am_tower_detuning_and_phasor_verification_guide.detuning_cap_pf;
+  assert.ok(pf780  > 0, 'detuning_cap_pf must be positive at 780 kHz');
+  assert.ok(pf1500 > 0, 'detuning_cap_pf must be positive at 1500 kHz');
+  assert.ok(pf780 > pf1500, 'lower frequency → larger detuning capacitor (Xc = 1/(2πfC))');
+});
+
+test('#98 candidate_comparison_table has dtv_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('dtv_active_towers'       in row, 'dtv_active_towers missing');
+    assert.ok('dtv_n_phasor_triggers'   in row, 'dtv_n_phasor_triggers missing');
+    assert.ok('dtv_detuning_cap_pf'     in row, 'dtv_detuning_cap_pf missing');
+    assert.ok('dtv_da_proof_cost_low_usd' in row, 'dtv_da_proof_cost_low_usd missing');
+    assert.ok('dtv_monitor_est_low_usd' in row, 'dtv_monitor_est_low_usd missing');
+  }
+});

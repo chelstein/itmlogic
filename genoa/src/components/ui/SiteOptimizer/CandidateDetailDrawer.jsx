@@ -2356,6 +2356,59 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Detuning and Phasor Verification Guide */}
+        {candidate.am_tower_detuning_and_phasor_verification_guide && (() => {
+          const dtv = candidate.am_tower_detuning_and_phasor_verification_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const triggerColors = { 'IMMEDIATE': '#ef4444', 'QUARTERLY': '#facc15', 'AS NEEDED': '#86efac' };
+          return (
+            <div key="dtv-guide" style={{ background: '#0a0c18', border: '1px solid #2a2a6e', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, color: '#818cf8', fontSize: 13, marginBottom: 6 }}>
+                Tower Detuning &amp; Phasor Verification — §73.150 / §73.153
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <div style={{ background: '#12142a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#818cf8' }}>Active Towers</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#e0e7ff' }}>{dtv.active_towers_typ}</div>
+                </div>
+                <div style={{ background: '#12142a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#818cf8' }}>Phasor Triggers</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#e0e7ff' }}>{dtv.n_phasor_triggers}</div>
+                </div>
+                <div style={{ background: '#12142a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#818cf8' }}>DA Proof Cost</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e0e7ff' }}>{dtv.is_da ? `${fmtUsd(dtv.cost_estimates?.full_da_proof_low_usd)}+` : 'N/A'}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 6 }}>{dtv.detuning_guard_note}</div>
+              {dtv.is_da && (
+                <div style={{ fontSize: 9, color: '#bbb', background: '#12142a', borderRadius: 4, padding: '4px 8px', marginBottom: 8 }}>
+                  <span style={{ color: '#818cf8', fontWeight: 600 }}>Detuning capacitor:</span> {dtv.detuning_cap_note}
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4, fontWeight: 600 }}>Phasor Re-check Triggers</div>
+              {(dtv.phasor_verification_triggers ?? []).map((t, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 9, color: '#ccc' }}>
+                  <span style={{ background: '#1a1a30', borderRadius: 3, padding: '1px 5px', color: triggerColors[t.frequency] ?? '#aaa', fontSize: 8, fontWeight: 700, minWidth: 60, textAlign: 'center' }}>{t.frequency}</span>
+                  {t.label}
+                  <span style={{ color: '#555', marginLeft: 'auto' }}>{t.cfr}</span>
+                </div>
+              ))}
+              {dtv.is_da && dtv.da_proof_retriggers?.length > 0 && (
+                <>
+                  <div style={{ fontSize: 10, color: '#aaa', marginTop: 8, marginBottom: 4, fontWeight: 600 }}>DA Proof Re-run Criteria (§73.154)</div>
+                  {(dtv.da_proof_retriggers ?? []).map((r, i) => (
+                    <div key={i} style={{ fontSize: 9, color: r.mandatory ? '#fca5a5' : '#aaa', padding: '2px 0' }}>
+                      {r.mandatory ? '⬥' : '◇'} {r.condition} <span style={{ color: '#555' }}>{r.cfr}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              <div className="font-mono text-[8px] text-textDim leading-snug mt-2">{dtv.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM License-to-Cover and STA Guide */}
         {candidate.am_license_to_cover_and_sta_guide && (() => {
           const ltc = candidate.am_license_to_cover_and_sta_guide;
