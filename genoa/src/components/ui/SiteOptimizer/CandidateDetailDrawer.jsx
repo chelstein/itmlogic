@@ -10772,6 +10772,238 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Nighttime Clear-Channel Exclusion Zone Guide */}
+        {candidate.am_nighttime_clear_channel_exclusion_zone_guide && (() => {
+          const g = candidate.am_nighttime_clear_channel_exclusion_zone_guide;
+          const zoneColor = g.exclusion_zone_applies ? '#f87171' : g.is_clear_channel_freq ? '#f59e0b' : '#22c55e';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Nighttime Clear-Channel Exclusion Zone (§73.26 / §73.182)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CLEAR CHANNEL FREQ</span>
+                  <div style={{ color: g.is_clear_channel_freq ? '#f59e0b' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                    {g.is_clear_channel_freq ? 'YES' : 'NO'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>EXCLUSION ZONE</span>
+                  <div style={{ color: zoneColor, fontSize: 11, fontWeight: 700 }}>
+                    {g.exclusion_zone_applies ? `${g.nighttime_exclusion_km} km` : 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>DAYTIME-ONLY REQUIRED</span>
+                  <div style={{ color: g.daytime_only_required ? '#f87171' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                    {g.daytime_only_required ? 'YES' : 'NO'}
+                  </div>
+                </div>
+                {g.skywave_05_mvm_km && (
+                  <div>
+                    <span style={{ color: '#94a3b8', fontSize: 9 }}>DOMINANT 0.5 mV/m SKYWAVE</span>
+                    <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.skywave_05_mvm_km} km</div>
+                  </div>
+                )}
+              </div>
+              {g.exclusion_zone_applies && (g.nighttime_options || []).length > 0 && (
+                <div>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Nighttime Operating Options</div>
+                  {g.nighttime_options.map((o, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: 9 }}>{o.option}</span>
+                      <span style={{ color: '#64748b', fontSize: 9 }}>{o.cost_usd > 0 ? `~$${o.cost_usd.toLocaleString()}` : 'No cost'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Licensed Power Class Upgrade Guide */}
+        {candidate.am_licensed_power_class_upgrade_guide && (() => {
+          const g = candidate.am_licensed_power_class_upgrade_guide;
+          const costs = g.cost_estimates || {};
+          const modColor = g.modification_type === 'MINOR' ? '#22c55e' : g.modification_type === 'MAJOR' ? '#f59e0b' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Licensed Power Class Upgrade (§73.21 / Form 301-AM)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CURRENT CLASS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>Class {g.current_class}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>POWER HEADROOM</span>
+                  <div style={{ color: g.headroom_kw > 0 ? '#22c55e' : '#f87171', fontSize: 11, fontWeight: 700 }}>
+                    {g.headroom_kw > 0 ? `+${g.headroom_kw} kW (${g.headroom_db?.toFixed(1)} dB)` : 'At ceiling'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MOD TYPE</span>
+                  <div style={{ color: modColor, fontSize: 11, fontWeight: 700 }}>{g.modification_type}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TIMELINE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.timeline_days} days</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {g.upgrade_path && (
+                <div style={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }}>
+                  <span style={{ color: '#64748b' }}>Upgrade path: </span>
+                  <span style={{ color: '#cbd5e1' }}>{g.upgrade_path.target}</span>
+                  {g.upgrade_path.notes && <span style={{ color: '#475569' }}> — {g.upgrade_path.notes}</span>}
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 9 }}>{g.n_engineering_exhibits} engineering exhibits required for modification application</div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Rural Electric & Standby Power Guide */}
+        {candidate.am_rural_electric_and_standby_power_guide && (() => {
+          const g = candidate.am_rural_electric_and_standby_power_guide;
+          const costs = g.cost_estimates || {};
+          const availColor = g.utility_availability === 'LIKELY_AVAILABLE' ? '#22c55e' : g.utility_availability === 'POSSIBLE_EXTENSION' ? '#f59e0b' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Rural Electric &amp; Standby Power (§73.1680 / §11.35)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>UTILITY STATUS</span>
+                  <div style={{ color: availColor, fontSize: 10, fontWeight: 700 }}>{(g.utility_availability || '').replace(/_/g, ' ')}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL LOAD</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{g.total_load_kw} kW</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>GEN SIZE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{g.generator_size_kva} kVA</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>60-HR FUEL</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.fuel_reserve_gal} gal</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_power_low_usd || 0).toLocaleString()}–${(costs.total_power_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>XMTR INPUT</span><div style={{ color: '#94a3b8', fontSize: 10 }}>{g.transmitter_input_kw} kW</div></div>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>HVAC+AUX</span><div style={{ color: '#94a3b8', fontSize: 10 }}>{g.hvac_and_aux_kw} kW</div></div>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>FUEL USE</span><div style={{ color: '#94a3b8', fontSize: 10 }}>{g.fuel_consumption_gph} gal/hr</div></div>
+                {g.ext_distance_km > 0 && <div><span style={{ color: '#94a3b8', fontSize: 9 }}>EXT DISTANCE</span><div style={{ color: '#f59e0b', fontSize: 10 }}>{g.ext_distance_km} km</div></div>}
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* RF Ground System Inspection & Maintenance Guide */}
+        {candidate.am_rf_ground_system_inspection_and_maintenance_guide && (() => {
+          const g = candidate.am_rf_ground_system_inspection_and_maintenance_guide;
+          const ann = g.annual_cost || {};
+          const rehab = g.rehabilitation_cost || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                RF Ground System Inspection &amp; Maintenance (§73.68 / §73.1560)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL RADIALS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.total_radials}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>RADIAL LENGTH</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.radial_length_ft} ft ({g.radial_length_m} m)</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOWERS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_towers}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ANNUAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(ann.total_annual_low_usd || 0).toLocaleString()}–${(ann.total_annual_high_usd || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FULL REHAB</span>
+                  <div style={{ color: '#f59e0b', fontSize: 11 }}>${(rehab.total_rehab_low_usd || 0).toLocaleString()}–${(rehab.total_rehab_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Inspection Schedule</div>
+              {(g.inspection_schedule || []).map((s, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                  <span style={{ color: '#38bdf8', fontSize: 9, minWidth: 60 }}>{s.interval}</span>
+                  <span style={{ color: '#cbd5e1', fontSize: 9 }}>{s.task}</span>
+                </div>
+              ))}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Antenna Commissioning & Proof of Performance Guide */}
+        {candidate.am_antenna_commissioning_and_proof_of_performance_guide && (() => {
+          const g = candidate.am_antenna_commissioning_and_proof_of_performance_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Antenna Commissioning &amp; Proof of Performance (§73.62 / §73.151)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>STEPS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.n_commissioning_steps}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FORMAL PROOF</span>
+                  <div style={{ color: g.formal_proof_required ? '#f59e0b' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                    {g.formal_proof_required ? `YES (≥${g.proof_radials_required} radials)` : 'Not required'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MONITOR POINTS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_monitor_points}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Commissioning Steps</div>
+              {(g.commissioning_steps || []).map((s, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                  <span style={{ color: '#475569', fontSize: 9, minWidth: 16 }}>{s.step}.</span>
+                  <span style={{ color: '#cbd5e1', fontSize: 9, flex: 1 }}>{s.task}</span>
+                  <span style={{ color: '#38bdf8', fontSize: 9 }}>{s.rule}</span>
+                </div>
+              ))}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

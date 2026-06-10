@@ -1710,7 +1710,32 @@ export async function runSiteOptimizer(body = {}){
     ccw_coverage_pct:                   c.am_community_coverage_waiver_and_short_spacing_guide?.coverage_pct_estimated ?? null,
     ccw_waiver_likely_needed:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_likely_needed ?? null,
     ccw_co_channel_min_km:              c.am_community_coverage_waiver_and_short_spacing_guide?.co_channel_min_km ?? null,
-    ccw_waiver_total_low_usd:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_cost?.total_low_usd ?? null
+    ccw_waiver_total_low_usd:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_cost?.total_low_usd ?? null,
+    ncc_is_clear_channel_freq:          c.am_nighttime_clear_channel_exclusion_zone_guide?.is_clear_channel_freq ?? null,
+    ncc_exclusion_zone_applies:         c.am_nighttime_clear_channel_exclusion_zone_guide?.exclusion_zone_applies ?? null,
+    ncc_exclusion_km:                   c.am_nighttime_clear_channel_exclusion_zone_guide?.nighttime_exclusion_km ?? null,
+    ncc_daytime_only_required:          c.am_nighttime_clear_channel_exclusion_zone_guide?.daytime_only_required ?? null,
+    ncc_n_nighttime_options:            c.am_nighttime_clear_channel_exclusion_zone_guide?.n_nighttime_options ?? null,
+    pcu_headroom_kw:                    c.am_licensed_power_class_upgrade_guide?.headroom_kw ?? null,
+    pcu_modification_type:              c.am_licensed_power_class_upgrade_guide?.modification_type ?? null,
+    pcu_total_low_usd:                  c.am_licensed_power_class_upgrade_guide?.cost_estimates?.total_low_usd ?? null,
+    pcu_timeline_days:                  c.am_licensed_power_class_upgrade_guide?.timeline_days ?? null,
+    pcu_n_exhibits:                     c.am_licensed_power_class_upgrade_guide?.n_engineering_exhibits ?? null,
+    rep_utility_availability:           c.am_rural_electric_and_standby_power_guide?.utility_availability ?? null,
+    rep_generator_size_kva:             c.am_rural_electric_and_standby_power_guide?.generator_size_kva ?? null,
+    rep_fuel_reserve_gal:               c.am_rural_electric_and_standby_power_guide?.fuel_reserve_gal ?? null,
+    rep_total_power_low_usd:            c.am_rural_electric_and_standby_power_guide?.cost_estimates?.total_power_low_usd ?? null,
+    rep_total_load_kw:                  c.am_rural_electric_and_standby_power_guide?.total_load_kw ?? null,
+    gnd_total_radials:                  c.am_rf_ground_system_inspection_and_maintenance_guide?.total_radials ?? null,
+    gnd_radial_length_ft:               c.am_rf_ground_system_inspection_and_maintenance_guide?.radial_length_ft ?? null,
+    gnd_rehab_low_usd:                  c.am_rf_ground_system_inspection_and_maintenance_guide?.rehabilitation_cost?.total_rehab_low_usd ?? null,
+    gnd_annual_low_usd:                 c.am_rf_ground_system_inspection_and_maintenance_guide?.annual_cost?.total_annual_low_usd ?? null,
+    gnd_n_inspection_tasks:             c.am_rf_ground_system_inspection_and_maintenance_guide?.n_inspection_tasks ?? null,
+    acp_n_steps:                        c.am_antenna_commissioning_and_proof_of_performance_guide?.n_commissioning_steps ?? null,
+    acp_formal_proof_required:          c.am_antenna_commissioning_and_proof_of_performance_guide?.formal_proof_required ?? null,
+    acp_n_monitor_points:               c.am_antenna_commissioning_and_proof_of_performance_guide?.n_monitor_points ?? null,
+    acp_total_low_usd:                  c.am_antenna_commissioning_and_proof_of_performance_guide?.cost_estimates?.total_low_usd ?? null,
+    acp_proof_radials:                  c.am_antenna_commissioning_and_proof_of_performance_guide?.proof_radials_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -30713,6 +30738,594 @@ async function scoreCandidate(pt, ctx, warnings){
         waiver_standard: '47 CFR §1.3 / §1.925 — public interest, no undue interference',
         reference: '47 CFR §73.24(j); §73.37; §73.215; §1.3; §1.925',
         note: `${frequency_khz} kHz (${fcc_class}): COL coverage status = ${coverage_status}. 5 mV/m reach ≈ ${r5_km ?? 'N/A'} km. ${waiver_likely_needed ? 'Waiver may be needed — est. $' + waiver_total_low.toLocaleString() + '–$' + waiver_total_high.toLocaleString() + '.' : 'Coverage likely adequate.'} Co-channel min spacing: ${co_channel_min_km} km.`
+      };
+    })(),
+
+    am_nighttime_clear_channel_exclusion_zone_guide: (() => {
+      // Guide #121 — Nighttime Clear-Channel Exclusion Zone
+      //
+      // Class A (clear-channel) AM stations are protected from skywave
+      // interference at night under §73.182.  Class D (secondary/local)
+      // stations on the same or adjacent channels cannot operate nighttime
+      // within specified exclusion zones around the dominant (Class A) station.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.182 — Engineering standards for AM directional antennas.
+      //   Establishes mileage separations that Class D (secondary) stations
+      //   must maintain from Class A dominants to avoid prohibited skywave
+      //   interference at night.
+      //
+      // 47 CFR §73.26 — Clear channels.
+      //   Class A stations (dominant) receive exclusive nighttime skywave
+      //   protection on their channels.  A secondary (Class D) station on
+      //   the same channel may not increase its nighttime interference to
+      //   the dominant below 0.5 mV/m at night.
+      //
+      // 47 CFR §73.29 — Dominant stations; exclusion zones.
+      //   Class D stations in the same channel as a Class A dominant must
+      //   operate daytime-only or comply with §73.182 nighttime protection.
+      //
+      // EXCLUSION ZONE LOGIC
+      // ────────────────────
+      //   Whether a nighttime exclusion zone applies depends on:
+      //    1. Is this a clear channel (Class A dominant on the frequency)?
+      //    2. Is the candidate station Class D on that same channel?
+      //    3. What is the skywave 0.5 mV/m contour radius of the dominant?
+      //
+      //   The FCC doesn't publish a single "exclusion zone" radius — instead
+      //   it requires that the candidate station's skywave signal not exceed
+      //   specific limits at the dominant's 0.5 mV/m skywave contour.
+      //   For practical purposes, the nighttime exclusion radius is a
+      //   function of frequency and dominant station ERP:
+      //    • 640/770/1030/1160 kHz (clear channels): exclusion ~1,200+ km
+      //    • Other clear channels: exclusion ~800–1,100 km
+      //    • Class B regional: no exclusion zone (protected differently)
+      //
+      // CHANNEL CLASSES (SIMPLIFIED)
+      // ─────────────────────────────
+      //   Clear channels (Class A dominants): 640, 650, 660, 670, 680, 700,
+      //   710, 720, 750, 760, 770, 780, 820, 830, 840, 870, 880, 890, 1020,
+      //   1030, 1040, 1100, 1120, 1160, 1180, 1200 kHz (US, partial list)
+      //
+      //   This guide computes:
+      //    • Whether this frequency is on a US clear channel
+      //    • Whether a Class D station on this channel faces nighttime restrictions
+      //    • Estimated nighttime exclusion radius
+
+      const US_CLEAR_CHANNELS = new Set([
+        640, 650, 660, 670, 680, 700, 710, 720, 750, 760, 770, 780,
+        820, 830, 840, 870, 880, 890, 1020, 1030, 1040, 1100, 1120,
+        1160, 1180, 1200
+      ]);
+
+      const is_clear_channel_freq = US_CLEAR_CHANNELS.has(frequency_khz);
+      const is_class_d = fcc_class.toUpperCase() === 'D';
+      const is_class_a = fcc_class.toUpperCase() === 'A';
+
+      // Exclusion zone applies when a Class D operates on a clear channel
+      const exclusion_zone_applies = is_clear_channel_freq && is_class_d;
+
+      // Approximate nighttime exclusion radius based on frequency band
+      // Lower frequencies propagate farther at night (longer skywave hop)
+      const nighttime_exclusion_km =
+        !is_clear_channel_freq ? 0
+        : frequency_khz <= 700  ? 1400   // low-band clear channels
+        : frequency_khz <= 900  ? 1200   // mid-band
+        : 1000;                           // upper-band clear channels
+
+      // Skywave contour distance estimate for 0.5 mV/m at night
+      // Rough model: inversely proportional to frequency (skywave propagation)
+      const skywave_05_mvm_km = is_clear_channel_freq
+        ? round2(nighttime_exclusion_km * 0.6)   // dominant's 0.5 mV/m ~60% of exclusion
+        : null;
+
+      // Nighttime operating options for Class D on clear channel
+      const NIGHTTIME_OPTIONS = exclusion_zone_applies ? [
+        { option: 'Daytime-only operation', description: 'Authorize as daytime-only; no nighttime license', cost_usd: 0 },
+        { option: 'Reduced nighttime power', description: 'Reduce power until skywave contribution meets §73.182 limits', cost_usd: 2000 },
+        { option: 'DA nighttime pattern', description: 'Use a directional antenna to null skywave toward dominant', cost_usd: 15000 },
+        { option: 'STA for nighttime experiment', description: 'Special Temporary Authority to test nighttime operation', cost_usd: 1500 },
+      ] : [];
+
+      return {
+        is_clear_channel_freq,
+        is_class_d,
+        is_class_a,
+        exclusion_zone_applies,
+        nighttime_exclusion_km: exclusion_zone_applies ? nighttime_exclusion_km : 0,
+        skywave_05_mvm_km,
+        nighttime_options: NIGHTTIME_OPTIONS,
+        n_nighttime_options: NIGHTTIME_OPTIONS.length,
+        dominant_protection_standard: '0.5 mV/m skywave contour must not be exceeded at night',
+        daytime_only_required: exclusion_zone_applies,
+        reference: '47 CFR §73.26; §73.29; §73.182; §73.186',
+        note: `${frequency_khz} kHz (${fcc_class}): ${is_clear_channel_freq ? 'CLEAR CHANNEL frequency' : 'Not a clear channel'}. ${exclusion_zone_applies ? `Class D on clear channel — nighttime exclusion zone ≈ ${nighttime_exclusion_km} km. Daytime-only or §73.182 DA pattern required.` : is_class_a ? 'Class A dominant — receives nighttime skywave protection.' : 'No clear-channel exclusion zone applies.'}`
+      };
+    })(),
+
+    am_licensed_power_class_upgrade_guide: (() => {
+      // Guide #122 — Licensed Power Class Upgrade
+      //
+      // A station may apply to increase its authorized power (and potentially
+      // its service class) by filing a modification application (FCC Form 301-AM).
+      // The upgrade must satisfy interference protection requirements and, for
+      // class upgrades, may require a rulemaking petition.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.21 — AM station classes.
+      //   Class A: 10–50 kW (dominant on clear channel), unlimited hours.
+      //   Class B: 0.25–50 kW (regional channel), unlimited hours.
+      //   Class C: 0.25–1 kW (local channel), unlimited hours.
+      //   Class D: 0.25–50 kW (secondary, daytime-only or limited nighttime).
+      //
+      // 47 CFR §73.24 — Licensing requirements.
+      //   A station must demonstrate it can serve the public interest with the
+      //   proposed power/class.  Power increases require showing no new
+      //   interference to existing stations.
+      //
+      // 47 CFR §73.3571 — Processing AM broadcast applications.
+      //   Power increase modifications are processed as minor (< certain
+      //   thresholds) or major (full rulemaking/Section 307(b) analysis).
+      //
+      // POWER CLASS UPGRADE PATHS
+      // ──────────────────────────
+      //   D → B:   Major modification; requires new interference study + rulemaking
+      //   D → C:   May be minor or major depending on power increase magnitude
+      //   C → B:   Major modification; channel change may be needed
+      //   B → A:   Requires petition for rulemaking; extremely rare
+      //   Any → same class, higher power: Minor if within class limits
+      //
+      // THRESHOLDS FOR MAJOR vs MINOR MODIFICATION
+      // ────────────────────────────────────────────
+      //   Minor: power increase ≤ 6 dB (×4 power) within same class
+      //   Major: power increase > 6 dB, class upgrade, or new DA requirement
+      //   Major modifications require full public notice and 30-day petition window
+      //
+      // ENGINEERING EXHIBITS REQUIRED (MODIFICATION APPLICATION)
+      // ──────────────────────────────────────────────────────────
+      //   1. Antenna system description (tower coordinates, height, base impedance)
+      //   2. Predicted contour map at proposed power (§73.183/§73.184)
+      //   3. Co-channel interference study (new proposed contours vs. existing)
+      //   4. Adjacent channel interference study (±10/20 kHz separations)
+      //   5. DA pattern data if directional antenna is proposed
+      //   6. Community of license coverage showing (5 mV/m to COL)
+      //   7. Environmental assessment if new tower or expanded ground system
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const tpo_kw_num = Number(tpo_kw) || 5;
+      const fc = fcc_class.toUpperCase();
+
+      // Current class power ceiling
+      const CLASS_MAX_KW = { A: 50, B: 50, C: 1, D: 50 };
+      const current_max_kw = CLASS_MAX_KW[fc] ?? 50;
+      const headroom_kw = round2(Math.max(0, current_max_kw - tpo_kw_num));
+      const headroom_db = headroom_kw > 0 ? round2(10 * Math.log10((tpo_kw_num + headroom_kw) / tpo_kw_num)) : 0;
+
+      // Can we increase power within the same class?
+      const can_increase_within_class = headroom_kw > 0;
+
+      // Is a class upgrade plausible?
+      const UPGRADE_PATH = {
+        D: { target: 'B or C', notes: 'Major modification required; new interference study' },
+        C: { target: 'B',      notes: 'Major modification; may need channel change' },
+        B: { target: 'A',      notes: 'Petition for rulemaking; extremely rare' },
+        A: { target: 'None',   notes: 'Already maximum class' },
+      };
+      const upgrade_path = UPGRADE_PATH[fc] ?? { target: 'Unknown', notes: '' };
+
+      // Modification type
+      const mod_type = headroom_db > 6 ? 'MAJOR' : can_increase_within_class ? 'MINOR' : 'CLASS_UPGRADE_REQUIRED';
+
+      // Engineering exhibit count
+      const n_exhibits = 6 + (is_da ? 1 : 0);  // +1 for DA pattern data
+
+      // Cost estimates
+      const ENG_LOW  = is_da ? 8000 : 5000;
+      const ENG_HIGH = is_da ? 20000 : 12000;
+      const LEGAL_LOW  = mod_type === 'MAJOR' ? 5000 : 2000;
+      const LEGAL_HIGH = mod_type === 'MAJOR' ? 15000 : 6000;
+      const FCC_FEE    = 1020;  // FY2024 application fee
+      const total_low  = round2(ENG_LOW  + LEGAL_LOW  + FCC_FEE);
+      const total_high = round2(ENG_HIGH + LEGAL_HIGH + FCC_FEE);
+
+      // Timeline
+      const timeline_days = mod_type === 'MAJOR' ? 180 : 60;
+
+      return {
+        current_class:         fc,
+        current_tpo_kw:        tpo_kw_num,
+        current_max_kw,
+        headroom_kw,
+        headroom_db,
+        can_increase_within_class,
+        upgrade_path,
+        modification_type:     mod_type,
+        n_engineering_exhibits: n_exhibits,
+        cost_estimates: {
+          engineering_low_usd:   ENG_LOW,
+          engineering_high_usd:  ENG_HIGH,
+          legal_low_usd:         LEGAL_LOW,
+          fcc_fee_usd:           FCC_FEE,
+          total_low_usd:         total_low,
+          total_high_usd:        total_high,
+        },
+        timeline_days,
+        reference: '47 CFR §73.21; §73.24; §73.3571; FCC Form 301-AM',
+        note: `${tpo_kw_num} kW (${fc}): ${can_increase_within_class ? `${headroom_kw} kW headroom within Class ${fc} (${headroom_db.toFixed(1)} dB). ` : 'At class power ceiling. '}Modification type: ${mod_type}. Cost est. $${total_low.toLocaleString()}–$${total_high.toLocaleString()}. Timeline ≈ ${timeline_days} days.`
+      };
+    })(),
+
+    am_rural_electric_and_standby_power_guide: (() => {
+      // Guide #123 — Rural Electric & Standby Power
+      //
+      // AM transmitter sites — especially rural relocation candidates — must
+      // have reliable utility power.  This guide estimates utility extension
+      // costs, standby generator requirements, and §73.1660 / §73.1680
+      // obligations for backup power and unattended operation.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.1680 — Emergency and standby power.
+      //   AM broadcast stations are strongly encouraged (not strictly required)
+      //   to maintain standby power sufficient to sustain authorized operation
+      //   for at least 60 hours.  EAS participation obligations (§11.35) make
+      //   standby power effectively mandatory for EAS compliance.
+      //
+      // 47 CFR §11.35 — EAS equipment operational readiness.
+      //   All EAS participants must ensure equipment is operational at all times.
+      //   A power outage that takes a station off-air during an EAS event is an
+      //   enforcement risk.  Standby generator or battery backup is the standard.
+      //
+      // 47 CFR §73.1560 — Operating power.
+      //   Station must be able to operate at authorized power on demand; a site
+      //   with unreliable utility power is a regulatory compliance risk.
+      //
+      // UTILITY POWER DISTANCE PROXY
+      // ─────────────────────────────
+      //   Distance from the current site is used as a proxy for rural remoteness.
+      //   Urban/suburban sites (< 15 km) likely have grid power at the property.
+      //   Suburban-rural (15–35 km) may need extension or upgrade.
+      //   Rural (> 35 km) often requires significant line extension.
+      //
+      // UTILITY EXTENSION COST ESTIMATES
+      //   < 0.5 km overhead extension:   $5,000–$15,000
+      //   0.5–2 km overhead:             $15,000–$50,000
+      //   2–5 km overhead:               $50,000–$150,000
+      //   Underground (per km):          $100,000–$300,000
+      //   Transformer and metered service: $5,000–$20,000
+      //
+      // GENERATOR SIZING
+      //   Generator must cover: transmitter TPO + HVAC + control equipment.
+      //   Rule of thumb: transmitter efficiency ≈ 65% (solid-state), so
+      //   input power ≈ TPO / 0.65.  Add 20% for HVAC and accessories.
+      //   Minimum generator size (kVA) ≈ (TPO_kW / 0.65) × 1.2 × 1.25 (PF)
+      //
+      // GENERATOR COST ESTIMATES (standby diesel, installed)
+      //   20–50 kVA:   $15,000–$35,000
+      //   50–100 kVA:  $30,000–$60,000
+      //   100–250 kVA: $60,000–$120,000
+      //   > 250 kVA:   $100,000–$250,000+
+
+      const tpo_kw_num = Number(tpo_kw) || 5;
+      const dist_km    = pt.distance_from_current_km ?? 0;
+
+      // Utility availability estimate based on distance proxy
+      const utility_availability =
+        dist_km < 15 ? 'LIKELY_AVAILABLE'
+        : dist_km < 35 ? 'POSSIBLE_EXTENSION'
+        : 'LIKELY_EXTENSION_REQUIRED';
+
+      // Utility extension distance estimate (rough)
+      const ext_distance_km =
+        dist_km < 15 ? 0
+        : dist_km < 35 ? round2(Math.max(0, (dist_km - 15) * 0.05))   // 5% of marginal distance
+        : round2(Math.max(0.5, (dist_km - 35) * 0.08));               // 8% of marginal distance
+
+      // Extension cost estimate
+      const ext_cost_low  =
+        ext_distance_km === 0   ? 5000
+        : ext_distance_km < 0.5 ? 5000
+        : ext_distance_km < 2   ? 15000
+        : ext_distance_km < 5   ? 50000
+        : 150000;
+      const ext_cost_high =
+        ext_distance_km === 0   ? 20000
+        : ext_distance_km < 0.5 ? 15000
+        : ext_distance_km < 2   ? 50000
+        : ext_distance_km < 5   ? 150000
+        : 400000;
+
+      // Generator sizing
+      const transmitter_input_kw  = round2(tpo_kw_num / 0.65);        // 65% efficiency
+      const hvac_and_aux_kw       = round2(transmitter_input_kw * 0.20);
+      const total_load_kw         = round2(transmitter_input_kw + hvac_and_aux_kw);
+      const generator_size_kva    = round2(total_load_kw * 1.25);     // 0.8 PF
+
+      // Generator cost by size
+      const gen_cost_low  =
+        generator_size_kva < 50   ? 15000
+        : generator_size_kva < 100 ? 30000
+        : generator_size_kva < 250 ? 60000
+        : 100000;
+      const gen_cost_high =
+        generator_size_kva < 50   ? 35000
+        : generator_size_kva < 100 ? 60000
+        : generator_size_kva < 250 ? 120000
+        : 250000;
+
+      const EAS_FUEL_RESERVE_HOURS = 60;   // §73.1680 recommended
+      // Diesel consumption ≈ 0.07 gal/kWh × total_load_kw
+      const fuel_gph     = round2(total_load_kw * 0.07);
+      const fuel_reserve_gal = round2(fuel_gph * EAS_FUEL_RESERVE_HOURS);
+
+      const total_power_low  = round2(ext_cost_low  + gen_cost_low);
+      const total_power_high = round2(ext_cost_high + gen_cost_high);
+
+      return {
+        utility_availability,
+        ext_distance_km,
+        transmitter_input_kw,
+        hvac_and_aux_kw,
+        total_load_kw,
+        generator_size_kva,
+        eas_fuel_reserve_hours: EAS_FUEL_RESERVE_HOURS,
+        fuel_reserve_gal,
+        fuel_consumption_gph: fuel_gph,
+        cost_estimates: {
+          utility_extension_low_usd:  ext_cost_low,
+          utility_extension_high_usd: ext_cost_high,
+          generator_low_usd:  gen_cost_low,
+          generator_high_usd: gen_cost_high,
+          total_power_low_usd:  total_power_low,
+          total_power_high_usd: total_power_high,
+        },
+        reference: '47 CFR §73.1560; §73.1680; §11.35',
+        note: `${tpo_kw_num} kW @ ${dist_km} km: utility ${utility_availability}. Gen size ≈ ${generator_size_kva} kVA. ${EAS_FUEL_RESERVE_HOURS}-hr fuel reserve ≈ ${fuel_reserve_gal} gal. Total power est. $${total_power_low.toLocaleString()}–$${total_power_high.toLocaleString()}.`
+      };
+    })(),
+
+    am_rf_ground_system_inspection_and_maintenance_guide: (() => {
+      // Guide #124 — RF Ground System Inspection & Maintenance
+      //
+      // The AM antenna ground system (buried radials) is the single largest
+      // determinant of antenna efficiency and radiated power.  Maintenance
+      // and inspection obligations are driven by §73.68/§73.69 (ground
+      // systems) and general good-engineering-practice standards.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.68 — Ground conductivity measurements for AM stations.
+      //   Licensee must maintain the ground system in good repair to sustain
+      //   the effective field (EF) within the §73.1560 operating power limits.
+      //   If ground system degradation causes EF to fall below authorized,
+      //   the station is operating out of compliance.
+      //
+      // 47 CFR §73.69 — Sampling systems for AM directional antennas.
+      //   DA stations require antenna monitor sampling loops that are part of
+      //   the ground system.  Maintenance of sampling lines is required to
+      //   maintain accurate phase/ratio readings.
+      //
+      // 47 CFR §73.1560 — Operating power.
+      //   Station must sustain ±10% of authorized power.  A corroded or
+      //   degraded ground system reduces antenna efficiency and effective
+      //   radiated power, which may cause the station to fall below the
+      //   −10% lower limit.
+      //
+      // GROUND SYSTEM DESIGN STANDARDS (FCC/ANSI)
+      // ───────────────────────────────────────────
+      //   Minimum recommended:  120 radials × λ/4 length buried at ~15 cm.
+      //   For Class A: often 120+ radials ≥ λ/2 (higher efficiency).
+      //   Radial wire: #10 AWG copper (bare) is standard; tinned copper
+      //   preferred in corrosive soils.
+      //   Connection bus: solid copper bus ring at base of tower, exothermic
+      //   or silver-brazed connections to each radial.
+      //
+      // INSPECTION INTERVALS
+      // ──────────────────────
+      //   FCC does not specify a mandatory inspection interval for ground
+      //   radials.  Best practice (SBE/NAB guidance):
+      //     Annual: visual inspection of base connection bus and buried
+      //             radial connection points for corrosion.
+      //     Every 3–5 years: resistance measurement of individual radials
+      //             (base current meter check against baseline).
+      //     At license renewal: full ground resistance confirmation.
+      //
+      // REHABILITATION COSTS
+      //   Corrosion inspection + resistance test (annual): $500–$1,500
+      //   Replace damaged radial connections (per connection): $150–$400
+      //   Add supplemental radials (per radial, buried, λ/4): $300–$800
+      //   Full ground rehabilitation (120 radials): $36,000–$96,000
+      //   Exothermic weld bus upgrade: $5,000–$15,000
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const is_da2 = /^DA-2/i.test(pattern_mode);
+
+      // Recommended radial count based on class
+      const isClassA = fcc_class.toUpperCase() === 'A';
+      const rec_radials = isClassA ? 120 : 120;  // 120 is baseline; Class A often more
+
+      // λ/4 radial length
+      const lambda_m      = 300000 / frequency_khz;
+      const qw_m          = round2(lambda_m / 4);
+      const qw_ft         = round2(qw_m * 3.28084);
+
+      // Number of towers (DA-2 = 2, DA-N ≥ 3, NDA = 1)
+      const n_towers = /^DA-2/i.test(pattern_mode) ? 2
+        : /^DA-N/i.test(pattern_mode) ? 3
+        : /^DA/i.test(pattern_mode) ? 2
+        : 1;
+      const total_radials = rec_radials * n_towers;
+
+      // Annual inspection cost
+      const ANNUAL_INSP_LOW  = 500;
+      const ANNUAL_INSP_HIGH = 1500;
+
+      // Full rehabilitation cost
+      const RADIAL_COST_LOW  = 300;
+      const RADIAL_COST_HIGH = 800;
+      const BUS_UPGRADE_LOW  = 5000;
+      const BUS_UPGRADE_HIGH = 15000;
+      const rehab_low  = round2(total_radials * RADIAL_COST_LOW  + n_towers * BUS_UPGRADE_LOW);
+      const rehab_high = round2(total_radials * RADIAL_COST_HIGH + n_towers * BUS_UPGRADE_HIGH);
+
+      // DA stations: sampling system maintenance adds cost
+      const SAMPLING_MAINT_ANNUAL = is_da ? 800 : 0;
+
+      const INSPECTION_SCHEDULE = [
+        { interval: 'Annual',    task: 'Visual inspection of base bus and connection points for corrosion' },
+        { interval: 'Annual',    task: 'Base current meter check vs. baseline' },
+        { interval: '3–5 years', task: 'Individual radial resistance measurements' },
+        { interval: 'At renewal',task: 'Full ground resistance confirmation for license records' },
+        ...(is_da ? [{ interval: 'Annual', task: 'DA sampling loop inspection and calibration verification' }] : []),
+      ];
+
+      return {
+        recommended_radials_per_tower: rec_radials,
+        n_towers,
+        total_radials,
+        radial_length_m: qw_m,
+        radial_length_ft: qw_ft,
+        inspection_schedule: INSPECTION_SCHEDULE,
+        n_inspection_tasks: INSPECTION_SCHEDULE.length,
+        da_sampling_maintenance: is_da,
+        annual_cost: {
+          inspection_low_usd:  ANNUAL_INSP_LOW,
+          inspection_high_usd: ANNUAL_INSP_HIGH,
+          sampling_maint_usd:  SAMPLING_MAINT_ANNUAL,
+          total_annual_low_usd: round2(ANNUAL_INSP_LOW  + SAMPLING_MAINT_ANNUAL),
+          total_annual_high_usd:round2(ANNUAL_INSP_HIGH + SAMPLING_MAINT_ANNUAL),
+        },
+        rehabilitation_cost: {
+          radial_cost_per_unit_low_usd:  RADIAL_COST_LOW,
+          radial_cost_per_unit_high_usd: RADIAL_COST_HIGH,
+          total_rehab_low_usd:  rehab_low,
+          total_rehab_high_usd: rehab_high,
+        },
+        reference: '47 CFR §73.68; §73.69; §73.1560',
+        note: `${frequency_khz} kHz: λ/4 radial = ${qw_ft} ft (${qw_m} m). ${n_towers} tower(s) × ${rec_radials} radials = ${total_radials} total. Annual inspection est. $${(ANNUAL_INSP_LOW + SAMPLING_MAINT_ANNUAL).toLocaleString()}–$${(ANNUAL_INSP_HIGH + SAMPLING_MAINT_ANNUAL).toLocaleString()}. Full rehab: $${rehab_low.toLocaleString()}–$${rehab_high.toLocaleString()}.`
+      };
+    })(),
+
+    am_antenna_commissioning_and_proof_of_performance_guide: (() => {
+      // Guide #125 — Antenna System Commissioning & Proof of Performance
+      //
+      // A new or modified AM antenna system must be commissioned before the
+      // station can operate under the new license/CP.  DA stations additionally
+      // require a formal proof of performance demonstrating the antenna system
+      // produces the authorized pattern.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.62 — Directional antenna performance requirements.
+      //   A DA station must maintain its authorized pattern within the
+      //   tolerances of §73.62: ±2° phase, ±5% ratio.
+      //   The licensee is responsible for ensuring the pattern is correct
+      //   at all times.
+      //
+      // 47 CFR §73.151 — Field strength measurements for proof of performance.
+      //   Proof consists of radial field strength measurements on at least
+      //   8 radials (more for complex patterns).  Each radial has ≥3 sample
+      //   points beyond the 1 km monitor point.
+      //
+      // 47 CFR §73.154 — Partial proof of performance.
+      //   When only a minor modification is made to an existing DA pattern,
+      //   a partial proof (fewer radials) may be accepted.
+      //
+      // 47 CFR §73.158 — Directional antenna monitoring points.
+      //   Each DA station must designate a monitor point (≥1 km from each
+      //   tower) where the field strength is measured to confirm pattern
+      //   integrity.  Monitor point values become license conditions.
+      //
+      // 47 CFR §73.67 — Sampling system specifications.
+      //   The antenna monitor sampling system must meet phase/amplitude
+      //   accuracy specifications to be used for pattern verification.
+      //
+      // COMMISSIONING CHECKLIST (NDA)
+      // ──────────────────────────────
+      //   1. Verify transmitter type acceptance (§73.1660)
+      //   2. Measure base impedance (bridge measurement)
+      //   3. Verify operating power within ±10% of authorized (§73.1560)
+      //   4. Set up base current meter and calibrate
+      //   5. Conduct 5 mV/m spot measurement in the direction of COL
+      //   6. File License to Cover (Form 302-AM) with measurements
+      //
+      // COMMISSIONING CHECKLIST (DA)
+      // ──────────────────────────────
+      //   All NDA steps plus:
+      //   7. Calibrate antenna monitor against reference bridge
+      //   8. Verify phase and ratio at each tower within ±2°/±5%
+      //   9. Measure field strength on ≥8 radials (§73.151)
+      //   10. Establish and measure monitor point(s) (§73.158)
+      //   11. Submit formal proof of performance to FCC
+      //   12. Obtain FCC acceptance of proof before commencing nighttime
+      //       operation (if applicable)
+      //
+      // COST ESTIMATES
+      //   NDA commissioning:                $2,000–$5,000
+      //   DA proof of performance (8 rad):  $8,000–$20,000
+      //   DA proof (complex, 16+ radials):  $15,000–$40,000
+      //   Monitor point establishment:       $1,000–$2,500 per point
+      //   FCC application review fee:        $1,020
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const is_da2 = /^DA-2/i.test(pattern_mode);
+
+      const NDA_STEPS = [
+        { step: 1, task: 'Verify transmitter type acceptance (FCC ID)', rule: '§73.1660' },
+        { step: 2, task: 'Measure base impedance (bridge measurement)', rule: '§73.1560' },
+        { step: 3, task: 'Verify operating power within ±10% of authorized', rule: '§73.1560' },
+        { step: 4, task: 'Install and calibrate base current meter', rule: '§73.1665' },
+        { step: 5, task: '5 mV/m spot measurement toward community of license', rule: '§73.24(j)' },
+        { step: 6, task: 'File License to Cover (FCC Form 302-AM)', rule: '§73.3598' },
+      ];
+
+      const DA_ADDITIONAL_STEPS = is_da ? [
+        { step: 7,  task: 'Calibrate antenna monitor against reference bridge', rule: '§73.67' },
+        { step: 8,  task: 'Verify phase (±2°) and ratio (±5%) at each tower', rule: '§73.62' },
+        { step: 9,  task: 'Conduct field strength proof on ≥8 radials', rule: '§73.151' },
+        { step: 10, task: 'Establish and measure monitor point(s)', rule: '§73.158' },
+        { step: 11, task: 'Submit formal proof of performance to FCC', rule: '§73.151' },
+        ...(is_da2 ? [{ step: 12, task: 'Obtain FCC acceptance before nighttime DA-2 operation', rule: '§73.62' }] : []),
+      ] : [];
+
+      const all_steps = [...NDA_STEPS, ...DA_ADDITIONAL_STEPS];
+
+      // Monitor points: one per unique direction of concern (simplified: 1 per tower for DA)
+      const n_towers = is_da2 ? 2 : is_da ? 2 : 1;
+      const n_monitor_points = is_da ? n_towers : 0;
+
+      // Cost estimates
+      const BASE_COMM_LOW  = 2000;
+      const BASE_COMM_HIGH = 5000;
+      const PROOF_LOW  = is_da2 ? 8000 : is_da ? 6000 : 0;
+      const PROOF_HIGH = is_da2 ? 20000 : is_da ? 12000 : 0;
+      const MONITOR_LOW  = n_monitor_points * 1000;
+      const MONITOR_HIGH = n_monitor_points * 2500;
+      const FCC_FEE = 1020;
+
+      const total_low  = round2(BASE_COMM_LOW  + PROOF_LOW  + MONITOR_LOW  + FCC_FEE);
+      const total_high = round2(BASE_COMM_HIGH + PROOF_HIGH + MONITOR_HIGH + FCC_FEE);
+
+      return {
+        n_commissioning_steps: all_steps.length,
+        commissioning_steps: all_steps,
+        formal_proof_required: is_da,
+        n_monitor_points,
+        proof_radials_required: is_da ? 8 : 0,
+        cost_estimates: {
+          base_commissioning_low_usd:  BASE_COMM_LOW,
+          base_commissioning_high_usd: BASE_COMM_HIGH,
+          proof_of_performance_low_usd: PROOF_LOW,
+          proof_of_performance_high_usd:PROOF_HIGH,
+          monitor_point_low_usd: MONITOR_LOW,
+          fcc_fee_usd: FCC_FEE,
+          total_low_usd:  total_low,
+          total_high_usd: total_high,
+        },
+        reference: '47 CFR §73.62; §73.67; §73.151; §73.154; §73.158; §73.1560; §73.1660; §73.3598',
+        note: `${frequency_khz} kHz (${fcc_class}): ${all_steps.length} commissioning steps. ${is_da ? `DA: formal proof required on ≥8 radials, ${n_monitor_points} monitor point(s). ` : 'NDA: no formal proof required. '}Cost est. $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
       };
     })(),
 
