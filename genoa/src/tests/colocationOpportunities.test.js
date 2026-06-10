@@ -4231,3 +4231,13 @@ test('am_licensed_contour_migration_guide present across colocation candidates',
     assert.ok(['EXPANDED','SIMILAR','CONTRACTED'].includes(lcm.soil_coverage_advantage), 'soil_coverage_advantage must be valid');
   }
 });
+
+test('am_tower_electrical_height_and_efficiency_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const teh = c.am_tower_electrical_height_and_efficiency_guide;
+    assert.ok(teh !== undefined && teh !== null, 'candidate missing am_tower_electrical_height_and_efficiency_guide');
+    assert.ok(typeof teh.electrical_height_deg === 'number', 'electrical_height_deg must be numeric');
+    assert.ok(['OPTIMAL','ACCEPTABLE','SUBOPTIMAL'].includes(teh.height_rating), 'height_rating must be valid');
+  }
+});
