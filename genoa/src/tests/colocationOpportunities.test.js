@@ -4190,3 +4190,13 @@ test('am_frequency_coordination_and_channel_study_guide present across colocatio
     assert.ok(fcs.n_form_301_required > 0, 'n_form_301_required must be positive');
   }
 });
+
+test('am_environmental_and_rf_hazard_assessment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const env = c.am_environmental_and_rf_hazard_assessment_guide;
+    assert.ok(env !== undefined && env !== null, 'candidate missing am_environmental_and_rf_hazard_assessment_guide');
+    assert.ok(typeof env.nepa_disposition === 'string', 'nepa_disposition must be a string');
+    assert.ok(Array.isArray(env.env_checklist), 'env_checklist must be an array');
+  }
+});

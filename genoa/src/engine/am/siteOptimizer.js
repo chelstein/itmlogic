@@ -1611,6 +1611,11 @@ export async function runSiteOptimizer(body = {}){
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
     cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    env_nepa_disposition:               c.am_environmental_and_rf_hazard_assessment_guide?.nepa_disposition ?? null,
+    env_rf_eval_required:               c.am_environmental_and_rf_hazard_assessment_guide?.rf_eval_required ?? null,
+    env_rf_safe_dist_m:                 c.am_environmental_and_rf_hazard_assessment_guide?.rf_safe_dist_m ?? null,
+    env_nhpa_likely:                    c.am_environmental_and_rf_hazard_assessment_guide?.nhpa_likely_required ?? null,
+    env_n_required:                     c.am_environmental_and_rf_hazard_assessment_guide?.n_env_required ?? null,
     fcs_channel_class:                  c.am_frequency_coordination_and_channel_study_guide?.channel_class ?? null,
     fcs_has_skywave:                    c.am_frequency_coordination_and_channel_study_guide?.has_skywave_obligation ?? null,
     fcs_coch_radius_km:                 c.am_frequency_coordination_and_channel_study_guide?.co_channel_search_radius_km ?? null,
@@ -27383,6 +27388,136 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_environmental_and_rf_hazard_assessment_guide: (() => {
+      // Environmental review and RF hazard assessment for transmitter site relocation.
+      //
+      // Any FCC construction permit application for a new/relocated AM transmitter
+      // site requires the applicant to address environmental impact under:
+      //
+      //   1. NEPA (National Environmental Policy Act) — FCC's rules at 47 CFR §1.1301–§1.1319
+      //      Most AM site relocations qualify for a Categorical Exclusion (CE) if the
+      //      site does not trigger any "significant environmental effect" threshold.
+      //      Eight categories require a full Environmental Assessment (EA):
+      //        (a) wilderness areas, (b) wildlife refuges, (c) floodplains,
+      //        (d) surface features, (e) high-intensity RF (>5 kW ERP or towers >60 m),
+      //        (f) Native American sites, (g) nuclear waste sites, (h) antenna farms.
+      //
+      //   2. NHPA §106 (National Historic Preservation Act) — FCC's rules at 47 CFR §1.1307(a)(4)
+      //      Proposed towers ≥ 200 ft AGL or requiring FAA marking/lighting may require
+      //      consultation with State Historic Preservation Officer (SHPO).
+      //
+      //   3. RF Exposure (47 CFR §1.1307(b) / §1.1310) — OET Bulletin 65
+      //      AM stations ≥ 1 kW TPO must evaluate general-population/uncontrolled
+      //      MPE limits.  AM towers carry RF current on the structure itself;
+      //      the base area is a controlled-environment hazard zone.  The 1.6 mW/cm²
+      //      general population limit at AM frequencies requires the tower fence to
+      //      be ≥ the calculated safe distance.
+      //
+      // References:
+      //   47 CFR §1.1301–§1.1319 (NEPA)
+      //   47 CFR §1.1307 (environmental significance)
+      //   47 CFR §1.1310 (RF safety)
+      //   OET Bulletin 65 (RF exposure evaluation)
+      //   36 CFR §800 (NHPA §106)
+
+      // NEPA CE vs EA threshold analysis
+      const NEPA_EA_TRIGGERS = [
+        {
+          code:       'NEPA_EA_WILDERNESS',
+          label:      'Wilderness area or wildlife refuge',
+          cfr:        '§1.1307(a)(1)(2)',
+          triggered:  false,   // requires GIS lookup — advisory only
+          advisory:   true
+        },
+        {
+          code:       'NEPA_EA_FLOODPLAIN',
+          label:      'Floodplain or wetland',
+          cfr:        '§1.1307(a)(3)',
+          triggered:  false,
+          advisory:   true
+        },
+        {
+          code:       'NEPA_EA_HIGH_RF',
+          label:      'High-intensity RF (ERP > 5 kW or tower > 60 m AGL)',
+          cfr:        '§1.1307(a)(5)',
+          triggered:  tpo_kw > 5,
+          advisory:   false
+        },
+        {
+          code:       'NEPA_EA_NATIVE_AMERICAN',
+          label:      'Native American/Alaskan Native religious or cultural site',
+          cfr:        '§1.1307(a)(6)',
+          triggered:  false,
+          advisory:   true
+        },
+        {
+          code:       'NEPA_EA_ANTENNA_FARM',
+          label:      'Antenna farm (site with ≥ 3 other broadcast structures)',
+          cfr:        '§1.1307(a)(8)',
+          triggered:  false,
+          advisory:   true
+        }
+      ];
+
+      const nDefinitelyTriggered = NEPA_EA_TRIGGERS.filter(t => t.triggered && !t.advisory).length;
+      const nAdvisory            = NEPA_EA_TRIGGERS.filter(t => t.advisory).length;
+
+      const nepaDisposition = nDefinitelyTriggered > 0
+        ? 'EA_REQUIRED'
+        : 'CE_LIKELY_PENDING_SITE_REVIEW';
+
+      // RF safety: approximate minimum safe distance at fence line
+      // AM base current creates near-field RF hazard in tower base area.
+      // General population MPE at AM: 1.6 mW/cm² (uncontrolled).
+      // Simplified: safe_dist_m ≈ sqrt(60 × P_watts / (4π × 1.6)) (EIRP model, very rough)
+      // For a full evaluation use OET Bulletin 65 procedure.
+      const tpo_watts        = tpo_kw * 1000;
+      const MPE_LIMIT_MW_CM2 = 1.6;  // mW/cm²; OET-65 Table 1 general population AM
+      const MPE_LIMIT_W_M2   = MPE_LIMIT_MW_CM2 * 10; // 16 W/m²
+      const safe_dist_m      = tpo_watts > 0
+        ? round2(Math.sqrt((30 * tpo_watts) / (Math.PI * MPE_LIMIT_W_M2)))
+        : null;
+
+      // NHPA §106 trigger: towers ≥ 200 ft AGL or requiring FAA marking
+      // Use tpo_kw and fcc_class as proxies for whether tower height is plausible
+      const NHPA_HEIGHT_TRIGGER_FT = 200;
+      const NHPA_HEIGHT_TRIGGER_M  = round2(NHPA_HEIGHT_TRIGGER_FT * 0.3048);
+      const nhpaLikelyRequired     = fcc_class === 'A' || fcc_class === 'B';  // proxy only
+
+      // Environmental checklist (Form 301 Section VII items)
+      const ENV_CHECKLIST = [
+        { item: 'NEPA Categorical Exclusion or Environmental Assessment', required: true,  cfr: '§1.1307' },
+        { item: 'RF Exposure evaluation (OET-65 procedure)', required: tpo_kw >= 1.0, cfr: '§1.1310; OET-65' },
+        { item: 'Floodplain / wetland screening (FIRM maps, NWI)', required: true, cfr: '§1.1307(a)(3)' },
+        { item: 'NHPA §106 consultation with SHPO (if tower ≥ 200 ft or FAA-required marking)', required: nhpaLikelyRequired, cfr: '36 CFR §800; FCC §1.1307(a)(4)' },
+        { item: 'Native American sacred site consultation (tribal SHPO)', required: false, cfr: '§1.1307(a)(6); NHPA §106', advisory: true },
+        { item: 'Migratory Bird Treaty Act screening (if tower ≥ 200 ft with guy wires)', required: false, cfr: 'MBTA; FCC guidance 2023', advisory: true },
+        { item: 'Antenna farm check (3+ structures within 640 acres)', required: false, cfr: '§1.1307(a)(8)', advisory: true }
+      ];
+
+      const nRequired  = ENV_CHECKLIST.filter(c => c.required && !c.advisory).length;
+      const nAdvisoryC = ENV_CHECKLIST.filter(c => c.advisory).length;
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        nepa_disposition:        nepaDisposition,
+        nepa_ea_triggers:        NEPA_EA_TRIGGERS,
+        n_nepa_ea_definitely:    nDefinitelyTriggered,
+        n_nepa_ea_advisory:      nAdvisory,
+        rf_safe_dist_m:          safe_dist_m,
+        rf_mpe_limit_mw_cm2:     MPE_LIMIT_MW_CM2,
+        rf_eval_required:        tpo_kw >= 1.0,
+        nhpa_height_trigger_ft:  NHPA_HEIGHT_TRIGGER_FT,
+        nhpa_height_trigger_m:   NHPA_HEIGHT_TRIGGER_M,
+        nhpa_likely_required:    nhpaLikelyRequired,
+        env_checklist:           ENV_CHECKLIST,
+        n_env_required:          nRequired,
+        n_env_advisory:          nAdvisoryC,
+        reference: '47 CFR §1.1301–§1.1319; §1.1307; §1.1310; OET Bulletin 65; 36 CFR §800; FCC Environmental Rules',
+        note: `NEPA: ${nepaDisposition}. RF eval required: ${tpo_kw >= 1.0 ? 'YES (TPO ≥ 1 kW)' : 'NO (TPO < 1 kW)'}. NHPA §106: ${nhpaLikelyRequired ? 'LIKELY (Class A/B — verify tower height)' : 'CHECK TOWER HEIGHT (< 200 ft AGL = exempt)'}. RF fence distance estimate: ${safe_dist_m != null ? safe_dist_m + ' m' : '—'}.`
       };
     })(),
 

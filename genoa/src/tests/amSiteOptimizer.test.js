@@ -16876,3 +16876,47 @@ test('#101 candidate_comparison_table has fcs_* columns', async () => {
     assert.ok('fcs_study_effort_max_hrs' in row, 'fcs_study_effort_max_hrs missing');
   }
 });
+
+// ---- Feature #102: am_environmental_and_rf_hazard_assessment_guide ----
+
+test('#102 KAZM: environmental guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const env = out.candidates[0].am_environmental_and_rf_hazard_assessment_guide;
+  assert.ok(env, 'am_environmental_and_rf_hazard_assessment_guide must be present');
+  assert.ok(typeof env.nepa_disposition === 'string', 'nepa_disposition must be a string');
+  assert.ok(Array.isArray(env.nepa_ea_triggers), 'nepa_ea_triggers must be an array');
+  assert.ok(typeof env.rf_eval_required === 'boolean', 'rf_eval_required must be boolean');
+  assert.ok(Array.isArray(env.env_checklist), 'env_checklist must be an array');
+  assert.ok(typeof env.n_env_required === 'number', 'n_env_required must be numeric');
+});
+
+test('#102 station ≥ 1 kW: rf_eval_required = true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const env = out.candidates[0].am_environmental_and_rf_hazard_assessment_guide;
+  assert.ok(env.rf_eval_required, 'TPO ≥ 1 kW must require RF evaluation');
+  assert.ok(env.rf_safe_dist_m > 0, 'RF safe distance must be positive for ≥ 1 kW');
+});
+
+test('#102 station < 1 kW: rf_eval_required = false', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 0.25, fcc_class: 'C', candidate_limit: 1 });
+  const env = out.candidates[0].am_environmental_and_rf_hazard_assessment_guide;
+  assert.ok(!env.rf_eval_required, 'TPO < 1 kW must not require RF evaluation');
+});
+
+test('#102 high ERP (>5 kW) triggers NEPA EA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 10, candidate_limit: 1 });
+  const env = out.candidates[0].am_environmental_and_rf_hazard_assessment_guide;
+  assert.ok(env.n_nepa_ea_definitely >= 1, 'TPO > 5 kW must trigger at least 1 definite NEPA EA condition');
+  assert.strictEqual(env.nepa_disposition, 'EA_REQUIRED', 'High-ERP station must require EA');
+});
+
+test('#102 candidate_comparison_table has env_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('env_nepa_disposition' in row, 'env_nepa_disposition missing');
+    assert.ok('env_rf_eval_required' in row, 'env_rf_eval_required missing');
+    assert.ok('env_rf_safe_dist_m'   in row, 'env_rf_safe_dist_m missing');
+    assert.ok('env_nhpa_likely'      in row, 'env_nhpa_likely missing');
+    assert.ok('env_n_required'       in row, 'env_n_required missing');
+  }
+});
