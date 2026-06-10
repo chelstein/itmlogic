@@ -17,6 +17,21 @@ import * as aiRouter from '../services/aiRouter.js';
 import * as fccKb from '../services/fccKb.js';
 import * as doKb from '../services/doKb.js';
 
+// Allowed advisory finding categories.  Every category is an OBSERVATION
+// class, never an engineering judgment:
+//   INCONSISTENCY       — two exhibit surfaces contradict each other
+//   MISSING_EVIDENCE    — a claim lacks the evidence record that should back it
+//   UNRESOLVED_CONFLICT — two sources disagree and no declared basis resolves it
+//   DOCUMENTATION_GAP   — a section/field the exhibit format requires is absent
+//   TRACEABILITY_GAP    — a value cannot be traced to a source or provenance record
+export const FINDING_CATEGORIES = Object.freeze([
+  'INCONSISTENCY',
+  'MISSING_EVIDENCE',
+  'UNRESOLVED_CONFLICT',
+  'DOCUMENTATION_GAP',
+  'TRACEABILITY_GAP'
+]);
+
 const SYSTEM_PROMPT =
   'You are an FCC broadcast engineering-exhibit consistency auditor.  You are given a ' +
   'condensed snapshot of a generated propagation exhibit (validation verdict, engineering ' +
@@ -24,8 +39,19 @@ const SYSTEM_PROMPT =
   'contradictions or claims that are physically/regulatorily impossible given the other ' +
   'values shown.  Do NOT restate the exhibit, do NOT speculate, do NOT comment on filing ' +
   'merits.  When grounding CFR text is provided, use it to check citations.  Respond as a ' +
-  'JSON array of {"issue":"<one sentence>","severity":"WARNING|INFO"}; empty array [] if ' +
-  'internally consistent.\n\n' +
+  'JSON array of {"issue":"<one sentence>","severity":"WARNING|INFO",' +
+  '"category":"INCONSISTENCY|MISSING_EVIDENCE|UNRESOLVED_CONFLICT|DOCUMENTATION_GAP|TRACEABILITY_GAP"}; ' +
+  'empty array [] if internally consistent.\n\n' +
+  'SCOPE LOCK — you may ONLY inspect: (a) internal consistency, (b) source provenance, ' +
+  '(c) traceability of values to evidence, and (d) missing evidence.  You may NOT inspect ' +
+  'or pronounce on: compliance determination, filing readiness, rule interpretation, or ' +
+  'engineering conclusions.  Those belong exclusively to the deterministic engines and the ' +
+  'engineer of record.\n\n' +
+  'YOU MUST NEVER DETERMINE WHICH ENGINEERING VALUE IS CORRECT.  You may not declare any ' +
+  'HAAT value correct or incorrect, declare FCC-record values wrong, declare computed ' +
+  'values correct, override engineer intent, or override source authority.  When two ' +
+  'values disagree, report the disagreement as an UNRESOLVED_CONFLICT (or note it is ' +
+  'declared/resolved) — never adjudicate it.\n\n' +
   'IMPORTANT: Do NOT flag regulatory_pass=false and haat_status=REVIEW (or PASS) as ' +
   'contradictory.  These are independent checks.  An station can have a valid or ' +
   'reviewable HAAT calculation and STILL fail §73.215 contour protection due to ' +
@@ -33,10 +59,11 @@ const SYSTEM_PROMPT =
   'the regulatory failure is explicitly attributed to a HAAT error (e.g. haat_status=INVALID ' +
   'while regulatory_pass=true claiming a HAAT-dependent compliance).\n\n' +
   'IMPORTANT: If haat_input_suspected_type=tower_agl_entered_as_haat, the operator likely ' +
-  'entered tower height AGL instead of HAAT.  The operative HAAT is terrain-derived and ' +
-  'is the correct value for RF calculations.  Do NOT treat the difference between ' +
-  'operator-entered and terrain-derived HAAT as a contradiction when this flag is set — ' +
-  'it is a known and labeled input issue, not an internal inconsistency.\n\n' +
+  'entered tower height AGL instead of HAAT.  The operative HAAT basis is declared by the ' +
+  'deterministic engine in the HAAT BASIS AND GOVERNANCE block; you do not adjudicate it.  ' +
+  'Do NOT treat the difference between operator-entered and terrain-derived HAAT as a ' +
+  'contradiction when this flag is set — it is a known and labeled input issue, not an ' +
+  'internal inconsistency.\n\n' +
   'SOURCE AUTHORITY CONTEXT: source_attestation_confidence reflects the provenance quality of ' +
   'engineering inputs (FCC LMS=1.00, USGS DEM=0.95, engine-derived=0.90, operator-only=0.50, ' +
   'AI-inferred=0.10).  source_operator_only_fields lists values with no authoritative cross-check. ' +
@@ -47,10 +74,63 @@ const SYSTEM_PROMPT =
   'SOURCE FRESHNESS AND EVIDENCE LOCK: source_stale lists sources older than their staleness ' +
   'threshold.  evidence_lock_status indicates whether the evidence lock is valid, invalid, ' +
   'missing, or not_verified.  source_record_changed lists sources whose evidence hash changed ' +
-  'after locking.  Treat stale, changed, or unlocked authoritative source records as filing ' +
-  'risk.  Do NOT recommend READY when a critical source (FCC LMS, ASR) is stale, changed, or ' +
-  'lacks a valid evidence lock.  evidence_lock_status=not_verified means the lock was created ' +
+  'after locking.  Report a stale, changed, or unlocked authoritative source record (FCC LMS, ' +
+  'ASR) as a TRACEABILITY_GAP or MISSING_EVIDENCE finding; do not make any filing-readiness ' +
+  'recommendation about it.  evidence_lock_status=not_verified means the lock was created ' +
   'this session and has not yet been re-verified — this is normal for fresh exhibits.';
+
+// ---------------------------------------------------------------------------
+// Finding sanitizer — enforces the advisory scope lock in code, not just in
+// the prompt.  Two rules:
+//
+//   1. Every finding carries a category from FINDING_CATEGORIES.  A missing
+//      or unknown category defaults to INCONSISTENCY (observation class) —
+//      findings are never invented or upgraded, only labeled.
+//
+//   2. Findings that act as engineering judgments are DROPPED.  The AI layer
+//      may surface inconsistencies, contradictions, missing evidence, missing
+//      provenance, and unresolved conflicts; it may never declare which
+//      engineering value is correct, declare FCC values wrong, declare
+//      computed values correct, pronounce a compliance determination, or
+//      pronounce filing readiness.  Those belong exclusively to the
+//      deterministic engines and the engineer of record.
+//
+// Dropped findings are returned separately (suppressed[]) so QA can audit
+// what the model attempted to assert.
+// ---------------------------------------------------------------------------
+const JUDGMENT_PATTERNS = [
+  /\bis the correct (value|haat|erp|height)\b/i,
+  /\bis (the )?(in)?correct\b/i,
+  /\b(value|haat|record|figure) is (simply |clearly |plainly )?wrong\b/i,
+  /\bshould (be used|control|govern|replace)\b/i,
+  /\bmust (be used|control|govern|replace)\b/i,
+  /\brecommend (using|adopting|filing|granting)\b/i,
+  /\bthe (fcc|licensed|authorized) (value|haat|record) (is|appears) (wrong|incorrect|invalid|erroneous)\b/i,
+  /\bthe (terrain|computed|derived) (value|haat|mean) (is|appears) (correct|right|valid|accurate)\b/i,
+  /\b(facility|exhibit|station) (is|is not|isn['’]t) (filing[- ]ready|ready to file|compliant|non-?compliant)\b/i,
+  /\bthis (filing|application) (should|must|may) (be granted|be dismissed|proceed)\b/i,
+  /\boverride the (engineer|declared basis|source authority)\b/i
+];
+
+export function sanitizeFindings(rawFindings){
+  const findings   = [];
+  const suppressed = [];
+  for (const f of (Array.isArray(rawFindings) ? rawFindings : [])){
+    const issue = String(f?.issue || '').trim();
+    if (!issue) continue;
+    if (JUDGMENT_PATTERNS.some(re => re.test(issue))){
+      suppressed.push({ ...f, suppressed_reason: 'ENGINEERING_JUDGMENT_OUT_OF_SCOPE' });
+      continue;
+    }
+    const cat = String(f?.category || '').toUpperCase();
+    findings.push({
+      issue,
+      severity: String(f?.severity || 'INFO').toUpperCase() === 'WARNING' ? 'WARNING' : 'INFO',
+      category: FINDING_CATEGORIES.includes(cat) ? cat : 'INCONSISTENCY'
+    });
+  }
+  return { findings, suppressed };
+}
 
 // Build a compact, deterministic snapshot of the consistency-relevant
 // surface.  Kept small (the router bills per token) and stable (so the
@@ -208,17 +288,23 @@ export async function reviewExhibit(exhibit){
   const out = await aiRouter.complete({ system: SYSTEM_PROMPT, user, maxTokens: 600 });
   if (!out.available) return { available: false, reason: out.reason, grounded: !!grounding };
 
-  let findings = [];
+  let parsed = [];
   try {
     const m = out.content.match(/\[[\s\S]*\]/);   // tolerate prose around the JSON
-    if (m) findings = JSON.parse(m[0]);
+    if (m) parsed = JSON.parse(m[0]);
   } catch { /* leave empty; raw content preserved below */ }
+
+  // Enforce the advisory scope lock: categorize every finding and drop
+  // anything that acts as an engineering judgment (see sanitizeFindings).
+  const { findings, suppressed } = sanitizeFindings(parsed);
 
   return {
     available: true,
     grounded:  !!grounding,
     model:     out.model,
-    findings:  Array.isArray(findings) ? findings : [],
+    findings,
+    // Findings the scope filter removed — kept for QA audit, never rendered.
+    suppressed_findings: suppressed,
     raw:       out.content
   };
 }

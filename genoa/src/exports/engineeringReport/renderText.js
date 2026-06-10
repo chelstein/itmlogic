@@ -89,7 +89,7 @@ function renderSection(s){
       if (s.table) buf.push(renderTable(s.table));
       break;
     case 'conclusion':
-      buf.push(`Conclusion: ${s.status}`);
+      buf.push(`Conclusion: ${s.display_status || s.status}`);
       buf.push('');
       buf.push(wrap(s.narrative || '', PAGE_WIDTH));
       if (Array.isArray(s.findings) && s.findings.length){

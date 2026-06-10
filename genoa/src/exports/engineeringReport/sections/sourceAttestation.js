@@ -98,31 +98,48 @@ export function buildSourceAttestationSection(exhibit, options){
       });
       const op = (r.candidates || []).find(x => x.operative);
       if (op){
+        // Humanized conflict panel — written the way a consulting engineer
+        // reads, not the way the resolver stores it.  The machine-readable
+        // codes stay in the table rows above; this panel is the prose the
+        // PDF reader actually uses.
         const isHaatField = key === 'haat_m';
+        const opSource    = SOURCE_LABEL[op.source_type] || op.source_type;
+        const altSource   = SOURCE_LABEL[c.source_type] || c.source_type;
+        const opIsLicensed = op.source_type === 'FCC_LMS' || op.source_type === 'FCC_CDBS';
+        const statusLine  = opIsLicensed
+          ? 'Licensed value controls.'
+          : op.source_type === 'MANUAL_ENGINEER_OVERRIDE'
+            ? 'Engineer override controls.'
+            : `${opSource} value controls (highest-authority source).`;
         if (isHaatField) {
-          // HAAT conflict narrative must use HAAT-specific framing.
-          // The operative value is the filing-controlling HAAT (basis declared
-          // in the HAAT BASIS AND GOVERNANCE section); the non-operative value
-          // is retained as engineering evidence.  A difference between an
-          // FCC-authorized HAAT and a Genoa-computed §73.313 HAAT is a
-          // basis-selection issue, NOT a math failure — do not label it as one.
+          // A difference between an FCC-authorized HAAT and a Genoa-computed
+          // §73.313 HAAT is a basis-selection issue, NOT a math failure.
           conflictNarratives.push(
-            `The filing-controlling HAAT used in this exhibit\'s RF calculations is ` +
-            `${fmtValue(op.value, op.unit)} from ${SOURCE_LABEL[op.source_type] || op.source_type}. ` +
-            `The ${SOURCE_LABEL[c.source_type] || c.source_type} HAAT value of ` +
-            `${fmtValue(c.value, c.unit)} is retained as advisory engineering evidence ` +
-            `(difference: Δ ${c.conflicts[0]?.delta ?? '—'} vs tolerance ${c.conflicts[0]?.tolerance ?? '—'}). ` +
-            `A difference between the FCC-authorized HAAT and the Genoa-computed §73.313 radial HAAT ` +
-            `is a basis-selection issue, not a math failure; it must be explicitly declared by the ` +
-            `engineer of record. See HAAT BASIS AND GOVERNANCE section for the declared basis.`
+            `HAAT\n\n` +
+            `Controlling Value:\n${fmtValue(op.value, op.unit)}\n\n` +
+            `Source:\n${opSource}\n\n` +
+            `Status:\n${statusLine}\n\n` +
+            `Additional Evidence:\n${altSource} HAAT = ${fmtValue(c.value, c.unit)}\n\n` +
+            `Review Note:\nDifference exceeds tolerance ` +
+            `(Δ ${c.conflicts[0]?.delta ?? '—'} vs tolerance ${c.conflicts[0]?.tolerance ?? '—'}).  ` +
+            `Retained for engineering review.  Does not control filing calculations.\n\n` +
+            `The filing-controlling HAAT used in this exhibit's RF calculations is ` +
+            `${fmtValue(op.value, op.unit)} from ${opSource}.  A difference between the ` +
+            `FCC-authorized HAAT and the Genoa-computed §73.313 radial HAAT is a ` +
+            `basis-selection issue, not a math failure; it must be explicitly declared by ` +
+            `the engineer of record.  See HAAT BASIS AND GOVERNANCE for the declared basis.`
           );
         } else {
           conflictNarratives.push(
-            `The operative ${label} for filing calculations is ${fmtValue(op.value, op.unit)} from ` +
-            `${SOURCE_LABEL[op.source_type] || op.source_type}.  The ${SOURCE_LABEL[c.source_type] || c.source_type} value of ` +
-            `${fmtValue(c.value, c.unit)} is retained as advisory engineering evidence and conflicts beyond tolerance ` +
-            `(Δ ${c.conflicts[0]?.delta ?? '—'} vs tolerance ${c.conflicts[0]?.tolerance ?? '—'}); it does not control filing ` +
-            `calculations unless reviewed and promoted by the engineer of record.`
+            `${label.toUpperCase()}\n\n` +
+            `Controlling Value:\n${fmtValue(op.value, op.unit)}\n\n` +
+            `Source:\n${opSource}\n\n` +
+            `Status:\n${statusLine}\n\n` +
+            `Additional Evidence:\n${altSource} = ${fmtValue(c.value, c.unit)}\n\n` +
+            `Review Note:\nDifference exceeds tolerance ` +
+            `(Δ ${c.conflicts[0]?.delta ?? '—'} vs tolerance ${c.conflicts[0]?.tolerance ?? '—'}).  ` +
+            `Retained for engineering review.  Does not control filing calculations ` +
+            `unless reviewed and promoted by the engineer of record.`
           );
         }
       }
@@ -140,7 +157,9 @@ export function buildSourceAttestationSection(exhibit, options){
     'measurement → TERTIARY derivation → operator input; ADVISORY sources never ' +
     'control filing values), its confidence, and its conflict status.  The ' +
     'operative value for each field was selected deterministically by authority ' +
-    'rank; conflicting non-operative values are shown with their conflict codes.',
+    'rank.  Status codes in the table are machine-readable audit values retained ' +
+    'for traceability; each conflicting value is explained in plain language ' +
+    'below the table.',
     ...conflictNarratives,
     `Status dimensions — math: ${st.math_status || '—'}; source: ${st.source_status || '—'}; ` +
     `rule: ${st.rule_status || '—'}; evidence: ${st.evidence_status || '—'}; ` +

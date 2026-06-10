@@ -67,6 +67,9 @@ export function applyExecutiveSummaryVariant(doc){
     title:    (doc.meta?.title || 'ENGINEERING STATEMENT'),
     subtitle: 'Executive Summary'
   };
+  // Internal QA surfaces (exhibit maturity score) never ship in the
+  // customer-facing document model.
+  delete meta.internal_qa;
   return { meta, sections };
 }
 
