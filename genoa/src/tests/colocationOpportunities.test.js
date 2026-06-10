@@ -4425,3 +4425,14 @@ test('am_rural_electric_and_standby_power_guide present across colocation candid
     assert.ok(g.cost_estimates?.total_power_low_usd >= 0, 'total_power_low_usd must be non-negative');
   }
 });
+
+test('am_rf_ground_system_inspection_and_maintenance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_rf_ground_system_inspection_and_maintenance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_rf_ground_system_inspection_and_maintenance_guide');
+    assert.ok(g.total_radials >= 120, 'total_radials must be ≥120');
+    assert.ok(g.radial_length_ft > 0, 'radial_length_ft must be positive');
+    assert.ok(g.rehabilitation_cost?.total_rehab_low_usd > 0, 'rehab cost must be positive');
+  }
+});

@@ -1725,7 +1725,12 @@ export async function runSiteOptimizer(body = {}){
     rep_generator_size_kva:             c.am_rural_electric_and_standby_power_guide?.generator_size_kva ?? null,
     rep_fuel_reserve_gal:               c.am_rural_electric_and_standby_power_guide?.fuel_reserve_gal ?? null,
     rep_total_power_low_usd:            c.am_rural_electric_and_standby_power_guide?.cost_estimates?.total_power_low_usd ?? null,
-    rep_total_load_kw:                  c.am_rural_electric_and_standby_power_guide?.total_load_kw ?? null
+    rep_total_load_kw:                  c.am_rural_electric_and_standby_power_guide?.total_load_kw ?? null,
+    gnd_total_radials:                  c.am_rf_ground_system_inspection_and_maintenance_guide?.total_radials ?? null,
+    gnd_radial_length_ft:               c.am_rf_ground_system_inspection_and_maintenance_guide?.radial_length_ft ?? null,
+    gnd_rehab_low_usd:                  c.am_rf_ground_system_inspection_and_maintenance_guide?.rehabilitation_cost?.total_rehab_low_usd ?? null,
+    gnd_annual_low_usd:                 c.am_rf_ground_system_inspection_and_maintenance_guide?.annual_cost?.total_annual_low_usd ?? null,
+    gnd_n_inspection_tasks:             c.am_rf_ground_system_inspection_and_maintenance_guide?.n_inspection_tasks ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31073,6 +31078,128 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.1560; §73.1680; §11.35',
         note: `${tpo_kw_num} kW @ ${dist_km} km: utility ${utility_availability}. Gen size ≈ ${generator_size_kva} kVA. ${EAS_FUEL_RESERVE_HOURS}-hr fuel reserve ≈ ${fuel_reserve_gal} gal. Total power est. $${total_power_low.toLocaleString()}–$${total_power_high.toLocaleString()}.`
+      };
+    })(),
+
+    am_rf_ground_system_inspection_and_maintenance_guide: (() => {
+      // Guide #124 — RF Ground System Inspection & Maintenance
+      //
+      // The AM antenna ground system (buried radials) is the single largest
+      // determinant of antenna efficiency and radiated power.  Maintenance
+      // and inspection obligations are driven by §73.68/§73.69 (ground
+      // systems) and general good-engineering-practice standards.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.68 — Ground conductivity measurements for AM stations.
+      //   Licensee must maintain the ground system in good repair to sustain
+      //   the effective field (EF) within the §73.1560 operating power limits.
+      //   If ground system degradation causes EF to fall below authorized,
+      //   the station is operating out of compliance.
+      //
+      // 47 CFR §73.69 — Sampling systems for AM directional antennas.
+      //   DA stations require antenna monitor sampling loops that are part of
+      //   the ground system.  Maintenance of sampling lines is required to
+      //   maintain accurate phase/ratio readings.
+      //
+      // 47 CFR §73.1560 — Operating power.
+      //   Station must sustain ±10% of authorized power.  A corroded or
+      //   degraded ground system reduces antenna efficiency and effective
+      //   radiated power, which may cause the station to fall below the
+      //   −10% lower limit.
+      //
+      // GROUND SYSTEM DESIGN STANDARDS (FCC/ANSI)
+      // ───────────────────────────────────────────
+      //   Minimum recommended:  120 radials × λ/4 length buried at ~15 cm.
+      //   For Class A: often 120+ radials ≥ λ/2 (higher efficiency).
+      //   Radial wire: #10 AWG copper (bare) is standard; tinned copper
+      //   preferred in corrosive soils.
+      //   Connection bus: solid copper bus ring at base of tower, exothermic
+      //   or silver-brazed connections to each radial.
+      //
+      // INSPECTION INTERVALS
+      // ──────────────────────
+      //   FCC does not specify a mandatory inspection interval for ground
+      //   radials.  Best practice (SBE/NAB guidance):
+      //     Annual: visual inspection of base connection bus and buried
+      //             radial connection points for corrosion.
+      //     Every 3–5 years: resistance measurement of individual radials
+      //             (base current meter check against baseline).
+      //     At license renewal: full ground resistance confirmation.
+      //
+      // REHABILITATION COSTS
+      //   Corrosion inspection + resistance test (annual): $500–$1,500
+      //   Replace damaged radial connections (per connection): $150–$400
+      //   Add supplemental radials (per radial, buried, λ/4): $300–$800
+      //   Full ground rehabilitation (120 radials): $36,000–$96,000
+      //   Exothermic weld bus upgrade: $5,000–$15,000
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const is_da2 = /^DA-2/i.test(pattern_mode);
+
+      // Recommended radial count based on class
+      const isClassA = fcc_class.toUpperCase() === 'A';
+      const rec_radials = isClassA ? 120 : 120;  // 120 is baseline; Class A often more
+
+      // λ/4 radial length
+      const lambda_m      = 300000 / frequency_khz;
+      const qw_m          = round2(lambda_m / 4);
+      const qw_ft         = round2(qw_m * 3.28084);
+
+      // Number of towers (DA-2 = 2, DA-N ≥ 3, NDA = 1)
+      const n_towers = /^DA-2/i.test(pattern_mode) ? 2
+        : /^DA-N/i.test(pattern_mode) ? 3
+        : /^DA/i.test(pattern_mode) ? 2
+        : 1;
+      const total_radials = rec_radials * n_towers;
+
+      // Annual inspection cost
+      const ANNUAL_INSP_LOW  = 500;
+      const ANNUAL_INSP_HIGH = 1500;
+
+      // Full rehabilitation cost
+      const RADIAL_COST_LOW  = 300;
+      const RADIAL_COST_HIGH = 800;
+      const BUS_UPGRADE_LOW  = 5000;
+      const BUS_UPGRADE_HIGH = 15000;
+      const rehab_low  = round2(total_radials * RADIAL_COST_LOW  + n_towers * BUS_UPGRADE_LOW);
+      const rehab_high = round2(total_radials * RADIAL_COST_HIGH + n_towers * BUS_UPGRADE_HIGH);
+
+      // DA stations: sampling system maintenance adds cost
+      const SAMPLING_MAINT_ANNUAL = is_da ? 800 : 0;
+
+      const INSPECTION_SCHEDULE = [
+        { interval: 'Annual',    task: 'Visual inspection of base bus and connection points for corrosion' },
+        { interval: 'Annual',    task: 'Base current meter check vs. baseline' },
+        { interval: '3–5 years', task: 'Individual radial resistance measurements' },
+        { interval: 'At renewal',task: 'Full ground resistance confirmation for license records' },
+        ...(is_da ? [{ interval: 'Annual', task: 'DA sampling loop inspection and calibration verification' }] : []),
+      ];
+
+      return {
+        recommended_radials_per_tower: rec_radials,
+        n_towers,
+        total_radials,
+        radial_length_m: qw_m,
+        radial_length_ft: qw_ft,
+        inspection_schedule: INSPECTION_SCHEDULE,
+        n_inspection_tasks: INSPECTION_SCHEDULE.length,
+        da_sampling_maintenance: is_da,
+        annual_cost: {
+          inspection_low_usd:  ANNUAL_INSP_LOW,
+          inspection_high_usd: ANNUAL_INSP_HIGH,
+          sampling_maint_usd:  SAMPLING_MAINT_ANNUAL,
+          total_annual_low_usd: round2(ANNUAL_INSP_LOW  + SAMPLING_MAINT_ANNUAL),
+          total_annual_high_usd:round2(ANNUAL_INSP_HIGH + SAMPLING_MAINT_ANNUAL),
+        },
+        rehabilitation_cost: {
+          radial_cost_per_unit_low_usd:  RADIAL_COST_LOW,
+          radial_cost_per_unit_high_usd: RADIAL_COST_HIGH,
+          total_rehab_low_usd:  rehab_low,
+          total_rehab_high_usd: rehab_high,
+        },
+        reference: '47 CFR §73.68; §73.69; §73.1560',
+        note: `${frequency_khz} kHz: λ/4 radial = ${qw_ft} ft (${qw_m} m). ${n_towers} tower(s) × ${rec_radials} radials = ${total_radials} total. Annual inspection est. $${(ANNUAL_INSP_LOW + SAMPLING_MAINT_ANNUAL).toLocaleString()}–$${(ANNUAL_INSP_HIGH + SAMPLING_MAINT_ANNUAL).toLocaleString()}. Full rehab: $${rehab_low.toLocaleString()}–$${rehab_high.toLocaleString()}.`
       };
     })(),
 

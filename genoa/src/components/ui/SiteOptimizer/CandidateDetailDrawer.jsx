@@ -10916,6 +10916,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* RF Ground System Inspection & Maintenance Guide */}
+        {candidate.am_rf_ground_system_inspection_and_maintenance_guide && (() => {
+          const g = candidate.am_rf_ground_system_inspection_and_maintenance_guide;
+          const ann = g.annual_cost || {};
+          const rehab = g.rehabilitation_cost || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                RF Ground System Inspection &amp; Maintenance (§73.68 / §73.1560)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL RADIALS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.total_radials}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>RADIAL LENGTH</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.radial_length_ft} ft ({g.radial_length_m} m)</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOWERS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_towers}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ANNUAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(ann.total_annual_low_usd || 0).toLocaleString()}–${(ann.total_annual_high_usd || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FULL REHAB</span>
+                  <div style={{ color: '#f59e0b', fontSize: 11 }}>${(rehab.total_rehab_low_usd || 0).toLocaleString()}–${(rehab.total_rehab_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Inspection Schedule</div>
+              {(g.inspection_schedule || []).map((s, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                  <span style={{ color: '#38bdf8', fontSize: 9, minWidth: 60 }}>{s.interval}</span>
+                  <span style={{ color: '#cbd5e1', fontSize: 9 }}>{s.task}</span>
+                </div>
+              ))}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
