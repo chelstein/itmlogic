@@ -2356,6 +2356,60 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Colocation Opportunity Score Guide */}
+        {candidate.am_colocation_opportunity_score_guide && (() => {
+          const cos = candidate.am_colocation_opportunity_score_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const scoreColor = cos.colocation_opportunity_score >= 65 ? '#4ade80'
+            : cos.colocation_opportunity_score >= 40 ? '#facc15' : '#f97316';
+          const RISK_COLOR = { LOW: '#4ade80', MODERATE: '#facc15', HIGH: '#ef4444' };
+          const FEAS_COLOR = { HIGH: '#4ade80', MODERATE: '#facc15', LOW: '#f97316' };
+          return (
+            <div key="cos-guide" style={{ background: '#0e1608', border: '1px solid #1e4a1e', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, color: '#86efac', fontSize: 13 }}>Colocation Opportunity Score</div>
+                <div style={{ background: '#1a2a10', border: `1px solid ${scoreColor}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, color: scoreColor }}>
+                  {cos.opportunity_tier}
+                </div>
+                <div style={{ marginLeft: 'auto', fontSize: 18, fontWeight: 800, color: scoreColor }}>{cos.colocation_opportunity_score}/100</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '4px 7px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Opt. Height</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{cos.optimal_tower_height_ft} ft</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '4px 7px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Tower Density</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: FEAS_COLOR[cos.existing_tower_density] ?? '#aaa' }}>{cos.existing_tower_density}</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '4px 7px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Co-locate Saves</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0' }}>{cos.is_da ? 'N/A' : fmtUsd(cos.cost_comparison?.potential_savings_low_usd)}</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '4px 7px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Search Priority</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: cos.colocation_search_priority === 'HIGH' ? '#4ade80' : '#aaa' }}>{cos.colocation_search_priority}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4, fontWeight: 600 }}>Scenarios</div>
+              {(cos.scenarios ?? []).map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '3px 0', borderBottom: '1px solid #1a2a10', fontSize: 9 }}>
+                  <span style={{ color: FEAS_COLOR[s.feasibility] ?? '#aaa', fontWeight: 700, minWidth: 55 }}>{s.feasibility}</span>
+                  <span style={{ color: '#bbb' }}>{s.label} — {s.notes.split('.')[0]}.</span>
+                </div>
+              ))}
+              <div style={{ fontSize: 10, color: '#aaa', marginTop: 8, marginBottom: 4, fontWeight: 600 }}>RF Interference Risks</div>
+              {(cos.rf_interference_risks ?? []).map((r, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, padding: '2px 0', fontSize: 9, color: '#ccc' }}>
+                  <span style={{ color: RISK_COLOR[r.risk] ?? '#aaa', fontWeight: 700, minWidth: 60 }}>{r.risk}</span>
+                  {r.source}
+                </div>
+              ))}
+              <div className="font-mono text-[8px] text-textDim leading-snug mt-2">{cos.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Carrier Frequency Reference Guide */}
         {candidate.am_carrier_frequency_reference_guide && (() => {
           const cfr = candidate.am_carrier_frequency_reference_guide;

@@ -16777,3 +16777,54 @@ test('#99 candidate_comparison_table has cfr_* columns', async () => {
     assert.ok('cfr_tcxo_marginal'      in row, 'cfr_tcxo_marginal missing');
   }
 });
+
+// ---- Feature #100: am_colocation_opportunity_score_guide ----
+
+test('#100 KAZM NDA: am_colocation_opportunity_score_guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cos = out.candidates[0].am_colocation_opportunity_score_guide;
+  assert.ok(cos, 'am_colocation_opportunity_score_guide must be present');
+  assert.ok(typeof cos.colocation_opportunity_score === 'number', 'score must be numeric');
+  assert.ok(cos.colocation_opportunity_score >= 0 && cos.colocation_opportunity_score <= 100, 'score must be 0–100');
+  assert.ok(['GOOD','MODERATE','LOW'].includes(cos.opportunity_tier), `unexpected tier: ${cos.opportunity_tier}`);
+  assert.ok(cos.optimal_tower_height_ft > 0, 'optimal_tower_height_ft must be positive');
+  assert.ok(cos.minimum_tower_height_ft > 0, 'minimum_tower_height_ft must be positive');
+  assert.ok(cos.optimal_tower_height_ft > cos.minimum_tower_height_ft, '5/8λ must exceed λ/4');
+});
+
+test('#100 DA station: opportunity score < NDA station score', async () => {
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const scoreNDA = outNDA.candidates[0].am_colocation_opportunity_score_guide.colocation_opportunity_score;
+  const scoreDA  = outDA.candidates[0].am_colocation_opportunity_score_guide.colocation_opportunity_score;
+  assert.ok(scoreNDA > scoreDA, `NDA score (${scoreNDA}) must exceed DA score (${scoreDA}) — DA has far fewer colocation options`);
+});
+
+test('#100 tower height scales with frequency (lower freq = taller tower)', async () => {
+  const out540  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const out1600 = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const ht540   = out540.candidates[0].am_colocation_opportunity_score_guide.optimal_tower_height_ft;
+  const ht1600  = out1600.candidates[0].am_colocation_opportunity_score_guide.optimal_tower_height_ft;
+  assert.ok(ht540 > ht1600, `540 kHz tower (${ht540} ft) must exceed 1600 kHz tower (${ht1600} ft)`);
+});
+
+test('#100 NDA colocation saves a positive amount vs greenfield', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_limit: 'NDA', candidate_limit: 1 });
+  const cos = out.candidates[0].am_colocation_opportunity_score_guide;
+  if (!cos.is_da) {
+    assert.ok(cos.cost_comparison.greenfield_tower_low_usd > 0, 'greenfield_low must be positive');
+    assert.ok(cos.cost_comparison.colocation_base_low_usd > 0, 'colocation_low must be positive');
+    assert.ok(cos.cost_comparison.ground_system_usd_low > 0, 'ground_system must be positive (always required)');
+  }
+});
+
+test('#100 candidate_comparison_table has cos_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cos_opportunity_score' in row, 'cos_opportunity_score missing');
+    assert.ok('cos_opportunity_tier'  in row, 'cos_opportunity_tier missing');
+    assert.ok('cos_tower_height_ft'   in row, 'cos_tower_height_ft missing');
+    assert.ok('cos_savings_low_usd'   in row, 'cos_savings_low_usd missing');
+    assert.ok('cos_tower_density'     in row, 'cos_tower_density missing');
+  }
+});
