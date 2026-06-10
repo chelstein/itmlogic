@@ -549,9 +549,21 @@ function renderVerdict(pdf, v){
   if (cats && cats.computational && cats.external && cats.filing){
     const rows = [
       ['COMPUTATIONAL VALIDATION',     cats.computational.status, cats.computational.detail],
-      ['EXTERNAL PARITY VERIFICATION', cats.external.status,      cats.external.detail],
-      ['FILING READINESS',             cats.filing.status,        cats.filing.detail]
+      ['EXTERNAL PARITY VERIFICATION', cats.external.status,      cats.external.detail]
     ];
+    // Attestation-v2 dimensions — present on exhibits carrying
+    // source_attestation_v2; omitted on legacy exhibits so old
+    // renders are unchanged.
+    if (cats.source && cats.source.status !== 'NOT_ATTACHED'){
+      rows.push(['SOURCE VALIDATION',   cats.source.status,   cats.source.detail]);
+    }
+    if (cats.rule && cats.rule.status !== 'NOT_ATTACHED'){
+      rows.push(['RULE VALIDATION',     cats.rule.status,     cats.rule.detail]);
+    }
+    if (cats.evidence && cats.evidence.status !== 'NOT_ATTACHED'){
+      rows.push(['EVIDENCE VALIDATION', cats.evidence.status, cats.evidence.detail]);
+    }
+    rows.push(['FILING READINESS',      cats.filing.status,   cats.filing.detail]);
     pdf.font(BOLD_FONT).fontSize(BODY_SIZE + 1).fillColor('black');
     for (const [label, status, detail] of rows){
       if (pageBottomReached(pdf)) pdf.addPage();

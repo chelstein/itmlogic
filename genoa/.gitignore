@@ -7,8 +7,8 @@ node_modules/
 /tmp/
 /coverage/                # test coverage reports (root-level only — src/engine/coverage/ is engine code)
 
-# Vite build output (generated; do not commit)
-src/ui/dist/
+# Vite build output — committed so deployment doesn't require a rebuild step
+# src/ui/dist/
 
 # Graphify generated artifacts
 graphify-out/

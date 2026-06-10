@@ -2356,6 +2356,1002 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Colocation Opportunity Score Guide */}
+        {candidate.am_colocation_opportunity_score_guide && (() => {
+          const cos = candidate.am_colocation_opportunity_score_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const scoreColor = cos.colocation_opportunity_score >= 65 ? '#4ade80'
+            : cos.colocation_opportunity_score >= 40 ? '#facc15' : '#f97316';
+          const RISK_COLOR = { LOW: '#4ade80', MODERATE: '#facc15', HIGH: '#ef4444' };
+          const FEAS_COLOR = { HIGH: '#4ade80', MODERATE: '#facc15', LOW: '#f97316' };
+          return (
+            <div key="cos-guide" style={{ background: '#0e1608', border: '1px solid #1e4a1e', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, color: '#86efac', fontSize: 13 }}>Colocation Opportunity Score</div>
+                <div style={{ background: '#1a2a10', border: `1px solid ${scoreColor}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, color: scoreColor }}>
+                  {cos.opportunity_tier}
+                </div>
+                <div style={{ marginLeft: 'auto', fontSize: 18, fontWeight: 800, color: scoreColor }}>{cos.colocation_opportunity_score}/100</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '4px 7px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Opt. Height</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{cos.optimal_tower_height_ft} ft</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '4px 7px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Tower Density</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: FEAS_COLOR[cos.existing_tower_density] ?? '#aaa' }}>{cos.existing_tower_density}</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '4px 7px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Co-locate Saves</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0' }}>{cos.is_da ? 'N/A' : fmtUsd(cos.cost_comparison?.potential_savings_low_usd)}</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '4px 7px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Search Priority</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: cos.colocation_search_priority === 'HIGH' ? '#4ade80' : '#aaa' }}>{cos.colocation_search_priority}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4, fontWeight: 600 }}>Scenarios</div>
+              {(cos.scenarios ?? []).map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '3px 0', borderBottom: '1px solid #1a2a10', fontSize: 9 }}>
+                  <span style={{ color: FEAS_COLOR[s.feasibility] ?? '#aaa', fontWeight: 700, minWidth: 55 }}>{s.feasibility}</span>
+                  <span style={{ color: '#bbb' }}>{s.label} — {s.notes.split('.')[0]}.</span>
+                </div>
+              ))}
+              <div style={{ fontSize: 10, color: '#aaa', marginTop: 8, marginBottom: 4, fontWeight: 600 }}>RF Interference Risks</div>
+              {(cos.rf_interference_risks ?? []).map((r, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, padding: '2px 0', fontSize: 9, color: '#ccc' }}>
+                  <span style={{ color: RISK_COLOR[r.risk] ?? '#aaa', fontWeight: 700, minWidth: 60 }}>{r.risk}</span>
+                  {r.source}
+                </div>
+              ))}
+              <div className="font-mono text-[8px] text-textDim leading-snug mt-2">{cos.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Carrier Frequency Reference Guide */}
+        {candidate.am_carrier_frequency_reference_guide && (() => {
+          const cfr = candidate.am_carrier_frequency_reference_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="cfr-guide" style={{ background: '#080e1a', border: '1px solid #1e3a5f', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, color: '#38bdf8', fontSize: 13, marginBottom: 6 }}>
+                Carrier Frequency Reference — §73.1540
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <div style={{ background: '#0a1624', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>FCC Tolerance</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#e0f2fe' }}>±{cfr.fcc_tolerance_hz} Hz</div>
+                  <div style={{ fontSize: 8, color: '#7ab7d0' }}>±{cfr.fcc_tolerance_ppm} ppm</div>
+                </div>
+                <div style={{ background: '#0a1624', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Recommended Ref</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#4ade80' }}>GPSDO</div>
+                  <div style={{ fontSize: 8, color: '#7ab7d0' }}>{fmtUsd(cfr.reference_options?.[0]?.cost_low_usd)}–{fmtUsd(cfr.reference_options?.[0]?.cost_high_usd)}</div>
+                </div>
+                <div style={{ background: '#0a1624', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Forfeiture Risk</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>${(cfr.forfeiture_risk?.base_per_day_usd ?? 0).toLocaleString()}/day</div>
+                </div>
+              </div>
+              {cfr.tcxo_marginal && (
+                <div style={{ fontSize: 9, color: '#fbbf24', background: '#1a1200', border: '1px solid #5a4200', borderRadius: 4, padding: '4px 8px', marginBottom: 8 }}>
+                  WARNING: TCXO alone exceeds ±20 Hz tolerance at {cfr.frequency_khz} kHz — GPS discipline required.
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4, fontWeight: 600 }}>Reference Options</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+                <thead>
+                  <tr style={{ background: '#0a1624' }}>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#38bdf8' }}>Type</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#38bdf8' }}>Accuracy</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#38bdf8' }}>Meets Tol.</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#38bdf8' }}>Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(cfr.reference_options ?? []).map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #1a3050', background: r.recommended ? '#0d1e30' : 'transparent' }}>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: r.recommended ? '#38bdf8' : '#ccc', fontWeight: r.recommended ? 700 : 400 }}>{r.label.split(' (')[0]}</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#bbb' }}>±{r.accuracy_hz} Hz</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: r.meets_fcc_tol ? '#4ade80' : '#ef4444', fontWeight: 600 }}>{r.meets_fcc_tol ? '✓' : '✗'}</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#bbb' }}>{r.cost_low_usd === 0 ? 'Built-in' : `${fmtUsd(r.cost_low_usd)}–${fmtUsd(r.cost_high_usd)}`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{cfr.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Detuning and Phasor Verification Guide */}
+        {candidate.am_tower_detuning_and_phasor_verification_guide && (() => {
+          const dtv = candidate.am_tower_detuning_and_phasor_verification_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const triggerColors = { 'IMMEDIATE': '#ef4444', 'QUARTERLY': '#facc15', 'AS NEEDED': '#86efac' };
+          return (
+            <div key="dtv-guide" style={{ background: '#0a0c18', border: '1px solid #2a2a6e', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, color: '#818cf8', fontSize: 13, marginBottom: 6 }}>
+                Tower Detuning &amp; Phasor Verification — §73.150 / §73.153
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <div style={{ background: '#12142a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#818cf8' }}>Active Towers</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#e0e7ff' }}>{dtv.active_towers_typ}</div>
+                </div>
+                <div style={{ background: '#12142a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#818cf8' }}>Phasor Triggers</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#e0e7ff' }}>{dtv.n_phasor_triggers}</div>
+                </div>
+                <div style={{ background: '#12142a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#818cf8' }}>DA Proof Cost</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e0e7ff' }}>{dtv.is_da ? `${fmtUsd(dtv.cost_estimates?.full_da_proof_low_usd)}+` : 'N/A'}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 6 }}>{dtv.detuning_guard_note}</div>
+              {dtv.is_da && (
+                <div style={{ fontSize: 9, color: '#bbb', background: '#12142a', borderRadius: 4, padding: '4px 8px', marginBottom: 8 }}>
+                  <span style={{ color: '#818cf8', fontWeight: 600 }}>Detuning capacitor:</span> {dtv.detuning_cap_note}
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4, fontWeight: 600 }}>Phasor Re-check Triggers</div>
+              {(dtv.phasor_verification_triggers ?? []).map((t, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 9, color: '#ccc' }}>
+                  <span style={{ background: '#1a1a30', borderRadius: 3, padding: '1px 5px', color: triggerColors[t.frequency] ?? '#aaa', fontSize: 8, fontWeight: 700, minWidth: 60, textAlign: 'center' }}>{t.frequency}</span>
+                  {t.label}
+                  <span style={{ color: '#555', marginLeft: 'auto' }}>{t.cfr}</span>
+                </div>
+              ))}
+              {dtv.is_da && dtv.da_proof_retriggers?.length > 0 && (
+                <>
+                  <div style={{ fontSize: 10, color: '#aaa', marginTop: 8, marginBottom: 4, fontWeight: 600 }}>DA Proof Re-run Criteria (§73.154)</div>
+                  {(dtv.da_proof_retriggers ?? []).map((r, i) => (
+                    <div key={i} style={{ fontSize: 9, color: r.mandatory ? '#fca5a5' : '#aaa', padding: '2px 0' }}>
+                      {r.mandatory ? '⬥' : '◇'} {r.condition} <span style={{ color: '#555' }}>{r.cfr}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              <div className="font-mono text-[8px] text-textDim leading-snug mt-2">{dtv.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM License-to-Cover and STA Guide */}
+        {candidate.am_license_to_cover_and_sta_guide && (() => {
+          const ltc = candidate.am_license_to_cover_and_sta_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ltc-guide" style={{ background: '#0e0a1a', border: '1px solid #3d2a6e', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, color: '#c084fc', fontSize: 13, marginBottom: 6 }}>
+                License-to-Cover &amp; STA — §73.3598 / §73.1635
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <div style={{ background: '#1a0e30', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#c084fc' }}>CP Term</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#f3e8ff' }}>{ltc.cp_term_years} yr</div>
+                </div>
+                <div style={{ background: '#1a0e30', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#c084fc' }}>LTC Items Required</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#f3e8ff' }}>{ltc.n_ltc_required_items}</div>
+                </div>
+                <div style={{ background: '#1a0e30', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#c084fc' }}>LTC Soft Cost</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f3e8ff' }}>{fmtUsd(ltc.filing_fees?.total_ltc_soft_cost_low_usd)}–{fmtUsd(ltc.filing_fees?.total_ltc_soft_cost_high_usd)}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#fbbf24', background: '#1a1200', border: '1px solid #5a4200', borderRadius: 4, padding: '5px 8px', marginBottom: 8 }}>
+                {ltc.critical_risk}
+              </div>
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 6, fontWeight: 600 }}>Post-Grant Milestones</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+                <thead>
+                  <tr style={{ background: '#1a0e30' }}>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#c084fc' }}>Day</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#c084fc' }}>Event</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#c084fc' }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(ltc.post_grant_milestones ?? []).map((m, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #2d1a50' }}>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#c084fc', whiteSpace: 'nowrap' }}>+{m.day_from_grant}d</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#e9d5ff', fontWeight: 600 }}>{m.event}</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#bbb' }}>{m.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4, fontWeight: 600 }}>Common STA Use Cases</div>
+              {(ltc.sta_use_cases ?? []).slice(0, 3).map((s, i) => (
+                <div key={i} style={{ background: '#160c2a', borderRadius: 4, padding: '4px 8px', marginBottom: 4, fontSize: 9, color: '#ccc' }}>
+                  <span style={{ color: '#c084fc', fontWeight: 600 }}>{s.label}</span>
+                  {' · '}{s.typical_duration_days}d typical · Grant: {s.grant_probability}
+                </div>
+              ))}
+              <div className="font-mono text-[8px] text-textDim leading-snug mt-2">{ltc.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Site Buildout Risk Assessment Guide */}
+        {candidate.am_site_buildout_risk_assessment_guide && (() => {
+          const bra = candidate.am_site_buildout_risk_assessment_guide;
+          const fmtUsd  = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const fmtMos  = (lo, hi) => lo != null ? `${lo}–${hi} mo` : '—';
+          const TIER_COLOR = { LOW: '#2d6a2d', MODERATE: '#7a6500', HIGH: '#8a2200', CRITICAL: '#5a0a0a' };
+          const tierBg = TIER_COLOR[bra.buildout_risk_tier] ?? '#1a1a2e';
+          const scoreColor = bra.buildout_feasibility_score >= 75 ? '#4ade80'
+            : bra.buildout_feasibility_score >= 50 ? '#facc15'
+            : bra.buildout_feasibility_score >= 25 ? '#f97316'
+            : '#ef4444';
+          const SCORE_BADGE = ['NEGLIGIBLE', 'LOW', 'MODERATE', 'HIGH', 'CRITICAL'];
+          const dimRow = (label, score, items) => (
+            <tr key={label} style={{ borderBottom: '1px solid #333' }}>
+              <td style={{ padding: '3px 6px', color: '#aaa', fontSize: 10, whiteSpace: 'nowrap' }}>{label}</td>
+              <td style={{ padding: '3px 6px', fontSize: 10, color: score >= 3 ? '#ef4444' : score >= 2 ? '#f97316' : '#4ade80', fontWeight: 600 }}>
+                {SCORE_BADGE[score] ?? score}
+              </td>
+              <td style={{ padding: '3px 6px', fontSize: 9, color: '#bbb' }}>
+                {(items ?? []).slice(0, 2).join(' · ')}
+              </td>
+            </tr>
+          );
+          return (
+            <div key="bra-guide" style={{ background: '#0c1008', border: '1px solid #2d4a1e', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, color: '#86efac', fontSize: 13 }}>
+                  Buildout Risk Assessment
+                </div>
+                <div style={{ background: tierBg, border: `1px solid ${scoreColor}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, color: scoreColor }}>
+                  {bra.buildout_risk_label ?? bra.buildout_risk_tier}
+                </div>
+                <div style={{ marginLeft: 'auto', fontSize: 18, fontWeight: 800, color: scoreColor }}>
+                  {bra.buildout_feasibility_score}/100
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#ccc', marginBottom: 8, fontStyle: 'italic' }}>
+                {bra.risk_summary}
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+                <thead>
+                  <tr style={{ background: '#1a2a10' }}>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#86efac' }}>Dimension</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#86efac' }}>Level</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#86efac' }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dimRow('Regulatory', bra.risk_dimensions?.regulatory?.score, bra.risk_dimensions?.regulatory?.items)}
+                  {dimRow('Environmental', bra.risk_dimensions?.environmental?.score, bra.risk_dimensions?.environmental?.items)}
+                  {dimRow('Acquisition', bra.risk_dimensions?.acquisition?.score, bra.risk_dimensions?.acquisition?.items)}
+                  {dimRow('Construction', bra.risk_dimensions?.construction?.score, bra.risk_dimensions?.construction?.items)}
+                  {dimRow('Zoning', bra.risk_dimensions?.zoning?.score, bra.risk_dimensions?.zoning?.items)}
+                </tbody>
+              </table>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Primary Risk</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f97316' }}>{bra.primary_risk_factor ?? '—'}</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Timeline</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{fmtMos(bra.est_buildout_months_low, bra.est_buildout_months_high)}</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Est. CapEx</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{fmtUsd(bra.est_capex_low_usd)}–{fmtUsd(bra.est_capex_high_usd)}</div>
+                </div>
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{bra.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Skywave Nighttime Guide */}
+        {candidate.am_skywave_nighttime_guide && (() => {
+          const sw = candidate.am_skywave_nighttime_guide;
+          const fmtUsd = (n) => n != null && n > 0 ? `$${Number(n).toLocaleString()}` : null;
+          const opColor = {
+            FULL_POWER: '#16a34a',
+            REGIONAL_NIGHT: '#0ea5e9',
+            LOCAL_UNPROTECTED: '#6b7280',
+            LIMITED_1KW_OR_DAN: '#dc2626',
+            LIMITED_2_5KW_OR_DAN: '#d97706'
+          }[sw.night_operation_type] ?? '#6b7280';
+          return (
+            <div style={{ background: '#080d18', border: '1px solid #1e3a5f', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#93c5fd', marginBottom: 10 }}>
+                §73.182 Skywave / Nighttime — {sw.frequency_khz} kHz Class {sw.fcc_class}
+              </div>
+              {/* Operation type badge + power */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <span style={{ background: opColor + '22', color: opColor, borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
+                  {sw.night_operation_type.replace(/_/g, ' ')}
+                </span>
+                <span style={{ background: '#0c1a2e', color: '#bfdbfe', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  Night limit: {sw.night_power_limit_kw} kW
+                </span>
+                {sw.is_clear_channel && (
+                  <span style={{ background: '#1e3a5f', color: '#60a5fa', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                    CLEAR CHANNEL
+                  </span>
+                )}
+                {sw.psa_eligible && (
+                  <span style={{ background: '#1e3a5f', color: '#93c5fd', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                    PSA Eligible
+                  </span>
+                )}
+              </div>
+              {/* Dominant station */}
+              {sw.dominant_station && (
+                <div style={{ background: '#0c1a2e', border: '1px solid #1e3a5f', borderRadius: 4, padding: '6px 10px', fontSize: 11, color: '#93c5fd', marginBottom: 8 }}>
+                  <span style={{ color: '#6b7280' }}>Dominant station: </span>{sw.dominant_station}
+                </div>
+              )}
+              {/* Nighttime constraint */}
+              <div style={{ background: '#0c1a2e', borderRadius: 4, padding: '6px 10px', fontSize: 11, color: '#bfdbfe', marginBottom: 8 }}>
+                {sw.nighttime_constraint}
+              </div>
+              {/* Study cost/timeline if required */}
+              {sw.night_study_required && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '5px 8px', fontSize: 11, flex: 1 }}>
+                    <div style={{ color: '#6b7280' }}>Nighttime study cost</div>
+                    <div style={{ color: '#bfdbfe', fontWeight: 600 }}>{fmtUsd(sw.night_study_cost_low_usd) ?? '—'} – {fmtUsd(sw.night_study_cost_high_usd) ?? '—'}</div>
+                  </div>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '5px 8px', fontSize: 11, flex: 1 }}>
+                    <div style={{ color: '#6b7280' }}>Study timeline</div>
+                    <div style={{ color: '#bfdbfe', fontWeight: 600 }}>{sw.night_study_weeks_low}–{sw.night_study_weeks_high} weeks</div>
+                  </div>
+                </div>
+              )}
+              {/* PSA note */}
+              {sw.psa_note && (
+                <div style={{ background: '#0c1a2e', border: '1px solid #1d4ed8', borderRadius: 4, padding: '5px 10px', fontSize: 10, color: '#93c5fd', fontStyle: 'italic' }}>
+                  {sw.psa_note}
+                </div>
+              )}
+              {sw.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{sw.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM CP Validity and Tolling Guide */}
+        {candidate.am_cp_validity_and_tolling_guide && (() => {
+          const cp = candidate.am_cp_validity_and_tolling_guide;
+          const riskColor = { HIGH: '#dc2626', MODERATE: '#d97706', LOW: '#16a34a' }[cp.complexity_risk] ?? '#6b7280';
+          const activeToggles = cp.tolling_triggers?.filter(t => t.applies) ?? [];
+          return (
+            <div style={{ background: '#0f0a1a', border: '1px solid #4c1d95', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#c084fc', marginBottom: 10 }}>
+                §73.3598 CP Validity & Tolling — Class {cp.fcc_class}
+              </div>
+              {/* Risk badge + key terms */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <span style={{ background: riskColor + '22', color: riskColor, borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
+                  {cp.complexity_risk} timeline risk
+                </span>
+                <span style={{ background: '#2e1065', color: '#ddd6fe', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {cp.cp_term_years}-year CP term
+                </span>
+                <span style={{ background: '#2e1065', color: '#ddd6fe', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {cp.extension_days}-day extension available
+                </span>
+                <span style={{ background: '#2e1065', color: '#ddd6fe', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  LtC due month {cp.ltc_deadline_months}
+                </span>
+              </div>
+              {/* Risk rationale */}
+              <div style={{ background: '#1a0d2e', borderRadius: 4, padding: '6px 10px', fontSize: 11, color: '#c4b5fd', marginBottom: 10 }}>
+                {cp.risk_rationale}
+              </div>
+              {/* Milestones */}
+              {cp.milestones && cp.milestones.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>CP Lifecycle Milestones</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <tbody>
+                      {cp.milestones.map((m, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #2e1065' }}>
+                          <td style={{ padding: '3px 4px', color: '#a78bfa', fontWeight: 600, whiteSpace: 'nowrap', width: 64 }}>
+                            {m.month != null ? `Mo ${m.month}` : `Mo ${m.month_low}–${m.month_high}`}
+                          </td>
+                          <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{m.event}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {/* Tolling triggers that apply */}
+              {activeToggles.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>Applicable Tolling Triggers</div>
+                  {activeToggles.map((t, i) => (
+                    <div key={i} style={{ fontSize: 10, color: '#ddd6fe', paddingLeft: 8, borderLeft: '2px solid #6d28d9', marginBottom: 2 }}>
+                      {t.trigger} <span style={{ color: '#7c3aed' }}>{t.ref}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {cp.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{cp.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM RF Exposure (MPE) Evaluation Guide */}
+        {candidate.am_rf_exposure_mpe_guide && (() => {
+          const mpe = candidate.am_rf_exposure_mpe_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const evalColor = { CE: '#16a34a', ANALYTIC_NDA: '#0ea5e9', ANALYTIC_FULL: '#d97706', SITE_STUDY: '#dc2626' }[mpe.eval_type] ?? '#6b7280';
+          const statusColor = (s) => ({ REQUIRED: '#fbbf24', INFO: '#60a5fa', CE: '#4ade80' }[s] ?? '#9ca3af');
+          return (
+            <div style={{ background: '#0a0f14', border: '1px solid #1e3a5f', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#38bdf8', marginBottom: 10 }}>
+                §1.1310 RF Exposure (MPE) — {mpe.frequency_khz} kHz @ {mpe.erp_kw} kW
+              </div>
+              {/* Required / CE badge */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <span style={{ background: (mpe.mpe_required ? '#dc2626' : '#16a34a') + '33', color: mpe.mpe_required ? '#fca5a5' : '#86efac', borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
+                  {mpe.mpe_required ? 'MPE EVALUATION REQUIRED' : 'CATEGORICALLY EXCLUDED (CE)'}
+                </span>
+                <span style={{ background: evalColor + '22', color: evalColor, borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {mpe.eval_type}
+                </span>
+              </div>
+              {/* Metric grid */}
+              {mpe.mpe_required && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                    <div style={{ color: '#6b7280' }}>Uncontrolled distance</div>
+                    <div style={{ color: '#bae6fd', fontWeight: 600 }}>{mpe.safe_distance_unctrl_m} m ({mpe.safe_distance_unctrl_ft} ft)</div>
+                  </div>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                    <div style={{ color: '#6b7280' }}>Reactive near-field</div>
+                    <div style={{ color: '#bae6fd', fontWeight: 600 }}>{mpe.near_field_m} m ({mpe.near_field_ft} ft)</div>
+                  </div>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                    <div style={{ color: '#6b7280' }}>Eval cost</div>
+                    <div style={{ color: '#bae6fd', fontWeight: 600 }}>{fmtUsd(mpe.eval_cost_low_usd)} – {fmtUsd(mpe.eval_cost_high_usd)}</div>
+                  </div>
+                </div>
+              )}
+              {/* MPE limits row */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <div style={{ background: '#061020', borderRadius: 4, padding: '5px 8px', fontSize: 10, flex: 1 }}>
+                  <span style={{ color: '#6b7280' }}>Controlled limit: </span>
+                  <span style={{ color: '#7dd3fc' }}>{mpe.e_limit_controlled_vm} V/m</span>
+                </div>
+                <div style={{ background: '#061020', borderRadius: 4, padding: '5px 8px', fontSize: 10, flex: 1 }}>
+                  <span style={{ color: '#6b7280' }}>Uncontrolled limit: </span>
+                  <span style={{ color: '#7dd3fc' }}>{mpe.e_limit_uncontrolled_vm} V/m</span>
+                </div>
+              </div>
+              {/* Fencing note */}
+              {mpe.fencing_note && (
+                <div style={{ background: mpe.fencing_required ? '#431407' : '#052e16', border: `1px solid ${mpe.fencing_required ? '#9a3412' : '#166534'}`, borderRadius: 4, padding: '5px 10px', fontSize: 11, marginBottom: 8, color: mpe.fencing_required ? '#fed7aa' : '#bbf7d0' }}>
+                  {mpe.fencing_note}
+                </div>
+              )}
+              {/* Checklist */}
+              {mpe.checklist && mpe.checklist.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: '#0284c7', fontWeight: 600, marginBottom: 4 }}>MPE Compliance Checklist</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <tbody>
+                      {mpe.checklist.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #1e3a5f' }}>
+                          <td style={{ padding: '3px 4px', color: statusColor(row.status), width: 56, fontWeight: 600 }}>{row.status}</td>
+                          <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{row.item}</td>
+                          <td style={{ padding: '3px 4px', color: '#38bdf8', textAlign: 'right', whiteSpace: 'nowrap' }}>{row.ref}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {mpe.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{mpe.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Ground System Design Guide */}
+        {candidate.am_ground_system_design_guide && (() => {
+          const gs = candidate.am_ground_system_design_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const fmtFt  = (n) => n != null ? `${Number(n).toLocaleString()} ft` : '—';
+          const sigmaColor = gs.sigma_mS_m == null ? '#6b7280'
+            : gs.sigma_mS_m < 2 ? '#dc2626'
+            : gs.sigma_mS_m < 5 ? '#d97706'
+            : '#16a34a';
+          return (
+            <div style={{ background: '#0a120a', border: '1px solid #14532d', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#4ade80', marginBottom: 10 }}>
+                §73.190 Ground System Design — {gs.frequency_khz} kHz
+              </div>
+              {/* Key metrics row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10 }}>
+                <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>λ/4 radial length</div>
+                  <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{fmtFt(gs.quarter_wave_ft)}</div>
+                </div>
+                <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Radials</div>
+                  <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{gs.radials_standard} standard</div>
+                </div>
+                <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Total wire</div>
+                  <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{fmtFt(gs.total_wire_ft)}</div>
+                </div>
+                <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Install cost</div>
+                  <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{fmtUsd(gs.ground_cost_low_usd)} – {fmtUsd(gs.ground_cost_high_usd)}</div>
+                </div>
+              </div>
+              {/* Conductivity badge */}
+              {gs.sigma_mS_m != null && (
+                <div style={{ background: sigmaColor + '22', border: `1px solid ${sigmaColor}44`, borderRadius: 4, padding: '5px 10px', fontSize: 11, marginBottom: 8, color: sigmaColor }}>
+                  σ = {gs.sigma_mS_m} mS/m — {gs.ground_efficiency_note}
+                </div>
+              )}
+              {gs.sigma_mS_m == null && gs.ground_efficiency_note && (
+                <div style={{ background: '#1f1f1f', border: '1px solid #374151', borderRadius: 4, padding: '5px 10px', fontSize: 11, marginBottom: 8, color: '#9ca3af', fontStyle: 'italic' }}>
+                  {gs.ground_efficiency_note}
+                </div>
+              )}
+              {/* Design items checklist */}
+              {gs.design_items && gs.design_items.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: '#15803d', fontWeight: 600, marginBottom: 4 }}>§73.190 Design Requirements</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <tbody>
+                      {gs.design_items.map((d, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #14532d' }}>
+                          <td style={{ padding: '3px 4px', color: d.required ? '#86efac' : '#6b7280', width: 16 }}>
+                            {d.required ? '✓' : '○'}
+                          </td>
+                          <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{d.item}</td>
+                          <td style={{ padding: '3px 4px', color: '#4ade80', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.ref}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {gs.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{gs.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM DA Pattern Design Guide */}
+        {candidate.am_da_pattern_design_guide && (() => {
+          const da = candidate.am_da_pattern_design_guide;
+          if (!da.applicable) {
+            return (
+              <div style={{ background: '#0c0c14', border: '1px solid #312e81', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#818cf8', marginBottom: 6 }}>AM DA Pattern Design — Not Required</div>
+                <div style={{ fontSize: 11, color: '#a5b4fc' }}>{da.reason}</div>
+                {da.conversion_trigger && (
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6, fontStyle: 'italic' }}>{da.conversion_trigger}</div>
+                )}
+              </div>
+            );
+          }
+          const complexColor = { HIGH: '#dc2626', MODERATE: '#d97706', LOW: '#16a34a' }[da.da_complexity] ?? '#6b7280';
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#0c0c14', border: '1px solid #312e81', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#818cf8', marginBottom: 10 }}>
+                §73.316 DA Pattern Design — {da.pattern_mode}
+              </div>
+              {/* Summary chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <span style={{ background: complexColor + '22', color: complexColor, borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
+                  {da.da_complexity} complexity
+                </span>
+                <span style={{ background: '#1e1b4b', color: '#a5b4fc', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {da.tower_count_low}–{da.tower_count_high} towers
+                </span>
+                <span style={{ background: '#1e1b4b', color: '#c4b5fd', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {da.suppression_low_db}–{da.suppression_high_db} dB suppression
+                </span>
+                {da.is_da2 && (
+                  <span style={{ background: '#2e1065', color: '#e879f9', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>DA-2 (day+night)</span>
+                )}
+                <span style={{ background: '#1e1b4b', color: '#94a3b8', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {da.hrp_azimuths} azimuth HRP table
+                </span>
+              </div>
+              {/* Cost + timeline row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                <div style={{ background: '#0a0a1a', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Design cost</div>
+                  <div style={{ color: '#e0e7ff', fontWeight: 600 }}>{fmtUsd(da.design_cost_low_usd)} – {fmtUsd(da.design_cost_high_usd)}</div>
+                </div>
+                <div style={{ background: '#0a0a1a', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Design timeline</div>
+                  <div style={{ color: '#e0e7ff', fontWeight: 600 }}>{da.design_weeks_low}–{da.design_weeks_high} weeks</div>
+                </div>
+                <div style={{ background: '#0a0a1a', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Construction premium</div>
+                  <div style={{ color: '#e0e7ff', fontWeight: 600 }}>{da.construction_premium_pct_low}–{da.construction_premium_pct_high}%</div>
+                </div>
+              </div>
+              {/* Form 301-AM DA exhibits */}
+              {da.form_301_da_exhibits && da.form_301_da_exhibits.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>Form 301-AM DA Exhibits Required</div>
+                  {da.form_301_da_exhibits.map((ex, i) => (
+                    <div key={i} style={{ fontSize: 10, color: '#a5b4fc', paddingLeft: 8, borderLeft: '2px solid #4338ca', marginBottom: 2 }}>
+                      {ex}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Compliance checklist */}
+              {da.compliance_checklist && da.compliance_checklist.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>§73.316 Compliance Checklist</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <tbody>
+                      {da.compliance_checklist.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #1e1b4b' }}>
+                          <td style={{ padding: '3px 4px', color: row.required ? '#86efac' : '#6b7280', width: 16 }}>
+                            {row.required ? '✓' : '○'}
+                          </td>
+                          <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{row.item}</td>
+                          <td style={{ padding: '3px 4px', color: '#6366f1', textAlign: 'right', whiteSpace: 'nowrap' }}>{row.ref}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {da.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{da.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Relocation Master Timeline Guide */}
+        {candidate.am_relocation_master_timeline_guide && (() => {
+          const mt = candidate.am_relocation_master_timeline_guide;
+          const phaseColor = (p) => p.parallel ? '#6366f1' : '#0ea5e9';
+          return (
+            <div style={{ background: '#09090b', border: '1px solid #3f3f46', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#fafafa', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Relocation Master Timeline</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#a1a1aa', background: '#18181b', borderRadius: 3, padding: '2px 6px', border: '1px solid #3f3f46' }}>8 PHASES</span>
+              </div>
+
+              {/* Total timeline banner */}
+              <div style={{ background: '#18181b', borderRadius: 6, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #3f3f46' }}>
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#71717a', marginBottom: 2 }}>TOTAL PROJECT TIMELINE</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 15, fontWeight: 700, color: '#f4f4f5' }}>
+                    {Math.round(mt.total_months_low)}–{Math.round(mt.total_months_high)} months
+                  </div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#71717a', marginTop: 1 }}>({mt.total_weeks_low}–{mt.total_weeks_high} wks)</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#71717a' }}>Critical parallel path</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#a78bfa', fontWeight: 600 }}>Phase {mt.parallel_critical_phase}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#71717a' }}>{mt.parallel_critical_name}</div>
+                </div>
+              </div>
+
+              {/* Phase Gantt table */}
+              <div style={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #27272a' }}>
+                {(mt.phases || []).map((phase, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '18px 1fr auto', gap: 6, padding: '5px 8px', background: i % 2 === 0 ? '#09090b' : '#0f0f11', borderBottom: '1px solid #18181b', alignItems: 'start' }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: 9, color: phaseColor(phase), fontWeight: 700, paddingTop: 1 }}>{phase.phase}</div>
+                    <div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#e4e4e7', display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {phase.name}
+                        {phase.parallel && <span style={{ fontFamily: 'monospace', fontSize: 7, color: '#6366f1', background: '#1e1b4b', borderRadius: 2, padding: '1px 4px' }}>PARALLEL</span>}
+                      </div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#52525b', marginTop: 1, lineHeight: 1.4 }}>{phase.description}</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 7, color: '#3f3f46', marginTop: 1 }}>↳ {phase.milestone}</div>
+                    </div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#a1a1aa', textAlign: 'right', whiteSpace: 'nowrap' }}>{phase.weeks_low}–{phase.weeks_high} wks</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Interference Budget and NIF Guide */}
+        {candidate.am_interference_budget_and_nif_guide && (() => {
+          const ib = candidate.am_interference_budget_and_nif_guide;
+          const passColor = ib.nif_screening_ok ? '#22c55e' : '#ef4444';
+          const passBg    = ib.nif_screening_ok ? '#052e16' : '#450a0a';
+          return (
+            <div style={{ background: '#0a0f1a', border: `1px solid ${passColor}40`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#e2e8f0', letterSpacing: '0.08em', textTransform: 'uppercase' }}>§73.182 NIF / Interference Budget</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: passColor, background: passBg, border: `1px solid ${passColor}60`, borderRadius: 3, padding: '2px 6px' }}>
+                  {ib.nif_screening_ok ? 'NIF SCREEN PASS' : 'NIF FLAG'}
+                </span>
+                {ib.da_night_operation_likely_required && (
+                  <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#fbbf24', background: '#451a03', border: '1px solid #fbbf2440', borderRadius: 3, padding: '2px 6px' }}>DA NIGHT LIKELY</span>
+                )}
+              </div>
+
+              {/* Channel class info */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#94a3b8', background: '#0f1629', borderRadius: 4, padding: '6px 8px', marginBottom: 8 }}>
+                {ib.is_clear_channel
+                  ? `CLEAR CHANNEL — full §73.182 NIF study required. D/U margin: ${ib.co_channel_du_margin_db} dB (need ≥ 0 for 20 dB criterion).`
+                  : `${ib.is_regional_channel ? 'REGIONAL' : 'LOCAL'} channel — ${ib.nif_study_complexity} NIF study. Min co-channel separation: ${ib.min_sep_co_channel_km} km.`}
+              </div>
+
+              {/* Metrics grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 8 }}>
+                {[
+                  { label: 'NIF complexity',   value: ib.nif_study_complexity },
+                  { label: 'D/U margin',        value: `${ib.co_channel_du_margin_db} dB` },
+                  { label: 'NIF study cost',    value: `$${Math.round((ib.nif_study_cost_low_usd??0)/1000)}K–$${Math.round((ib.nif_study_cost_high_usd??0)/1000)}K` },
+                  { label: 'NIF study time',    value: `${ib.nif_study_weeks_low}–${ib.nif_study_weeks_high} wks` },
+                  { label: 'Min co-ch sep',     value: `${ib.min_sep_co_channel_km} km` },
+                  { label: '1st adj D/U req',   value: `${ib.first_adj_du_req_db} dB` }
+                ].map(m => (
+                  <div key={m.label} style={{ background: '#0f1629', borderRadius: 4, padding: '6px 8px', border: '1px solid #1e2d4a' }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#93c5fd', fontWeight: 600 }}>{m.value}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#3b5278', marginTop: 1 }}>{m.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {ib.da_night_operation_likely_required && (
+                <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#fbbf24', background: '#451a03', borderRadius: 4, padding: '6px 8px', border: '1px solid #fbbf2440', lineHeight: 1.5 }}>
+                  DA night operation likely required — {ib.frequency_khz} kHz clear channel NDA station typically must operate as DA-N at night to limit skywave interference to the dominant Class A station per §73.182(l).
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM NEPA Environmental Review Guide */}
+        {candidate.am_nepa_environmental_review_guide && (() => {
+          const ne = candidate.am_nepa_environmental_review_guide;
+          const pathColor = ne.review_path === 'EA_REQUIRED' ? '#ef4444' : ne.review_path === 'CE_LIKELY_WITH_NHPA' ? '#f59e0b' : '#22c55e';
+          const pathBg    = ne.review_path === 'EA_REQUIRED' ? '#450a0a' : ne.review_path === 'CE_LIKELY_WITH_NHPA' ? '#451a03' : '#052e16';
+          const sevColor  = (s) => s === 'HIGH' ? '#ef4444' : s === 'MODERATE' ? '#f59e0b' : '#94a3b8';
+          return (
+            <div style={{ background: '#0c1007', border: `1px solid ${pathColor}40`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#f0fdf4', letterSpacing: '0.08em', textTransform: 'uppercase' }}>NEPA Environmental Review</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: pathColor, background: pathBg, border: `1px solid ${pathColor}60`, borderRadius: 3, padding: '2px 6px' }}>
+                  {ne.review_path === 'EA_REQUIRED' ? 'EA REQUIRED' : ne.review_path === 'CE_LIKELY_WITH_NHPA' ? 'CE + NHPA §106' : 'CE ELIGIBLE'}
+                </span>
+              </div>
+
+              {/* Review path description */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: pathColor, background: pathBg, borderRadius: 4, padding: '6px 8px', marginBottom: 8, lineHeight: 1.5 }}>
+                {ne.review_path_description}
+              </div>
+
+              {/* Metrics grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
+                {[
+                  { label: 'Review timeline', value: `${ne.env_review_weeks_low}–${ne.env_review_weeks_high} wks` },
+                  { label: '§1.1307 triggers', value: String(ne.n_triggers) },
+                  { label: 'Consultant est.', value: `$${Math.round(ne.env_consultant_cost_low_usd/1000)}K–$${Math.round(ne.env_consultant_cost_high_usd/1000)}K` },
+                  { label: 'NHPA §106', value: ne.nhpa_106_triggered ? 'TRIGGERED' : 'Not triggered' },
+                  { label: 'TCNS tribal', value: 'Required (all towers)' },
+                  { label: 'Tower height', value: `${ne.tower_height_ft} ft` }
+                ].map(m => (
+                  <div key={m.label} style={{ background: '#0f1c0a', borderRadius: 4, padding: '6px 8px', border: '1px solid #1a2e14' }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#d1fae5', fontWeight: 600 }}>{m.value}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#4d7c52', marginTop: 1 }}>{m.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Triggers list */}
+              {ne.ce_triggers && ne.ce_triggers.length > 0 && (
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#4d7c52', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>§1.1307 triggers</div>
+                  <div>
+                    {ne.ce_triggers.map((t, i) => (
+                      <div key={i} style={{ padding: '5px 8px', background: i % 2 === 0 ? '#0f1c0a' : '#0c1007', borderBottom: '1px solid #1a2e14', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: sevColor(t.severity), whiteSpace: 'nowrap', minWidth: 80 }}>{t.severity}</span>
+                        <div>
+                          <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#86efac', fontWeight: 600 }}>{t.factor}</div>
+                          <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#4d7c52', lineHeight: 1.4 }}>{t.description}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Site Access and Land Use Guide */}
+        {candidate.am_site_access_and_land_use_guide && (() => {
+          const lu = candidate.am_site_access_and_land_use_guide;
+          const riskColor = lu.zone_risk_tier === 'HIGH' ? '#ef4444' : lu.zone_risk_tier === 'MODERATE' ? '#f59e0b' : '#22c55e';
+          const riskBg    = lu.zone_risk_tier === 'HIGH' ? '#450a0a' : lu.zone_risk_tier === 'MODERATE' ? '#451a03' : '#052e16';
+          const fmtK = (n) => n != null ? '$' + Math.round(n / 1000) + 'K' : '—';
+          return (
+            <div style={{ background: '#0c0a09', border: `1px solid ${riskColor}40`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#fafaf9', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Site Access & Land Use</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: riskColor, background: riskBg, border: `1px solid ${riskColor}60`, borderRadius: 3, padding: '2px 6px' }}>{lu.zone_risk_tier} ZONE RISK</span>
+                {lu.faa_study_trigger && <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#fbbf24', background: '#451a03', border: '1px solid #fbbf2440', borderRadius: 3, padding: '2px 6px' }}>FAA STUDY REQUIRED</span>}
+              </div>
+
+              {/* Key metrics grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
+                {[
+                  { label: 'Lease (est.)',   value: `$${lu.lease_low_per_month_usd?.toLocaleString()}–$${lu.lease_high_per_month_usd?.toLocaleString()}/mo` },
+                  { label: 'Site control',   value: `${lu.site_control_weeks_low}–${lu.site_control_weeks_high} wks` },
+                  { label: '10-yr lease',    value: fmtK(lu.lease_10yr_low_usd) + '–' + fmtK(lu.lease_10yr_high_usd) },
+                  { label: 'NHPA §106',      value: lu.nhpa_106_risk },
+                  { label: 'Floodplain',     value: lu.floodplain_risk },
+                  { label: 'LU class',       value: (lu.land_use_class ?? '—').replace(/_/g, ' ').toLowerCase() }
+                ].map(m => (
+                  <div key={m.label} style={{ background: '#1c1917', borderRadius: 4, padding: '6px 8px', border: '1px solid #292524' }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#e7e5e4', fontWeight: 600 }}>{m.value}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#78716c', marginTop: 1 }}>{m.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Zone risk description */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: riskColor, background: riskBg, borderRadius: 4, padding: '6px 8px', marginBottom: 8, lineHeight: 1.5 }}>
+                {lu.zone_risk_description}
+              </div>
+
+              {/* Due diligence checklist */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#78716c', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Pre-filing due diligence</div>
+              <div style={{ space: 0 }}>
+                {(lu.due_diligence_items || []).map((item, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: '4px 6px', background: i % 2 === 0 ? '#1c1917' : '#0c0a09', borderBottom: '1px solid #1c1917', borderRadius: i === 0 ? '4px 4px 0 0' : i === (lu.due_diligence_items.length - 1) ? '0 0 4px 4px' : 0 }}>
+                    <div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#e7e5e4' }}>{item.item}</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#57534e', marginTop: 1 }}>{item.notes}</div>
+                    </div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#a8a29e', textAlign: 'right', whiteSpace: 'nowrap' }}>{item.weeks_low}–{item.weeks_high} wks</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Station Relocation Total Project Cost Pro Forma */}
+        {candidate.am_station_relocation_total_project_cost_proforma && (() => {
+          const pf = candidate.am_station_relocation_total_project_cost_proforma;
+          const fmt = (n) => n != null ? '$' + Number(n).toLocaleString() : '—';
+          const fmtK = (n) => n != null ? '$' + Math.round(n / 1000) + 'K' : '—';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#f8fafc', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Total Project Cost Pro Forma</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b', background: '#1e293b', borderRadius: 3, padding: '2px 6px' }}>SCREENING-GRADE</span>
+              </div>
+
+              {/* Grand total banner */}
+              <div style={{ background: '#1e293b', borderRadius: 6, padding: '10px 14px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', marginBottom: 2 }}>GRAND TOTAL (incl. contingency)</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>
+                    {fmtK(pf.grand_total_low_usd)} – {fmtK(pf.grand_total_high_usd)}
+                  </div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', marginTop: 2 }}>midpoint {fmtK(pf.grand_total_midpoint_usd)}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b' }}>Class {pf.fcc_class} · {pf.frequency_khz} kHz</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b' }}>{pf.tpo_kw} kW · {pf.is_da ? 'DA' : 'NDA'}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b' }}>{pf.tower_height_ft} ft {pf.is_guyed ? 'guyed' : 'self-support'}</div>
+                </div>
+              </div>
+
+              {/* Line items table */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Line Items</div>
+              <div style={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #1e293b', marginBottom: 8 }}>
+                {(pf.line_items || []).map((item, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, padding: '5px 8px', background: i % 2 === 0 ? '#0f172a' : '#141d2e', borderBottom: '1px solid #1e293b' }}>
+                    <div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#cbd5e1' }}>{item.category}</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#475569', marginTop: 1 }}>{item.notes}</div>
+                    </div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtK(item.low)}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', textAlign: 'right', whiteSpace: 'nowrap' }}>–{fmtK(item.high)}</div>
+                  </div>
+                ))}
+                {/* Subtotal row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, padding: '5px 8px', background: '#1e293b', borderTop: '1px solid #334155' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>Subtotal</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', textAlign: 'right' }}>{fmtK(pf.subtotal_low_usd)}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', textAlign: 'right' }}>–{fmtK(pf.subtotal_high_usd)}</div>
+                </div>
+                {/* Contingency row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, padding: '5px 8px', background: '#1e293b' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8' }}>Contingency ({pf.contingency_pct_low}–{pf.contingency_pct_high}%)</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', textAlign: 'right' }}>{fmtK(pf.contingency_low_usd)}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', textAlign: 'right' }}>–{fmtK(pf.contingency_high_usd)}</div>
+                </div>
+                {/* Grand total row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, padding: '6px 8px', background: '#0f172a', borderTop: '2px solid #334155' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#f1f5f9', fontWeight: 700 }}>GRAND TOTAL</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#38bdf8', textAlign: 'right', fontWeight: 700 }}>{fmtK(pf.grand_total_low_usd)}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#0ea5e9', textAlign: 'right', fontWeight: 700 }}>–{fmtK(pf.grand_total_high_usd)}</div>
+                </div>
+              </div>
+
+              <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#475569', lineHeight: 1.5 }}>{pf.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM FCC Application Filing Cost and Timeline Guide */}
+        {candidate.am_fcc_application_filing_cost_and_timeline_guide && (() => {
+          const g = candidate.am_fcc_application_filing_cost_and_timeline_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#713f12', marginBottom: 8 }}>
+                FCC Application Filing Cost &amp; Timeline (§73.3500 / FY2024)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
+                <div><b>Form 301-AM (CP):</b> ${fmt(g.fee_form_301_am)}</div>
+                <div><b>Form 302-AM (License):</b> ${fmt(g.fee_form_302_am)}</div>
+                <div><b>Total FCC fees:</b> ${fmt(g.total_fcc_fees)}</div>
+                <div><b>Station type:</b> {g.is_directional ? `DA (${g.pattern_mode})` : 'NDA'} Class {g.fcc_class}</div>
+                <div><b>Attorney (5–15 hrs):</b> ${fmt(g.attorney_cost_low)}–${fmt(g.attorney_cost_high)}</div>
+                <div><b>Engineering prep:</b> ${fmt(g.engineering_prep_low)}–${fmt(g.engineering_prep_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total soft cost:</b> ${fmt(g.total_soft_cost_low)}–${fmt(g.total_soft_cost_high)}</div>
+                <div><b>FCC processing:</b> {g.fcc_processing_days_low}–{g.fcc_processing_days_high} days</div>
+                <div><b>Total timeline (excl. construction):</b> {g.total_timeline_days_low}–{g.total_timeline_days_high} days</div>
+                <div><b>CP construction window:</b> {g.construction_days_allowed} days (§73.3561)</div>
+              </div>
+              {g.filing_sequence && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>Filing sequence:</div>
+                  <ol style={{ margin: 0, paddingLeft: 16, fontSize: 10, color: '#78350f', lineHeight: 1.6 }}>
+                    {g.filing_sequence.map((step, i) => <li key={i}>{step}</li>)}
+                  </ol>
+                </div>
+              )}
+              <div style={{ marginTop: 6, fontSize: 10, color: '#b45309' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Transmitter Building and HVAC Guide */}
+        {candidate.am_transmitter_building_and_hvac_guide && (() => {
+          const g = candidate.am_transmitter_building_and_hvac_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#065f46', marginBottom: 8 }}>
+                Transmitter Building &amp; HVAC (NFPA 70 / NFPA 110)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#064e3b' }}>
+                <div><b>TPO:</b> {g.tpo_kw} kW</div>
+                <div><b>Solid-state efficiency:</b> {g.eta_solid_state_pct}%</div>
+                <div><b>Heat dissipated (SS):</b> {fmtF(g.p_heat_solid_state_kw)} kW</div>
+                <div><b>Aux heat (lighting/ctrl):</b> {g.aux_heat_kw} kW</div>
+                <div><b>Total heat load:</b> {fmtF(g.total_heat_kw)} kW</div>
+                <div><b>HVAC required:</b> {fmtF(g.hvac_tons_required, 2)} ton → <b>{g.hvac_tons_specified} ton specified</b></div>
+                <div><b>Building size:</b> {g.building_sqft_low}–{g.building_sqft_high} sq ft</div>
+                <div><b>HVAC cost:</b> ${fmt(g.hvac_cost_low)}–${fmt(g.hvac_cost_high)}</div>
+                <div><b>Building shell:</b> ${fmt(g.building_cost_low)}–${fmt(g.building_cost_high)}</div>
+                <div><b>Security + panel:</b> ${fmt(g.security_cost_low + g.panel_cost_low)}–${fmt(g.security_cost_high + g.panel_cost_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total building:</b> ${fmt(g.total_building_low_usd)}–${fmt(g.total_building_high_usd)}</div>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#047857' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Structural Load Analysis Guide */}
         {candidate.am_tower_structural_load_analysis_guide && (() => {
           const g = candidate.am_tower_structural_load_analysis_guide;
@@ -9725,7 +10721,15 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               {a.proof_of_performance && (
                 <div style={{ background: '#0c1a1a', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
-                  <span style={{ color: '#9ca3af' }}>Proof method:</span> <span style={{ color: '#d1d5db' }}>{a.proof_of_performance}</span>
+                  <span style={{ color: '#9ca3af' }}>Proof method:</span>{' '}
+                  <span style={{ color: '#d1d5db' }}>
+                    {typeof a.proof_of_performance === 'string'
+                      ? a.proof_of_performance
+                      : a.proof_of_performance.method}
+                  </span>
+                  {typeof a.proof_of_performance === 'object' && a.proof_of_performance.tolerance && (
+                    <span style={{ color: '#6b7280', marginLeft: 8 }}>tolerance: {a.proof_of_performance.tolerance}</span>
+                  )}
                 </div>
               )}
               {a.note && <div style={{ color: '#6b7280', fontSize: 10, fontStyle: 'italic', marginBottom: 4 }}>{a.note}</div>}
