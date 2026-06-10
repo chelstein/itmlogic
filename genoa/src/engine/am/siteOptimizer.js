@@ -1600,7 +1600,12 @@ export async function runSiteOptimizer(body = {}){
     dtv_n_phasor_triggers:              c.am_tower_detuning_and_phasor_verification_guide?.n_phasor_triggers ?? null,
     dtv_detuning_cap_pf:                c.am_tower_detuning_and_phasor_verification_guide?.detuning_cap_pf ?? null,
     dtv_da_proof_cost_low_usd:          c.am_tower_detuning_and_phasor_verification_guide?.cost_estimates?.full_da_proof_low_usd ?? null,
-    dtv_monitor_est_low_usd:            c.am_tower_detuning_and_phasor_verification_guide?.antenna_monitor?.est_cost_usd?.low ?? null
+    dtv_monitor_est_low_usd:            c.am_tower_detuning_and_phasor_verification_guide?.antenna_monitor?.est_cost_usd?.low ?? null,
+    cfr_tolerance_hz:                   c.am_carrier_frequency_reference_guide?.fcc_tolerance_hz ?? null,
+    cfr_tolerance_ppm:                  c.am_carrier_frequency_reference_guide?.fcc_tolerance_ppm ?? null,
+    cfr_recommended_ref:                c.am_carrier_frequency_reference_guide?.recommended_reference ?? null,
+    cfr_gpsdo_cost_low_usd:             c.am_carrier_frequency_reference_guide?.reference_options?.[0]?.cost_low_usd ?? null,
+    cfr_tcxo_marginal:                  c.am_carrier_frequency_reference_guide?.tcxo_marginal ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -27368,6 +27373,135 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_carrier_frequency_reference_guide: (() => {
+      // Carrier frequency accuracy and standard frequency reference guide.
+      //
+      // §73.1540: AM stations must maintain carrier frequency within ±20 Hz of the
+      // licensed (center) frequency at all times.  The frequency tolerance is the most
+      // stringent technical requirement for AM — violations carry a forfeiture of up to
+      // $10,000 per day (§1.80(b)(7)).
+      //
+      // §73.1545: Unattended operation is permitted if the transmitter's automatic
+      // frequency control (AFC) keeps the carrier within tolerance.  Any drift must be
+      // logged.
+      //
+      // During a relocation, the existing frequency reference system (OCXO, TCXO, or
+      // GPS-disciplined oscillator) may need to be reinstalled, recalibrated, or
+      // replaced at the new site — particularly if the transmitter is also being
+      // upgraded.
+      //
+      // References: 47 CFR §73.1540; §73.1545; §73.1215; §73.1350; §1.80(b)(7)
+      //             ITU-R TF.460-6; NAB Engineering Handbook Ch. 4
+
+      const freq_hz = frequency_khz * 1000;
+      const tolerance_hz  = 20;          // §73.1540: ±20 Hz absolute
+      const tolerance_ppm = round2((tolerance_hz / freq_hz) * 1e6);
+      const tolerance_ppb = round2(tolerance_ppm * 1000);
+
+      // ---- Frequency reference technology options ----
+      const REF_TYPES = [
+        {
+          id:              'GPS_DISCIPLINED',
+          label:           'GPS-Disciplined Oscillator (GPSDO)',
+          stability_ppb:   0.1,          // GPSDO: ≤ 0.1 ppb long-term (GPS-locked)
+          accuracy_hz:     round2(freq_hz * 0.1e-9),
+          meets_fcc_tol:   true,
+          cost_low_usd:    800,
+          cost_high_usd:   3500,
+          recommended:     true,
+          notes:           'Best practice for new installations. GPS lock provides NIST-traceable accuracy far exceeding §73.1540. Failover to holdover OCXO if GPS signal is lost.'
+        },
+        {
+          id:              'OCXO',
+          label:           'Oven-Controlled Crystal Oscillator (OCXO)',
+          stability_ppb:   1,            // OCXO: ~1 ppb/day aging; ±0.01 ppm at temperature
+          accuracy_hz:     round2(freq_hz * 1e-9),
+          meets_fcc_tol:   round2(freq_hz * 1e-9) <= tolerance_hz,
+          cost_low_usd:    400,
+          cost_high_usd:   2000,
+          recommended:     false,
+          notes:           'Adequate if maintained and checked against WWV/WWVB/GPS reference monthly. Annual calibration required. Aging requires periodic retrimming.'
+        },
+        {
+          id:              'TCXO',
+          label:           'Temperature-Compensated Crystal Oscillator (TCXO)',
+          stability_ppb:   50,           // TCXO: ~±0.05 ppm = 50 ppb; marginal for MF AM
+          accuracy_hz:     round2(freq_hz * 50e-9),
+          meets_fcc_tol:   round2(freq_hz * 50e-9) <= tolerance_hz,
+          cost_low_usd:    100,
+          cost_high_usd:   500,
+          recommended:     false,
+          notes:           `TCXO accuracy: ±${round2(freq_hz * 50e-9)} Hz at ${frequency_khz} kHz. ${round2(freq_hz * 50e-9) <= tolerance_hz ? 'Within ±20 Hz tolerance — adequate with regular monitoring.' : 'EXCEEDS ±20 Hz tolerance at this frequency — NOT RECOMMENDED without GPS discipline.'}`
+        },
+        {
+          id:              'INTEGRATED_AFC',
+          label:           'Transmitter Integrated AFC',
+          stability_ppb:   5,
+          accuracy_hz:     round2(freq_hz * 5e-9),
+          meets_fcc_tol:   true,
+          cost_low_usd:    0,            // built into modern transmitters
+          cost_high_usd:   0,
+          recommended:     false,
+          notes:           'Modern AM transmitters (Harris/GatesAir, Nautel, BE) include AFC ±5 ppm or better. Adequate as sole reference only if manufacturer specifies §73.1540 compliance. Verify via transmitter spec sheet.'
+        }
+      ];
+
+      // TCXO analysis: at very high frequencies the 50 ppb floor may exceed 20 Hz
+      const tcxo_marginal = REF_TYPES.find(r => r.id === 'TCXO')?.meets_fcc_tol === false;
+
+      // ---- WWV/WWVB/GPS monitoring ----
+      // §73.1540 implies the station must have a way to verify carrier frequency.
+      // Best practice: monthly check against WWV (5, 10, 15, 20, 25 MHz) or GPS.
+      const MONITORING_METHODS = [
+        { method: 'GPS receiver comparison',         frequency: 'Continuous', accuracy_hz: 0.01, recommended: true  },
+        { method: 'WWV / CHU shortwave comparison',  frequency: 'Monthly',    accuracy_hz: 1,    recommended: true  },
+        { method: 'WWVB 60 kHz comparison (via receiver)', frequency: 'Monthly', accuracy_hz: 0.1, recommended: false },
+        { method: 'Spectrum analyzer sweep',         frequency: 'Quarterly',  accuracy_hz: 5,    recommended: false }
+      ];
+
+      // ---- Relocation considerations ----
+      // Moving to a new transmitter site often requires:
+      //   1. Transporting and reinstalling the existing frequency reference.
+      //   2. Allowing 24–48 hours of GPSDO warm-up/lock at the new site.
+      //   3. Verifying GPS sky view (obstructions, jamming potential) at the new site.
+      //   4. Updating the transmitter's internal frequency trim after any hardware change.
+      const relocation_checklist = [
+        { step: 'Confirm existing frequency reference model and GPS sky view at new site', priority: 'HIGH' },
+        { step: 'Allow 48-hour GPSDO warm-up at new site before commencing permanent operation', priority: 'HIGH' },
+        { step: 'Log initial carrier frequency measurement within 24 hours of new site activation', priority: 'HIGH' },
+        { step: 'Verify transmitter AFC calibration against GPS reference after power-on', priority: 'MODERATE' },
+        { step: 'Schedule first monthly WWV check within 30 days of new site operation', priority: 'MODERATE' }
+      ];
+
+      // ---- §1.80 forfeiture risk ----
+      // Carrier frequency violation: $10,000/day base forfeiture (§1.80(b)(7)).
+      // FCC considers willful/repeated violations; technical malfunction with prompt correction
+      // typically results in a warning or reduced forfeiture.
+      const FORFEITURE = {
+        base_per_day_usd:   10000,
+        max_single_usd:     100000,
+        cfr:                '§1.80(b)(7)',
+        mitigation:         'Log frequency measurements at least monthly; correct any drift immediately; file STA if extended drift period expected.'
+      };
+
+      return {
+        frequency_khz, fcc_class,
+        carrier_freq_hz: freq_hz,
+        fcc_tolerance_hz: tolerance_hz,
+        fcc_tolerance_ppm: tolerance_ppm,
+        fcc_tolerance_ppb: tolerance_ppb,
+        tcxo_marginal,
+        recommended_reference: 'GPS_DISCIPLINED',
+        reference_options: REF_TYPES,
+        n_reference_options: REF_TYPES.length,
+        monitoring_methods: MONITORING_METHODS,
+        relocation_checklist,
+        forfeiture_risk: FORFEITURE,
+        reference: '47 CFR §73.1540; §73.1545; §73.1215; §73.1350; §1.80(b)(7); ITU-R TF.460-6',
+        note: `${frequency_khz} kHz carrier. FCC tolerance: ±${tolerance_hz} Hz (±${tolerance_ppm} ppm). GPSDO recommended ($${REF_TYPES[0].cost_low_usd}–$${REF_TYPES[0].cost_high_usd}). ${tcxo_marginal ? 'WARNING: TCXO alone exceeds ±20 Hz tolerance at this frequency.' : 'TCXO is marginal; GPS-discipline recommended.'} Forfeiture: $${FORFEITURE.base_per_day_usd.toLocaleString()}/day.`
       };
     })(),
 
