@@ -1745,7 +1745,12 @@ export async function runSiteOptimizer(body = {}){
     fhz_ea_required_if_in_floodplain:   c.am_site_hydrology_and_flood_zone_guide?.ea_required_if_in_floodplain ?? null,
     fhz_n_mitigation_measures:          c.am_site_hydrology_and_flood_zone_guide?.n_mitigation_measures ?? null,
     fhz_total_low_usd:                  c.am_site_hydrology_and_flood_zone_guide?.cost_estimates?.total_low_usd ?? null,
-    fhz_ea_cost_low_usd:                c.am_site_hydrology_and_flood_zone_guide?.cost_estimates?.environmental_assessment_low_usd ?? null
+    fhz_ea_cost_low_usd:                c.am_site_hydrology_and_flood_zone_guide?.cost_estimates?.environmental_assessment_low_usd ?? null,
+    scr_conductivity_category:          c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.conductivity_category ?? null,
+    scr_itm_validation_status:          c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.itm_validation_status ?? null,
+    scr_coverage_deviation_risk:        c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.coverage_deviation_risk ?? null,
+    scr_n_measurement_radials:          c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.n_measurement_radials ?? null,
+    scr_total_low_usd:                  c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.cost_estimates?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31558,6 +31563,86 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §1.1307(a)(3); §1.1311; FEMA FIRM; 44 CFR §60.3',
         note: `Site hydrology risk: ${flood_risk_level} (screening-grade proxy; actual risk requires FEMA FIRM lookup at coordinates). ${flood_risk_level !== 'LOW' ? `EA may be required if in FEMA AE/A zone. ` : ''}Est. cost $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
+      };
+    })(),
+
+    am_soil_conductivity_measurement_and_radial_design_validation_guide: (() => {
+      // ITM groundwave propagation accuracy depends on §73 App B soil conductivity.
+      // Real measurements vs FCC conductivity map (Soil Conductivity of USA) can differ
+      // significantly; FCC allows measured values per §73.186(b) to correct ITM inputs.
+      const sigma_base = sigma_msm ?? 5;   // mS/m from ITM inputs (§73 App B)
+      const freq_khz   = frequency_khz ?? 1000;
+
+      // ITU-R P.832 conductivity quality categories
+      const SIGMA_POOR     = 2;    // <2 mS/m — poor (desert/rock)
+      const SIGMA_FAIR     = 5;    // 2–5 mS/m — fair (typical US interior)
+      const SIGMA_GOOD     = 15;   // 5–15 mS/m — good (most agricultural)
+      const SIGMA_EXCELLENT = 30;  // >15 mS/m — excellent (marsh/coastal plain)
+
+      const conductivity_category =
+        sigma_base < SIGMA_POOR     ? 'POOR' :
+        sigma_base < SIGMA_FAIR     ? 'FAIR' :
+        sigma_base < SIGMA_GOOD     ? 'GOOD' : 'EXCELLENT';
+
+      // Number of Bevington-method radial field strength measurements recommended
+      // (§73.186(b) allows replacement of Appendix B map value with measured value)
+      const n_measurement_radials = conductivity_category === 'POOR'      ? 8  :
+                                    conductivity_category === 'FAIR'      ? 6  :
+                                    conductivity_category === 'GOOD'      ? 4  : 3;
+
+      // Coverage deviation risk: if map value deviates from reality, coverage is over/under predicted
+      const coverage_deviation_risk =
+        conductivity_category === 'POOR'      ? 'HIGH' :
+        conductivity_category === 'FAIR'      ? 'MODERATE' :
+        conductivity_category === 'GOOD'      ? 'LOW' : 'NEGLIGIBLE';
+
+      // Radial efficiency — longer radials capture more of the near-field ground return
+      // 120 × λ/4 radials is the standard FCC-accepted design (§73.190(e))
+      const wavelength_m    = round2(300000 / freq_khz);
+      const quarter_wave_m  = round2(wavelength_m / 4);
+      const quarter_wave_ft = round2(quarter_wave_m * 3.28084);
+
+      // Minimum radials for licensed class per §73.190(e) table
+      const min_radials =
+        fcc_class === 'A' ? 120 :
+        fcc_class === 'B' ? 90  :
+        fcc_class === 'C' ? 60  : 60;
+
+      // Soil resistivity testing cost
+      const WENNER_TEST_COST_LOW  = 1500;
+      const WENNER_TEST_COST_HIGH = 4000;
+      const BEVINGTON_COST_LOW    = round2(n_measurement_radials * 500);
+      const BEVINGTON_COST_HIGH   = round2(n_measurement_radials * 1200);
+      const total_low_usd         = round2(WENNER_TEST_COST_LOW + BEVINGTON_COST_LOW);
+      const total_high_usd        = round2(WENNER_TEST_COST_HIGH + BEVINGTON_COST_HIGH);
+
+      // Can ITM model be validated with current conductivity value?
+      const itm_validation_status =
+        conductivity_category === 'POOR'      ? 'MEASUREMENT_REQUIRED' :
+        conductivity_category === 'FAIR'      ? 'MEASUREMENT_RECOMMENDED' :
+        conductivity_category === 'GOOD'      ? 'MAP_VALUE_ACCEPTABLE' : 'MAP_VALUE_ACCEPTABLE';
+
+      return {
+        conductivity_msm:          sigma_base,
+        conductivity_category,
+        n_measurement_radials,
+        coverage_deviation_risk,
+        itm_validation_status,
+        wavelength_m,
+        quarter_wave_m,
+        quarter_wave_ft,
+        min_radials_fcc_class:     min_radials,
+        measurement_methods:       ['Wenner four-electrode resistivity', 'Bevington radial field strength'],
+        cost_estimates: {
+          wenner_test_low_usd:     WENNER_TEST_COST_LOW,
+          wenner_test_high_usd:    WENNER_TEST_COST_HIGH,
+          bevington_low_usd:       BEVINGTON_COST_LOW,
+          bevington_high_usd:      BEVINGTON_COST_HIGH,
+          total_low_usd,
+          total_high_usd,
+        },
+        reference: '47 CFR §73.186(b); §73.190(e); §73 App B; ITU-R P.832',
+        note: `Soil conductivity ${sigma_base} mS/m (${conductivity_category}). ITM validation: ${itm_validation_status}. Coverage deviation risk: ${coverage_deviation_risk}. Recommended ${n_measurement_radials} Bevington radials; min FCC class-${fcc_class ?? '?'} radials: ${min_radials}. λ/4 = ${quarter_wave_ft} ft. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 

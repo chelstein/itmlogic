@@ -18179,3 +18179,51 @@ test('#127 candidate_comparison_table has fhz_* columns', async () => {
     assert.ok('fhz_ea_cost_low_usd'          in row, 'fhz_ea_cost_low_usd missing');
   }
 });
+
+test('#128 KAZM: soil conductivity guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  const g = c.am_soil_conductivity_measurement_and_radial_design_validation_guide;
+  assert.ok(g, 'am_soil_conductivity_measurement_and_radial_design_validation_guide missing');
+  assert.ok(['POOR','FAIR','GOOD','EXCELLENT'].includes(g.conductivity_category), 'conductivity_category must be valid enum');
+  assert.ok(['MAP_VALUE_ACCEPTABLE','MEASUREMENT_RECOMMENDED','MEASUREMENT_REQUIRED'].includes(g.itm_validation_status), 'itm_validation_status must be valid enum');
+  assert.ok(['NEGLIGIBLE','LOW','MODERATE','HIGH'].includes(g.coverage_deviation_risk), 'coverage_deviation_risk must be valid enum');
+});
+
+test('#128 quarter-wave length matches frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  const g = c.am_soil_conductivity_measurement_and_radial_design_validation_guide;
+  const freq = KAZM.frequency_khz;
+  const expected_qw_m = Math.round((300000 / freq / 4) * 100) / 100;
+  assert.ok(Math.abs(g.quarter_wave_m - expected_qw_m) < 1, `quarter_wave_m ${g.quarter_wave_m} should be ≈${expected_qw_m}`);
+  assert.ok(g.quarter_wave_ft > 0, 'quarter_wave_ft must be positive');
+});
+
+test('#128 low conductivity yields non-trivial deviation risk', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  const g = c.am_soil_conductivity_measurement_and_radial_design_validation_guide;
+  assert.ok(g.conductivity_msm > 0, 'conductivity_msm must be positive');
+  assert.ok(g.n_measurement_radials >= 3, 'must recommend ≥3 measurement radials');
+  assert.ok(g.cost_estimates.total_low_usd > 0, 'measurement cost must be positive');
+});
+
+test('#128 min_radials_fcc_class is 60 for Class D (KAZM default)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  const g = c.am_soil_conductivity_measurement_and_radial_design_validation_guide;
+  assert.strictEqual(g.min_radials_fcc_class, 60, 'Class D requires 60 radials');
+  assert.ok(Array.isArray(g.measurement_methods) && g.measurement_methods.length >= 2, 'must have ≥2 measurement methods');
+});
+
+test('#128 candidate_comparison_table has scr_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('scr_conductivity_category'   in row, 'scr_conductivity_category missing');
+    assert.ok('scr_itm_validation_status'   in row, 'scr_itm_validation_status missing');
+    assert.ok('scr_coverage_deviation_risk' in row, 'scr_coverage_deviation_risk missing');
+    assert.ok('scr_n_measurement_radials'   in row, 'scr_n_measurement_radials missing');
+    assert.ok('scr_total_low_usd'           in row, 'scr_total_low_usd missing');
+  }
+});

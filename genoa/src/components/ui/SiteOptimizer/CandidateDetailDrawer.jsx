@@ -11090,6 +11090,59 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Soil Conductivity & Radial Design Validation Guide */}
+        {candidate.am_soil_conductivity_measurement_and_radial_design_validation_guide && (() => {
+          const g = candidate.am_soil_conductivity_measurement_and_radial_design_validation_guide;
+          const costs = g.cost_estimates || {};
+          const riskColor = g.coverage_deviation_risk === 'NEGLIGIBLE' ? '#22c55e' :
+                            g.coverage_deviation_risk === 'LOW'        ? '#4ade80' :
+                            g.coverage_deviation_risk === 'MODERATE'   ? '#f59e0b' : '#f87171';
+          const validColor = g.itm_validation_status === 'MAP_VALUE_ACCEPTABLE'    ? '#22c55e' :
+                             g.itm_validation_status === 'MEASUREMENT_RECOMMENDED' ? '#f59e0b' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Soil Conductivity &amp; Radial Design Validation (§73.186(b) / §73.190(e) / ITU-R P.832)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CONDUCTIVITY</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.conductivity_msm} mS/m</div>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>{g.conductivity_category}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ITM VALIDATION</span>
+                  <div style={{ color: validColor, fontSize: 10, fontWeight: 700 }}>{(g.itm_validation_status || '').replace(/_/g, ' ')}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>DEVIATION RISK</span>
+                  <div style={{ color: riskColor, fontSize: 11, fontWeight: 700 }}>{g.coverage_deviation_risk}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MEAS RADIALS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_measurement_radials}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>λ/4</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.quarter_wave_ft} ft</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MIN RADIALS (CLASS)</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.min_radials_fcc_class}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                {(g.measurement_methods || []).map((m, i) => (
+                  <span key={i} style={{ background: '#1e293b', color: '#94a3b8', fontSize: 9, padding: '2px 5px', borderRadius: 3 }}>{m}</span>
+                ))}
+              </div>
+              <div style={{ color: '#94a3b8', fontSize: 9 }}>Est. Test Cost: <span style={{ color: '#e2e8f0' }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</span></div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

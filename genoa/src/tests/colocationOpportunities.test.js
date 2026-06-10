@@ -4469,3 +4469,14 @@ test('am_site_hydrology_and_flood_zone_guide present across colocation candidate
     assert.ok(g.n_mitigation_measures >= 3, 'must have ≥3 mitigation measures');
   }
 });
+
+test('am_soil_conductivity_measurement_and_radial_design_validation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_soil_conductivity_measurement_and_radial_design_validation_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_soil_conductivity_measurement_and_radial_design_validation_guide');
+    assert.ok(['POOR','FAIR','GOOD','EXCELLENT'].includes(g.conductivity_category), 'conductivity_category must be valid enum');
+    assert.ok(g.n_measurement_radials >= 3, 'must recommend ≥3 measurement radials');
+    assert.ok(g.cost_estimates?.total_low_usd > 0, 'measurement cost must be positive');
+  }
+});
