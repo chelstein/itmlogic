@@ -1794,7 +1794,11 @@ export async function runSiteOptimizer(body = {}){
     fee_form_301_fee_usd:               c.am_fcc_application_fee_budget_guide?.form_301_fee_usd ?? null,
     fee_total_fcc_fees_usd:             c.am_fcc_application_fee_budget_guide?.total_fcc_fees_usd ?? null,
     fee_consulting_low_usd:             c.am_fcc_application_fee_budget_guide?.cost_estimates?.consulting_low_usd ?? null,
-    fee_total_with_consulting_low_usd:  c.am_fcc_application_fee_budget_guide?.cost_estimates?.total_with_consulting_low_usd ?? null
+    fee_total_with_consulting_low_usd:  c.am_fcc_application_fee_budget_guide?.cost_estimates?.total_with_consulting_low_usd ?? null,
+    ada_applicability:                  c.am_site_accessibility_and_ada_compliance_guide?.ada_applicability ?? null,
+    ada_n_features:                     c.am_site_accessibility_and_ada_compliance_guide?.n_accessibility_features ?? null,
+    ada_is_staffed:                     c.am_site_accessibility_and_ada_compliance_guide?.is_likely_staffed ?? null,
+    ada_access_low_usd:                 c.am_site_accessibility_and_ada_compliance_guide?.cost_estimates?.accessibility_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -32316,6 +32320,60 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §1.1102; §1.1104; FCC Fee Schedule FY2023; FCC Form 301-AM',
         note: `FCC Class ${fcc_cl} Form 301-AM fee: $${FORM_301_FEE.toLocaleString()}. Total FCC fees: $${total_fcc_fees.toLocaleString()}. With consulting: $${total_with_consulting_low.toLocaleString()}–$${total_with_consulting_high.toLocaleString()}${isDA ? ' (DA premium)' : ''}.`
+      };
+    })(),
+
+    am_site_accessibility_and_ada_compliance_guide: (() => {
+      // ADA Title II/III: Transmitter buildings with regular employee access require
+      // accessible design (parking, entrance, workspaces). Remote/unmanned sites may
+      // have limited requirements, but construction must comply with local building codes.
+      // §73.1350: Unattended operation reduces but doesn't eliminate ADA scope.
+      const dist_km = pt.distance_from_current_km ?? 10;
+      const isDA    = /^DA/i.test(pattern_mode ?? '');
+      const tpo     = tpo_kw ?? 1;
+
+      // Staffing model: higher power / DA sites more likely staffed (chief op on-site)
+      const is_likely_staffed = tpo >= 5 || isDA;
+
+      // ADA applicability level
+      const ada_applicability =
+        is_likely_staffed  ? 'FULL'    :   // staffed site — full ADA Title I/III
+        dist_km < 20       ? 'PARTIAL' :   // near-urban — likely visited regularly
+                             'MINIMAL';    // remote unmanned — basic accessibility
+
+      // Required accessibility features
+      const accessibility_features = [];
+      if (ada_applicability === 'FULL' || ada_applicability === 'PARTIAL') {
+        accessibility_features.push('Accessible parking space (1 per 25 spaces, per ADA §208)');
+        accessibility_features.push('Accessible route from parking to building entrance');
+        accessibility_features.push('Doorway width ≥32 in. (34 in. preferred) per ADA §404');
+        accessibility_features.push('Threshold ramp if grade change >0.5 in. at entrance');
+      }
+      if (ada_applicability === 'FULL') {
+        accessibility_features.push('Accessible interior workspaces (control room, equipment racks)');
+        accessibility_features.push('Accessible restroom facilities if provided on-site');
+      }
+      accessibility_features.push('Signage: RF hazard warning signs per §73.49 (all sites)');
+
+      const n_features = accessibility_features.length;
+
+      // Cost
+      const ACCESS_LOW  = ada_applicability === 'FULL'    ? 8000  :
+                          ada_applicability === 'PARTIAL' ? 3000  : 500;
+      const ACCESS_HIGH = ada_applicability === 'FULL'    ? 25000 :
+                          ada_applicability === 'PARTIAL' ? 8000  : 2000;
+
+      return {
+        ada_applicability,
+        is_likely_staffed,
+        n_accessibility_features:  n_features,
+        accessibility_features,
+        cost_estimates: {
+          accessibility_low_usd:  ACCESS_LOW,
+          accessibility_high_usd: ACCESS_HIGH,
+        },
+        reference: 'Americans with Disabilities Act (42 USC §12182); ADA Standards 2010; 47 CFR §73.1350; §73.49',
+        note: `ADA applicability: ${ada_applicability}${is_likely_staffed ? ' (staffed site)' : ''}. ${n_features} accessibility features required. Est. $${ACCESS_LOW.toLocaleString()}–$${ACCESS_HIGH.toLocaleString()}.`
       };
     })(),
 

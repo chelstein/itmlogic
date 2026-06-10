@@ -11613,6 +11613,43 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Site Accessibility & ADA Compliance */}
+        {candidate.am_site_accessibility_and_ada_compliance_guide && (() => {
+          const g = candidate.am_site_accessibility_and_ada_compliance_guide;
+          const ADA_COLOR = g.ada_applicability === 'FULL' ? '#7c3aed' : g.ada_applicability === 'PARTIAL' ? '#2563eb' : '#64748b';
+          return (
+            <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, padding: '10px 14px', marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#5b21b6', marginBottom: 6 }}>
+                Site Accessibility & ADA Compliance
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                <span style={{ background: ADA_COLOR, color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                  {g.ada_applicability}
+                </span>
+                <span style={{ background: g.is_likely_staffed ? '#7c3aed' : '#94a3b8', color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>
+                  {g.is_likely_staffed ? 'Staffed Site' : 'Unstaffed'}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 11, marginBottom: 6 }}>
+                <div><span style={{ color: '#6b7280' }}>ADA Features Required:</span> <b>{g.n_accessibility_features}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Est. Cost:</span> <b>${(g.cost_estimates?.accessibility_low_usd ?? 0).toLocaleString()}–${(g.cost_estimates?.accessibility_high_usd ?? 0).toLocaleString()}</b></div>
+              </div>
+              {Array.isArray(g.accessibility_features) && g.accessibility_features.length > 0 && (
+                <div style={{ marginBottom: 5 }}>
+                  <div style={{ color: '#5b21b6', fontWeight: 600, fontSize: 11, marginBottom: 3 }}>Accessibility Features</div>
+                  <ul style={{ margin: 0, padding: '0 0 0 16px' }}>
+                    {g.accessibility_features.map((f, i) => (
+                      <li key={i} style={{ fontSize: 10, color: '#374151', marginBottom: 1 }}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
