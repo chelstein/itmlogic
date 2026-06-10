@@ -4414,3 +4414,14 @@ test('am_licensed_power_class_upgrade_guide present across colocation candidates
     assert.ok(g.n_engineering_exhibits >= 6, 'must have ≥6 exhibits');
   }
 });
+
+test('am_rural_electric_and_standby_power_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_rural_electric_and_standby_power_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_rural_electric_and_standby_power_guide');
+    assert.ok(g.generator_size_kva > 0, 'generator_size_kva must be positive');
+    assert.ok(g.fuel_reserve_gal > 0, 'fuel_reserve_gal must be positive');
+    assert.ok(g.cost_estimates?.total_power_low_usd >= 0, 'total_power_low_usd must be non-negative');
+  }
+});

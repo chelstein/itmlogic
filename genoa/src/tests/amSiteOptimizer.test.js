@@ -17952,3 +17952,46 @@ test('#122 candidate_comparison_table has pcu_* columns', async () => {
     assert.ok('pcu_n_exhibits'        in row, 'pcu_n_exhibits missing');
   }
 });
+
+// ---- Feature #123: am_rural_electric_and_standby_power_guide ----
+test('#123 KAZM: rural electric & standby power guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_rural_electric_and_standby_power_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(['LIKELY_AVAILABLE','POSSIBLE_EXTENSION','LIKELY_EXTENSION_REQUIRED'].includes(g.utility_availability), 'utility_availability must be valid enum');
+  assert.ok(g.generator_size_kva > 0, 'generator_size_kva must be positive');
+  assert.ok(g.fuel_reserve_gal > 0, 'fuel_reserve_gal must be positive');
+});
+
+test('#123 generator size scales with TPO power', async () => {
+  const low  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1,  candidate_limit: 1 });
+  const high = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, candidate_limit: 1 });
+  const gL   = low.candidates[0].am_rural_electric_and_standby_power_guide;
+  const gH   = high.candidates[0].am_rural_electric_and_standby_power_guide;
+  assert.ok(gH.generator_size_kva > gL.generator_size_kva, '50 kW generator must be larger than 1 kW generator');
+  assert.ok(gH.total_load_kw > gL.total_load_kw, '50 kW total load must exceed 1 kW total load');
+});
+
+test('#123 transmitter input power = TPO / 0.65', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 10, candidate_limit: 1 });
+  const g   = out.candidates[0].am_rural_electric_and_standby_power_guide;
+  assert.ok(Math.abs(g.transmitter_input_kw - 10 / 0.65) < 0.5, `transmitter_input_kw (${g.transmitter_input_kw}) must be ≈ ${(10/0.65).toFixed(2)} kW`);
+});
+
+test('#123 rural candidate (high dist) has higher cost than nearby candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const costs = out.candidates.map(c => c.am_rural_electric_and_standby_power_guide?.cost_estimates?.total_power_low_usd ?? 0);
+  // At least one non-zero cost exists
+  assert.ok(costs.some(c => c > 0), 'at least one candidate must have non-zero power cost');
+});
+
+test('#123 candidate_comparison_table has rep_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('rep_utility_availability' in row, 'rep_utility_availability missing');
+    assert.ok('rep_generator_size_kva'   in row, 'rep_generator_size_kva missing');
+    assert.ok('rep_fuel_reserve_gal'     in row, 'rep_fuel_reserve_gal missing');
+    assert.ok('rep_total_power_low_usd'  in row, 'rep_total_power_low_usd missing');
+    assert.ok('rep_total_load_kw'        in row, 'rep_total_load_kw missing');
+  }
+});

@@ -10872,6 +10872,50 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Rural Electric & Standby Power Guide */}
+        {candidate.am_rural_electric_and_standby_power_guide && (() => {
+          const g = candidate.am_rural_electric_and_standby_power_guide;
+          const costs = g.cost_estimates || {};
+          const availColor = g.utility_availability === 'LIKELY_AVAILABLE' ? '#22c55e' : g.utility_availability === 'POSSIBLE_EXTENSION' ? '#f59e0b' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Rural Electric &amp; Standby Power (§73.1680 / §11.35)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>UTILITY STATUS</span>
+                  <div style={{ color: availColor, fontSize: 10, fontWeight: 700 }}>{(g.utility_availability || '').replace(/_/g, ' ')}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL LOAD</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{g.total_load_kw} kW</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>GEN SIZE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{g.generator_size_kva} kVA</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>60-HR FUEL</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.fuel_reserve_gal} gal</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_power_low_usd || 0).toLocaleString()}–${(costs.total_power_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>XMTR INPUT</span><div style={{ color: '#94a3b8', fontSize: 10 }}>{g.transmitter_input_kw} kW</div></div>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>HVAC+AUX</span><div style={{ color: '#94a3b8', fontSize: 10 }}>{g.hvac_and_aux_kw} kW</div></div>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>FUEL USE</span><div style={{ color: '#94a3b8', fontSize: 10 }}>{g.fuel_consumption_gph} gal/hr</div></div>
+                {g.ext_distance_km > 0 && <div><span style={{ color: '#94a3b8', fontSize: 9 }}>EXT DISTANCE</span><div style={{ color: '#f59e0b', fontSize: 10 }}>{g.ext_distance_km} km</div></div>}
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

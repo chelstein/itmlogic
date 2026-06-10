@@ -1720,7 +1720,12 @@ export async function runSiteOptimizer(body = {}){
     pcu_modification_type:              c.am_licensed_power_class_upgrade_guide?.modification_type ?? null,
     pcu_total_low_usd:                  c.am_licensed_power_class_upgrade_guide?.cost_estimates?.total_low_usd ?? null,
     pcu_timeline_days:                  c.am_licensed_power_class_upgrade_guide?.timeline_days ?? null,
-    pcu_n_exhibits:                     c.am_licensed_power_class_upgrade_guide?.n_engineering_exhibits ?? null
+    pcu_n_exhibits:                     c.am_licensed_power_class_upgrade_guide?.n_engineering_exhibits ?? null,
+    rep_utility_availability:           c.am_rural_electric_and_standby_power_guide?.utility_availability ?? null,
+    rep_generator_size_kva:             c.am_rural_electric_and_standby_power_guide?.generator_size_kva ?? null,
+    rep_fuel_reserve_gal:               c.am_rural_electric_and_standby_power_guide?.fuel_reserve_gal ?? null,
+    rep_total_power_low_usd:            c.am_rural_electric_and_standby_power_guide?.cost_estimates?.total_power_low_usd ?? null,
+    rep_total_load_kw:                  c.am_rural_electric_and_standby_power_guide?.total_load_kw ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -30939,6 +30944,135 @@ async function scoreCandidate(pt, ctx, warnings){
         timeline_days,
         reference: '47 CFR §73.21; §73.24; §73.3571; FCC Form 301-AM',
         note: `${tpo_kw_num} kW (${fc}): ${can_increase_within_class ? `${headroom_kw} kW headroom within Class ${fc} (${headroom_db.toFixed(1)} dB). ` : 'At class power ceiling. '}Modification type: ${mod_type}. Cost est. $${total_low.toLocaleString()}–$${total_high.toLocaleString()}. Timeline ≈ ${timeline_days} days.`
+      };
+    })(),
+
+    am_rural_electric_and_standby_power_guide: (() => {
+      // Guide #123 — Rural Electric & Standby Power
+      //
+      // AM transmitter sites — especially rural relocation candidates — must
+      // have reliable utility power.  This guide estimates utility extension
+      // costs, standby generator requirements, and §73.1660 / §73.1680
+      // obligations for backup power and unattended operation.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.1680 — Emergency and standby power.
+      //   AM broadcast stations are strongly encouraged (not strictly required)
+      //   to maintain standby power sufficient to sustain authorized operation
+      //   for at least 60 hours.  EAS participation obligations (§11.35) make
+      //   standby power effectively mandatory for EAS compliance.
+      //
+      // 47 CFR §11.35 — EAS equipment operational readiness.
+      //   All EAS participants must ensure equipment is operational at all times.
+      //   A power outage that takes a station off-air during an EAS event is an
+      //   enforcement risk.  Standby generator or battery backup is the standard.
+      //
+      // 47 CFR §73.1560 — Operating power.
+      //   Station must be able to operate at authorized power on demand; a site
+      //   with unreliable utility power is a regulatory compliance risk.
+      //
+      // UTILITY POWER DISTANCE PROXY
+      // ─────────────────────────────
+      //   Distance from the current site is used as a proxy for rural remoteness.
+      //   Urban/suburban sites (< 15 km) likely have grid power at the property.
+      //   Suburban-rural (15–35 km) may need extension or upgrade.
+      //   Rural (> 35 km) often requires significant line extension.
+      //
+      // UTILITY EXTENSION COST ESTIMATES
+      //   < 0.5 km overhead extension:   $5,000–$15,000
+      //   0.5–2 km overhead:             $15,000–$50,000
+      //   2–5 km overhead:               $50,000–$150,000
+      //   Underground (per km):          $100,000–$300,000
+      //   Transformer and metered service: $5,000–$20,000
+      //
+      // GENERATOR SIZING
+      //   Generator must cover: transmitter TPO + HVAC + control equipment.
+      //   Rule of thumb: transmitter efficiency ≈ 65% (solid-state), so
+      //   input power ≈ TPO / 0.65.  Add 20% for HVAC and accessories.
+      //   Minimum generator size (kVA) ≈ (TPO_kW / 0.65) × 1.2 × 1.25 (PF)
+      //
+      // GENERATOR COST ESTIMATES (standby diesel, installed)
+      //   20–50 kVA:   $15,000–$35,000
+      //   50–100 kVA:  $30,000–$60,000
+      //   100–250 kVA: $60,000–$120,000
+      //   > 250 kVA:   $100,000–$250,000+
+
+      const tpo_kw_num = Number(tpo_kw) || 5;
+      const dist_km    = pt.distance_from_current_km ?? 0;
+
+      // Utility availability estimate based on distance proxy
+      const utility_availability =
+        dist_km < 15 ? 'LIKELY_AVAILABLE'
+        : dist_km < 35 ? 'POSSIBLE_EXTENSION'
+        : 'LIKELY_EXTENSION_REQUIRED';
+
+      // Utility extension distance estimate (rough)
+      const ext_distance_km =
+        dist_km < 15 ? 0
+        : dist_km < 35 ? round2(Math.max(0, (dist_km - 15) * 0.05))   // 5% of marginal distance
+        : round2(Math.max(0.5, (dist_km - 35) * 0.08));               // 8% of marginal distance
+
+      // Extension cost estimate
+      const ext_cost_low  =
+        ext_distance_km === 0   ? 5000
+        : ext_distance_km < 0.5 ? 5000
+        : ext_distance_km < 2   ? 15000
+        : ext_distance_km < 5   ? 50000
+        : 150000;
+      const ext_cost_high =
+        ext_distance_km === 0   ? 20000
+        : ext_distance_km < 0.5 ? 15000
+        : ext_distance_km < 2   ? 50000
+        : ext_distance_km < 5   ? 150000
+        : 400000;
+
+      // Generator sizing
+      const transmitter_input_kw  = round2(tpo_kw_num / 0.65);        // 65% efficiency
+      const hvac_and_aux_kw       = round2(transmitter_input_kw * 0.20);
+      const total_load_kw         = round2(transmitter_input_kw + hvac_and_aux_kw);
+      const generator_size_kva    = round2(total_load_kw * 1.25);     // 0.8 PF
+
+      // Generator cost by size
+      const gen_cost_low  =
+        generator_size_kva < 50   ? 15000
+        : generator_size_kva < 100 ? 30000
+        : generator_size_kva < 250 ? 60000
+        : 100000;
+      const gen_cost_high =
+        generator_size_kva < 50   ? 35000
+        : generator_size_kva < 100 ? 60000
+        : generator_size_kva < 250 ? 120000
+        : 250000;
+
+      const EAS_FUEL_RESERVE_HOURS = 60;   // §73.1680 recommended
+      // Diesel consumption ≈ 0.07 gal/kWh × total_load_kw
+      const fuel_gph     = round2(total_load_kw * 0.07);
+      const fuel_reserve_gal = round2(fuel_gph * EAS_FUEL_RESERVE_HOURS);
+
+      const total_power_low  = round2(ext_cost_low  + gen_cost_low);
+      const total_power_high = round2(ext_cost_high + gen_cost_high);
+
+      return {
+        utility_availability,
+        ext_distance_km,
+        transmitter_input_kw,
+        hvac_and_aux_kw,
+        total_load_kw,
+        generator_size_kva,
+        eas_fuel_reserve_hours: EAS_FUEL_RESERVE_HOURS,
+        fuel_reserve_gal,
+        fuel_consumption_gph: fuel_gph,
+        cost_estimates: {
+          utility_extension_low_usd:  ext_cost_low,
+          utility_extension_high_usd: ext_cost_high,
+          generator_low_usd:  gen_cost_low,
+          generator_high_usd: gen_cost_high,
+          total_power_low_usd:  total_power_low,
+          total_power_high_usd: total_power_high,
+        },
+        reference: '47 CFR §73.1560; §73.1680; §11.35',
+        note: `${tpo_kw_num} kW @ ${dist_km} km: utility ${utility_availability}. Gen size ≈ ${generator_size_kva} kVA. ${EAS_FUEL_RESERVE_HOURS}-hr fuel reserve ≈ ${fuel_reserve_gal} gal. Total power est. $${total_power_low.toLocaleString()}–$${total_power_high.toLocaleString()}.`
       };
     })(),
 
