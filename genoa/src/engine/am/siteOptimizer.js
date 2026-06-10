@@ -1655,7 +1655,12 @@ export async function runSiteOptimizer(body = {}){
     fcs_has_skywave:                    c.am_frequency_coordination_and_channel_study_guide?.has_skywave_obligation ?? null,
     fcs_coch_radius_km:                 c.am_frequency_coordination_and_channel_study_guide?.co_channel_search_radius_km ?? null,
     fcs_adj_radius_km:                  c.am_frequency_coordination_and_channel_study_guide?.adj_channel_search_radius_km ?? null,
-    fcs_study_effort_max_hrs:           c.am_frequency_coordination_and_channel_study_guide?.study_effort_hrs?.max ?? null
+    fcs_study_effort_max_hrs:           c.am_frequency_coordination_and_channel_study_guide?.study_effort_hrs?.max ?? null,
+    pml_power_tolerance_pct:            c.am_transmitter_power_monitoring_and_operating_log_guide?.power_tolerance_pct ?? null,
+    pml_n_base_current_meters:          c.am_transmitter_power_monitoring_and_operating_log_guide?.n_base_current_meters ?? null,
+    pml_antenna_monitor_required:       c.am_transmitter_power_monitoring_and_operating_log_guide?.antenna_monitor_required ?? null,
+    pml_apc_required:                   c.am_transmitter_power_monitoring_and_operating_log_guide?.automatic_power_control_required ?? null,
+    pml_total_monitoring_low_usd:       c.am_transmitter_power_monitoring_and_operating_log_guide?.total_monitoring_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -29222,6 +29227,155 @@ async function scoreCandidate(pt, ctx, warnings){
         translator_opportunity: TRANSLATOR_OPPORTUNITY,
         reference: '47 CFR §73.24; §73.182; §73.187; §73.318; §74.1200; FCC AMTA 2020; FCC Form 349',
         note: `Class ${fcc_class} at ${frequency_khz} kHz. Primary 0.5 mV/m reach: ${primary_reach_km} km (${COVERAGE_ZONES[0].area_km2} km²). COL min: ${myThreshold.day_mvm} mV/m day. FM translator (250W) authorized under AMTA.`
+      };
+    })(),
+
+    am_transmitter_power_monitoring_and_operating_log_guide: (() => {
+      // Transmitter power monitoring and station operating log compliance.
+      //
+      // 47 CFR §73.1560 — Operating power limits.
+      //   AM stations must operate within ±10% (for DA-N/DA-D/DA-2 stations)
+      //   or ±5% (for NDA Class A/B) of the licensed antenna input power (AIP),
+      //   measured at the base of the radiating antenna.
+      //   Tolerance: ±10% for all AM stations in §73.1560(a)(1).
+      //
+      // 47 CFR §73.1215 — Antenna base current meters.
+      //   Each AM radiating antenna element must have a calibrated base current
+      //   meter capable of reading antenna input current continuously.
+      //   Meters must be calibrated at least annually.
+      //
+      // 47 CFR §73.1800–73.1870 — Station logs and records.
+      //   §73.1800: Log content — entries required by §73.1820 (operating log)
+      //   §73.1820: Operating log entries for each transmission system change,
+      //     power reduction, equipment failure, and EAS test. No continuous
+      //     power readings are required for unattended operation if the
+      //     transmitter is equipped with automatic regulation.
+      //   §73.1840: Log retention — 2 years after the log entry date.
+      //   §73.1870: License renewal: logs may be requested by FCC staff.
+      //
+      // 47 CFR §73.1201 — Station identification.
+      //   AM station must broadcast call letters at the top of each clock hour
+      //   and at sign-on and sign-off. ID must include city of license.
+      //   Remote/unattended transmitters must store and replay the ID.
+      //
+      // Power monitoring equipment:
+      //   - Base current ammeter (RF ammeter or toroidal current transformer)
+      //   - Antenna monitor (required for DA stations per §73.68)
+      //   - Wattmeter in the transmission line (recommended; not required for NDA)
+      //   - Automatic power reduction relay (required if STA or license specifies)
+      //
+      // References:
+      //   47 CFR §73.1215; §73.1560; §73.1800; §73.1820; §73.1840; §73.1870; §73.1201
+      //   FCC AM Stereo/DAB Technical Standards (OET Bulletin 63)
+
+      const isDA       = /^DA/i.test(pattern_mode);
+      const isDAN      = /^DA-N/i.test(pattern_mode);
+      const isDAD      = /^DA-D/i.test(pattern_mode);
+      const isDA2      = /^DA-2/i.test(pattern_mode);
+      const isNDA      = !isDA;
+
+      // §73.1560 power tolerance — same for all AM
+      const power_tolerance_pct = 10;  // ±10% AIP
+
+      // Base current meters required — one per antenna element for DA
+      const n_da_towers = isDA2 ? 3 : (isDA ? 2 : 1);
+      const n_base_current_meters = n_da_towers;  // one per tower
+      const calibration_interval_months = 12;
+
+      // Antenna monitor required for DA per §73.68
+      const antenna_monitor_required = isDA;
+      const antenna_monitor_cfr      = '47 CFR §73.68';
+
+      // Wattmeter / directional power meter
+      const WATTMETER_TYPES = [
+        { type: 'Bird Model 43 (slug style)', suitable_kw_max: 10, cost_usd: 350 },
+        { type: 'Coaxial Dynamics 91000 series', suitable_kw_max: 50, cost_usd: 650 },
+        { type: 'Thruline / Bird 4314 bench standard', suitable_kw_max: 100, cost_usd: 900 }
+      ];
+      const tpo_index = tpo_kw <= 10 ? 0 : tpo_kw <= 50 ? 1 : 2;
+      const recommended_wattmeter = WATTMETER_TYPES[tpo_index];
+
+      // Automatic power control (APC)
+      const apc_required = isDAN || isDA2;  // night pattern DA must have APC to switch power
+      const apc_cost_usd = apc_required ? { low: 1200, high: 2800 } : null;
+
+      // Log entry triggers (§73.1820)
+      const LOG_ENTRY_TRIGGERS = [
+        { trigger: 'Sign-on / sign-off', cfr: '§73.1820(a)(1)' },
+        { trigger: 'Pattern change (DA-N or DA-2 day/night switch)', cfr: '§73.1820(a)(2)', da_only: true },
+        { trigger: 'EAS required weekly and monthly test', cfr: '§73.1820(a)(3)' },
+        { trigger: 'Equipment failures or abnormal operation', cfr: '§73.1820(a)(4)' },
+        { trigger: 'Power reduction or emergency operation', cfr: '§73.1820(a)(5)' },
+        { trigger: 'STA commencement / termination', cfr: '§73.1820(a)(6)' },
+        { trigger: 'Silent period start / end', cfr: '§73.1820(a)(7)' }
+      ];
+      const applicable_triggers = LOG_ENTRY_TRIGGERS.filter(t => !t.da_only || isDA);
+
+      // Log retention
+      const log_retention_years = 2;
+      const log_format = 'Electronic or paper; electronic logs must be printable on demand';
+
+      // Station ID requirements (§73.1201)
+      const STATION_ID = {
+        frequency_minutes: 60,    // at least every 60 minutes (top of hour)
+        sign_on_required: true,
+        sign_off_required: true,
+        must_include_col: true,
+        format: `"This is ${fcc_class}-class AM station at ${frequency_khz} kHz — [call letters], [city of license]."`,
+        cfr: '47 CFR §73.1201'
+      };
+
+      // Compliance cost summary
+      const base_current_meter_cost_usd = {
+        low:  350 * n_base_current_meters,
+        high: 700 * n_base_current_meters
+      };
+      const antenna_monitor_cost_usd = antenna_monitor_required ? { low: 2500, high: 5000 } : null;
+      const log_software_cost_usd    = { low: 0, high: 800 };  // paper logs free; software optional
+      const annual_calibration_usd   = { low: 150 * n_base_current_meters, high: 350 * n_base_current_meters };
+
+      const total_monitoring_low_usd = round2(
+        base_current_meter_cost_usd.low +
+        (antenna_monitor_cost_usd?.low ?? 0) +
+        (apc_cost_usd?.low ?? 0) +
+        log_software_cost_usd.low
+      );
+      const total_monitoring_high_usd = round2(
+        base_current_meter_cost_usd.high +
+        (antenna_monitor_cost_usd?.high ?? 0) +
+        (apc_cost_usd?.high ?? 0) +
+        log_software_cost_usd.high
+      );
+
+      return {
+        fcc_class, frequency_khz, tpo_kw, pattern_mode,
+        is_da_station:               isDA,
+        is_nda_station:              isNDA,
+        is_da2:                      isDA2,
+        power_tolerance_pct,
+        n_antenna_elements:          n_da_towers,
+        n_base_current_meters,
+        calibration_interval_months,
+        antenna_monitor_required,
+        antenna_monitor_cfr,
+        automatic_power_control_required: apc_required,
+        apc_cost_usd,
+        recommended_wattmeter,
+        log_entry_triggers:          applicable_triggers,
+        n_log_entry_triggers:        applicable_triggers.length,
+        log_retention_years,
+        log_format,
+        station_id_requirements:     STATION_ID,
+        base_current_meter_cost_usd,
+        antenna_monitor_cost_usd,
+        log_software_cost_usd,
+        annual_calibration_usd,
+        total_monitoring_low_usd,
+        total_monitoring_high_usd,
+        reference: '47 CFR §73.68; §73.1201; §73.1215; §73.1560; §73.1800–§73.1870',
+        note: isDA
+          ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: ${n_base_current_meters} base current meters required (one/element), antenna monitor required per §73.68, APC ${apc_required ? 'required for day/night switch' : 'not required'}. Operating log must record all pattern changes. Log retention: ${log_retention_years} years.`
+          : `NDA station at ${frequency_khz} kHz: 1 base current meter required (§73.1215), no antenna monitor, ±${power_tolerance_pct}% AIP tolerance (§73.1560). Operating log required (§73.1820); retain ${log_retention_years} years.`
       };
     })(),
 

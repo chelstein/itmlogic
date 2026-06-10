@@ -17304,3 +17304,60 @@ test('#109 candidate_comparison_table has cap_* columns', async () => {
     assert.ok('cap_contingency_pct'  in row, 'cap_contingency_pct missing');
   }
 });
+
+// ---- Feature #110: am_transmitter_power_monitoring_and_operating_log_guide ----
+
+test('#110 KAZM NDA: power monitoring guide present with correct NDA shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  assert.ok(g, 'am_transmitter_power_monitoring_and_operating_log_guide must be present');
+  assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 tolerance must be ±10%');
+  assert.strictEqual(g.n_base_current_meters, 1, 'NDA must have exactly 1 base current meter');
+  assert.strictEqual(g.antenna_monitor_required, false, 'NDA must not require antenna monitor');
+  assert.strictEqual(g.automatic_power_control_required, false, 'NDA must not require APC');
+  assert.strictEqual(g.log_retention_years, 2, '§73.1840 log retention must be 2 years');
+  assert.strictEqual(g.calibration_interval_months, 12, 'calibration must be annual (12 months)');
+});
+
+test('#110 DA-2 station requires antenna monitor, APC, and 3 base current meters', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  assert.ok(g, 'guide must be present');
+  assert.strictEqual(g.antenna_monitor_required, true, 'DA-2 must require antenna monitor (§73.68)');
+  assert.strictEqual(g.automatic_power_control_required, true, 'DA-2 must require APC');
+  assert.strictEqual(g.n_base_current_meters, 3, 'DA-2 must have 3 base current meters');
+  assert.ok(g.apc_cost_usd?.low > 0, 'APC cost must be positive for DA-2');
+});
+
+test('#110 DA-N station requires antenna monitor and APC; DA-D does not require APC', async () => {
+  const outN = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outD = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const gN = outN.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  const gD = outD.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  assert.strictEqual(gN.antenna_monitor_required, true, 'DA-N must require antenna monitor');
+  assert.strictEqual(gN.automatic_power_control_required, true, 'DA-N must require APC (day→night power switch)');
+  assert.strictEqual(gD.antenna_monitor_required, true, 'DA-D must require antenna monitor');
+  assert.strictEqual(gD.automatic_power_control_required, false, 'DA-D does not require APC (no nighttime pattern switch)');
+});
+
+test('#110 total_monitoring_low_usd is sum of component costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
+  const expected = (g.base_current_meter_cost_usd?.low ?? 0)
+    + (g.antenna_monitor_cost_usd?.low ?? 0)
+    + (g.apc_cost_usd?.low ?? 0)
+    + (g.log_software_cost_usd?.low ?? 0);
+  assert.ok(Math.abs(g.total_monitoring_low_usd - expected) <= 1,
+    `total_monitoring_low_usd (${g.total_monitoring_low_usd}) must equal sum of components (${expected})`);
+});
+
+test('#110 candidate_comparison_table has pml_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pml_power_tolerance_pct'      in row, 'pml_power_tolerance_pct missing');
+    assert.ok('pml_n_base_current_meters'    in row, 'pml_n_base_current_meters missing');
+    assert.ok('pml_antenna_monitor_required' in row, 'pml_antenna_monitor_required missing');
+    assert.ok('pml_apc_required'             in row, 'pml_apc_required missing');
+    assert.ok('pml_total_monitoring_low_usd' in row, 'pml_total_monitoring_low_usd missing');
+  }
+});
