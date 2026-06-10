@@ -11192,6 +11192,53 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Noise Floor & RF Interference Environment Survey Guide */}
+        {candidate.am_noise_floor_and_interference_environment_survey_guide && (() => {
+          const g = candidate.am_noise_floor_and_interference_environment_survey_guide;
+          const costs = g.cost_estimates || {};
+          const snrColor = g.adequate_snr ? '#22c55e' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Noise Floor &amp; Interference Environment Survey (§73.182(a) / ITU-R P.372)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>NOISE ENVIRONMENT</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{(g.noise_environment || '').replace(/_/g, ' ')}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>AMBIENT FLOOR</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.ambient_noise_floor_dbuv} dBμV/m</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>SNR @ 0.5 mV/m</span>
+                  <div style={{ color: snrColor, fontSize: 13, fontWeight: 700 }}>{g.snr_at_05mvm_contour_db} dB</div>
+                  <div style={{ color: snrColor, fontSize: 9 }}>{g.adequate_snr ? 'ADEQUATE' : 'MARGINAL'}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>NOISE SOURCES</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_noise_sources}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.noise_sources || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Noise Sources to Survey</div>
+                  {g.noise_sources.map((src, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>{src}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
