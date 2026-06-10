@@ -11650,6 +11650,40 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Ground System & Radial Field Installation */}
+        {candidate.am_ground_system_and_radial_field_installation_guide && (() => {
+          const g = candidate.am_ground_system_and_radial_field_installation_guide;
+          return (
+            <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 6 }}>
+                Ground System & Radial Field Installation
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 11, marginBottom: 6 }}>
+                <div><span style={{ color: '#6b7280' }}>Standard Radials:</span> <b>{g.std_n_radials} × {g.std_radial_len_m} m ({g.std_radial_len_ft} ft)</b></div>
+                <div><span style={{ color: '#6b7280' }}>Wavelength:</span> <b>{g.wavelength_m} m at freq</b></div>
+                <div><span style={{ color: '#6b7280' }}>Total Copper:</span> <b>{g.copper_kg} kg AWG #10</b></div>
+                <div><span style={{ color: '#6b7280' }}>Towers:</span> <b>{g.n_towers}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Install Cost:</span> <b>${(g.cost_estimates?.total_system_low_usd ?? 0).toLocaleString()}–${(g.cost_estimates?.total_system_high_usd ?? 0).toLocaleString()}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Proof Required:</span> <b style={{ color: g.proof_of_performance_required ? '#dc2626' : '#16a34a' }}>{g.proof_of_performance_required ? 'Yes (§73.151)' : 'No'}</b></div>
+              </div>
+              {Array.isArray(g.checklist) && g.checklist.length > 0 && (
+                <details style={{ marginBottom: 5 }}>
+                  <summary style={{ color: '#92400e', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>
+                    Installation Checklist ({g.n_checklist_items} items)
+                  </summary>
+                  <ul style={{ margin: '4px 0 0', padding: '0 0 0 16px' }}>
+                    {g.checklist.map((item, i) => (
+                      <li key={i} style={{ fontSize: 10, color: '#374151', marginBottom: 1 }}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* FAA Tower Lighting & Obstruction Marking */}
         {candidate.am_faa_tower_lighting_and_obstruction_marking_guide && (() => {
           const g = candidate.am_faa_tower_lighting_and_obstruction_marking_guide;

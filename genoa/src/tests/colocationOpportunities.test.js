@@ -4611,3 +4611,14 @@ test('am_faa_tower_lighting_and_obstruction_marking_guide present across colocat
     assert.ok(Array.isArray(g.checklist), 'checklist must be array');
   }
 });
+
+test('am_ground_system_and_radial_field_installation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_ground_system_and_radial_field_installation_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_ground_system_and_radial_field_installation_guide');
+    assert.ok(g.std_n_radials > 0, 'std_n_radials must be positive');
+    assert.ok(g.copper_kg > 0, 'copper_kg must be positive');
+    assert.ok(g.cost_estimates.total_system_low_usd > 0, 'total_system_low_usd must be positive');
+  }
+});

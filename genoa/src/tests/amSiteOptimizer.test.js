@@ -18769,3 +18769,51 @@ test('#140 candidate_comparison_table has faa_* columns', async () => {
     assert.ok('faa_lighting_install_low_usd' in row, 'faa_lighting_install_low_usd missing');
   }
 });
+
+// ── Guide #141: Ground System & Radial Field Installation ────────────────────
+test('#141 am_ground_system_and_radial_field_installation_guide is present and valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_and_radial_field_installation_guide;
+  assert.ok(g, 'guide must exist');
+  assert.ok(g.std_n_radials > 0, 'std_n_radials must be positive');
+  assert.ok(g.std_radial_len_m > 0, 'std_radial_len_m must be positive');
+  assert.ok(g.wavelength_m > 0, 'wavelength_m must be positive');
+  assert.ok(g.copper_kg > 0, 'copper_kg must be positive');
+});
+
+test('#141 lower frequency station needs longer radials', async () => {
+  const hiFreqOut = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const loFreqOut = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const gHi = hiFreqOut.candidates[0].am_ground_system_and_radial_field_installation_guide;
+  const gLo = loFreqOut.candidates[0].am_ground_system_and_radial_field_installation_guide;
+  assert.ok(gLo.std_radial_len_m > gHi.std_radial_len_m, '540 kHz radials must be longer than 1600 kHz');
+  assert.ok(gLo.copper_kg > gHi.copper_kg, '540 kHz requires more copper');
+});
+
+test('#141 DA station has more towers than NDA', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = ndaOut.candidates[0].am_ground_system_and_radial_field_installation_guide;
+  const gDA  = daOut.candidates[0].am_ground_system_and_radial_field_installation_guide;
+  assert.ok(gDA.n_towers > gNDA.n_towers, 'DA must have more towers than NDA');
+  assert.ok(gDA.cost_estimates.total_system_low_usd > gNDA.cost_estimates.total_system_low_usd, 'DA system costs more');
+});
+
+test('#141 std_radial_len_m is 0.35 wavelength', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_and_radial_field_installation_guide;
+  const expected_wl = Math.round(300000 / 780);
+  const expected_radial = Math.round(expected_wl * 0.35);
+  assert.strictEqual(g.wavelength_m, expected_wl, 'wavelength must be c/f');
+  assert.strictEqual(g.std_radial_len_m, expected_radial, 'radial must be 0.35 wavelength');
+});
+
+test('#141 candidate_comparison_table has gnd_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gnd_std_n_radials'        in row, 'gnd_std_n_radials missing');
+    assert.ok('gnd_std_radial_len_m'     in row, 'gnd_std_radial_len_m missing');
+    assert.ok('gnd_total_system_low_usd' in row, 'gnd_total_system_low_usd missing');
+    assert.ok('gnd_proof_required'       in row, 'gnd_proof_required missing');
+  }
+});
