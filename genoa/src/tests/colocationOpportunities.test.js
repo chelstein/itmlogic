@@ -4436,3 +4436,14 @@ test('am_rf_ground_system_inspection_and_maintenance_guide present across coloca
     assert.ok(g.rehabilitation_cost?.total_rehab_low_usd > 0, 'rehab cost must be positive');
   }
 });
+
+test('am_antenna_commissioning_and_proof_of_performance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_antenna_commissioning_and_proof_of_performance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_antenna_commissioning_and_proof_of_performance_guide');
+    assert.ok(g.n_commissioning_steps >= 6, 'must have ≥6 commissioning steps');
+    assert.ok(typeof g.formal_proof_required === 'boolean', 'formal_proof_required must be boolean');
+    assert.ok(g.cost_estimates?.total_low_usd > 0, 'total cost must be positive');
+  }
+});

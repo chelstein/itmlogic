@@ -10961,6 +10961,49 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Antenna Commissioning & Proof of Performance Guide */}
+        {candidate.am_antenna_commissioning_and_proof_of_performance_guide && (() => {
+          const g = candidate.am_antenna_commissioning_and_proof_of_performance_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Antenna Commissioning &amp; Proof of Performance (§73.62 / §73.151)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>STEPS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.n_commissioning_steps}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FORMAL PROOF</span>
+                  <div style={{ color: g.formal_proof_required ? '#f59e0b' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                    {g.formal_proof_required ? `YES (≥${g.proof_radials_required} radials)` : 'Not required'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MONITOR POINTS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_monitor_points}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Commissioning Steps</div>
+              {(g.commissioning_steps || []).map((s, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                  <span style={{ color: '#475569', fontSize: 9, minWidth: 16 }}>{s.step}.</span>
+                  <span style={{ color: '#cbd5e1', fontSize: 9, flex: 1 }}>{s.task}</span>
+                  <span style={{ color: '#38bdf8', fontSize: 9 }}>{s.rule}</span>
+                </div>
+              ))}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
