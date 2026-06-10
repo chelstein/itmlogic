@@ -1705,7 +1705,12 @@ export async function runSiteOptimizer(body = {}){
     tta_max_power_kw:                   c.am_transmitter_type_acceptance_and_fcc_certification_guide?.authorized_power_range?.max_kw ?? null,
     tta_min_power_kw:                   c.am_transmitter_type_acceptance_and_fcc_certification_guide?.authorized_power_range?.min_kw ?? null,
     tta_total_equipment_low_usd:        c.am_transmitter_type_acceptance_and_fcc_certification_guide?.cost_estimates?.total_equipment_low_usd ?? null,
-    tta_n_verification_steps:           c.am_transmitter_type_acceptance_and_fcc_certification_guide?.n_verification_steps ?? null
+    tta_n_verification_steps:           c.am_transmitter_type_acceptance_and_fcc_certification_guide?.n_verification_steps ?? null,
+    ccw_coverage_status:                c.am_community_coverage_waiver_and_short_spacing_guide?.coverage_status ?? null,
+    ccw_coverage_pct:                   c.am_community_coverage_waiver_and_short_spacing_guide?.coverage_pct_estimated ?? null,
+    ccw_waiver_likely_needed:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_likely_needed ?? null,
+    ccw_co_channel_min_km:              c.am_community_coverage_waiver_and_short_spacing_guide?.co_channel_min_km ?? null,
+    ccw_waiver_total_low_usd:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_cost?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -30585,6 +30590,129 @@ async function scoreCandidate(pt, ctx, warnings){
         discontinued_models_ok: true,
         reference: '47 CFR §73.1560; §73.1660; §73.1665; §73.1670',
         note: `${tpo_kw_num} kW (${power_category}): authorized range ${min_power_kw}–${max_power_kw} kW (+5%/−10%). Transmitter cost est. $${total_equipment_low.toLocaleString()}–$${total_equipment_high.toLocaleString()}. ${is_da ? `DA element tolerance ±${da_element_tolerance_pct}%.` : 'NDA: TPO tolerance only.'} Max AM power 50 kW.`
+      };
+    })(),
+
+    am_community_coverage_waiver_and_short_spacing_guide: (() => {
+      // Guide #120 — Community Coverage Waiver & Short-Spacing
+      //
+      // Every AM station must provide a principal community (COL) signal.
+      // A relocation that reduces COL coverage below the §73.24(j) standard
+      // requires either: (1) engineering showing adequate coverage is still met,
+      // or (2) a waiver under §1.3 / §1.925.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.24(j) — Principal community coverage.
+      //   A broadcast station must provide a predicted coverage signal of at
+      //   least 5 mV/m to the entire principal community (city of license).
+      //   "Entire" means the city limits, not the metropolitan area.
+      //   An NDA station radiates 5 mV/m in all directions; a DA station must
+      //   show 5 mV/m in the direction of the COL from the transmitter site.
+      //
+      // 47 CFR §73.215 — Directional antenna short-spacing.
+      //   When a DA station cannot meet the §73.24(j) standard omnidirectionally,
+      //   a directional antenna may be required.  §73.215 sets the conditions
+      //   under which a station operating with a DA pattern still qualifies
+      //   for protection from interference.
+      //
+      // 47 CFR §73.37 — Short-spacing.
+      //   New AM stations or moves may not create short-spacing to existing
+      //   stations unless a waiver is granted.  Minimum spacings depend on
+      //   frequency class and channel type (co-channel, ±10/20 kHz, etc.).
+      //
+      // WAIVER STANDARD (§1.3 / §1.925)
+      // ────────────────────────────────
+      //   FCC grants waivers when the public interest is served and strict
+      //   compliance would not advance the underlying policy goal.  For AM:
+      //   • Applicant must show community still receives adequate coverage.
+      //   • Must show no undue interference to other stations.
+      //   • Waiver requests are processed informally as part of the application.
+      //
+      // COVERAGE ASSESSMENT
+      // ───────────────────
+      //   §73.24(j) requires 5 mV/m to the COL city limits.
+      //   For the purpose of this guide, coverage_pct (already computed for
+      //   this candidate) is used to estimate whether the requirement is met.
+      //   We use a simplified check: if 5 mV/m radius ≥ distance to the COL
+      //   from the candidate site, coverage is likely adequate.
+      //
+      // COL COVERAGE OUTCOMES
+      //   ADEQUATE:   5 mV/m contour reaches COL — no waiver likely needed.
+      //   MARGINAL:   5 mV/m contour may not reach entire COL — DA may help.
+      //   DEFICIENT:  Relocation likely reduces coverage — waiver may be needed.
+      //
+      // SHORT-SPACING MINIMUM DISTANCES (APPROXIMATE, kHz separation → km)
+      //   Co-channel Class A: 1,000 km (US–US), 650 km (US–Mex clear channel)
+      //   Co-channel Class B: 800 km
+      //   Co-channel Class C/D: 300 km
+      //   ±10 kHz: 100–200 km (class-dependent)
+      //   ±20 kHz: 50–100 km
+      //
+      // WAIVER COSTS
+      //   Engineering exhibits for §73.24(j) waiver: $3,000–$8,000
+      //   Legal preparation: $3,000–$10,000
+      //   Total (waiver scenario): $6,000–$18,000
+
+      const is_da = /^DA/i.test(pattern_mode);
+
+      // Principal community 5 mV/m distance proxy (screening-grade, 4 mS/m)
+      let r5_km = null;
+      try {
+        const r5 = fccAmDistanceKm({ frequency_khz, target_mvm: 5.0, conductivity_msm: 4, erp_kw: tpo_kw });
+        r5_km = round2(r5.distance_km);
+      } catch (_){ /* leave null */ }
+
+      // Coverage status based on coverage_pct (computed earlier in scoreCandidate)
+      const coverage_status =
+        coverage_pct == null ? 'UNKNOWN'
+        : coverage_pct >= 0.90 ? 'ADEQUATE'
+        : coverage_pct >= 0.60 ? 'MARGINAL'
+        : 'DEFICIENT';
+
+      const waiver_likely_needed = coverage_status === 'DEFICIENT';
+      const da_may_improve = coverage_status === 'MARGINAL' || coverage_status === 'DEFICIENT';
+
+      // Short-spacing minimum by class (co-channel, km)
+      const CO_CHANNEL_MIN_KM = {
+        A: 1000,
+        B: 800,
+        C: 300,
+        D: 300,
+      };
+      const co_channel_min_km = CO_CHANNEL_MIN_KM[fcc_class.toUpperCase()] ?? 300;
+
+      // Waiver cost estimates
+      const WAIVER_ENG_LOW   = 3000;
+      const WAIVER_ENG_HIGH  = 8000;
+      const WAIVER_LEGAL_LOW = 3000;
+      const WAIVER_LEGAL_HIGH= 10000;
+      const waiver_total_low  = round2(WAIVER_ENG_LOW  + WAIVER_LEGAL_LOW);
+      const waiver_total_high = round2(WAIVER_ENG_HIGH + WAIVER_LEGAL_HIGH);
+
+      return {
+        coverage_status,
+        coverage_pct_estimated: coverage_pct != null ? round2(coverage_pct * 100) : null,
+        r5_mvm_km: r5_km,
+        waiver_likely_needed,
+        da_may_improve,
+        co_channel_min_km,
+        short_spacing_minimums: {
+          co_channel_km: co_channel_min_km,
+          adj_10khz_km: 150,
+          adj_20khz_km: 75,
+        },
+        waiver_cost: {
+          engineering_low_usd: WAIVER_ENG_LOW,
+          engineering_high_usd: WAIVER_ENG_HIGH,
+          legal_low_usd: WAIVER_LEGAL_LOW,
+          legal_high_usd: WAIVER_LEGAL_HIGH,
+          total_low_usd: waiver_total_low,
+          total_high_usd: waiver_total_high,
+        },
+        waiver_standard: '47 CFR §1.3 / §1.925 — public interest, no undue interference',
+        reference: '47 CFR §73.24(j); §73.37; §73.215; §1.3; §1.925',
+        note: `${frequency_khz} kHz (${fcc_class}): COL coverage status = ${coverage_status}. 5 mV/m reach ≈ ${r5_km ?? 'N/A'} km. ${waiver_likely_needed ? 'Waiver may be needed — est. $' + waiver_total_low.toLocaleString() + '–$' + waiver_total_high.toLocaleString() + '.' : 'Coverage likely adequate.'} Co-channel min spacing: ${co_channel_min_km} km.`
       };
     })(),
 

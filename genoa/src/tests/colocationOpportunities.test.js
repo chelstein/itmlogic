@@ -4381,3 +4381,14 @@ test('am_transmitter_type_acceptance_and_fcc_certification_guide present across 
     assert.ok(g.cost_estimates?.total_equipment_low_usd > 0, 'equipment cost must be positive');
   }
 });
+
+test('am_community_coverage_waiver_and_short_spacing_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_community_coverage_waiver_and_short_spacing_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_community_coverage_waiver_and_short_spacing_guide');
+    assert.ok(['ADEQUATE','MARGINAL','DEFICIENT','UNKNOWN'].includes(g.coverage_status), 'coverage_status must be valid enum');
+    assert.ok(g.co_channel_min_km > 0, 'co_channel_min_km must be positive');
+    assert.ok(typeof g.waiver_likely_needed === 'boolean', 'waiver_likely_needed must be boolean');
+  }
+});
