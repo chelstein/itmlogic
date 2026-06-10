@@ -4545,3 +4545,14 @@ test('am_antenna_phasing_unit_installation_guide present across colocation candi
     assert.ok(g.n_towers >= 1, 'n_towers must be ≥1');
   }
 });
+
+test('am_transmission_line_coax_maintenance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_coax_maintenance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_transmission_line_coax_maintenance_guide');
+    assert.ok(['RIGID_COAX_6IN','HARDLINE_3IN','HARDLINE_1_5IN','FLEXIBLE_COAX_7_8IN'].includes(g.line_type), 'line_type must be valid');
+    assert.ok(g.n_failure_modes >= 4, 'must identify ≥4 failure modes');
+    assert.ok(g.cost_estimates?.annual_low_usd > 0, 'annual maintenance cost must be positive');
+  }
+});

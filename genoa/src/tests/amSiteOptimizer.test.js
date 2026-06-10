@@ -18487,3 +18487,45 @@ test('#134 candidate_comparison_table has atu_* columns', async () => {
     assert.ok('atu_total_low_usd'       in row, 'atu_total_low_usd missing');
   }
 });
+
+// ---- Feature #135: am_transmission_line_coax_maintenance_guide ----
+test('#135 KAZM: transmission line maintenance guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_coax_maintenance_guide;
+  assert.ok(g, 'am_transmission_line_coax_maintenance_guide missing');
+  assert.ok(['RIGID_COAX_6IN','HARDLINE_3IN','HARDLINE_1_5IN','FLEXIBLE_COAX_7_8IN'].includes(g.line_type), 'line_type must be valid enum');
+  assert.ok([3, 6].includes(g.inspection_interval_months), 'inspection interval must be 3 or 6 months');
+  assert.ok(g.line_length_ft > 0, 'line_length_ft must be positive');
+});
+
+test('#135 high power station inspects more frequently', async () => {
+  const lowPwr  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, candidate_limit: 1 });
+  const highPwr = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, candidate_limit: 1 });
+  const gLow  = lowPwr.candidates[0].am_transmission_line_coax_maintenance_guide;
+  const gHigh = highPwr.candidates[0].am_transmission_line_coax_maintenance_guide;
+  assert.ok(gHigh.inspection_interval_months <= gLow.inspection_interval_months, 'high power needs ≤ inspection interval vs low power');
+});
+
+test('#135 high power uses larger coax line type', async () => {
+  const highPwr = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, candidate_limit: 1 });
+  const g = highPwr.candidates[0].am_transmission_line_coax_maintenance_guide;
+  assert.ok(['RIGID_COAX_6IN','HARDLINE_3IN'].includes(g.line_type), '50 kW should use hardline or rigid coax');
+});
+
+test('#135 DA adds ATU failure mode', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = ndaOut.candidates[0].am_transmission_line_coax_maintenance_guide;
+  const gDA  = daOut.candidates[0].am_transmission_line_coax_maintenance_guide;
+  assert.ok(gDA.n_failure_modes > gNDA.n_failure_modes, 'DA must add ATU-related failure mode');
+});
+
+test('#135 candidate_comparison_table has tlm_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tlm_line_type'                  in row, 'tlm_line_type missing');
+    assert.ok('tlm_inspection_interval_months' in row, 'tlm_inspection_interval_months missing');
+    assert.ok('tlm_n_failure_modes'            in row, 'tlm_n_failure_modes missing');
+    assert.ok('tlm_annual_low_usd'             in row, 'tlm_annual_low_usd missing');
+  }
+});

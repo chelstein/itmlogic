@@ -11420,6 +11420,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmission Line & Coax Maintenance Guide */}
+        {candidate.am_transmission_line_coax_maintenance_guide && (() => {
+          const g = candidate.am_transmission_line_coax_maintenance_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Transmission Line &amp; Coax Maintenance (§73.1580)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>LINE TYPE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 10, fontWeight: 700 }}>{(g.line_type || '').replace(/_/g, ' ')}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>LENGTH</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.line_length_ft} ft</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>INSPECTION</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 10 }}>Every {g.inspection_interval_months} months</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>VSWR TEST</span>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>{g.vswr_test_interval}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ANNUAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.annual_low_usd || 0).toLocaleString()}–${(costs.annual_high_usd || 0).toLocaleString()}/yr</div>
+                </div>
+              </div>
+              {(g.failure_modes || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Monitored Failure Modes</div>
+                  {g.failure_modes.map((fm, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>{fm}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
