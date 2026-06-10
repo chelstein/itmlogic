@@ -4261,3 +4261,13 @@ test('am_transmitter_building_specification_guide present across colocation cand
     assert.ok(tbs.generator?.recommended_std_kw > 0, 'generator size must be positive');
   }
 });
+
+test('am_total_project_capital_cost_rollup_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const cap = c.am_total_project_capital_cost_rollup_guide;
+    assert.ok(cap !== undefined && cap !== null, 'candidate missing am_total_project_capital_cost_rollup_guide');
+    assert.ok(cap.total_usd?.low > 0, 'total_usd.low must be positive');
+    assert.ok(Array.isArray(cap.components), 'components must be an array');
+  }
+});
