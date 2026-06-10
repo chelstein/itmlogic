@@ -10772,6 +10772,58 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Nighttime Clear-Channel Exclusion Zone Guide */}
+        {candidate.am_nighttime_clear_channel_exclusion_zone_guide && (() => {
+          const g = candidate.am_nighttime_clear_channel_exclusion_zone_guide;
+          const zoneColor = g.exclusion_zone_applies ? '#f87171' : g.is_clear_channel_freq ? '#f59e0b' : '#22c55e';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Nighttime Clear-Channel Exclusion Zone (§73.26 / §73.182)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CLEAR CHANNEL FREQ</span>
+                  <div style={{ color: g.is_clear_channel_freq ? '#f59e0b' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                    {g.is_clear_channel_freq ? 'YES' : 'NO'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>EXCLUSION ZONE</span>
+                  <div style={{ color: zoneColor, fontSize: 11, fontWeight: 700 }}>
+                    {g.exclusion_zone_applies ? `${g.nighttime_exclusion_km} km` : 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>DAYTIME-ONLY REQUIRED</span>
+                  <div style={{ color: g.daytime_only_required ? '#f87171' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                    {g.daytime_only_required ? 'YES' : 'NO'}
+                  </div>
+                </div>
+                {g.skywave_05_mvm_km && (
+                  <div>
+                    <span style={{ color: '#94a3b8', fontSize: 9 }}>DOMINANT 0.5 mV/m SKYWAVE</span>
+                    <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.skywave_05_mvm_km} km</div>
+                  </div>
+                )}
+              </div>
+              {g.exclusion_zone_applies && (g.nighttime_options || []).length > 0 && (
+                <div>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Nighttime Operating Options</div>
+                  {g.nighttime_options.map((o, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: 9 }}>{o.option}</span>
+                      <span style={{ color: '#64748b', fontSize: 9 }}>{o.cost_usd > 0 ? `~$${o.cost_usd.toLocaleString()}` : 'No cost'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

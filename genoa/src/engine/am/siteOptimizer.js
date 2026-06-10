@@ -1710,7 +1710,12 @@ export async function runSiteOptimizer(body = {}){
     ccw_coverage_pct:                   c.am_community_coverage_waiver_and_short_spacing_guide?.coverage_pct_estimated ?? null,
     ccw_waiver_likely_needed:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_likely_needed ?? null,
     ccw_co_channel_min_km:              c.am_community_coverage_waiver_and_short_spacing_guide?.co_channel_min_km ?? null,
-    ccw_waiver_total_low_usd:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_cost?.total_low_usd ?? null
+    ccw_waiver_total_low_usd:           c.am_community_coverage_waiver_and_short_spacing_guide?.waiver_cost?.total_low_usd ?? null,
+    ncc_is_clear_channel_freq:          c.am_nighttime_clear_channel_exclusion_zone_guide?.is_clear_channel_freq ?? null,
+    ncc_exclusion_zone_applies:         c.am_nighttime_clear_channel_exclusion_zone_guide?.exclusion_zone_applies ?? null,
+    ncc_exclusion_km:                   c.am_nighttime_clear_channel_exclusion_zone_guide?.nighttime_exclusion_km ?? null,
+    ncc_daytime_only_required:          c.am_nighttime_clear_channel_exclusion_zone_guide?.daytime_only_required ?? null,
+    ncc_n_nighttime_options:            c.am_nighttime_clear_channel_exclusion_zone_guide?.n_nighttime_options ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -30713,6 +30718,109 @@ async function scoreCandidate(pt, ctx, warnings){
         waiver_standard: '47 CFR §1.3 / §1.925 — public interest, no undue interference',
         reference: '47 CFR §73.24(j); §73.37; §73.215; §1.3; §1.925',
         note: `${frequency_khz} kHz (${fcc_class}): COL coverage status = ${coverage_status}. 5 mV/m reach ≈ ${r5_km ?? 'N/A'} km. ${waiver_likely_needed ? 'Waiver may be needed — est. $' + waiver_total_low.toLocaleString() + '–$' + waiver_total_high.toLocaleString() + '.' : 'Coverage likely adequate.'} Co-channel min spacing: ${co_channel_min_km} km.`
+      };
+    })(),
+
+    am_nighttime_clear_channel_exclusion_zone_guide: (() => {
+      // Guide #121 — Nighttime Clear-Channel Exclusion Zone
+      //
+      // Class A (clear-channel) AM stations are protected from skywave
+      // interference at night under §73.182.  Class D (secondary/local)
+      // stations on the same or adjacent channels cannot operate nighttime
+      // within specified exclusion zones around the dominant (Class A) station.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.182 — Engineering standards for AM directional antennas.
+      //   Establishes mileage separations that Class D (secondary) stations
+      //   must maintain from Class A dominants to avoid prohibited skywave
+      //   interference at night.
+      //
+      // 47 CFR §73.26 — Clear channels.
+      //   Class A stations (dominant) receive exclusive nighttime skywave
+      //   protection on their channels.  A secondary (Class D) station on
+      //   the same channel may not increase its nighttime interference to
+      //   the dominant below 0.5 mV/m at night.
+      //
+      // 47 CFR §73.29 — Dominant stations; exclusion zones.
+      //   Class D stations in the same channel as a Class A dominant must
+      //   operate daytime-only or comply with §73.182 nighttime protection.
+      //
+      // EXCLUSION ZONE LOGIC
+      // ────────────────────
+      //   Whether a nighttime exclusion zone applies depends on:
+      //    1. Is this a clear channel (Class A dominant on the frequency)?
+      //    2. Is the candidate station Class D on that same channel?
+      //    3. What is the skywave 0.5 mV/m contour radius of the dominant?
+      //
+      //   The FCC doesn't publish a single "exclusion zone" radius — instead
+      //   it requires that the candidate station's skywave signal not exceed
+      //   specific limits at the dominant's 0.5 mV/m skywave contour.
+      //   For practical purposes, the nighttime exclusion radius is a
+      //   function of frequency and dominant station ERP:
+      //    • 640/770/1030/1160 kHz (clear channels): exclusion ~1,200+ km
+      //    • Other clear channels: exclusion ~800–1,100 km
+      //    • Class B regional: no exclusion zone (protected differently)
+      //
+      // CHANNEL CLASSES (SIMPLIFIED)
+      // ─────────────────────────────
+      //   Clear channels (Class A dominants): 640, 650, 660, 670, 680, 700,
+      //   710, 720, 750, 760, 770, 780, 820, 830, 840, 870, 880, 890, 1020,
+      //   1030, 1040, 1100, 1120, 1160, 1180, 1200 kHz (US, partial list)
+      //
+      //   This guide computes:
+      //    • Whether this frequency is on a US clear channel
+      //    • Whether a Class D station on this channel faces nighttime restrictions
+      //    • Estimated nighttime exclusion radius
+
+      const US_CLEAR_CHANNELS = new Set([
+        640, 650, 660, 670, 680, 700, 710, 720, 750, 760, 770, 780,
+        820, 830, 840, 870, 880, 890, 1020, 1030, 1040, 1100, 1120,
+        1160, 1180, 1200
+      ]);
+
+      const is_clear_channel_freq = US_CLEAR_CHANNELS.has(frequency_khz);
+      const is_class_d = fcc_class.toUpperCase() === 'D';
+      const is_class_a = fcc_class.toUpperCase() === 'A';
+
+      // Exclusion zone applies when a Class D operates on a clear channel
+      const exclusion_zone_applies = is_clear_channel_freq && is_class_d;
+
+      // Approximate nighttime exclusion radius based on frequency band
+      // Lower frequencies propagate farther at night (longer skywave hop)
+      const nighttime_exclusion_km =
+        !is_clear_channel_freq ? 0
+        : frequency_khz <= 700  ? 1400   // low-band clear channels
+        : frequency_khz <= 900  ? 1200   // mid-band
+        : 1000;                           // upper-band clear channels
+
+      // Skywave contour distance estimate for 0.5 mV/m at night
+      // Rough model: inversely proportional to frequency (skywave propagation)
+      const skywave_05_mvm_km = is_clear_channel_freq
+        ? round2(nighttime_exclusion_km * 0.6)   // dominant's 0.5 mV/m ~60% of exclusion
+        : null;
+
+      // Nighttime operating options for Class D on clear channel
+      const NIGHTTIME_OPTIONS = exclusion_zone_applies ? [
+        { option: 'Daytime-only operation', description: 'Authorize as daytime-only; no nighttime license', cost_usd: 0 },
+        { option: 'Reduced nighttime power', description: 'Reduce power until skywave contribution meets §73.182 limits', cost_usd: 2000 },
+        { option: 'DA nighttime pattern', description: 'Use a directional antenna to null skywave toward dominant', cost_usd: 15000 },
+        { option: 'STA for nighttime experiment', description: 'Special Temporary Authority to test nighttime operation', cost_usd: 1500 },
+      ] : [];
+
+      return {
+        is_clear_channel_freq,
+        is_class_d,
+        is_class_a,
+        exclusion_zone_applies,
+        nighttime_exclusion_km: exclusion_zone_applies ? nighttime_exclusion_km : 0,
+        skywave_05_mvm_km,
+        nighttime_options: NIGHTTIME_OPTIONS,
+        n_nighttime_options: NIGHTTIME_OPTIONS.length,
+        dominant_protection_standard: '0.5 mV/m skywave contour must not be exceeded at night',
+        daytime_only_required: exclusion_zone_applies,
+        reference: '47 CFR §73.26; §73.29; §73.182; §73.186',
+        note: `${frequency_khz} kHz (${fcc_class}): ${is_clear_channel_freq ? 'CLEAR CHANNEL frequency' : 'Not a clear channel'}. ${exclusion_zone_applies ? `Class D on clear channel — nighttime exclusion zone ≈ ${nighttime_exclusion_km} km. Daytime-only or §73.182 DA pattern required.` : is_class_a ? 'Class A dominant — receives nighttime skywave protection.' : 'No clear-channel exclusion zone applies.'}`
       };
     })(),
 

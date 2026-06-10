@@ -17864,3 +17864,44 @@ test('#120 candidate_comparison_table has ccw_* columns', async () => {
     assert.ok('ccw_waiver_total_low_usd'  in row, 'ccw_waiver_total_low_usd missing');
   }
 });
+
+// ---- Feature #121: am_nighttime_clear_channel_exclusion_zone_guide ----
+test('#121 KAZM (780 kHz): nighttime exclusion zone guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_nighttime_clear_channel_exclusion_zone_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(typeof g.is_clear_channel_freq === 'boolean', 'is_clear_channel_freq must be boolean');
+  assert.ok(typeof g.exclusion_zone_applies === 'boolean', 'exclusion_zone_applies must be boolean');
+});
+
+test('#121 780 kHz is a clear channel frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, candidate_limit: 1 });
+  const g   = out.candidates[0].am_nighttime_clear_channel_exclusion_zone_guide;
+  assert.strictEqual(g.is_clear_channel_freq, true, '780 kHz is a US clear channel');
+});
+
+test('#121 Class D on clear channel triggers exclusion zone; Class A does not', async () => {
+  const classD = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, fcc_class: 'D', candidate_limit: 1 });
+  const classA = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, fcc_class: 'A', candidate_limit: 1 });
+  assert.strictEqual(classD.candidates[0].am_nighttime_clear_channel_exclusion_zone_guide.exclusion_zone_applies, true,  'Class D on 780 kHz must trigger exclusion zone');
+  assert.strictEqual(classA.candidates[0].am_nighttime_clear_channel_exclusion_zone_guide.exclusion_zone_applies, false, 'Class A on 780 kHz must NOT trigger exclusion zone (it IS the dominant)');
+});
+
+test('#121 non-clear-channel frequency has no exclusion zone', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1000, fcc_class: 'D', candidate_limit: 1 });
+  const g   = out.candidates[0].am_nighttime_clear_channel_exclusion_zone_guide;
+  assert.strictEqual(g.is_clear_channel_freq, false, '1000 kHz is not a clear channel');
+  assert.strictEqual(g.exclusion_zone_applies, false, 'exclusion zone must not apply on non-clear-channel freq');
+  assert.strictEqual(g.nighttime_exclusion_km, 0, 'exclusion km must be 0 for non-clear channel');
+});
+
+test('#121 candidate_comparison_table has ncc_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ncc_is_clear_channel_freq'  in row, 'ncc_is_clear_channel_freq missing');
+    assert.ok('ncc_exclusion_zone_applies' in row, 'ncc_exclusion_zone_applies missing');
+    assert.ok('ncc_exclusion_km'           in row, 'ncc_exclusion_km missing');
+    assert.ok('ncc_daytime_only_required'  in row, 'ncc_daytime_only_required missing');
+    assert.ok('ncc_n_nighttime_options'    in row, 'ncc_n_nighttime_options missing');
+  }
+});

@@ -4392,3 +4392,14 @@ test('am_community_coverage_waiver_and_short_spacing_guide present across coloca
     assert.ok(typeof g.waiver_likely_needed === 'boolean', 'waiver_likely_needed must be boolean');
   }
 });
+
+test('am_nighttime_clear_channel_exclusion_zone_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_nighttime_clear_channel_exclusion_zone_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_nighttime_clear_channel_exclusion_zone_guide');
+    assert.ok(typeof g.is_clear_channel_freq === 'boolean', 'is_clear_channel_freq must be boolean');
+    assert.ok(typeof g.exclusion_zone_applies === 'boolean', 'exclusion_zone_applies must be boolean');
+    assert.ok(typeof g.daytime_only_required === 'boolean', 'daytime_only_required must be boolean');
+  }
+});
