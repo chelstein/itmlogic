@@ -4221,3 +4221,13 @@ test('am_construction_permit_exhibit_requirements_guide present across colocatio
     assert.ok(cpe.n_required_exhibits >= 4, 'must have at least 4 required exhibits');
   }
 });
+
+test('am_licensed_contour_migration_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const lcm = c.am_licensed_contour_migration_guide;
+    assert.ok(lcm !== undefined && lcm !== null, 'candidate missing am_licensed_contour_migration_guide');
+    assert.ok(typeof lcm.daytime_5mvm_contour_km === 'number', 'daytime_5mvm_contour_km must be numeric');
+    assert.ok(['EXPANDED','SIMILAR','CONTRACTED'].includes(lcm.soil_coverage_advantage), 'soil_coverage_advantage must be valid');
+  }
+});
