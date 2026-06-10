@@ -4251,3 +4251,13 @@ test('am_ground_radial_system_cost_and_specification_guide present across coloca
     assert.ok(grs.recommended_config?.label === 'standard', 'recommended config must be standard');
   }
 });
+
+test('am_transmitter_building_specification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const tbs = c.am_transmitter_building_specification_guide;
+    assert.ok(tbs !== undefined && tbs !== null, 'candidate missing am_transmitter_building_specification_guide');
+    assert.ok(typeof tbs.floor_area_m2 === 'number' && tbs.floor_area_m2 > 0, 'floor_area_m2 must be positive');
+    assert.ok(tbs.generator?.recommended_std_kw > 0, 'generator size must be positive');
+  }
+});
