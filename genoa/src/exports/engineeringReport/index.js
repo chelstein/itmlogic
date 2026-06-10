@@ -44,6 +44,7 @@ import { buildVisualSummarySection }               from './sections/visualSummar
 import { buildAdvisoryReviewSection }              from './sections/advisoryReview.js';
 import { buildRemediationSection }                from './sections/remediation.js';
 import { buildCountyOverlaySection }              from './sections/countyOverlay.js';
+import { buildHaatBasisGovernanceSection }        from './sections/haatBasisGovernance.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -89,6 +90,11 @@ export function buildEngineeringReport(exhibit, options){
   // contour_definitions.  Sits right after Measurements so a reviewer
   // sees the raw audio record then the engineering comparison.
   push(buildSdrObservabilitySection(exhibit, opt));
+  // HAAT BASIS AND GOVERNANCE — declares the three distinct HAAT concepts and
+  // the filing-controlling basis before the contour results so a reviewer sees
+  // the HAAT governance posture before the calculated distances.
+  // Omitted for AM exhibits (groundwave is conductivity-based, not HAAT-based).
+  push(buildHaatBasisGovernanceSection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
   // Printable contour map — embedded PNG composed by the map sidecar
   // (genoa/src/sidecars/map/, headless Chromium + Leaflet).  The HTTP

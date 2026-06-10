@@ -10,7 +10,8 @@ import { contourFeature, featureCollection } from './geometry/geojson.js';
 import { parsePatternTable } from './pattern/parse.js';
 import { patternFactor } from './pattern/factor.js';
 import { flatHaatPerRadial } from './haat/flat.js';
-import { resolveOperativeHaat } from './haat/resolveOperativeHaat.js';
+import { resolveOperativeHaat }    from './haat/resolveOperativeHaat.js';
+import { resolveHaatAuthority }    from './haat/resolveHaatAuthority.js';
 import { fmRadialTable, FM_DEFAULT_CONTOURS, FM_INTERP, FM_INTERP_FCC, FM_CONTOUR_METHODS, FM_ENGINE_DEFAULT } from './fm/contour.js';
 import { fmInputGuards } from './fm/rules.js';
 import { lpfmRadialTable, LPFM_DEFAULT_CONTOURS, LPFM_METHOD, lpfmInputGuards } from './lpfm/contour.js';
@@ -206,6 +207,20 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       warnings.push(W.make(w.code, w.message));
     }
   }
+
+  // Resolve HAAT authority — distinguishes FCC-authorized, Genoa-computed
+  // §73.313, and operator-declared HAAT so they are never conflated.
+  // The result is stamped onto exhibit.haat_authority for PDF/attestation use.
+  const haatAuthority = resolveHaatAuthority({
+    studyIntent:            inputs.study_intent || 'existing_facility_review',
+    facilityStatus:         inputs.facility_status || (evidence?.fcc_licensed ? 'licensed' : 'proposed'),
+    fccAuthorizedHaatM:     evidence?.fcc_licensed?.haat_m ?? evidence?.facility?.haat_m ?? null,
+    operatorDeclaredHaatM:  inputs.haat_m ?? null,
+    computedRadialHaat:     evidence?.terrain_haat_per_radial ?? [],
+    rcamslM:                inputs.rcamsl_m ?? inputs.overall_height_amsl_m ?? null,
+    groundElevationM:       evidence?.terrain?.elevation_m ?? null,
+    engineerOverride:       inputs.haat_engineer_override ?? null
+  });
 
   if (service === 'FM') {
     warnings.push(...fmInputGuards({ erp_kW, haat_m, frequency_mhz: freq }));
@@ -822,6 +837,11 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       validation_warnings: []
     };
   }
+
+  // HAAT authority block — the three distinct HAAT concepts are stamped
+  // here so the PDF, source attestation, and validation verdict can
+  // reference the correct values with the correct labels.
+  exhibit.haat_authority = haatAuthority;
 
   // §73.150 AM DA pattern-shape compliance — run BEFORE warnings are
   // frozen so a failing pattern raises AM_DA_PATTERN_COMPLIANCE_FAIL and

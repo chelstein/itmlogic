@@ -221,6 +221,44 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
+  // HAAT basis governance — surfaces the filing-controlling HAAT basis and any
+  // conflicts between FCC-authorized and Genoa-computed §73.313 values.
+  // category:'validation' because an unresolved HAAT conflict is not merely
+  // a regulatory matter — it means the contour distances may be computed on
+  // the wrong HAAT, which is a direct math-integrity issue.
+  // Note: source-attestation HAAT conflicts do NOT downgrade engine math parity;
+  // those are labeling issues, not calculation errors.
+  const ha = exhibit?.haat_authority;
+  const svc_haat = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  if (ha && svc_haat !== 'AM') {
+    const haatBasisLabel = {
+      FCC_AUTHORIZED:           'FCC-authorized (licensed value)',
+      GENOA_COMPUTED_73_313:    'Genoa-computed §73.313 terrain-derived mean',
+      ENGINEER_OVERRIDE_LOCKED: 'Engineer override (locked)',
+      OPERATOR_DECLARED:        'Operator-declared (no terrain/FCC evidence)'
+    }[ha.filing_controlling_haat_basis] || (ha.filing_controlling_haat_basis || 'unknown');
+    const haatBasisDetail = ha.filing_controlling_haat_m != null
+      ? `${ha.filing_controlling_haat_m} m — basis: ${haatBasisLabel}`
+      : 'Filing-controlling HAAT not resolved — see HAAT BASIS AND GOVERNANCE section';
+    components.push({
+      name:   'HAAT basis (filing-controlling)',
+      status: ha.filing_controlling_haat_m != null ? 'PASS' : 'FAIL',
+      detail: haatBasisDetail
+    });
+
+    const haatReviewStatusMap = {
+      RESOLVED:        { status: 'PASS', detail: 'FCC-authorized and computed §73.313 HAAT agree within tolerance.' },
+      REVIEW_REQUIRED: { status: 'WARN', detail: (ha.haat_review_messages?.[0] || 'FCC-authorized and computed §73.313 HAAT differ; engineer must declare filing basis.') },
+      BLOCKER:         { status: 'FAIL', detail: (ha.haat_blockers?.[0]?.message || 'HAAT basis blocker — cannot file as-is.') }
+    };
+    const haatReview = haatReviewStatusMap[ha.haat_conflict_status] || { status: 'SKIP', detail: 'HAAT conflict status not determined.' };
+    components.push({
+      name:   'HAAT review (FCC-authorized vs §73.313 computed)',
+      status: haatReview.status,
+      detail: haatReview.detail
+    });
+  }
+
   // Engineering confidence (terrain-aware advisory layer).
   //
   // This row is ADVISORY — it does not gate compliance and there is no

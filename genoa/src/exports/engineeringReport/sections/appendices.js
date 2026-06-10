@@ -58,7 +58,7 @@ export function buildAppendixSections(exhibit){
     } else {
       columns = [
         { key: 'azimuth_deg', label: 'Az (°)',     width: 0.10, align: 'right' },
-        { key: 'haat_m',      label: 'HAAT (m)',   width: 0.14, align: 'right' },
+        { key: 'haat_m',      label: 'Computed radial HAAT (m)',   width: 0.18, align: 'right' },
         { key: 'erp_kw',      label: 'ERP (kW)',   width: 0.14, align: 'right' }
       ];
     }
@@ -194,7 +194,7 @@ export function buildAppendixSections(exhibit){
       const lines = [];
       lines.push('');
       lines.push('');
-      lines.push(`HAAT Validation Status: ${haatV.status}`);
+      lines.push(`Computed §73.313 Radial HAAT Review Status: ${haatV.status}`);
       lines.push(`Basis: ${basisLabel}`);
 
       if (haatV.status === 'INVALID' || haatV.status === 'FALLBACK_ONLY' || haatV.status === 'NOT_RUN'){
@@ -229,6 +229,13 @@ export function buildAppendixSections(exhibit){
         lines.push('Outliers present — engineer of record should confirm:');
         for (const i of (haatV.issues || [])) lines.push(`  - ${i.code} (${i.severity}): ${i.detail}`);
       }
+      // Terrain-derived vs FCC-authorized disambiguation footnote
+      lines.push('');
+      lines.push('NOTE: These values are terrain-derived radial calculations per 47 CFR §73.313 and are not');
+      lines.push('necessarily the FCC-authorized HAAT of record unless selected as the filing-controlling');
+      lines.push('HAAT basis. The FCC-authorized HAAT is the factual licensed facility value. A difference');
+      lines.push('between these values is a basis-selection issue, not automatically a math failure.');
+      lines.push('See HAAT BASIS AND GOVERNANCE section for the declared filing-controlling basis.');
       haatFootnote = lines.join('\n');
     }
     sections.push({
