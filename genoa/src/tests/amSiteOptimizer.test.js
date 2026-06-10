@@ -17573,3 +17573,56 @@ test('#114 candidate_comparison_table has tia_* columns', async () => {
     assert.ok('tia_total_pe_low_usd' in row, 'tia_total_pe_low_usd missing');
   }
 });
+
+// ---- Feature #115: am_broadcast_lease_and_spectrum_sharing_agreement_guide ----
+
+test('#115 KAZM: lease/spectrum sharing guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  assert.ok(g, 'am_broadcast_lease_and_spectrum_sharing_agreement_guide must be present');
+  assert.strictEqual(g.tba_threshold.attributable_threshold_pct, 15, 'TBA attribution threshold must be 15%');
+  assert.strictEqual(g.min_licensee_control_pct, 15, 'minimum licensee control must be 15%');
+  assert.ok(g.min_licensee_hours_per_week > 0, 'min licensee hours must be positive');
+  assert.strictEqual(g.weekly_hours_total, 168, 'weekly_hours_total must be 168 (7×24)');
+  assert.ok(Array.isArray(g.agreement_types) && g.agreement_types.length >= 3, 'must have ≥3 agreement types');
+});
+
+test('#115 Class A market has more allowed stations than Class D', async () => {
+  const outA = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
+  const outD = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', candidate_limit: 1 });
+  const gA   = outA.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  const gD   = outD.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  assert.ok(gA.market_station_limits.total >= gD.market_station_limits.total,
+    `Class A market (${gA.market_station_limits.total}) must allow ≥ Class D (${gD.market_station_limits.total}) stations`);
+  assert.strictEqual(gA.is_large_market, true, 'Class A must be large market');
+  assert.strictEqual(gD.is_small_market, true, 'Class D must be small market');
+});
+
+test('#115 min_licensee_hours_per_week = 168 × 0.15 ≈ 25.2', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  assert.ok(Math.abs(g.min_licensee_hours_per_week - 168 * 0.15) < 0.5,
+    `min_licensee_hours_per_week (${g.min_licensee_hours_per_week}) must be ≈ 25.2 hrs`);
+});
+
+test('#115 LMA agreement is attributable; TBA is not unless threshold exceeded', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+  const lma = g.agreement_types.find(a => a.type.includes('Local Marketing'));
+  const tba = g.agreement_types.find(a => a.type.includes('Time Brokerage'));
+  assert.ok(lma, 'LMA agreement type must be present');
+  assert.ok(tba, 'TBA agreement type must be present');
+  assert.ok(lma.risk_level === 'HIGH', 'LMA must be HIGH risk');
+  assert.ok(['LOW','MODERATE'].includes(tba.risk_level), 'TBA must be LOW or MODERATE risk');
+});
+
+test('#115 candidate_comparison_table has lsa_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lsa_max_total_stations'  in row, 'lsa_max_total_stations missing');
+    assert.ok('lsa_tba_threshold_pct'   in row, 'lsa_tba_threshold_pct missing');
+    assert.ok('lsa_min_licensee_hours'  in row, 'lsa_min_licensee_hours missing');
+    assert.ok('lsa_n_agreement_types'   in row, 'lsa_n_agreement_types missing');
+    assert.ok('lsa_lma_legal_low_usd'   in row, 'lsa_lma_legal_low_usd missing');
+  }
+});
