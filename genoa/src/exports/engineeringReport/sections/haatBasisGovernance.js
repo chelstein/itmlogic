@@ -1,14 +1,57 @@
-// HAAT BASIS AND GOVERNANCE section
+// HAAT BASIS AND GOVERNANCE section — filing-grade governance block.
 //
-// Renders a structured exhibit section that explicitly declares:
-//   1. The FCC-authorized HAAT (if applicable)
-//   2. The Genoa-computed §73.313 radial HAAT (if terrain evidence exists)
-//   3. The operator-declared HAAT
-//   4. The filing-controlling basis and which value was used for RF calculations
-//   5. Any conflicts, blockers, or review requirements
+// Declares, in one place, which HAAT value controls the RF engineering
+// calculations and the filed exhibit:
+//   1. The study intent and facility status that drive basis selection
+//   2. The FCC-authorized HAAT (if applicable)
+//   3. The Genoa-computed §73.313 radial HAAT mean and per-radial range
+//   4. The filing-controlling HAAT, its basis, and its source
+//   5. The conflict/review status with a plain-language reason
+// plus a visual governance table that shows every HAAT concept side by
+// side with its source, role, and whether it controls the filing.
+//
+// Rendered as a 'considerations' section (kvRows + table + summary) so
+// both renderPdf.js and renderText.js produce the full governance block.
+// (The previous 'text'/content shape was silently dropped by both
+// renderers' default branches — the section printed a heading and
+// nothing else.)
 //
 // This section is always rendered for FM/LPFM/FX exhibits and omitted for AM
 // (AM groundwave does not use HAAT per §73.184).
+
+const STUDY_INTENT_LABEL = {
+  existing_facility_review: 'Existing Licensed Facility Review',
+  cp_application:           'Construction Permit Application',
+  modification:             'Facility Modification Study',
+  proposed:                 'Proposed Facility Study',
+  allocation_study:         'Allocation Study'
+};
+
+const FACILITY_STATUS_LABEL = {
+  licensed:   'Licensed Facility',
+  cp_granted: 'Construction Permit Granted',
+  proposed:   'Proposed Facility'
+};
+
+const BASIS_LABEL = {
+  FCC_AUTHORIZED:           'FCC_AUTHORIZED — licensed facility HAAT controls',
+  GENOA_COMPUTED_73_313:    'GENOA_COMPUTED_73_313 — terrain-derived §73.313 mean controls',
+  ENGINEER_OVERRIDE_LOCKED: 'ENGINEER_OVERRIDE_LOCKED — engineer override (immutable in exhibit hash)',
+  OPERATOR_DECLARED:        'OPERATOR_DECLARED — operator input (no terrain or FCC evidence available)'
+};
+
+// Display mapping for the conflict status.  The resolver emits
+// RESOLVED | REVIEW_REQUIRED | BLOCKER; the exhibit displays the
+// engineer-facing labels.
+const CONFLICT_DISPLAY = {
+  RESOLVED:        'RESOLVED',
+  REVIEW_REQUIRED: 'REVIEW',
+  BLOCKER:         'BLOCKER'
+};
+
+function fmtM(v){
+  return (v === null || v === undefined || !Number.isFinite(Number(v))) ? '—' : `${v} m`;
+}
 
 export function buildHaatBasisGovernanceSection(exhibit, options = {}) {
   const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
@@ -19,144 +62,157 @@ export function buildHaatBasisGovernanceSection(exhibit, options = {}) {
   const ha = exhibit?.haat_authority;
   if (!ha) return null;
 
-  const lines = [];
+  const prov           = ha.provenance || {};
+  const studyIntent    = STUDY_INTENT_LABEL[prov.study_intent] || prov.study_intent || '—';
+  const facilityStatus = FACILITY_STATUS_LABEL[prov.facility_status] || prov.facility_status || '—';
+  const isLicensed     = prov.facility_status === 'licensed';
+  const conflictDisplay = CONFLICT_DISPLAY[ha.haat_conflict_status] || ha.haat_conflict_status || '—';
 
-  lines.push('This section declares which HAAT value controls the RF engineering calculations');
-  lines.push('and the filed exhibit. Three distinct HAAT concepts are maintained and never conflated:');
-  lines.push('');
+  // Per-radial range from the validated radial array.
+  const radials = Array.isArray(ha.computed_radial_haat_m) ? ha.computed_radial_haat_m : [];
+  const radialRange = radials.length
+    ? `${Math.min(...radials).toFixed(1)} m – ${Math.max(...radials).toFixed(1)} m  (${radials.length} radials)`
+    : 'Not available — terrain DEM evidence absent';
 
   // ------------------------------------------------------------------
-  // 1. FCC-Authorized HAAT
+  // Governance block (key/value) — the headline declaration.
   // ------------------------------------------------------------------
-  lines.push('1. FCC-AUTHORIZED HAAT (facility license / CP)');
-  if (ha.authorized_haat_m != null) {
-    lines.push(`   Value:  ${ha.authorized_haat_m} m`);
-    lines.push('   This is the HAAT value appearing on the station\'s current license or Construction Permit.');
-    lines.push('   It is a factual regulatory record and cannot be changed without a new license or CP.');
+  const kvRows = [
+    ['Study Intent',             studyIntent],
+    ['Facility Status',          facilityStatus],
+    ['FCC Authorized HAAT',      fmtM(ha.authorized_haat_m)],
+    ['Genoa Computed Mean HAAT', fmtM(ha.computed_average_haat_m)],
+    ['Computed Radial Range',    radialRange],
+    ['Operator-Declared HAAT',   fmtM(ha.operator_declared_haat_m)],
+    ['Filing-Controlling HAAT',  fmtM(ha.filing_controlling_haat_m)],
+    ['Filing-Controlling Basis', ha.filing_controlling_haat_basis || 'UNRESOLVED'],
+    ['Filing Source',            ha.filing_controlling_haat_source || '—'],
+    ['Conflict Status',          conflictDisplay]
+  ];
+
+  // Plain-language reason for the declared conflict status.
+  let reason;
+  if (ha.haat_conflict_status === 'REVIEW_REQUIRED' && isLicensed){
+    reason =
+      'Existing licensed facilities may possess a licensed HAAT that differs from ' +
+      'terrain-derived recalculations.  The FCC-authorized HAAT remains the ' +
+      'filing-controlling value unless an engineer override or facility ' +
+      'modification changes the declared basis.';
+  } else if (ha.haat_conflict_status === 'REVIEW_REQUIRED'){
+    reason =
+      'Two HAAT evidence sources differ beyond tolerance.  The engineer of record ' +
+      'must confirm the declared filing-controlling basis before filing.';
+  } else if (ha.haat_conflict_status === 'BLOCKER'){
+    reason =
+      'A required HAAT value is missing or a conflict cannot be resolved.  This ' +
+      'exhibit cannot be filed as-is; see the blockers listed below.';
   } else {
-    lines.push('   Not available — no FCC license data was attached to this exhibit.');
+    reason =
+      'All available HAAT evidence agrees within tolerance; the filing-controlling ' +
+      'basis is unambiguous.';
   }
-  lines.push('');
+  kvRows.push(['Reason', reason]);
 
   // ------------------------------------------------------------------
-  // 2. Genoa-Computed §73.313 Radial HAAT
+  // Visual governance table — every HAAT concept side by side.
   // ------------------------------------------------------------------
-  lines.push('2. GENOA-COMPUTED §73.313 RADIAL HAAT (terrain-derived)');
-  if (ha.computed_average_haat_m != null) {
-    const radialCount = ha.computed_radial_haat_m?.length ?? ha.provenance?.radial_count_used ?? '—';
-    lines.push(`   Mean:   ${ha.computed_average_haat_m} m  (${radialCount} radials)`);
-    lines.push('   Method: 47 CFR §73.313 — terrain elevation sampling via multi-source DEM;');
-    lines.push('           per-radial HAAT = transmitter AMSL minus mean ground elevation over 3–16 km.');
-    lines.push('   This value is used for contour recomputation studies and engineering analysis.');
-    lines.push('   It is an engineering-analysis value, not a licensed value.');
-  } else {
-    lines.push('   Not available — no terrain-derived per-radial HAAT data was attached.');
-    lines.push('   Terrain DEM unavailable; per-radial HAAT computation was not performed.');
-  }
-  lines.push('');
-
-  // ------------------------------------------------------------------
-  // 3. Operator-Declared HAAT
-  // ------------------------------------------------------------------
-  lines.push('3. OPERATOR-DECLARED HAAT (form input)');
-  if (ha.operator_declared_haat_m != null) {
-    lines.push(`   Value:  ${ha.operator_declared_haat_m} m`);
-    lines.push('   This is the value entered by the operator or licensee into the engineering study form.');
-    lines.push('   It may match the FCC-authorized HAAT, a tower AGL height, or a prior study value.');
-    lines.push('   It is captured for audit and display but is not blindly trusted for RF calculations.');
-  } else {
-    lines.push('   Not provided — no operator HAAT input was found.');
-  }
-  lines.push('');
-
-  // ------------------------------------------------------------------
-  // 4. Filing-Controlling HAAT
-  // ------------------------------------------------------------------
-  lines.push('4. FILING-CONTROLLING HAAT');
-  if (ha.filing_controlling_haat_m != null) {
-    lines.push(`   Value:  ${ha.filing_controlling_haat_m} m`);
-    const basisLabel = {
-      FCC_AUTHORIZED:          'FCC-authorized (licensed facility HAAT)',
-      GENOA_COMPUTED_73_313:   'Genoa-computed §73.313 terrain-derived mean',
-      ENGINEER_OVERRIDE_LOCKED: 'Engineer override (locked — immutable in exhibit hash)',
-      OPERATOR_DECLARED:       'Operator-declared (no terrain or FCC evidence available)'
-    }[ha.filing_controlling_haat_basis] || ha.filing_controlling_haat_basis || '—';
-    lines.push(`   Basis:  ${basisLabel}`);
-    lines.push(`   Source: ${ha.filing_controlling_haat_source || '—'}`);
-    lines.push('   This is the HAAT value used for all §73.333 contour calculations in this exhibit.');
-  } else {
-    lines.push('   UNRESOLVED — no filing-controlling HAAT could be determined.');
-    lines.push('   See BLOCKERS below.');
-  }
-  lines.push('');
-
-  // ------------------------------------------------------------------
-  // 5. Conflict / review status
-  // ------------------------------------------------------------------
-  lines.push('5. HAAT BASIS REVIEW STATUS');
-  const statusLabels = {
-    RESOLVED:        'RESOLVED — Values agree within tolerance; basis is unambiguous.',
-    REVIEW_REQUIRED: 'REVIEW REQUIRED — FCC-authorized and computed §73.313 HAAT differ; engineer must confirm basis.',
-    BLOCKER:         'BLOCKER — A required value is missing or a conflict cannot be resolved; this exhibit cannot be filed as-is.'
-  };
-  lines.push(`   Status: ${statusLabels[ha.haat_conflict_status] || ha.haat_conflict_status || '—'}`);
-  lines.push('');
-
-  if (ha.haat_review_messages?.length) {
-    for (const m of ha.haat_review_messages) {
-      lines.push(`   ${m}`);
-      lines.push('');
+  const basis = ha.filing_controlling_haat_basis;
+  const tableRows = [
+    {
+      concept:  'FCC-Authorized HAAT',
+      value_m:  ha.authorized_haat_m != null ? String(ha.authorized_haat_m) : '—',
+      source:   'FCC license / CP (LMS)',
+      role:     'Factual regulatory record',
+      controls: basis === 'FCC_AUTHORIZED' ? 'YES — CONTROLS FILING' : 'No'
+    },
+    {
+      concept:  'Genoa-Computed §73.313 Mean',
+      value_m:  ha.computed_average_haat_m != null ? String(ha.computed_average_haat_m) : '—',
+      source:   'Terrain DEM (§73.313 radial method)',
+      role:     'Engineering-analysis value',
+      controls: basis === 'GENOA_COMPUTED_73_313' ? 'YES — CONTROLS FILING' : 'No — retained for review'
+    },
+    {
+      concept:  'Operator-Declared HAAT',
+      value_m:  ha.operator_declared_haat_m != null ? String(ha.operator_declared_haat_m) : '—',
+      source:   'Study form input',
+      role:     'Captured for audit',
+      controls: basis === 'OPERATOR_DECLARED' ? 'YES — CONTROLS FILING' : 'No'
     }
-  }
-
-  if (ha.haat_blockers?.length) {
-    lines.push('   BLOCKERS:');
-    for (const b of ha.haat_blockers) {
-      lines.push(`   [${b.code}] ${b.message}`);
-    }
-    lines.push('');
-  }
-
-  if (ha.haat_warnings?.length) {
-    lines.push('   WARNINGS:');
-    for (const w of ha.haat_warnings) {
-      lines.push(`   [${w.code}] ${w.message}`);
-    }
-    lines.push('');
+  ];
+  if (ha.engineer_override){
+    tableRows.push({
+      concept:  'Engineer Override (locked)',
+      value_m:  ha.engineer_override.value_m != null ? String(ha.engineer_override.value_m) : '—',
+      source:   `Evidence: ${ha.engineer_override.evidence_ref || '—'}`,
+      role:     'Immutable in exhibit hash',
+      controls: basis === 'ENGINEER_OVERRIDE_LOCKED' ? 'YES — CONTROLS FILING' : 'No'
+    });
   }
 
   // ------------------------------------------------------------------
-  // 6. Engineer override audit trail (PII-stripped)
+  // Summary — review messages, blockers/warnings, override audit, and
+  // the standing regulatory statement.
   // ------------------------------------------------------------------
-  if (ha.engineer_override) {
-    lines.push('6. ENGINEER OVERRIDE (LOCKED)');
-    lines.push(`   Override value:   ${ha.engineer_override.value_m} m`);
-    if (ha.engineer_override.original_value_m != null) {
-      lines.push(`   Original value:   ${ha.engineer_override.original_value_m} m`);
-    }
-    lines.push(`   Evidence ref:     ${ha.engineer_override.evidence_ref}`);
-    lines.push(`   Override time:    ${ha.engineer_override.timestamp}`);
-    lines.push('   Engineer identity and reason are recorded in the server-side attestation log.');
-    lines.push('   This override is immutable in the exhibit hash and replay token.');
-    lines.push('');
+  const summaryParts = [];
+
+  if (ha.haat_review_messages?.length){
+    summaryParts.push('REVIEW NOTES:\n' + ha.haat_review_messages.map(m => `• ${m}`).join('\n'));
+  }
+  if (ha.haat_blockers?.length){
+    summaryParts.push('BLOCKERS:\n' + ha.haat_blockers.map(b => `• [${b.code}] ${b.message}`).join('\n'));
+  }
+  if (ha.haat_warnings?.length){
+    summaryParts.push('WARNINGS:\n' + ha.haat_warnings.map(w => `• [${w.code}] ${w.message}`).join('\n'));
+  }
+  if (ha.engineer_override){
+    const eo = ha.engineer_override;
+    summaryParts.push(
+      'ENGINEER OVERRIDE (LOCKED):\n' +
+      `• Override value: ${fmtM(eo.value_m)}` +
+      (eo.original_value_m != null ? `\n• Original value: ${fmtM(eo.original_value_m)}` : '') +
+      `\n• Evidence ref: ${eo.evidence_ref}` +
+      `\n• Override time: ${eo.timestamp}` +
+      '\n• Engineer identity and reason are recorded in the server-side attestation log; ' +
+      'this override is immutable in the exhibit hash and replay token.'
+    );
   }
 
-  // ------------------------------------------------------------------
-  // Regulatory note
-  // ------------------------------------------------------------------
-  lines.push('REGULATORY STATEMENT:');
-  lines.push('The FCC-authorized HAAT is the factual licensed facility value. Genoa-computed');
-  lines.push('§73.313 radial HAAT is shown for engineering review and contour recomputation.');
-  lines.push('A difference between these values is not automatically a defect; it is a');
-  lines.push('basis-selection issue that must be explicitly declared by the engineer of record.');
-  lines.push('Final certification of the HAAT basis is the responsibility of the qualified');
-  lines.push('broadcast engineer of record per 47 CFR §73.801 / §73.1690.');
+  summaryParts.push(
+    'REGULATORY STATEMENT:  The FCC-authorized HAAT is the factual licensed facility ' +
+    'value.  The Genoa-computed §73.313 radial HAAT is shown for engineering review ' +
+    'and contour recomputation.  A difference between these values is not ' +
+    'automatically a defect; it is a basis-selection issue that must be explicitly ' +
+    'declared by the engineer of record.  Final certification of the HAAT basis is ' +
+    'the responsibility of the qualified broadcast engineer of record per ' +
+    '47 CFR §73.801 / §73.1690.'
+  );
 
   return {
     id:      'haat-basis-governance',
-    type:    'text',
+    type:    'considerations',
     heading: 'HAAT BASIS AND GOVERNANCE',
-    content: lines.join('\n'),
+    preface:
+      'This section declares which HAAT value controls the RF engineering ' +
+      'calculations and the filed exhibit.  Three distinct HAAT concepts are ' +
+      'maintained and never conflated: the FCC-authorized HAAT (the licensed ' +
+      'facility record), the Genoa-computed 47 CFR §73.313 terrain-derived radial ' +
+      'HAAT (an engineering-analysis value), and the operator-declared HAAT (a ' +
+      'form input captured for audit).  The filing-controlling value and its basis ' +
+      'are declared below.',
+    kvRows,
+    table: {
+      columns: [
+        { key: 'concept',  label: 'HAAT Concept',     width: 0.26 },
+        { key: 'value_m',  label: 'Value (m)',        width: 0.10 },
+        { key: 'source',   label: 'Source',           width: 0.26 },
+        { key: 'role',     label: 'Role',             width: 0.18 },
+        { key: 'controls', label: 'Controls Filing?', width: 0.20 }
+      ],
+      rows: tableRows
+    },
+    summary: summaryParts.join('\n\n'),
+    // Machine-readable pass-through (unchanged shape for downstream consumers).
     haat_conflict_status: ha.haat_conflict_status,
     filing_controlling_haat_m:     ha.filing_controlling_haat_m,
     filing_controlling_haat_basis: ha.filing_controlling_haat_basis

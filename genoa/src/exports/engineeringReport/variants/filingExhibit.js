@@ -51,6 +51,9 @@ export function applyFilingExhibitVariant(doc){
     variant:  'filing_exhibit',
     subtitle: doc.meta?.subtitle || 'FCC Propagation Study'
   };
+  // Internal QA surfaces (exhibit maturity score) never ship in the
+  // filing-facing document model.
+  delete meta.internal_qa;
   return { meta, sections };
 }
 
