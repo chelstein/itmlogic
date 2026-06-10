@@ -1665,7 +1665,12 @@ export async function runSiteOptimizer(body = {}){
     coq_n_weekly_duties:                c.am_operator_and_chief_operator_qualification_guide?.n_weekly_duties ?? null,
     coq_unattended_authorized:          c.am_operator_and_chief_operator_qualification_guide?.unattended_operation?.authorized ?? null,
     coq_n_mod_triggers:                 c.am_operator_and_chief_operator_qualification_guide?.n_modification_triggers ?? null,
-    coq_n_calendar_items:               c.am_operator_and_chief_operator_qualification_guide?.n_calendar_items ?? null
+    coq_n_calendar_items:               c.am_operator_and_chief_operator_qualification_guide?.n_calendar_items ?? null,
+    fsm_formal_proof_required:          c.am_field_strength_measurement_and_contour_verification_guide?.formal_proof_required ?? null,
+    fsm_n_radials:                      c.am_field_strength_measurement_and_contour_verification_guide?.n_radials_required ?? null,
+    fsm_total_measurements:             c.am_field_strength_measurement_and_contour_verification_guide?.total_field_measurements ?? null,
+    fsm_total_cost_low_usd:             c.am_field_strength_measurement_and_contour_verification_guide?.total_cost_low_usd ?? null,
+    fsm_filing_deadline_days:           c.am_field_strength_measurement_and_contour_verification_guide?.filing_deadline_days ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -29508,6 +29513,137 @@ async function scoreCandidate(pt, ctx, warnings){
         note: isDA
           ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: chief operator required (§73.1870); must review logs weekly and check antenna monitor readings. DA pattern modification requires prior CP/STA. Unattended operation authorized under §73.801 with remote control.`
           : `NDA station at ${frequency_khz} kHz: chief operator required (§73.1870); weekly log review and transmitter power verification. Transmitter modifications to power or antenna require prior FCC authorization (§73.1690). Unattended operation authorized under §73.801.`
+      };
+    })(),
+
+    am_field_strength_measurement_and_contour_verification_guide: (() => {
+      // Field strength measurement and contour verification for AM stations
+      // following construction permit (CP) buildout.
+      //
+      // 47 CFR §73.154 — Proof of performance (applicability and filing).
+      //   After CP grant and initial operation, the licensee must file proof of
+      //   performance measurements unless the station is NDA and FCC does not
+      //   require a proof.  For DA stations, proof must be filed within 90 days
+      //   of commencing operation under the new license.
+      //
+      // 47 CFR §73.151 — Field strength measurements (DA stations).
+      //   Formal proof requires radial field-strength measurements taken at
+      //   distances along each FCC-specified radial.  Measurements must be:
+      //   - At least 3 points per radial (near, mid, and at/beyond licensed contour)
+      //   - GPS-logged with coordinates and time stamps
+      //   - Taken with a calibrated field strength meter
+      //   - Corrected for inverse-distance variation (E × d vs distance curve)
+      //
+      // 47 CFR §73.315 — AM field strength measurement methodology.
+      //   - Measurements must be taken on open, level terrain ≥ 30 m from structures
+      //   - Rod antenna height: 1 meter above ground
+      //   - Multiple readings (≥ 3) averaged per point
+      //   - Avoid wet ground conditions (within 24h of rain)
+      //   - Log ambient noise floor at each measurement location
+      //
+      // Post-CP contour verification (non-DA stations):
+      //   NDA stations are NOT required to file formal proof measurements unless
+      //   the FCC specifically orders it.  However, the licensee should conduct
+      //   internal spot-check measurements to verify:
+      //   (a) The city of license receives the licensed field strength
+      //   (b) Protected contour distances match the license
+      //   This provides documented defense against any future interference complaint.
+      //
+      // Groundwave field strength calculation (ITU-R P.368 / FCC M3 curves):
+      //   The FCC uses M3 conductivity curves for AM groundwave contours.
+      //   Field strength at distance d (km) decreases approximately as:
+      //     E(d) = E₀ × f(d, σ) where f is the Sommerfeld attenuation function.
+      //   Measured values should match within ±3 dB of the calculated contour.
+      //
+      // NRSC measurement protocol (industry standard):
+      //   - Use Potomac Instruments FIM-41/FIM-71 or equivalent
+      //   - Calibration certificate must be < 12 months old
+      //   - Station must be at 100% modulation with reference tone during measurement
+      //
+      // References:
+      //   47 CFR §73.151; §73.154; §73.315
+      //   ITU-R P.368-10; FCC M3 conductivity maps; NRSC AM Field Measurement Protocol
+
+      const isDA     = /^DA/i.test(pattern_mode);
+      const isDAN    = /^DA-N/i.test(pattern_mode);
+      const isDA2    = /^DA-2/i.test(pattern_mode);
+      const isNDA    = !isDA;
+
+      // Formal proof required?
+      const formal_proof_required = isDA;
+      const proof_trigger         = isDA ? 'After DA antenna system installed, modified, or replaced per §73.154' : 'Only if FCC orders per §73.152';
+      const filing_deadline_days  = isDA ? 90 : null;
+
+      // Radials for DA proof
+      const n_da_towers = isDA2 ? 3 : (isDA ? 2 : 1);
+      const radial_step_deg = n_da_towers >= 4 ? 5 : 10;
+      const n_radials_required = isDA ? Math.round(360 / radial_step_deg) : 0;
+
+      // Points per radial (§73.151 minimum)
+      const MIN_POINTS_PER_RADIAL = 3;
+      const total_field_measurements = n_radials_required * MIN_POINTS_PER_RADIAL;
+
+      // Spot check for NDA — recommended even though not required
+      const nda_spot_check_radials   = isNDA ? 8  : 0;
+      const nda_spot_check_points    = isNDA ? 16 : 0;
+
+      // Field strength meter
+      const RECOMMENDED_METERS = [
+        { model: 'Potomac Instruments FIM-41', range_khz: '200–3000', accuracy_db: 1.5, cost_usd: 3200 },
+        { model: 'Potomac Instruments FIM-71', range_khz: '300–1800', accuracy_db: 1.0, cost_usd: 5800 },
+        { model: 'Rohde & Schwarz FPC-1500 (with AM probe)', range_khz: '10–3000', accuracy_db: 2.0, cost_usd: 2200 }
+      ];
+      const recommended_meter = RECOMMENDED_METERS[0];  // standard FIM-41
+
+      // Measurement conditions checklist
+      const MEASUREMENT_CONDITIONS = [
+        { condition: 'Open terrain — ≥ 30 m from buildings, trees, utility lines', required: true, cfr: '§73.315' },
+        { condition: 'Dry ground — no rain within 24 hours', required: true, cfr: '§73.315' },
+        { condition: 'Antenna height 1 m above ground; oriented vertically', required: true, cfr: '§73.315' },
+        { condition: 'GPS coordinates logged at each point (sub-meter preferred)', required: true, cfr: '§73.151' },
+        { condition: 'Station at 100% modulation (400 Hz or 1 kHz reference tone)', required: true, cfr: 'NRSC protocol' },
+        { condition: 'At least 3 readings averaged per point', required: true, cfr: '§73.315' },
+        { condition: 'Calibration certificate for field strength meter < 12 months', required: true, cfr: '§73.151' },
+        { condition: 'Ambient noise floor logged at each point', required: false, cfr: 'NRSC recommended' }
+      ];
+
+      // Cost estimate
+      const FIELD_CREW_RATE_PER_RADIAL = isDA ? { low: 800, high: 1400 } : { low: 300, high: 600 };
+      const n_radials_for_cost = isDA ? n_radials_required : nda_spot_check_radials;
+      const field_crew_cost_usd = {
+        low:  round2(FIELD_CREW_RATE_PER_RADIAL.low  * n_radials_for_cost),
+        high: round2(FIELD_CREW_RATE_PER_RADIAL.high * n_radials_for_cost)
+      };
+      const engineer_review_cost_usd = isDA ? { low: 2000, high: 3500 } : { low: 800, high: 1500 };
+      const fcc_filing_fee_usd = isDA ? 0 : 0;  // no FCC fee for proof filing
+
+      const total_cost_low_usd  = round2(field_crew_cost_usd.low  + engineer_review_cost_usd.low);
+      const total_cost_high_usd = round2(field_crew_cost_usd.high + engineer_review_cost_usd.high);
+
+      return {
+        fcc_class, frequency_khz, tpo_kw, pattern_mode,
+        is_da_station:                  isDA,
+        formal_proof_required,
+        proof_trigger,
+        filing_deadline_days,
+        radial_step_deg:                isDA ? radial_step_deg : null,
+        n_radials_required,
+        min_points_per_radial:          MIN_POINTS_PER_RADIAL,
+        total_field_measurements,
+        nda_spot_check_radials,
+        nda_spot_check_points,
+        recommended_meter,
+        measurement_conditions:         MEASUREMENT_CONDITIONS,
+        n_required_conditions:          MEASUREMENT_CONDITIONS.filter(c => c.required).length,
+        field_crew_cost_usd,
+        engineer_review_cost_usd,
+        fcc_filing_fee_usd,
+        total_cost_low_usd,
+        total_cost_high_usd,
+        reference: '47 CFR §73.151; §73.154; §73.315; ITU-R P.368-10; NRSC AM Field Measurement Protocol',
+        note: isDA
+          ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: formal proof required within ${filing_deadline_days} days of initial operation — ${n_radials_required} radials at ${radial_step_deg}° steps, ${MIN_POINTS_PER_RADIAL} points/radial (${total_field_measurements} measurements). File via FCC Form 302-AM.`
+          : `NDA station at ${frequency_khz} kHz: formal proof not required (§73.152) unless FCC orders. Recommend ${nda_spot_check_radials} spot-check radials internally to verify COL coverage and document compliance.`
       };
     })(),
 
