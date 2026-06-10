@@ -1778,7 +1778,11 @@ export async function runSiteOptimizer(body = {}){
     atu_n_towers:                       c.am_antenna_phasing_unit_installation_guide?.n_towers ?? null,
     atu_phase_tolerance_deg:            c.am_antenna_phasing_unit_installation_guide?.phase_tolerance_deg ?? null,
     atu_n_installation_steps:           c.am_antenna_phasing_unit_installation_guide?.n_installation_steps ?? null,
-    atu_total_low_usd:                  c.am_antenna_phasing_unit_installation_guide?.cost_estimates?.total_low_usd ?? null
+    atu_total_low_usd:                  c.am_antenna_phasing_unit_installation_guide?.cost_estimates?.total_low_usd ?? null,
+    tlm_line_type:                      c.am_transmission_line_coax_maintenance_guide?.line_type ?? null,
+    tlm_inspection_interval_months:     c.am_transmission_line_coax_maintenance_guide?.inspection_interval_months ?? null,
+    tlm_n_failure_modes:                c.am_transmission_line_coax_maintenance_guide?.n_failure_modes ?? null,
+    tlm_annual_low_usd:                 c.am_transmission_line_coax_maintenance_guide?.cost_estimates?.annual_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -32049,6 +32053,67 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.62; §73.68; §73.154',
         note: `${n_towers}-tower DA ATU. §73.68 tolerances: ±${PHASE_TOL_DEG}° phase, ±${RATIO_TOL_PCT}% ratio. ${n_installation_steps} installation steps. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_transmission_line_coax_maintenance_guide: (() => {
+      // §73.1580: Chief Operator must establish maintenance schedule for all RF transmission
+      // equipment including coaxial feed line, ATU, and tower base switches.
+      // AM sites typically use open-wire feeders or coaxial lines 50–200 ft long.
+      const isDA     = /^DA/i.test(pattern_mode ?? '');
+      const tpo      = tpo_kw ?? 1;
+      const dist_km  = pt.distance_from_current_km ?? 10;
+
+      // Transmission line type based on power level
+      const line_type =
+        tpo >= 50 ? 'RIGID_COAX_6IN'   :
+        tpo >= 10 ? 'HARDLINE_3IN'      :
+        isDA      ? 'HARDLINE_1_5IN'    : 'FLEXIBLE_COAX_7_8IN';
+
+      // Estimated line length: typically 50–200 ft from transmitter building to ATU
+      const BUILDING_DISTANCE_FT = round2(30 + dist_km * 2);   // proxy
+      const line_length_ft = Math.min(BUILDING_DISTANCE_FT, 200);
+
+      // Maintenance intervals per §73.1580
+      const inspection_interval_months  = tpo >= 10 ? 3 : 6;
+      const connector_torque_interval   = 'Semi-annual';
+      const vswr_test_interval          = 'Annual (or after any RF work)';
+
+      // Common failure modes
+      const failure_modes = [
+        'Connector oxidation and loosening (moisture ingress)',
+        'Insulator surface tracking from RF arcing',
+        'Outer conductor corrosion (burial / ground contact sections)',
+        'Dielectric foam breakdown in high-humidity environments',
+      ];
+      if (isDA) failure_modes.push('ATU/phasor network component aging (capacitors, inductors)');
+
+      // Maintenance cost per year
+      const ANNUAL_LABOR_LOW  = round2(tpo >= 10 ? 1500 : 800);
+      const ANNUAL_LABOR_HIGH = round2(tpo >= 10 ? 4000 : 2000);
+      const SPARE_PARTS_LOW   = 300;
+      const SPARE_PARTS_HIGH  = round2(isDA ? 1500 : 800);
+      const annual_low_usd    = round2(ANNUAL_LABOR_LOW  + SPARE_PARTS_LOW);
+      const annual_high_usd   = round2(ANNUAL_LABOR_HIGH + SPARE_PARTS_HIGH);
+
+      return {
+        line_type,
+        line_length_ft,
+        inspection_interval_months,
+        connector_torque_interval,
+        vswr_test_interval,
+        n_failure_modes:      failure_modes.length,
+        failure_modes,
+        cost_estimates: {
+          annual_labor_low_usd:  ANNUAL_LABOR_LOW,
+          annual_labor_high_usd: ANNUAL_LABOR_HIGH,
+          spare_parts_low_usd:   SPARE_PARTS_LOW,
+          spare_parts_high_usd:  SPARE_PARTS_HIGH,
+          annual_low_usd,
+          annual_high_usd,
+        },
+        reference: '47 CFR §73.1580; §73.1590; ARRL Handbook — Transmission Line Maintenance',
+        note: `Line type: ${line_type} (${line_length_ft} ft). Inspect every ${inspection_interval_months} months. VSWR test: ${vswr_test_interval}. ${failure_modes.length} monitored failure modes. Annual cost: $${annual_low_usd.toLocaleString()}–$${annual_high_usd.toLocaleString()}.`
       };
     })(),
 
