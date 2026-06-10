@@ -17252,3 +17252,55 @@ test('#108 candidate_comparison_table has tbs_* columns', async () => {
     assert.ok('tbs_heat_w'            in row, 'tbs_heat_w missing');
   }
 });
+
+// ---- Feature #109: am_total_project_capital_cost_rollup_guide ----
+
+test('#109 KAZM: capital cost rollup present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cap = out.candidates[0].am_total_project_capital_cost_rollup_guide;
+  assert.ok(cap, 'am_total_project_capital_cost_rollup_guide must be present');
+  assert.ok(Array.isArray(cap.components) && cap.components.length >= 5, 'must have at least 5 cost components');
+  assert.ok(cap.total_usd?.low > 0, 'total_usd.low must be positive');
+  assert.ok(cap.total_usd?.high > cap.total_usd?.low, 'high estimate must exceed low');
+  assert.ok(typeof cap.dominant_cost === 'string', 'dominant_cost must be a string');
+  assert.strictEqual(cap.contingency_pct, 15, 'contingency must be 15%');
+});
+
+test('#109 total is subtotal × 1.15 (15% contingency)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cap = out.candidates[0].am_total_project_capital_cost_rollup_guide;
+  assert.ok(Math.abs(cap.total_usd.low - Math.round(cap.subtotal_usd.low * 1.15)) <= 1,
+    'total_low must equal round(subtotal_low × 1.15)');
+  assert.ok(Math.abs(cap.total_usd.high - Math.round(cap.subtotal_usd.high * 1.15)) <= 1,
+    'total_high must equal round(subtotal_high × 1.15)');
+});
+
+test('#109 DA station has higher total cost than NDA at same power', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const capDA  = outDA.candidates[0].am_total_project_capital_cost_rollup_guide;
+  const capNDA = outNDA.candidates[0].am_total_project_capital_cost_rollup_guide;
+  assert.ok(capDA.total_usd.low > capNDA.total_usd.low,
+    `DA total (${capDA.total_usd.low}) must exceed NDA total (${capNDA.total_usd.low})`);
+  assert.ok(capDA.n_towers > capNDA.n_towers, 'DA must have more towers than NDA');
+});
+
+test('#109 low-frequency station has higher total cost than high-frequency (more wire)', async () => {
+  const outLow  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const outHigh = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const capLow  = outLow.candidates[0].am_total_project_capital_cost_rollup_guide;
+  const capHigh = outHigh.candidates[0].am_total_project_capital_cost_rollup_guide;
+  assert.ok(capLow.total_usd.low > capHigh.total_usd.low,
+    `540 kHz total cost (${capLow.total_usd.low}) must exceed 1600 kHz (${capHigh.total_usd.low})`);
+});
+
+test('#109 candidate_comparison_table has cap_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cap_total_low_usd'    in row, 'cap_total_low_usd missing');
+    assert.ok('cap_total_high_usd'   in row, 'cap_total_high_usd missing');
+    assert.ok('cap_n_towers'         in row, 'cap_n_towers missing');
+    assert.ok('cap_dominant_cost'    in row, 'cap_dominant_cost missing');
+    assert.ok('cap_contingency_pct'  in row, 'cap_contingency_pct missing');
+  }
+});

@@ -1611,6 +1611,11 @@ export async function runSiteOptimizer(body = {}){
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
     cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    cap_total_low_usd:                  c.am_total_project_capital_cost_rollup_guide?.total_usd?.low ?? null,
+    cap_total_high_usd:                 c.am_total_project_capital_cost_rollup_guide?.total_usd?.high ?? null,
+    cap_n_towers:                       c.am_total_project_capital_cost_rollup_guide?.n_towers ?? null,
+    cap_dominant_cost:                  c.am_total_project_capital_cost_rollup_guide?.dominant_cost ?? null,
+    cap_contingency_pct:                c.am_total_project_capital_cost_rollup_guide?.contingency_pct ?? null,
     tbs_floor_area_m2:                  c.am_transmitter_building_specification_guide?.floor_area_m2 ?? null,
     tbs_hvac_tons:                      c.am_transmitter_building_specification_guide?.hvac_tons ?? null,
     tbs_gen_std_kw:                     c.am_transmitter_building_specification_guide?.generator?.recommended_std_kw ?? null,
@@ -27508,6 +27513,126 @@ async function scoreCandidate(pt, ctx, warnings){
         form:                         'FCC Form 301-AM',
         reference:                    '47 CFR §73.182; §73.316; §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
         note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Quarter-wave tower: ${quarter_wave_height_m}m (${asr_required ? 'ASR required' : 'ASR likely not required'}). Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
+      };
+    })(),
+
+    am_total_project_capital_cost_rollup_guide: (() => {
+      // Total project capital cost rollup for AM relocation.
+      //
+      // Rolls up the major cost components of an AM broadcast site build-out
+      // into a single summary with low and high estimates.  This is SCREENING
+      // GRADE — actual costs depend on site conditions, contractor rates,
+      // tower type, soil, and permitting complexity.
+      //
+      // Cost components:
+      //   1. Tower: λ/4 guyed monopole (most common NDA); DA adds tower(s)
+      //   2. Ground radial system: 90-radial standard (λ/4 radials)
+      //   3. Transmitter building: prefab shelter including HVAC/generator
+      //   4. Transmitter equipment: main + spare by power class
+      //   5. ATU (antenna tuning unit) + phasor (DA only)
+      //   6. Engineering + FCC filing fees
+      //   7. Construction project management + contingency (15%)
+      //   8. Site access road / utility connection (flat estimate)
+      //
+      // Tower cost model (guyed monopole, turn-key):
+      //   Low-power (h < 50m):   $120–$180k
+      //   Medium (50–100m):      $220–$360k
+      //   Tall (100–150m):       $350–$600k
+      //   Very tall (>150m):     $550–$900k
+      // DA stations add one tower per additional pattern element:
+      //   Each additional tower: ~0.6× primary tower cost
+      //
+      // Transmitter equipment:
+      //   <1 kW:    $18k–$35k
+      //   1–5 kW:   $35k–$80k
+      //   5–25 kW:  $80k–$200k
+      //   25–50 kW: $180k–$380k
+      //   >50 kW:   $350k–$700k
+      //
+      // ATU + phasor (DA only): $25k–$65k
+
+      const isDA = /^DA/i.test(pattern_mode);
+      const lambda_m    = round2(300000 / frequency_khz);
+      const qwave_h_m   = round2(lambda_m / 4);
+
+      // Tower cost
+      const towerCost = (h) => {
+        if (h < 50)  return { low: 120000, high: 180000 };
+        if (h < 100) return { low: 220000, high: 360000 };
+        if (h < 150) return { low: 350000, high: 600000 };
+        return          { low: 550000, high: 900000 };
+      };
+      const primaryTower = towerCost(qwave_h_m);
+      // DA: estimate 2 towers for DA-N/DA-2, 3 for DA-D
+      const n_towers = /^DA-D/i.test(pattern_mode) ? 3 : isDA ? 2 : 1;
+      const extra_towers = n_towers - 1;
+      const tower_low  = primaryTower.low  + Math.round(extra_towers * primaryTower.low  * 0.6);
+      const tower_high = primaryTower.high + Math.round(extra_towers * primaryTower.high * 0.6);
+
+      // Ground radial system (90-radial standard)
+      const radial_length_m = round2(lambda_m / 4);
+      const gnd_wire_m      = 90 * radial_length_m;
+      const gnd_low  = Math.round(gnd_wire_m * 2.80);
+      const gnd_high = Math.round(gnd_wire_m * 4.20);
+
+      // Transmitter building (prefab + site)
+      const bldg_area   = (tpo_kw < 1 ? 12 : tpo_kw <= 5 ? 25 : tpo_kw <= 25 ? 40 : 60) + (isDA ? 20 : 0);
+      const bldg_low    = Math.round(bldg_area * 350 + 15000);
+      const bldg_high   = Math.round(bldg_area * 550 + 35000);
+
+      // Transmitter equipment
+      const txCost = (p) => {
+        if (p < 1)  return { low: 18000,  high: 35000  };
+        if (p <= 5) return { low: 35000,  high: 80000  };
+        if (p <= 25)return { low: 80000,  high: 200000 };
+        if (p <= 50)return { low: 180000, high: 380000 };
+        return         { low: 350000, high: 700000 };
+      };
+      const tx = txCost(tpo_kw);
+
+      // ATU + phasor
+      const atu_low  = isDA ? 25000 : 8000;
+      const atu_high = isDA ? 65000 : 20000;
+
+      // Engineering + FCC
+      const eng_low  = 5205;  // $3,500 + $1,705 FCC fee (base NDA)
+      const eng_high = isDA ? 20000 : 10000;
+
+      // Utility + road + site access
+      const access_low  = 15000;
+      const access_high = 50000;
+
+      // Sub-totals
+      const sub_low  = tower_low  + gnd_low  + bldg_low  + tx.low  + atu_low  + eng_low  + access_low;
+      const sub_high = tower_high + gnd_high + bldg_high + tx.high + atu_high + eng_high + access_high;
+
+      // Contingency 15%
+      const total_low  = Math.round(sub_low  * 1.15);
+      const total_high = Math.round(sub_high * 1.15);
+
+      const components = [
+        { item: 'Tower construction',     low: tower_low,  high: tower_high,  n_towers },
+        { item: 'Ground radial system',   low: gnd_low,    high: gnd_high,    n_radials: 90 },
+        { item: 'Transmitter building',   low: bldg_low,   high: bldg_high,   area_m2: bldg_area },
+        { item: 'Transmitter equipment',  low: tx.low,     high: tx.high,     tpo_kw },
+        { item: isDA ? 'ATU + phasor (DA)' : 'ATU',
+                                          low: atu_low,    high: atu_high },
+        { item: 'Engineering + FCC fees', low: eng_low,    high: eng_high },
+        { item: 'Site access/utilities',  low: access_low, high: access_high },
+      ];
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        is_da:      isDA,
+        n_towers,
+        quarter_wave_height_m: qwave_h_m,
+        components,
+        subtotal_usd:   { low: sub_low,   high: sub_high   },
+        contingency_pct: 15,
+        total_usd:      { low: total_low, high: total_high },
+        dominant_cost:  components.reduce((a, b) => (b.low > a.low ? b : a)).item,
+        reference:      'Screening-grade estimate; industry standard AM broadcast construction costs (2024 USD)',
+        note:           `Total est. project cost: $${total_low.toLocaleString()}–$${total_high.toLocaleString()} (incl. 15% contingency). Dominant cost: ${components.reduce((a, b) => (b.low > a.low ? b : a)).item}. ${n_towers} tower(s), ${isDA ? 'DA phasor included' : 'NDA'}.`
       };
     })(),
 

@@ -2356,6 +2356,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Total Project Capital Cost Rollup Guide */}
+        {candidate.am_total_project_capital_cost_rollup_guide && (() => {
+          const cap = candidate.am_total_project_capital_cost_rollup_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #166534', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#4ade80' }}>💰</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Total Project Capital Cost</span>
+                <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#4ade80', background: '#14532d', padding: '2px 10px', borderRadius: 4 }}>
+                  {fmtUsd(cap.total_usd?.low)}–{fmtUsd(cap.total_usd?.high)}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                {cap.components?.map(comp => (
+                  <span key={comp.item}>{comp.item}: <b style={{ color: '#e2e8f0' }}>{fmtUsd(comp.low)}–{fmtUsd(comp.high)}</b></span>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: '#4ade80', borderTop: '1px solid #166534', paddingTop: 6 }}>
+                Subtotal {fmtUsd(cap.subtotal_usd?.low)}–{fmtUsd(cap.subtotal_usd?.high)} + 15% contingency = <b>{fmtUsd(cap.total_usd?.low)}–{fmtUsd(cap.total_usd?.high)}</b>
+              </div>
+              <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>SCREENING GRADE · {cap.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter Building Specification Guide */}
         {candidate.am_transmitter_building_specification_guide && (() => {
           const tbs = candidate.am_transmitter_building_specification_guide;
