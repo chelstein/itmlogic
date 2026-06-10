@@ -4502,3 +4502,14 @@ test('am_noise_floor_and_interference_environment_survey_guide present across co
     assert.ok(g.cost_estimates?.total_low_usd > 0, 'survey cost must be positive');
   }
 });
+
+test('am_online_public_file_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_online_public_file_compliance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_online_public_file_compliance_guide');
+    assert.ok(g.n_triggered_on_relocation >= 5, 'relocation must trigger ≥5 OPIF categories');
+    assert.strictEqual(g.opif_update_deadline_days, 30, 'OPIF deadline must be 30 days');
+    assert.ok(g.cost_estimates?.total_low_usd > 0, 'OPIF compliance cost must be positive');
+  }
+});
