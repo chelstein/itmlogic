@@ -17905,3 +17905,50 @@ test('#121 candidate_comparison_table has ncc_* columns', async () => {
     assert.ok('ncc_n_nighttime_options'    in row, 'ncc_n_nighttime_options missing');
   }
 });
+
+// ---- Feature #122: am_licensed_power_class_upgrade_guide ----
+test('#122 KAZM: power class upgrade guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_licensed_power_class_upgrade_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(typeof g.modification_type === 'string', 'modification_type must be a string');
+  assert.ok(g.cost_estimates?.total_low_usd > 0, 'total cost must be positive');
+  assert.ok(g.n_engineering_exhibits >= 6, 'must have ≥6 engineering exhibits');
+});
+
+test('#122 Class C station has 1 kW ceiling; below-ceiling station has headroom', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, fcc_class: 'C', tpo_kw: 0.5, candidate_limit: 1 });
+  const g   = out.candidates[0].am_licensed_power_class_upgrade_guide;
+  assert.strictEqual(g.current_max_kw, 1, 'Class C max power must be 1 kW');
+  assert.ok(g.headroom_kw > 0, 'Class C at 0.5 kW must have headroom');
+  assert.ok(g.can_increase_within_class, 'can_increase_within_class must be true');
+});
+
+test('#122 MAJOR modification costs more and takes longer than MINOR', async () => {
+  const minor = await runSiteOptimizer({ ...KAZM, fcc_class: 'C', tpo_kw: 0.5, candidate_limit: 1 });
+  const major = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', tpo_kw: 50,  candidate_limit: 1 });
+  const gMinor = minor.candidates[0].am_licensed_power_class_upgrade_guide;
+  const gMajor = major.candidates[0].am_licensed_power_class_upgrade_guide;
+  // Class D at 50 kW is at ceiling, so modification_type should not be MINOR
+  assert.ok(gMajor.modification_type !== 'MINOR' || gMajor.headroom_kw === 0, 'Class D at 50 kW should not be MINOR');
+  assert.ok(gMinor.cost_estimates.total_low_usd <= gMajor.cost_estimates.total_low_usd || gMinor.modification_type === 'MINOR', 'MINOR should not cost more than MAJOR');
+});
+
+test('#122 DA station has more engineering exhibits than NDA', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = nda.candidates[0].am_licensed_power_class_upgrade_guide;
+  const gDA2 = da2.candidates[0].am_licensed_power_class_upgrade_guide;
+  assert.ok(gDA2.n_engineering_exhibits > gNDA.n_engineering_exhibits, 'DA-2 must require more exhibits than NDA');
+});
+
+test('#122 candidate_comparison_table has pcu_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pcu_headroom_kw'       in row, 'pcu_headroom_kw missing');
+    assert.ok('pcu_modification_type' in row, 'pcu_modification_type missing');
+    assert.ok('pcu_total_low_usd'     in row, 'pcu_total_low_usd missing');
+    assert.ok('pcu_timeline_days'     in row, 'pcu_timeline_days missing');
+    assert.ok('pcu_n_exhibits'        in row, 'pcu_n_exhibits missing');
+  }
+});

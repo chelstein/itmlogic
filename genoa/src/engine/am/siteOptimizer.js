@@ -1715,7 +1715,12 @@ export async function runSiteOptimizer(body = {}){
     ncc_exclusion_zone_applies:         c.am_nighttime_clear_channel_exclusion_zone_guide?.exclusion_zone_applies ?? null,
     ncc_exclusion_km:                   c.am_nighttime_clear_channel_exclusion_zone_guide?.nighttime_exclusion_km ?? null,
     ncc_daytime_only_required:          c.am_nighttime_clear_channel_exclusion_zone_guide?.daytime_only_required ?? null,
-    ncc_n_nighttime_options:            c.am_nighttime_clear_channel_exclusion_zone_guide?.n_nighttime_options ?? null
+    ncc_n_nighttime_options:            c.am_nighttime_clear_channel_exclusion_zone_guide?.n_nighttime_options ?? null,
+    pcu_headroom_kw:                    c.am_licensed_power_class_upgrade_guide?.headroom_kw ?? null,
+    pcu_modification_type:              c.am_licensed_power_class_upgrade_guide?.modification_type ?? null,
+    pcu_total_low_usd:                  c.am_licensed_power_class_upgrade_guide?.cost_estimates?.total_low_usd ?? null,
+    pcu_timeline_days:                  c.am_licensed_power_class_upgrade_guide?.timeline_days ?? null,
+    pcu_n_exhibits:                     c.am_licensed_power_class_upgrade_guide?.n_engineering_exhibits ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -30821,6 +30826,119 @@ async function scoreCandidate(pt, ctx, warnings){
         daytime_only_required: exclusion_zone_applies,
         reference: '47 CFR §73.26; §73.29; §73.182; §73.186',
         note: `${frequency_khz} kHz (${fcc_class}): ${is_clear_channel_freq ? 'CLEAR CHANNEL frequency' : 'Not a clear channel'}. ${exclusion_zone_applies ? `Class D on clear channel — nighttime exclusion zone ≈ ${nighttime_exclusion_km} km. Daytime-only or §73.182 DA pattern required.` : is_class_a ? 'Class A dominant — receives nighttime skywave protection.' : 'No clear-channel exclusion zone applies.'}`
+      };
+    })(),
+
+    am_licensed_power_class_upgrade_guide: (() => {
+      // Guide #122 — Licensed Power Class Upgrade
+      //
+      // A station may apply to increase its authorized power (and potentially
+      // its service class) by filing a modification application (FCC Form 301-AM).
+      // The upgrade must satisfy interference protection requirements and, for
+      // class upgrades, may require a rulemaking petition.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.21 — AM station classes.
+      //   Class A: 10–50 kW (dominant on clear channel), unlimited hours.
+      //   Class B: 0.25–50 kW (regional channel), unlimited hours.
+      //   Class C: 0.25–1 kW (local channel), unlimited hours.
+      //   Class D: 0.25–50 kW (secondary, daytime-only or limited nighttime).
+      //
+      // 47 CFR §73.24 — Licensing requirements.
+      //   A station must demonstrate it can serve the public interest with the
+      //   proposed power/class.  Power increases require showing no new
+      //   interference to existing stations.
+      //
+      // 47 CFR §73.3571 — Processing AM broadcast applications.
+      //   Power increase modifications are processed as minor (< certain
+      //   thresholds) or major (full rulemaking/Section 307(b) analysis).
+      //
+      // POWER CLASS UPGRADE PATHS
+      // ──────────────────────────
+      //   D → B:   Major modification; requires new interference study + rulemaking
+      //   D → C:   May be minor or major depending on power increase magnitude
+      //   C → B:   Major modification; channel change may be needed
+      //   B → A:   Requires petition for rulemaking; extremely rare
+      //   Any → same class, higher power: Minor if within class limits
+      //
+      // THRESHOLDS FOR MAJOR vs MINOR MODIFICATION
+      // ────────────────────────────────────────────
+      //   Minor: power increase ≤ 6 dB (×4 power) within same class
+      //   Major: power increase > 6 dB, class upgrade, or new DA requirement
+      //   Major modifications require full public notice and 30-day petition window
+      //
+      // ENGINEERING EXHIBITS REQUIRED (MODIFICATION APPLICATION)
+      // ──────────────────────────────────────────────────────────
+      //   1. Antenna system description (tower coordinates, height, base impedance)
+      //   2. Predicted contour map at proposed power (§73.183/§73.184)
+      //   3. Co-channel interference study (new proposed contours vs. existing)
+      //   4. Adjacent channel interference study (±10/20 kHz separations)
+      //   5. DA pattern data if directional antenna is proposed
+      //   6. Community of license coverage showing (5 mV/m to COL)
+      //   7. Environmental assessment if new tower or expanded ground system
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const tpo_kw_num = Number(tpo_kw) || 5;
+      const fc = fcc_class.toUpperCase();
+
+      // Current class power ceiling
+      const CLASS_MAX_KW = { A: 50, B: 50, C: 1, D: 50 };
+      const current_max_kw = CLASS_MAX_KW[fc] ?? 50;
+      const headroom_kw = round2(Math.max(0, current_max_kw - tpo_kw_num));
+      const headroom_db = headroom_kw > 0 ? round2(10 * Math.log10((tpo_kw_num + headroom_kw) / tpo_kw_num)) : 0;
+
+      // Can we increase power within the same class?
+      const can_increase_within_class = headroom_kw > 0;
+
+      // Is a class upgrade plausible?
+      const UPGRADE_PATH = {
+        D: { target: 'B or C', notes: 'Major modification required; new interference study' },
+        C: { target: 'B',      notes: 'Major modification; may need channel change' },
+        B: { target: 'A',      notes: 'Petition for rulemaking; extremely rare' },
+        A: { target: 'None',   notes: 'Already maximum class' },
+      };
+      const upgrade_path = UPGRADE_PATH[fc] ?? { target: 'Unknown', notes: '' };
+
+      // Modification type
+      const mod_type = headroom_db > 6 ? 'MAJOR' : can_increase_within_class ? 'MINOR' : 'CLASS_UPGRADE_REQUIRED';
+
+      // Engineering exhibit count
+      const n_exhibits = 6 + (is_da ? 1 : 0);  // +1 for DA pattern data
+
+      // Cost estimates
+      const ENG_LOW  = is_da ? 8000 : 5000;
+      const ENG_HIGH = is_da ? 20000 : 12000;
+      const LEGAL_LOW  = mod_type === 'MAJOR' ? 5000 : 2000;
+      const LEGAL_HIGH = mod_type === 'MAJOR' ? 15000 : 6000;
+      const FCC_FEE    = 1020;  // FY2024 application fee
+      const total_low  = round2(ENG_LOW  + LEGAL_LOW  + FCC_FEE);
+      const total_high = round2(ENG_HIGH + LEGAL_HIGH + FCC_FEE);
+
+      // Timeline
+      const timeline_days = mod_type === 'MAJOR' ? 180 : 60;
+
+      return {
+        current_class:         fc,
+        current_tpo_kw:        tpo_kw_num,
+        current_max_kw,
+        headroom_kw,
+        headroom_db,
+        can_increase_within_class,
+        upgrade_path,
+        modification_type:     mod_type,
+        n_engineering_exhibits: n_exhibits,
+        cost_estimates: {
+          engineering_low_usd:   ENG_LOW,
+          engineering_high_usd:  ENG_HIGH,
+          legal_low_usd:         LEGAL_LOW,
+          fcc_fee_usd:           FCC_FEE,
+          total_low_usd:         total_low,
+          total_high_usd:        total_high,
+        },
+        timeline_days,
+        reference: '47 CFR §73.21; §73.24; §73.3571; FCC Form 301-AM',
+        note: `${tpo_kw_num} kW (${fc}): ${can_increase_within_class ? `${headroom_kw} kW headroom within Class ${fc} (${headroom_db.toFixed(1)} dB). ` : 'At class power ceiling. '}Modification type: ${mod_type}. Cost est. $${total_low.toLocaleString()}–$${total_high.toLocaleString()}. Timeline ≈ ${timeline_days} days.`
       };
     })(),
 

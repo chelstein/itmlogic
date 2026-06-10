@@ -10824,6 +10824,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Licensed Power Class Upgrade Guide */}
+        {candidate.am_licensed_power_class_upgrade_guide && (() => {
+          const g = candidate.am_licensed_power_class_upgrade_guide;
+          const costs = g.cost_estimates || {};
+          const modColor = g.modification_type === 'MINOR' ? '#22c55e' : g.modification_type === 'MAJOR' ? '#f59e0b' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Licensed Power Class Upgrade (§73.21 / Form 301-AM)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CURRENT CLASS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>Class {g.current_class}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>POWER HEADROOM</span>
+                  <div style={{ color: g.headroom_kw > 0 ? '#22c55e' : '#f87171', fontSize: 11, fontWeight: 700 }}>
+                    {g.headroom_kw > 0 ? `+${g.headroom_kw} kW (${g.headroom_db?.toFixed(1)} dB)` : 'At ceiling'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MOD TYPE</span>
+                  <div style={{ color: modColor, fontSize: 11, fontWeight: 700 }}>{g.modification_type}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TIMELINE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.timeline_days} days</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {g.upgrade_path && (
+                <div style={{ color: '#94a3b8', fontSize: 9, marginBottom: 4 }}>
+                  <span style={{ color: '#64748b' }}>Upgrade path: </span>
+                  <span style={{ color: '#cbd5e1' }}>{g.upgrade_path.target}</span>
+                  {g.upgrade_path.notes && <span style={{ color: '#475569' }}> — {g.upgrade_path.notes}</span>}
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 9 }}>{g.n_engineering_exhibits} engineering exhibits required for modification application</div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
