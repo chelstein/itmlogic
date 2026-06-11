@@ -31639,9 +31639,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // FLOOD ZONE RISK PROXY
       // ─────────────────────
-      //   This guide uses distance from current site and latitude as a rough
-      //   proxy for flood risk (flat, low-lying coastal/river valley areas have
-      //   higher flood risk).  A real FEMA FIRM lookup requires coordinates.
+      //   This guide uses latitude as a rough proxy for flood risk (coastal/low-lying
+      //   areas near Gulf Coast, Southeast, and Great Lakes have higher FEMA Zone AE
+      //   density).  A real FEMA FIRM lookup requires coordinates.
       //
       // COST ESTIMATES
       //   FEMA FIRM flood zone determination: $500–$1,500
@@ -31653,14 +31653,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const dist_km = pt.distance_from_current_km ?? 0;
       const lat     = pt.lat ?? 39;  // fallback to mid-US latitude
 
-      // Flood risk proxy: coastal latitudes + low distances = higher risk
-      // This is a screening-grade proxy only; actual risk requires FIRM lookup
-      const isCoastalLat = lat < 35 || lat > 45;  // Gulf Coast, SE, or northern Great Lakes
-      const isLowlying   = dist_km < 20 && isCoastalLat;
-
+      // Flood risk proxy (screening-grade; actual risk requires FEMA FIRM lookup)
+      const isCoastalLat  = lat < 35 || lat > 45;  // Gulf Coast, SE, or northern Great Lakes
+      const isInlandLow   = lat >= 35 && lat <= 42 && (pt.lon ?? -95) > -100;  // MS/Ohio/Missouri river valleys
       const flood_risk_level =
-        isLowlying ? 'ELEVATED'
-        : isCoastalLat ? 'MODERATE'
+        isCoastalLat ? 'ELEVATED'
+        : isInlandLow ? 'MODERATE'
         : 'LOW';
 
       const ea_required_if_in_floodplain = true;
@@ -32250,7 +32248,7 @@ async function scoreCandidate(pt, ctx, warnings){
         'Remote control / unattended operation verified per §73.1350',
       ];
       if (isDA) emergency_checklist.push('Auxiliary NDA operation mode documented (§73.1680(a)(2))');
-      if (dist_km > 30) emergency_checklist.push('New site road access and emergency response route documented');
+      if (land_use_class === 'RURAL' || land_use_class === 'REMOTE') emergency_checklist.push('New site road access and emergency response route documented');
 
       const n_checklist_items = emergency_checklist.length;
 
