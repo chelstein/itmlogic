@@ -6997,7 +6997,7 @@ async function scoreCandidate(pt, ctx, warnings){
     // PASS, WARN, FAIL, or NOT_EVALUATED.
     regulatory_compliance_checklist: (() => {
       const ASR_M = 60.96;   // §17.7 200-ft threshold
-      const MPE_ERP_THRESHOLD_KW = 5.0;  // OET-65 / §1.1310 threshold for FM; AM threshold varies
+      const MPE_ERP_THRESHOLD_KW = 5.0;  // conservative formal-exhibit trigger; §1.1307(b) Table 1 actual AM threshold is > 1 kW
       const lambda_rc = 300000 / frequency_khz;
       const isHighClass_rc  = /^[AB]$/i.test(fcc_class);
       const designH_rc      = lambda_rc * (isHighClass_rc ? 0.625 : 0.375);
@@ -7046,14 +7046,15 @@ async function scoreCandidate(pt, ctx, warnings){
           `Class ${fcc_class} design height ${round2(designH_rc)} m at ${frequency_khz} kHz — below the 60.96 m (200 ft) §17.7 ASR threshold. ASR registration not required at standard height.`);
 
       // 4. RF exposure (MPE) — §1.1310 / OET Bulletin 65
-      // AM stations > 5 kW ERP must conduct MPE evaluation (general pop uncontrolled limits).
+      // §1.1307(b): AM broadcast ERP > 1 kW requires routine MPE evaluation (general pop/uncontrolled).
+      // This checklist uses 5 kW as a conservative formal-exhibit flag; 1–5 kW stations must also evaluate.
       const mpeRequired_rc = tpo_kw >= MPE_ERP_THRESHOLD_KW;
       const i4 = mpeRequired_rc
         ? item('mpe_evaluation', 'RF exposure MPE evaluation', '47 CFR §1.1310 / OET Bulletin 65', 'WARN',
-          `TPO = ${tpo_kw} kW ≥ 5 kW threshold. Routine MPE evaluation (field-strength measurement or calculation) is required before license grant. General population/uncontrolled limits apply beyond the antenna base exclusion zone.`,
+          `TPO = ${tpo_kw} kW ≥ 5 kW (formal exhibit threshold; §1.1307(b) Table 1 actual AM threshold is > 1 kW). Routine MPE evaluation required before license grant. General population/uncontrolled limits apply beyond the antenna base exclusion zone.`,
           'Compute uncontrolled MPE limit distance from antenna base; fence or post exclusion zone signage per OET-65 guidance.')
         : item('mpe_evaluation', 'RF exposure MPE evaluation', '47 CFR §1.1310 / OET Bulletin 65', 'PASS',
-          `TPO = ${tpo_kw} kW < 5 kW screening threshold. Simplified MPE evaluation typically sufficient; confirm with Form 302-AM.`);
+          `TPO = ${tpo_kw} kW below 5 kW formal-exhibit threshold. ${tpo_kw > 1 ? '§1.1307(b) Table 1 requires evaluation (> 1 kW AM); retain OET-65 calculation on file.' : 'Categorically excluded per §1.1307(b) (≤ 1 kW).'}`);
 
       // 5. Nighttime NIF study — §73.182
       const nifRequired_rc = !isLocal_rc;  // all non-local channels require NIF at new site
@@ -7696,8 +7697,8 @@ async function scoreCandidate(pt, ctx, warnings){
         measurement_method: 'Calibrated broadband or narrowband field meter (e.g., Narda, ETS-Lindgren)',
         exclusion_zone_m:    round2(towerH_pp * 0.10),  // ~10% of tower height as rough MPE boundary
         note: mpe_required
-          ? `TPO = ${tpo_kw} kW ≥ 5 kW threshold. RF exposure (MPE) evaluation required. Measure field strength at accessible locations within and around the antenna exclusion zone. Post MPE warning signs at exclusion zone perimeter. Submit MPE evaluation with Form 302-AM.`
-          : `TPO = ${tpo_kw} kW < 5 kW. MPE evaluation simplified — confirm compliance with occupational (controlled) limits at base of antenna. General public (uncontrolled) limits apply at fence/accessible areas.`
+          ? `TPO = ${tpo_kw} kW ≥ 5 kW (formal exhibit threshold; §1.1307(b) Table 1 actual AM threshold > 1 kW). RF exposure evaluation required. Measure field strength at accessible locations within and around the antenna exclusion zone. Post MPE warning signs at exclusion zone perimeter. Submit MPE evaluation with Form 302-AM.`
+          : `TPO = ${tpo_kw} kW below 5 kW formal-exhibit threshold. ${tpo_kw > 1 ? '§1.1307(b) Table 1 requires evaluation for AM ERP > 1 kW; retain OET-65 on file.' : 'Categorically excluded per §1.1307(b) (≤ 1 kW).'}`
       };
 
       // Antenna pattern proof specifics
@@ -8026,9 +8027,12 @@ async function scoreCandidate(pt, ctx, warnings){
     am_rf_exposure_mpe_guide: (() => {
       // AM RF Exposure (MPE) Evaluation Guide.
       //
-      // §1.1310 requires a Maximum Permissible Exposure (MPE) evaluation for
-      // any AM broadcast station with ERP ≥ 5 kW (daytime TPO is used as ERP
-      // for AM; AM antennas typically have near-unity gain relative to isotropic).
+      // §1.1307(b) Table 1 requires a routine MPE evaluation for AM broadcast
+      // stations with ERP > 1 kW (daytime TPO is used as ERP for AM; AM antennas
+      // typically have near-unity gain relative to isotropic).  Stations ≤ 1 kW ERP
+      // are categorically excluded per §1.1307(b).  This section uses a conservative
+      // 5 kW threshold as the trigger for formal filing exhibit preparation; stations
+      // between 1 kW and 5 kW must still evaluate — retain the OET-65 calculation on file.
       //
       // OET Bulletin 65 (1997 ed.) provides the methodology:
       //   - OET Bulletin 65 / 47 CFR §1.1310 Table 1 E-field limits:
@@ -8037,12 +8041,14 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Near-field evaluation radius: the reactive near-field extends to ~λ/2π
       //   - Far-field safe distance (fenced zone): d = sqrt(30 × P_W × G) / E_limit [m]
       //
-      // FCC rule: ERP ≥ 5 kW daytime → formal RF exposure evaluation and
-      // submittal with FCC Form 301-AM as an engineering exhibit.
-      // Stations < 5 kW are categorically excluded (CE) under §1.1306.
+      // Per §1.1307(b) Table 1: AM broadcast ERP > 1 kW requires routine evaluation.
+      // Stations ≤ 1 kW ERP are categorically excluded per §1.1307(b).
+      // This guide flags formal exhibit preparation for stations ≥ 5 kW ERP as a
+      // conservative screening choice; 1–5 kW stations must evaluate but may use
+      // simplified methods — retain the OET-65 calculation on file.
       //
       // Key outputs:
-      //   - Whether MPE evaluation is required (ERP ≥ 5 kW threshold)
+      //   - Whether MPE evaluation is required (ERP > 1 kW per §1.1307(b); ≥ 5 kW flags formal exhibit)
       //   - Estimated controlled and uncontrolled fenced distances
       //   - Evaluation type: near-field prediction, far-field analytic, full site study
       //   - Consultant cost and timeline estimates
@@ -8050,7 +8056,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz     = frequency_khz / 1000;        // e.g., 0.780 MHz for 780 kHz
       const erp_kw       = tpo_kw;                      // AM ERP ≈ TPO (near-unity gain)
 
-      // §1.1306 categorical exclusion threshold: 5 kW ERP for general population
+      // §1.1307(b) Table 1: categorical exclusion for AM broadcast ≤ 1 kW ERP.
+      // Conservative formal-exhibit trigger used here: ≥ 5 kW (stations 1–5 kW must still evaluate)
       const mpe_required = erp_kw >= 5;
 
       // OET Bulletin 65 / 47 CFR §1.1310 Table 1 MPE E-field limits:
@@ -8110,7 +8117,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Key checklist
       const checklist = [
-        { item: `ERP threshold check (≥ 5 kW → evaluation required)`, status: mpe_required ? 'REQUIRED' : 'CE', ref: '§1.1306; §1.1310' },
+        { item: `ERP threshold check (> 1 kW → evaluation required per §1.1307(b); ≥ 5 kW → formal filing exhibit)`, status: mpe_required ? 'REQUIRED' : 'CE', ref: '§1.1307(b); §1.1310' },
         { item: `Controlled MPE limit: ${e_limit_ctrl_vm} V/m (at ${frequency_khz} kHz)`, status: 'INFO', ref: 'OET Bulletin 65' },
         { item: `Uncontrolled MPE limit: ${e_limit_unctrl_vm} V/m (at ${frequency_khz} kHz)`, status: 'INFO', ref: 'OET Bulletin 65' },
         { item: mpe_required ? `Uncontrolled safe distance: ${d_unctrl_m} m (${d_unctrl_ft} ft)` : 'CE — no safe distance calc required', status: mpe_required ? 'REQUIRED' : 'CE', ref: 'OET Bulletin 65' },
@@ -8143,10 +8150,10 @@ async function scoreCandidate(pt, ctx, warnings){
         eval_cost_low_usd,
         eval_cost_high_usd,
         checklist,
-        reference: '47 CFR §1.1310 (MPE); §1.1306 (categorical exclusion); OET Bulletin 65 (1997, ed. 97-01); FCC Form 301-AM instructions',
+        reference: '47 CFR §1.1307(b) Table 1 (categorical exclusion ≤ 1 kW ERP for AM broadcast); §1.1310 (MPE limits); OET Bulletin 65 (1997, ed. 97-01); FCC Form 301-AM instructions',
         note: mpe_required
-          ? `Class ${fcc_class} @ ${erp_kw} kW — MPE evaluation required. Uncontrolled boundary: ${d_unctrl_m} m. Eval type: ${eval_type}. Cost: $${eval_cost_low_usd.toLocaleString()}–$${eval_cost_high_usd.toLocaleString()}.`
-          : `Class ${fcc_class} @ ${erp_kw} kW — Categorically Excluded (< 5 kW ERP threshold). No formal MPE evaluation required.`
+          ? `Class ${fcc_class} @ ${erp_kw} kW — MPE evaluation required (formal exhibit threshold ≥ 5 kW; §1.1307(b) actual threshold is > 1 kW). Uncontrolled boundary: ${d_unctrl_m} m. Eval type: ${eval_type}. Cost: $${eval_cost_low_usd.toLocaleString()}–$${eval_cost_high_usd.toLocaleString()}.`
+          : `Class ${fcc_class} @ ${erp_kw} kW — below formal exhibit threshold (< 5 kW). ${erp_kw > 1 ? 'NOTE: ERP > 1 kW — §1.1307(b) evaluation required; retain OET-65 calculation on file.' : 'Categorically excluded per §1.1307(b) (≤ 1 kW ERP).'}`
       };
     })(),
 
@@ -13537,7 +13544,7 @@ async function scoreCandidate(pt, ctx, warnings){
         evaluation_cost_low_usd,
         evaluation_cost_high_usd,
         reference: '47 CFR §1.1307(b) (categorical exclusion ≤ 1 kW); §1.1310 (MPE limits — GP: 614 V/m / 100 mW/cm² flat for 0.3–1.34 MHz; OC: 1842 V/m / 900 mW/cm² flat for 0.3–3 MHz); OET Bulletin 65 Ed. 97-01; IEEE C95.1-2019',
-        note: `ERP ~${erp_kw} kW → GP exclusion zone ~${exclusion_radius_m_general} m; OC zone ~${exclusion_radius_m_controlled} m. Formal §1.1310 evaluation ${evaluation_required ? 'REQUIRED (ERP > 5 kW)' : 'not required at this ERP — retain calculation on file'}. GP MPE: ${mpe_general_v_per_m} V/m (${mpe_general_mw_cm2} mW/cm²).`
+        note: `ERP ~${erp_kw} kW → GP exclusion zone ~${exclusion_radius_m_general} m; OC zone ~${exclusion_radius_m_controlled} m. Formal filing exhibit ${evaluation_required ? 'REQUIRED (ERP ≥ 5 kW; §1.1307(b) Table 1 threshold is 1 kW — retain OET-65 calculation for all stations > 1 kW)' : 'not flagged at this ERP — if ERP > 1 kW, retain OET-65 calculation on file per §1.1307(b)'}. GP MPE: ${mpe_general_v_per_m} V/m (${mpe_general_mw_cm2} mW/cm²).`
       };
     })(),
 
@@ -26589,7 +26596,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const POST_CONSTRUCTION = [
         { id: 'FORM_302_AM',   phase: 'POST_CONSTRUCTION', form: 'FCC Form 302-AM',       required: true,  fee_usd: 0, description: 'License to cover construction permit. Filed after construction; must include field strength measurements per §73.154.' },
         { id: 'DA_PROOF',      phase: 'POST_CONSTRUCTION', form: 'DA Proof of Performance', required: isDA_rc, description: 'DA field strength traversal (72 radials × 8 measurement points each per §73.154). Must be within 6 months of CP grant.' },
-        { id: 'MPE_STUDY',     phase: 'POST_CONSTRUCTION', form: 'MPE Exhibit (Form 302)', required: tpo_kw >= 5, description: `RF exposure MPE analysis per OET Bulletin 65. Required at or above 5 kW ERP. ${tpo_kw >= 5 ? 'REQUIRED.' : 'Not required (< 5 kW).'}` },
+        { id: 'MPE_STUDY',     phase: 'POST_CONSTRUCTION', form: 'MPE Exhibit (Form 302)', required: tpo_kw > 1, description: `RF exposure MPE analysis per OET Bulletin 65. Required per §1.1307(b) for AM ERP > 1 kW. ${tpo_kw >= 5 ? 'REQUIRED (≥ 5 kW — formal exhibit).' : tpo_kw > 1 ? 'REQUIRED (> 1 kW per §1.1307(b)); retain OET-65 on file.' : 'Categorically excluded (≤ 1 kW).'}` },
         { id: 'ANNUAL_EAS',    phase: 'ONGOING',            form: 'EAS Compliance Review', required: true,  description: 'Annual EAS compliance review per §11.61. Document LP sources, RWT/RMT/NAT test logs, and IPAWS connectivity.' }
       ];
 
@@ -27098,7 +27105,7 @@ async function scoreCandidate(pt, ctx, warnings){
           spec: 'ANSI Z535.2 caution signs at all fence entry points; post at ≤ 10m intervals',
           n_signs: Math.max(4, Math.ceil(perimeterCirc_m / 10)),
           cost_usd: round2(Math.max(4, Math.ceil(perimeterCirc_m / 10)) * 35),
-          notes: mpe_eval_required ? `ERP ${tpo_kw} kW meets §1.1310 evaluation threshold — RF signage required` : `ERP ${tpo_kw} kW below 5 kW MPE evaluation threshold — signage still recommended`
+          notes: mpe_eval_required ? `ERP ${tpo_kw} kW requires §1.1307(b) MPE evaluation (> 1 kW AM threshold) — RF signage required` : `ERP ${tpo_kw} kW ≤ 1 kW — categorically excluded per §1.1307(b); signage still recommended`
         },
         {
           id: 'ANTI_CLIMB',
@@ -27466,7 +27473,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // §1.1310 evaluation triggers
       const EVALUATION_TRIGGERS = [
-        { trigger: 'ERP ≥ 5 kW', applicable: mpe_eval_required, note: 'AM broadcast evaluation threshold per §1.1310 Table 1' },
+        { trigger: 'ERP > 1 kW', applicable: mpe_eval_required, note: 'AM broadcast categorical exclusion threshold per §1.1307(b) Table 1 (not §1.1310; 5 kW used as formal-exhibit threshold only)' },
         { trigger: 'New construction or modification', applicable: true, note: 'Any new CP or modification requires evaluation or categorical exclusion determination' },
         { trigger: 'Tower within 50m of public access', applicable: true, note: 'Any publicly accessible area within exclusion zone triggers formal MPE evaluation' },
         { trigger: 'Colocation with other RF sources', applicable: false, note: 'Multiple RF sources may require combined field strength analysis per OET-65 §4' }
