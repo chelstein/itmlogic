@@ -18413,12 +18413,15 @@ test('#133 KAZM: coverage population guide present with correct shape', async ()
   assert.ok(g.est_coverage_area_km2 >= 0, 'est_coverage_area_km2 must be non-negative');
 });
 
-test('#133 est_coverage_area_km2 is computed from coverage_pct', async () => {
+test('#133 est_coverage_area_km2 is computed from daytime_reach_km', async () => {
+  // Area is π × daytime_reach_km² (0.5 mV/m contour disc), not the old broken proxy.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_coverage_population_and_demographic_analysis_guide;
-  const R = Math.round(50 * (g.coverage_pct / 100) * 100) / 100;
+  const R = g.daytime_reach_km_used;
   const expectedArea = Math.round(Math.PI * R * R * 100) / 100;
-  assert.ok(Math.abs(g.est_coverage_area_km2 - expectedArea) < 10, `area ${g.est_coverage_area_km2} should be ≈${expectedArea}`);
+  assert.ok(Math.abs(g.est_coverage_area_km2 - expectedArea) < 50, `area ${g.est_coverage_area_km2} should be ≈${expectedArea}`);
+  // Coverage area must be plausible — KAZM at 780 kHz should reach at least 50 km
+  assert.ok(g.est_coverage_area_km2 > 100, `est_coverage_area_km2 ${g.est_coverage_area_km2} should be >100 km²`);
 });
 
 test('#133 est_served_population is density × area', async () => {
@@ -18428,10 +18431,11 @@ test('#133 est_served_population is density × area', async () => {
   assert.ok(Math.abs(g.est_served_population - expected) < 100, `served pop ${g.est_served_population} should be ≈${expected}`);
 });
 
-test('#133 coverage_delta_vs_baseline_pct is coverage_pct - 50', async () => {
+test('#133 coverage_delta_vs_baseline_pct is coverage_pct×100 − 50 (percentage points)', async () => {
+  // Delta is percentage points vs a 50% baseline (coverage_pct is fraction 0–1).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_coverage_population_and_demographic_analysis_guide;
-  const expected = Math.round((g.coverage_pct - 50) * 100) / 100;
+  const expected = Math.round((g.coverage_pct * 100 - 50) * 100) / 100;
   assert.ok(Math.abs(g.coverage_delta_vs_baseline_pct - expected) < 0.1, `delta ${g.coverage_delta_vs_baseline_pct} should be ≈${expected}`);
 });
 

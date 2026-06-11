@@ -1791,6 +1791,7 @@ export async function runSiteOptimizer(body = {}){
     aux_n_checklist_items:              c.am_auxiliary_transmitter_and_emergency_operations_guide?.n_checklist_items ?? null,
     aux_total_low_usd:                  c.am_auxiliary_transmitter_and_emergency_operations_guide?.cost_estimates?.total_low_usd ?? null,
     wfr_wildfire_risk_level:            c.am_wildfire_risk_and_vegetation_management_guide?.wildfire_risk_level ?? null,
+    wfr_wildfire_sub_score:             c.explanation?.score_components_raw?.wildfire ?? null,
     wfr_ea_required:                    c.am_wildfire_risk_and_vegetation_management_guide?.ea_required ?? null,
     wfr_veg_clearance_ft:               c.am_wildfire_risk_and_vegetation_management_guide?.veg_clearance_ft ?? null,
     wfr_total_low_usd:                  c.am_wildfire_risk_and_vegetation_management_guide?.cost_estimates?.total_low_usd ?? null,
@@ -6866,10 +6867,10 @@ async function scoreCandidate(pt, ctx, warnings){
         {
           goal:       'avoid_wildfire_risk',
           label:      'Wildfire risk avoidance',
-          raw_metric: null,
-          raw_unit:   'N/A',
-          formula:    'NOT EVALUATED (placeholder)',
-          data_source: 'USFS/NIFC risk layer (not yet integrated)'
+          raw_metric: sub.wildfire,
+          raw_unit:   'score 0–100 (higher = lower risk)',
+          formula:    'Geographic region proxy: LOW→100, MODERATE→75, ELEVATED→50, HIGH→25, VERY_HIGH→0',
+          data_source: 'FCC M3-zone region (Western US / PNW / SE / Midwest); upgrade with USFS FIA/LANDFIRE for parcel precision'
         },
         {
           goal:       'minimize_int_treaty_zone',
@@ -6903,6 +6904,12 @@ async function scoreCandidate(pt, ctx, warnings){
             return `COL coverage ${(coverage_pct * 100).toFixed(0)}% < §73.24(j) 80% floor — NON-COMPLIANT`;
           if (m.goal === 'minimize_blanket_population' && blanket_population_pct != null && blanket_population_pct > 1)
             return `Blanket population ${blanket_population_pct.toFixed(2)}% > §73.24(g) 1% ceiling — NON-COMPLIANT`;
+          if (m.goal === 'avoid_wildfire_risk' && sub_score != null && sub_score <= 25)
+            return `High wildfire risk region (score ${sub_score}/100) — NEPA EA likely required; USFS FIA/LANDFIRE raster recommended for parcel-level precision`;
+          if (m.goal === 'minimize_int_treaty_zone' && treaty_zone)
+            return `Inside ${treaty_zone} treaty zone — FCC IB coordination required before CP can be granted`;
+          if (m.goal === 'prefer_high_conductivity' && sigma_msm < 4)
+            return `σ=${sigma_msm} mS/m below preferred 8 mS/m — poor ground conditions reduce reach and increase ground radial cost`;
           return null;
         })();
         return {
@@ -6948,6 +6955,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const MPE_ERP_THRESHOLD_KW = 5.0;  // OET-65 / §1.1310 threshold for FM; AM threshold varies
       const lambda_rc = 300000 / frequency_khz;
       const qwave_rc  = lambda_rc / 4;
+      const hwave_rc  = lambda_rc / 2;
       const isDA_rc   = /^DA/i.test(pattern_mode);
       const isClear_rc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const isLocal_rc = LOCAL_CHANNEL_KHZ.has(frequency_khz);
@@ -6982,13 +6990,21 @@ async function scoreCandidate(pt, ctx, warnings){
       })();
 
       // 3. ASR tower registration — §17.7 (200 ft / 60.96 m threshold)
-      const asrRequired_rc = qwave_rc > ASR_M;
+      // If λ/4 > 60.96 m → ASR is certain (WARN).
+      // If λ/4 ≤ 60.96 m but λ/2 > 60.96 m → depends on final tower height (NOT_EVALUATED).
+      // If even λ/2 ≤ 60.96 m → standard heights clear the threshold (PASS).
+      const asrRequired_rc   = qwave_rc > ASR_M;
+      const asrPossible_rc   = !asrRequired_rc && hwave_rc > ASR_M;
+      const asrNotRequired_rc = !asrRequired_rc && !asrPossible_rc;
       const i3 = asrRequired_rc
         ? item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'WARN',
           `λ/4 = ${round2(qwave_rc)} m at ${frequency_khz} kHz exceeds the 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 and FAA Form 7460-1 (aeronautical study) required before construction.`,
           'File FAA Form 7460-1 and obtain FAA determination before filing Form 854 with FCC. Marking/lighting per FAA determination (§17.21–§17.50).')
+        : asrNotRequired_rc
+        ? item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'PASS',
+          `λ/4 = ${round2(qwave_rc)} m, λ/2 = ${round2(hwave_rc)} m at ${frequency_khz} kHz — both standard heights are below the 60.96 m (200 ft) §17.7 ASR threshold. ASR registration not required at standard heights.`)
         : item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'NOT_EVALUATED',
-          `λ/4 = ${round2(qwave_rc)} m at ${frequency_khz} kHz is below the 60.96 m threshold at quarter-wave. Final tower height determines ASR applicability.`,
+          `λ/4 = ${round2(qwave_rc)} m (below threshold) but λ/2 = ${round2(hwave_rc)} m exceeds 60.96 m at ${frequency_khz} kHz. ASR applicability depends on final tower height.`,
           'Confirm final antenna height. If tower exceeds 200 ft (60.96 m) ASR is mandatory regardless of frequency.');
 
       // 4. RF exposure (MPE) — §1.1310 / OET Bulletin 65
@@ -13810,7 +13826,7 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_repaint_high_usd: annual_repaint_high,
         lighting_inspection_low_usd, lighting_inspection_high_usd,
         total_initial_low_usd, total_initial_high_usd,
-        reference: '47 CFR §17.21–§17.25 (tower painting and marking); §17.47 (periodic inspection); §17.56 (painting specifications); FAA AC 70/7460-1M (obstruction marking and lighting); FAA Form 7460-2 (notice of construction completion)',
+        reference: '47 CFR §17.21 (marking required); §17.23 (painting specifications — aviation orange/white alternating bands); §17.25 (obstruction lighting); §17.47 (periodic inspection); §17.56 (painting maintenance); FAA AC 70/7460-1M (obstruction marking and lighting); FAA Form 7460-2 (notice of construction completion)',
         note: `${tower_h_ft.toFixed(0)} ft tower: ${requires_painting ? `${num_bands} orange/white bands (${band_height_ft.toFixed(0)} ft/band). Initial paint: $${paint_low_usd.toLocaleString()}–$${paint_high_usd.toLocaleString()}; repaint every ${repaint_cycle_years} yr.` : 'No FAA paint required (≤200 ft).'}`
       };
     })(),
@@ -32045,15 +32061,17 @@ async function scoreCandidate(pt, ctx, warnings){
         pop_density_proxy >= POP_DENSITY_SUBURBAN ? 'SUBURBAN' :
         pop_density_proxy >= POP_DENSITY_RURAL    ? 'RURAL'    : 'REMOTE';
 
-      // Coverage contour area estimate (0.5 mV/m groundwave contour, circular approx)
-      const COVERAGE_RADIUS_KM = round2(50 * (coverage_pct / 100));
-      const coverage_area_km2  = round2(Math.PI * Math.pow(COVERAGE_RADIUS_KM, 2));
+      // Coverage contour area estimate: use the 0.5 mV/m groundwave reach already computed
+      // for the candidate.  Falls back to a conservative 25 km if not yet available.
+      const COVERAGE_RADIUS_KM = daytime_reach_km != null ? round2(daytime_reach_km) : 25;
+      const coverage_area_km2  = round2(Math.PI * COVERAGE_RADIUS_KM * COVERAGE_RADIUS_KM);
 
-      // Estimated served population (persons within coverage area)
+      // Estimated served population (persons within 0.5 mV/m contour)
       const est_served_pop = round2(coverage_area_km2 * pop_density_proxy);
 
-      // Coverage improvement vs current site (positive = gain)
-      const coverage_delta_pct = round2(cvg_pct - 50);   // assumes 50% baseline
+      // Coverage improvement vs current site (positive = gain, in coverage_pct percentage points)
+      // cvg_pct is the COL coverage fraction (0–1); report as a percentage delta vs 50% baseline.
+      const coverage_delta_pct = round2(cvg_pct * 100 - 50);
 
       // Demographic characterization
       const audience_profile = {
@@ -32063,7 +32081,10 @@ async function scoreCandidate(pt, ctx, warnings){
         est_coverage_area_km2:         coverage_area_km2,
         est_served_population:         est_served_pop,
         coverage_pct,
+        // coverage_pct is the COL polygon coverage fraction (0–1); delta is percentage points vs 50% baseline.
         coverage_delta_vs_baseline_pct: coverage_delta_pct,
+        // Expose daytime_reach_km used for area computation (0.5 mV/m contour radius).
+        daytime_reach_km_used: COVERAGE_RADIUS_KM,
       };
 
       // Population study cost (FCC LMS filing aid + GIS population overlay)
@@ -33606,15 +33627,28 @@ function buildTopSummary(top, baseline, nEvaluated){
     parts.push(fStr);
   }
 
+  // COL city-at-risk status for rank 1 (from the contour migration guide).
+  const r1ColAtRisk = r1.am_licensed_contour_migration_guide?.city_of_license_at_risk;
+  if (r1ColAtRisk && r1ColAtRisk !== 'NOT_EVALUATED'){
+    const colDist = r1.am_licensed_contour_migration_guide?.city_to_candidate_distance_km;
+    const distNote = colDist != null ? ` (${colDist} km from COL)` : '';
+    const riskNote = (r1ColAtRisk === 'AT_RISK' || r1ColAtRisk === 'AT_RISK_PROXY')
+      ? `COL ${r1ColAtRisk}${distNote} — city of license outside estimated 5 mV/m contour`
+      : `COL ${r1ColAtRisk}${distNote}`;
+    parts.push(riskNote);
+  }
+
   // Improvement vs baseline.
   if (baseline){
     const dScore = r1.score - (baseline.score || 0);
     const dReach = r1.daytime_reach_km != null && baseline.daytime_reach_km != null
       ? r1.daytime_reach_km - baseline.daytime_reach_km : null;
+    const reachPct = r1.adjacent_market_coverage_analysis?.reach_pct_change_vs_current_site;
     const sign = s => s >= 0 ? `+${s.toFixed(1)}` : s.toFixed(1);
     const deltas = [];
     if (Math.abs(dScore) > 0.1) deltas.push(`score ${sign(dScore)}`);
     if (dReach != null && Math.abs(dReach) > 0.5) deltas.push(`reach ${sign(dReach)} km`);
+    if (reachPct != null && Math.abs(reachPct) >= 1) deltas.push(`reach ${sign(reachPct)}%`);
     if (deltas.length) parts.push(`vs current site: ${deltas.join(', ')}`);
   }
 
