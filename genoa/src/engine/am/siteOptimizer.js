@@ -5100,14 +5100,15 @@ async function scoreCandidate(pt, ctx, warnings){
       return { overall_verdict, overall_note, fail_count: failCount, warn_count: warnCount, gates };
     })(),
     ground_system_design_specification: (() => {
-      // AM ground system design per FCC §73.190 / NBS TN-24 / Terman textbook.
+      // AM ground system design per FCC §73.186 / NBS TN-24 / Terman textbook.
+      // §73.186 specifies the standard: 120 radials × 0.35λ buried copper.
       // Prescribes radial count, length, conductor gauge, and burial depth.
       const lambdaM_gs = 300000 / frequency_khz;
-      const qwM_gs = round2(lambdaM_gs / 4);
+      const qwM_gs = round2(lambdaM_gs / 4);  // λ/4 physics reference only (R_rad = 36.5 Ω)
 
-      // Ideal radial length is λ/4; shorter acceptable for constrained lots.
-      const idealRadialLengthM = qwM_gs;
-      const minRadialLengthM   = round2(qwM_gs * 0.5);  // NBS TN-24: 50% still effective
+      // Ideal radial length is 0.35λ per §73.186 / NBS TN-24; λ/4 is only the antenna physics reference.
+      const idealRadialLengthM = round2(lambdaM_gs * 0.35); // 0.35λ per §73.186
+      const minRadialLengthM   = round2(qwM_gs * 0.5);  // NBS TN-24: 50% of λ/4 still effective
       const practicalLengthM   = round2(Math.min(idealRadialLengthM, 120)); // lot constraint proxy
 
       // Radial count: NBS TN-24 / Terman — 120 radials is the proven sweet spot;
@@ -5135,7 +5136,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Burial depth: 150–200 mm below grade to minimize surface-wave losses.
       const burial_depth_mm = 150;
 
-      // Area required for full λ/4 radial field (circle of radius qwM_gs).
+      // Area required for full 0.35λ radial field (circle of radius practicalLengthM per §73.186).
       const area_ha = round2(Math.PI * practicalLengthM * practicalLengthM / 10000);
 
       const sigma_tier = sigma_msm >= 10 ? 'GOOD' : sigma_msm >= 5 ? 'MARGINAL' : 'POOR';
@@ -5178,7 +5179,7 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         recommended_design: design_grade,
         soil_quality_tier: sigma_tier,
-        note: 'Ground system design per NBS Technical Note 24 (Terman formula for R_g) and FCC §73.190 efficiency certification guidelines. All figures are pre-construction estimates — a field soil resistivity survey (4-electrode Wenner array) is required before final design.'
+        note: 'Ground system design per §73.186 / NBS Technical Note 24 (0.35λ standard radial; Terman formula for R_g). §73.190 soil survey and efficiency certification required before construction. All figures are pre-construction estimates.'
       };
     })(),
     noise_floor_estimate: (() => {
@@ -6235,7 +6236,8 @@ async function scoreCandidate(pt, ctx, warnings){
     // All figures are 2024-dollar screening estimates — actual costs vary
     // significantly by region, contractor, site conditions, and market.
     financial_feasibility_summary: (() => {
-      const qwM_ff    = round2((300000 / frequency_khz) / 4);
+      const lambdaM_ff = 300000 / frequency_khz;
+      const qwM_ff    = round2(lambdaM_ff / 4);  // λ/4 tower height (Class D) / physics reference
       const asrReq_ff = qwM_ff > 60.96;
       const isClear_ff = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const isDA_ff    = /^DA/i.test(pattern_mode);  // NDA starts with N, not DA
@@ -6243,9 +6245,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const isHighPow_ff = tpo_kw >= 25;
       const isMedPow_ff  = tpo_kw >= 5 && tpo_kw < 25;
 
+      // Standard radial length per §73.186 / NBS TN-24 — drives parcel size
+      const radialLenStd_m = round2(lambdaM_ff * 0.35); // 0.35λ per §73.186
+
       // Land / Site
-      // Parcel purchase or lease — AM requires significant land for radial system
-      const parcelRadius_m = round2(qwM_ff * 1.1);
+      // Parcel purchase or lease — AM requires significant land for radial system (0.35λ radius + 10%)
+      const parcelRadius_m = round2(radialLenStd_m * 1.1);
       const parcelArea_ha  = round2(Math.PI * (parcelRadius_m / 100) ** 2);
       const landLow  = isHighPow_ff ? 150000 : isMedPow_ff ? 80000 : 30000;
       const landHigh = isHighPow_ff ? 600000 : isMedPow_ff ? 250000 : 120000;
@@ -6261,9 +6266,9 @@ async function scoreCandidate(pt, ctx, warnings){
         : asrReq_ff ? `${qwM_ff} m guyed monopole exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.`
         : `${qwM_ff} m guyed monopole below ASR threshold; standard guyed tower with base insulator.`;
 
-      // Ground system — §73.190 radial copper buried system
+      // Ground system — §73.186 radial copper buried system (120 × 0.35λ standard)
       const nRadials    = isHighPow_ff ? 120 : isMedPow_ff ? 120 : isLocal_ff ? 60 : 90;
-      const radialLen_m = round2(qwM_ff * (isHighPow_ff ? 1.0 : 0.9));
+      const radialLen_m = radialLenStd_m; // 0.35λ per §73.186 / NBS TN-24
       const groundLow   = isHighPow_ff ? 80000 : isMedPow_ff ? 35000 : 12000;
       const groundHigh  = isHighPow_ff ? 250000 : isMedPow_ff ? 100000 : 40000;
 
@@ -7117,14 +7122,14 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     // Per-candidate AM ground radial system design guide.
-    // Provides §73.190-compliant radial system specifications based on
-    // Terman/Belrose ground loss theory and FCC M3 conductivity at this
-    // candidate location.  Radial count, length, burial depth, staging,
-    // and soil resistivity measurement requirements are all addressed.
+    // Provides §73.186-compliant radial system specifications (120 × 0.35λ standard per NBS TN-24)
+    // based on Terman/Belrose ground loss theory and FCC M3 conductivity at this candidate location.
+    // Radial count, length, burial depth, staging, and soil resistivity measurement requirements addressed.
+    // §73.190 governs the conductivity map and certification process; §73.186 governs the ground system design.
     ground_system_design_guide: (() => {
       const P_watts_gs  = tpo_kw * 1000;
       const lambda_gs_m = round2(300000 / frequency_khz);   // full wavelength in meters
-      const qwave_gs_m  = round2(lambda_gs_m / 4);           // λ/4 radial length (optimal)
+      const qwave_gs_m  = round2(lambda_gs_m * 0.35);         // 0.35λ standard radial length per §73.186 / NBS TN-24
       const min_radial_len_m = round2(lambda_gs_m / 8);      // λ/8 minimum practical radial length
 
       // Standard and minimal radial counts per ARRL/FCC practice
@@ -7152,8 +7157,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const soilClass = sigma_msm >= 15 ? 'EXCELLENT' : sigma_msm >= 8 ? 'GOOD' : sigma_msm >= 4 ? 'AVERAGE' : sigma_msm >= 2 ? 'POOR' : 'VERY_POOR';
       const soilNote = {
         EXCELLENT: 'High-conductivity soil (swamp/marsh/coastal). 60–90 radials typically sufficient. Minimal ground loss expected.',
-        GOOD:      'Good conductivity. Standard 120-radial system (λ/4) achieves near-ideal efficiency. FCC M3 zone meets §73.190 screening threshold.',
-        AVERAGE:   'Average conductivity. Standard 120-radial λ/4 system required for acceptable efficiency. Commission soil resistivity survey before construction.',
+        GOOD:      'Good conductivity. Standard 120-radial system (0.35λ per §73.186) achieves near-ideal efficiency. FCC M3 zone meets §73.190 screening threshold.',
+        AVERAGE:   'Average conductivity. Standard 120-radial 0.35λ system (§73.186) required for acceptable efficiency. Commission soil resistivity survey before construction.',
         POOR:      'Poor conductivity. Extended radials (up to λ/2) and/or elevated antenna may be necessary to achieve acceptable efficiency. Soil survey critical.',
         VERY_POOR: 'Very poor conductivity. Ground system losses will be significant. Consider elevated (base-insulated) antenna to reduce dependence on ground conductivity. Soil survey mandatory.'
       }[soilClass];
@@ -7203,7 +7208,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.190 certification checklist
       const cert_requirements = [
         'Soil resistivity survey (Wenner 4-electrode method) at proposed radial layout locations',
-        `Minimum ${N_STD} copper radials at λ/4 (${qwave_gs_m} m) length, buried ${burialDepth_cm}`,
+        `Minimum ${N_STD} copper radials at 0.35λ (${qwave_gs_m} m) length per §73.186, buried ${burialDepth_cm}`,
         `Ground ring: solid copper conductor connecting all radial tips at ${qwave_gs_m} m radius`,
         'All radials bonded to tower base connection point (ground bus bar or direct burial clamp)',
         `Conductor specification: ${conductor}`,
@@ -8111,10 +8116,10 @@ async function scoreCandidate(pt, ctx, warnings){
     am_ground_system_design_guide: (() => {
       // AM Ground System Design Guide.
       //
-      // §73.190 requires a buried radial ground system for AM broadcast stations.
+      // §73.186 specifies the standard AM ground radial system (120 × 0.35λ).
       // The standard "FCC" ground system for AM:
       //   - 120 buried copper radials per tower base
-      //   - Minimum radial length: 1/4 wavelength at operating frequency
+      //   - Standard radial length: 0.35λ per §73.186 / NBS TN-24
       //   - Radials extend uniformly at ~3° spacing (360° / 120 = 3°)
       //
       // Fewer radials (down to ~90) may be accepted for constrained sites but
@@ -8134,13 +8139,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // Cost estimate basis:
       //   Labor: $2–4/LF for trenching + burial + backfill (machine trench)
       //   Wire:  $0.12–0.18/LF for #10 bare copper (market-dependent)
-      //   ~120 radials × (λ/4 length) × (labor + wire) per tower
+      //   ~120 radials × (0.35λ length per §73.186) × (labor + wire) per tower
 
       const isDA_gs = /^DA/i.test(pattern_mode);
 
-      // Quarter-wave radial length in meters (λ/4)
+      // Standard radial length: 0.35λ per §73.186 / NBS TN-24
       const lambda_gs   = (3e8 / (frequency_khz * 1e3));
-      const qwave_m_gs  = lambda_gs / 4;
+      const qwave_m_gs  = lambda_gs * 0.35;  // 0.35λ per §73.186 / NBS TN-24
       const qwave_ft_gs = qwave_m_gs * 3.28084;
 
       // Standard radial count (FCC standard vs. constrained minimum)
@@ -8148,7 +8153,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const radials_min       = 90;
       const radial_spacing_deg = round2(360 / radials_standard);
 
-      // Wire length per radial is λ/4; total wire = radials × length (per tower)
+      // Wire length per radial is 0.35λ; total wire = radials × length (per tower)
       const wire_length_per_tower_m  = radials_standard * qwave_m_gs;
       const wire_length_per_tower_ft = Math.round(wire_length_per_tower_m * 3.28084);
 
@@ -8187,14 +8192,14 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Radial design items
       const design_items = [
-        { item: '120 buried radials per tower, uniform 3° spacing', ref: '§73.190', required: true },
-        { item: `Radial length ≥ λ/4 (${Math.round(qwave_ft_gs)} ft at ${frequency_khz} kHz)`, ref: '§73.190', required: true },
-        { item: '#10 AWG bare copper wire, buried 6–12 inches minimum', ref: '§73.190', required: true },
-        { item: 'All radials bonded at tower base with low-resistance clamp', ref: '§73.190', required: true },
-        { item: 'Ground conductivity (M3 zone) verified per §73.184', ref: '§73.184; §73.190', required: true },
-        { item: isDA_gs ? 'Separate full ground system per tower in DA array' : null, ref: '§73.190', required: true },
-        { item: 'Base insulator clearance ≥ 3 ft from any buried conductor', ref: '§73.190; §73.61', required: true },
-        { item: 'Optional: augmented radial count (>120) for low-conductivity sites', ref: '§73.190', required: false },
+        { item: '120 buried radials per tower, uniform 3° spacing', ref: '§73.186', required: true },
+        { item: `Radial length 0.35λ (${Math.round(qwave_ft_gs)} ft at ${frequency_khz} kHz) per §73.186 / NBS TN-24`, ref: '§73.186', required: true },
+        { item: '#10 AWG bare copper wire, buried 6–12 inches minimum', ref: '§73.186', required: true },
+        { item: 'All radials bonded at tower base with low-resistance clamp', ref: '§73.186', required: true },
+        { item: 'Ground conductivity (M3 zone) verified per §73.184', ref: '§73.184; §73.186', required: true },
+        { item: isDA_gs ? 'Separate full ground system per tower in DA array' : null, ref: '§73.186', required: true },
+        { item: 'Base insulator clearance ≥ 3 ft from any buried conductor', ref: '§73.186; §73.61', required: true },
+        { item: 'Optional: augmented radial count (>120) for low-conductivity sites', ref: '§73.186', required: false },
         { item: 'RF bonding of guy anchors and buried metalwork per §73.190(c)', ref: '§73.190(c)', required: true }
       ].filter(d => d.item !== null);
 
@@ -8217,8 +8222,8 @@ async function scoreCandidate(pt, ctx, warnings){
         install_weeks_high,
         ground_efficiency_note,
         design_items,
-        reference: '47 CFR §73.190 (ground system); §73.184 (groundwave conductivity map); §73.61 (base current monitors); §73.190(c) (bonding)',
-        note: `Standard AM ground system: ${radials_standard} radials × ${Math.round(qwave_ft_gs)} ft = ${wire_length_per_tower_ft.toLocaleString()} LF per tower. DA: ${da_tower_est_gs} tower estimate × = ${Math.round(total_wire_ft).toLocaleString()} LF total. Installed cost: $${ground_cost_low_usd.toLocaleString()}–$${ground_cost_high_usd.toLocaleString()}.`
+        reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ); §73.184 (groundwave conductivity map); §73.61 (base current monitors); §73.190(c) (bonding); NBS Technical Note 24',
+        note: `Standard AM ground system: ${radials_standard} radials × ${Math.round(qwave_ft_gs)} ft (0.35λ) = ${wire_length_per_tower_ft.toLocaleString()} LF per tower. DA: ${da_tower_est_gs} tower estimate × = ${Math.round(total_wire_ft).toLocaleString()} LF total. Installed cost: $${ground_cost_low_usd.toLocaleString()}–$${ground_cost_high_usd.toLocaleString()}.`
       };
     })(),
 
@@ -8339,7 +8344,7 @@ async function scoreCandidate(pt, ctx, warnings){
         'Antenna system description (number of towers, phasing/coupling network)',
         isDA2 ? 'Separate day and night pattern tables with transition timing' : null,
         'Computer-modeled proof prediction (MoM or NEC for multi-tower arrays)',
-        'Ground system design (per §73.190 — minimum 120 buried radials per tower)',
+        'Ground system design (per §73.186 — minimum 120 buried radials × 0.35λ per tower)',
         'Common point impedance and power calculations'
       ].filter(Boolean);
 
@@ -9720,8 +9725,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //     Total installed ≈ sum above per 120-radial "full" system
 
       const lambda_m           = 299792.458 / frequency_khz;        // wavelength in metres
-      const quarter_wave_m     = lambda_m / 4;                       // λ/4 radial length
+      const quarter_wave_m     = lambda_m / 4;                       // λ/4 physics reference (36.5 Ω R_rad)
       const quarter_wave_ft    = round2(quarter_wave_m * 3.28084);   // in feet
+      const standard_radial_m  = round2(lambda_m * 0.35);            // 0.35λ FCC standard per §73.186 / NBS TN-24
+      const standard_radial_ft = round2(standard_radial_m * 3.28084); // in feet
 
       // Standard system sizes: economy (60), standard (120), full (120) – choose by conductivity
       const sigmaQ = sigma_msm;                // site σ from conductivity IIFE already computed
@@ -9745,9 +9752,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const i_full      = round2(Math.sqrt(p_watts / r_base_full));
       const i_economy   = round2(Math.sqrt(p_watts / r_base_economy));
 
-      // ── Cost model (120-radial full system) ──────────────────────────────────
+      // ── Cost model (120-radial full system at 0.35λ per §73.186) ────────────
       // Wire material: 10 AWG solid copper ≈ $0.12–$0.22 / ft
-      const total_radial_ft   = n_radials_full * quarter_wave_ft;
+      const total_radial_ft   = n_radials_full * standard_radial_ft;
       const wire_low          = Math.round(total_radial_ft * 0.12);
       const wire_high         = Math.round(total_radial_ft * 0.22);
 
@@ -9767,13 +9774,13 @@ async function scoreCandidate(pt, ctx, warnings){
       const total_radial_system_high_usd = wire_high + trench_high + connector_high + buss_high;
 
       // Economy (60-radial) cost
-      const total_radial_ft_eco   = n_radials_economy * quarter_wave_ft;
+      const total_radial_ft_eco   = n_radials_economy * standard_radial_ft;
       const total_radial_eco_low  = Math.round(total_radial_ft_eco * (0.12 + 4) + n_radials_economy * 8  + buss_low);
       const total_radial_eco_high = Math.round(total_radial_ft_eco * (0.22 + 8) + n_radials_economy * 15 + buss_high);
 
-      // Site area constraint: radials fan out 360°; need ≥ quarter_wave_m radius clear
-      const min_site_radius_m  = round2(quarter_wave_m);
-      const min_site_radius_ft = quarter_wave_ft;
+      // Site area constraint: radials fan out 360°; need ≥ standard_radial_m (0.35λ per §73.186) radius clear
+      const min_site_radius_m  = standard_radial_m;
+      const min_site_radius_ft = standard_radial_ft;
 
       // Power lost to ground (informational)
       const p_loss_full_w    = Math.round(p_watts * (1 - r_rad / r_base_full));
@@ -9784,6 +9791,8 @@ async function scoreCandidate(pt, ctx, warnings){
         lambda_m:                  round2(lambda_m),
         quarter_wave_m:            round2(quarter_wave_m),
         quarter_wave_ft,
+        standard_radial_m,
+        standard_radial_ft,
         n_radials_full,
         n_radials_economy,
         r_loss_full_ohm:           r_loss_full,
@@ -9810,8 +9819,8 @@ async function scoreCandidate(pt, ctx, warnings){
         total_radial_eco_low_usd:  total_radial_eco_low,
         total_radial_eco_high_usd: total_radial_eco_high,
         recommended_n_radials:     n_radials_full,
-        reference: '47 CFR §73.68 (grounding); §73.190 (conductivity map); §73.154 (proof of performance); Sevick, Antenna Engineering Handbook ch. 3 (ground radial systems); ITU-R BS.598 (AM transmitting antennas)',
-        note: `At ${frequency_khz} kHz, λ/4 radial length ≈ ${quarter_wave_ft} ft (${round2(quarter_wave_m)} m). 120-radial full system: R_loss=${r_loss_full} Ω, η=${efficiency_full}%, I_base=${i_full} A. Installed cost ≈ $${total_radial_system_low_usd.toLocaleString()}–$${total_radial_system_high_usd.toLocaleString()}. Site must clear ≥${min_site_radius_ft} ft radius for full radial fan.`
+        reference: '47 CFR §73.68 (grounding); §73.186 (AM ground system standard — 120 × 0.35λ); §73.190 (conductivity map); §73.154 (proof of performance); NBS TN-24; Sevick, Antenna Engineering Handbook ch. 3; ITU-R BS.598',
+        note: `At ${frequency_khz} kHz, standard radial length = 0.35λ ≈ ${standard_radial_ft} ft (${standard_radial_m} m) per §73.186 / NBS TN-24 (physics ref: λ/4 ≈ ${quarter_wave_ft} ft for R_rad = 36.5Ω). 120-radial full system: R_loss=${r_loss_full} Ω, η=${efficiency_full}%, I_base=${i_full} A. Installed cost ≈ $${total_radial_system_low_usd.toLocaleString()}–$${total_radial_system_high_usd.toLocaleString()}. Site must clear ≥${min_site_radius_ft} ft radius for full radial fan.`
       };
     })(),
 
@@ -11496,7 +11505,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   < 20 km from current: assume same-tier market (similar lease cost)
       //   ≥ 20 km: may be different market; use conservative estimate.
       const lambda_m      = 300000 / frequency_khz;
-      const radial_m      = round2(lambda_m / 4);
+      const radial_m      = round2(lambda_m * 0.35);  // 0.35λ per §73.186 / NBS TN-24
       const circle_m2     = round2(Math.PI * radial_m * radial_m);
       const buffer_factor = 1.20;
       const site_m2       = round2(circle_m2 * buffer_factor);
@@ -12518,7 +12527,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   FAA paint/lighting inspection: $2,000–$5,000 (if applicable per 47 CFR §17.50)
       const f_khz        = frequency_khz;
       const lambda_m     = 300000 / f_khz;                       // free-space wavelength, metres
-      const H_m          = round2(lambda_m / 4);                 // λ/4 tower height (design reference)
+      const H_m          = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_m); // 5/8λ Class A/B, λ/4 Class C/D
       const V_mph        = 90;                                    // 3-sec gust, ASCE 7-22 Risk Cat II
       const V_ms         = round2(V_mph * 0.44704);              // m/s
       const rho_air      = 1.225;                                 // kg/m³ at sea level
@@ -12575,7 +12584,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM tower grounding serves two roles: RF ground (antenna efficiency) + safety/lightning ground.
       // §73.190(a): ground conductivity σ (mS/m) governs groundwave propagation — the radial copper
       //   system reduces ground loss R_g, boosting radiation resistance and antenna efficiency.
-      // FCC Rule of Thumb (§73.190(b)): 120 buried radials of length ≥ λ/4 is the "standard"
+      // FCC standard (§73.186 / NBS TN-24): 120 buried radials × 0.35λ is the standard
       //   high-efficiency ground system; shorter radials or fewer count are allowed but reduce η.
       // R_g estimate: R_g ≈ (1/(n × r)) × (ρ/(2π)) × ln(r/a) where n=radials, r=length, ρ=soil.
       //   Simplified empirical: R_g ≈ 40/n for n<120 radials at λ/4 length; ≈ 1–3 Ω for 120 radials.
@@ -12585,7 +12594,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Lightning: NFPA 780 (2023) governs AM tower lightning protection; §73.1820 (FCC) requires
       //   adequate grounding. AWS D1.1/D1.2 governs structural welded connections to ground ring.
       const n_radials_std = 120;
-      const radial_length_m = round2(300000 / frequency_khz / 4); // λ/4
+      const radial_length_m = round2(300000 / frequency_khz * 0.35); // 0.35λ per §73.186 / NBS TN-24
       const radial_length_ft = round2(radial_length_m * 3.281);
       // R_g estimate: standard 120-radial system ≈ 1.5 Ω; fewer radials → higher R_g
       const r_g_std_ohm = 1.5;
@@ -12594,7 +12603,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const rho_soil_ohm_m = round2(1000 / sigma_local); // Ω·m from mS/m
       // CP need: high soil corrosivity if ρ < 300 Ω·m (σ > 3.3 mS/m) or pH issues
       const cp_recommended = rho_soil_ohm_m < 300;
-      // Total copper wire needed for 120 × λ/4 radials (AWG #10 stranded, ~1.4 kg/m)
+      // Total copper wire needed for 120 × 0.35λ radials (AWG #10 stranded, ~1.4 kg/m)
       const total_copper_wire_m = round2(n_radials_std * radial_length_m);
       const copper_wire_kg = round2(total_copper_wire_m * 0.35 / 1000); // AWG #12, ~0.35 kg/100m
       // Cost estimates (2024 USD)
@@ -12637,8 +12646,8 @@ async function scoreCandidate(pt, ctx, warnings){
         total_ground_high_usd,
         annual_maint_ground_low_usd,
         annual_maint_ground_high_usd,
-        reference: '47 CFR §73.190 (AM groundwave, ground conductivity, radial system requirements); §73.1820 (grounding); NFPA 780 §4.13 (2023) (cathodic protection for buried copper); IEEE Std 80-2013 (safety grounding); FCC Engineering Handbook §9.4.2 (AM ground systems); ARRL Antenna Book Ch. 3 (R_g estimation)',
-        note: `${frequency_khz} kHz: standard 120×λ/4 radials = 120×${radial_length_m} m = ${total_copper_wire_m} m total copper (R_g ≈ ${r_g_std_ohm} Ω). σ=${sigma_local} mS/m → ρ≈${rho_soil_ohm_m} Ω·m. ${cp_recommended ? 'Cathodic protection RECOMMENDED.' : 'CP not required.'} Total ground system: $${total_ground_low_usd.toLocaleString()}–$${total_ground_high_usd.toLocaleString()}.`
+        reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ radials); §73.190 (AM groundwave, conductivity maps, certification); §73.1820 (grounding); NFPA 780 §4.13 (2023) (cathodic protection for buried copper); IEEE Std 80-2013 (safety grounding); NBS TN-24; ARRL Antenna Book Ch. 3 (R_g estimation)',
+        note: `${frequency_khz} kHz: standard 120×0.35λ radials = 120×${radial_length_m} m = ${total_copper_wire_m} m total copper per §73.186 (R_g ≈ ${r_g_std_ohm} Ω). σ=${sigma_local} mS/m → ρ≈${rho_soil_ohm_m} Ω·m. ${cp_recommended ? 'Cathodic protection RECOMMENDED.' : 'CP not required.'} Total ground system: $${total_ground_low_usd.toLocaleString()}–$${total_ground_high_usd.toLocaleString()}.`
       };
     })(),
 
@@ -13741,11 +13750,11 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_ground_system_radial_design_guide: (() => {
-      // FCC §73.190 references the minimum ground system for AM broadcast stations.
-      // FCC rules require a minimum of 120 ground radials, each λ/4 in length,
-      // for Class A/B/C stations. Class D (secondary) stations are encouraged but
-      // not mandated to meet the full 120-radial standard; 90–120 radials are common.
-      // Radial length: ideally λ/4 (one quarter wavelength); some sites use λ/8 for cost.
+      // FCC §73.186 specifies the standard AM ground radial system: 120 radials × 0.35λ per NBS TN-24.
+      // §73.186 establishes the "standard" AM antenna system; §73.190 covers ground conductivity measurement.
+      // Optimum system: 120 radials at 0.35λ length per §73.186 / NBS TN-24.
+      // Class D stations are encouraged but not mandated; 90–120 radials at 0.35λ are best practice.
+      // Radial length: 0.35λ (per §73.186 / NBS TN-24); λ/4 is sometimes used as a minimum fallback.
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m      = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_ab_gr    = /^[AB]$/i.test(fcc_class);
@@ -13753,7 +13762,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Recommended radial counts:
       const num_radials_ideal  = 120;
       const num_radials_min    = is_class_ab_gr ? 120 : 90;  // FCC minimum or best practice
-      const radial_length_m    = round2(wavelength_m / 4);   // λ/4
+      const radial_length_m    = round2(wavelength_m * 0.35); // 0.35λ per §73.186 / NBS TN-24
       const radial_length_ft   = round2(radial_length_m * 3.28084);
       const radial_length_mi   = round2(radial_length_m / 1609.34);
       // Total copper wire length:
@@ -13785,8 +13794,8 @@ async function scoreCandidate(pt, ctx, warnings){
         burial_low_usd, burial_high_usd,
         bus_ring_low_usd, bus_ring_high_usd,
         total_low_usd, total_high_usd,
-        reference: '47 CFR §73.190 (AM ground systems); FCC AM Improvement R&O (MB Docket 13-249); Terman "Radio Engineers Handbook"; Beverage/Brown/Schubert (1921) 120-radial standard; NRSC ground system engineering guidelines',
-        note: `${frequency_khz} kHz: λ=${wavelength_m}m, λ/4=${radial_length_ft.toFixed(0)} ft. ${num_radials_ideal} radials × ${radial_length_ft.toFixed(0)} ft = ${total_radial_length_mi} mi total wire. Total: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
+        reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ); NBS Technical Note 24; FCC AM Improvement R&O (MB Docket 13-249); Terman "Radio Engineers Handbook"; Beverage/Brown/Schubert (1921) 120-radial standard; NRSC ground system engineering guidelines',
+        note: `${frequency_khz} kHz: λ=${wavelength_m}m, 0.35λ=${radial_length_ft.toFixed(0)} ft (per §73.186). ${num_radials_ideal} radials × ${radial_length_ft.toFixed(0)} ft = ${total_radial_length_mi} mi total wire. Total: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
 
@@ -14963,12 +14972,12 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_ground_system_installation_and_maintenance_guide: (() => {
-      // FCC-standard AM ground system: 120 buried radials at λ/4 length.
+      // FCC-standard AM ground system: 120 buried radials at 0.35λ length per §73.186 / NBS TN-24.
       // Longer/more radials (160+) improve efficiency and are typical for DA or
       // Class A/B stations; shorter legacy systems may need upgrade to meet efficiency targets.
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const radial_length_m  = round2(wavelength_m / 4);
+      const radial_length_m  = round2(wavelength_m * 0.35); // 0.35λ per §73.186 / NBS TN-24
       const radial_length_ft = round2(radial_length_m * 3.28084);
       const num_radials_standard = 120;
       const num_radials_enhanced = 160; // DA or high-efficiency systems
@@ -15921,7 +15930,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // due to corrosion, soil disturbance, or seasonal moisture variation.
 
       // Estimate ground resistance from site soil conductivity (empirical table)
-      // Based on a 120-radial λ/4 system (standard per §73.190)
+      // Based on a 120-radial 0.35λ system (standard per §73.186 / NBS TN-24)
       const rg_est_ohm = sigma_msm >= 10 ? 2
         : sigma_msm >= 4  ? 5
         : sigma_msm >= 2  ? 12
@@ -15971,7 +15980,7 @@ async function scoreCandidate(pt, ctx, warnings){
         comprehensive_amortized_annual_usd,
         total_annual_ground_maint_low_usd,
         total_annual_ground_maint_high_usd,
-        reference: '47 CFR §73.190 (ground system — buried radials); §73.190(c) (ground resistance monitoring); §73.61 (base current log); NAB Engineering Handbook 11th Ed. Ch. 6 (AM ground system maintenance); TIA-222-H (antenna structure standards)',
+        reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ radials); §73.190(c) (ground resistance monitoring); §73.61 (base current log); NAB Engineering Handbook 11th Ed. Ch. 6 (AM ground system maintenance); TIA-222-H (antenna structure standards)',
         note: `Ground system maintenance: σ=${sigma_msm} mS/m → Rg≈${rg_est_ohm} Ω (${rg_acceptable ? 'meets' : 'EXCEEDS'} ${rg_target_ohm} Ω target for Class ${fcc_class}). Annual resistance check: $${annual_resistance_check_low_usd.toLocaleString()}–$${annual_resistance_check_high_usd.toLocaleString()}. Radial replacement: ${n_radials_annual_replace_low}–${n_radials_annual_replace_high}/yr × $${radial_repair_cost_per_radial_usd}. Total annual reserve: $${total_annual_ground_maint_low_usd.toLocaleString()}–$${total_annual_ground_maint_high_usd.toLocaleString()}.`
       };
     })(),
@@ -16222,11 +16231,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // banding under §17.50 unless an FAA lighting waiver is in effect.  Paint
       // maintenance cycles of 5–7 years are the industry standard.
 
-      // Derive tower height from frequency and class (λ/4 for C/D, λ/2 for A/B)
+      // Derive tower height from frequency and class: 0.625λ for A/B (FCC optimum), λ/4 for C/D
       const lambda_pnt_m   = 300000 / frequency_khz;
       const tower_pnt_m    = ['A','B'].includes(fcc_class)
-        ? round2(lambda_pnt_m * 0.5)
-        : round2(lambda_pnt_m / 4);
+        ? round2(lambda_pnt_m * 0.625)
+        : round2(lambda_pnt_m * 0.25);
       const tower_pnt_ft   = Math.round(tower_pnt_m * 3.281);
 
       // FAA obstruction marking threshold: 200 ft AGL (61 m)
@@ -16749,7 +16758,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ---- Tower effective collection area (NFPA 780 Annex A) ----
       const lambda_m_lp     = round2(299792.458 / frequency_khz);
-      const tower_h_m_lp    = round2(lambda_m_lp * (fcc_class === 'D' ? 0.25 : fcc_class === 'A' ? 0.525 : 0.375));
+      // 0.625λ for Class A/B (FCC optimum); 0.25λ for C/D (λ/4)
+      const tower_h_m_lp    = round2(lambda_m_lp * (['A','B'].includes(fcc_class) ? 0.625 : 0.25));
       const tower_h_ft_lp   = Math.round(tower_h_m_lp * 3.28084);
       // A_e = π × (3H)² per NFPA 780 simplified model (H in km)
       const A_e_km2         = round2(Math.PI * Math.pow(tower_h_m_lp * 3 / 1000, 2));
@@ -16915,7 +16925,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // rules), the FCC/ACHP/NCSHPO Nationwide Programmatic Agreement (NPA), and
       // the Endangered Species Act §7 consultation process.
       const lambda_m_env        = round2(299792.458 / frequency_khz);
-      const hf_env              = fcc_class === 'D' ? 0.25 : (fcc_class === 'A' ? 0.525 : 0.375);
+      // 0.625λ for Class A/B (FCC optimum); 0.25λ for C/D (λ/4)
+      const hf_env              = ['A','B'].includes(fcc_class) ? 0.625 : 0.25;
       const tower_height_m_env  = round2(lambda_m_env * hf_env);
       const tower_height_ft_env = Math.round(tower_height_m_env * 3.28084);
       // FCC ASR threshold = 200 ft; towers above this height trigger Section 106
@@ -16986,9 +16997,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const lambda_m        = round2(299792.458 / frequency_khz);
       const quarter_wave_m  = round2(lambda_m / 4);
       const quarter_wave_ft = Math.round(quarter_wave_m * 3.28084);
-      // Class D secondary stations minimize capex with 0.25λ; full-power classes
-      // benefit from 0.525λ (5λ/8) for maximum radiation resistance (~36.6 Ω).
-      const height_fraction = fcc_class === 'D' ? 0.25 : (fcc_class === 'A' ? 0.525 : 0.375);
+      // 0.625λ for Class A/B (5/8 wave, FCC optimum ~36.6 Ω radiation resistance);
+      // 0.25λ (λ/4) for Class C/D (minimizes capex for limited-power stations).
+      const height_fraction = ['A','B'].includes(fcc_class) ? 0.625 : 0.25;
       const tower_height_m  = round2(lambda_m * height_fraction);
       const tower_height_ft = Math.round(tower_height_m * 3.28084);
       // Wind zone per ASCE 7-22 Figure 26.5-1D (simplified by latitude/longitude)
@@ -18039,14 +18050,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_clear_ch_gnd = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const is_local_ch_gnd = LOCAL_CHANNEL_KHZ.has(frequency_khz);
 
-      // ---- §73.54 Ground radial system ----
-      // Wavelength and standard λ/4 radial length
+      // ---- §73.186 Ground radial system (FCC standard: 120 × 0.35λ per NBS TN-24) ----
       const lambda_m        = round2(300000 / frequency_khz);
-      const radial_length_m = round2(lambda_m / 4);
+      const radial_length_m = round2(lambda_m * 0.35);  // 0.35λ per §73.186 / NBS TN-24
 
       // Number of buried radials per FCC/industry practice.
-      // §73.54 requires an "adequate" ground system; 120 buried radials is the
-      // standard for Class A/B; fewer are acceptable for lower-power classes.
+      // §73.186 specifies 120 buried radials as the standard; fewer acceptable for lower classes.
       const N_RADIALS = { A: 120, B: 120, C: 90, D: is_local_ch_gnd ? 60 : 90 };
       const n_radials = N_RADIALS[fcc_class] ?? 90;
 
@@ -18133,8 +18142,8 @@ async function scoreCandidate(pt, ctx, warnings){
         // Grand total (ground system + fence)
         total_cost_low_usd,
         total_cost_high_usd,
-        note: `Ground system: ${n_radials} buried #${wire_gauge_awg} AWG copper radials at λ/4 = ${radial_length_m}m (λ = ${lambda_m}m @ ${frequency_khz} kHz) per §73.54${isDA_gnd ? ` — ${n_tower_elements}-tower DA array` : ''}; total copper: ${total_radial_length_m}m. RF safety per OET-65 Supplement B and §1.1310: uncontrolled MPE = ${mpe_uncontrolled_mw_cm2} mW/cm² at ${f_mhz} MHz; uncontrolled exclusion zone ${exclusion_zone_m}m, controlled zone ${controlled_zone_m}m${rf_fence_required ? `; RF safety fence required (${Math.round(fence_perimeter_ft)} linear ft, $${fence_cost_low_usd.toLocaleString()}–$${fence_cost_high_usd.toLocaleString()})` : ''}.`,
-        reference: '47 CFR §73.190 (ground system); §73.54 (AM antenna systems); §1.1310 (RF exposure limits); OET Bulletin 65 Supplement B (AM RF safety); NFPA 780 (lightning protection); §73.49 (antenna enclosure)',
+        note: `Ground system: ${n_radials} buried #${wire_gauge_awg} AWG copper radials × 0.35λ = ${radial_length_m}m (λ = ${lambda_m}m @ ${frequency_khz} kHz) per §73.186 / NBS TN-24${isDA_gnd ? ` — ${n_tower_elements}-tower DA array` : ''}; total copper: ${total_radial_length_m}m. RF safety per OET-65 Supplement B and §1.1310: uncontrolled MPE = ${mpe_uncontrolled_mw_cm2} mW/cm² at ${f_mhz} MHz; uncontrolled exclusion zone ${exclusion_zone_m}m, controlled zone ${controlled_zone_m}m${rf_fence_required ? `; RF safety fence required (${Math.round(fence_perimeter_ft)} linear ft, $${fence_cost_low_usd.toLocaleString()}–$${fence_cost_high_usd.toLocaleString()})` : ''}.`,
+        reference: '47 CFR §73.186 (ground radial system standard — 120 × 0.35λ); §1.1310 (RF exposure limits); OET Bulletin 65 Supplement B (AM RF safety); NFPA 780 (lightning protection); §73.49 (antenna enclosure)',
       };
     })(),
 
@@ -18375,7 +18384,7 @@ async function scoreCandidate(pt, ctx, warnings){
         is_clear_channel:               is_clear_ch_pop,
         is_local_channel:               is_local_ch_pop,
         is_da:                          isDA_pop,
-        reference: '47 CFR §73.154; §73.186; §73.69; FCC Form 302-AM; FCC Tech Note: DA Proof Procedures; OET Bulletin 65; NRSC-4',
+        reference: '47 CFR §73.151 (field strength measurements); §73.154 (proof of performance); §73.69 (sampling systems); FCC Form 302-AM; NRSC-4',
         note: `Proof type: ${proof_type}. ${n_radials_required} radials × ${n_measurement_points_per_radial} points = ${total_measurement_points} total. ` +
               `Timeline: ${proof_weeks_low}–${proof_weeks_high} weeks. ` +
               `Total cost: $${total_proof_cost_low.toLocaleString()}–$${total_proof_cost_high.toLocaleString()}.`
@@ -19777,7 +19786,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'B1', section: 'B', title: 'Site coordinates — FCC datum (NAD83)', required: true, cfr: '§73.1020(c)', notes: 'Latitude/longitude to 1-second accuracy; must match ASR registration if tower already registered' },
         { id: 'B2', section: 'B', title: 'Proposed ERP and TPO (kW)', required: true, cfr: '§73.21; §73.51', notes: 'Separate day/night values for Class D on clear channel; transmitter type and model number' },
         { id: 'B3', section: 'B', title: 'Antenna height data (AMSL and AGL)', required: true, cfr: '§73.1020(b)', notes: 'Ground elevation AMSL + structure height AGL + radiation center AGL; must agree with ASR data' },
-        { id: 'B4', section: 'B', title: 'Ground system design description', required: true, cfr: '§73.190', notes: 'Number of radials, length, burial depth, wire gauge; minimum 120 radials for Class A, 60 for Class D screened as adequate' },
+        { id: 'B4', section: 'B', title: 'Ground system design description', required: true, cfr: '§73.186', notes: 'Number of radials, length (0.35λ standard per §73.186), burial depth, wire gauge; minimum 120 radials for Class A, 60 for Class D screened as adequate' },
         { id: 'B5', section: 'B', title: 'Soil conductivity (§73.184 M3 value or measured)', required: true, cfr: '§73.184; §73.150', notes: 'If using FCC M3 table value, state zone; if measured, include ASTM G57 or Wenner 4-electrode test data' },
         { id: 'B6', section: 'B', title: 'Proposed operating schedule (day/night/critical hours)', required: isDA_ch || is_clear_ch, cfr: '§73.99; §73.1740', notes: 'For Class D on clear channel: sunrise/sunset hours; operating schedule changes if moving from current site' },
       ];
@@ -20091,8 +20100,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   1. FCC regulatory fees (Form 301 CP + Form 302-AM license to cover)
       //   2. Professional services (broadcast attorney + engineer)
       //   3. Site acquisition costs (excl. land price: survey, ESA, permits)
-      //   4. Tower construction (new λ/4 guyed monopole at candidate site)
-      //   5. Ground radial system (120 radials at λ/4 length)
+      //   4. Tower construction (guyed monopole: 0.625λ for Class A/B, 0.25λ for C/D)
+      //   5. Ground radial system (120 radials × 0.35λ per §73.186 / NBS TN-24)
       //   6. Transmitter & ATU equipment
       //   7. Transmitter building (structure, HVAC, generator, security)
       //   8. STL system (studio-transmitter link)
@@ -20107,10 +20116,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_pf     = /^DA/i.test(pattern_mode);
       const is_clear_ch = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const lambda_m    = 300000 / frequency_khz;
-      const lambda_q_m  = lambda_m / 4;               // λ/4 tower height (m)
+      // Tower height: Class A/B use 0.625λ (FCC optimum); C/D use 0.25λ (λ/4)
+      const h_frac_pf   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const lambda_q_m  = lambda_m * h_frac_pf;        // class-dependent tower height (m)
       const tower_ft    = Math.round(lambda_q_m * 3.28084);
       const n_radials   = 120;                          // standard AM ground system
-      const radial_len_m = Math.round(lambda_q_m);     // λ/4 radial length
+      const radial_len_m = Math.round(lambda_m * 0.35); // 0.35λ per §73.186 / NBS TN-24
 
       // 1. FCC Regulatory Fees (§1.1102, 2024 schedule).
       const fcc_form301     = 4200;   // major change CP, AM commercial
@@ -20192,8 +20203,8 @@ async function scoreCandidate(pt, ctx, warnings){
         { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: 'Form 301 CP ($4,200) + Form 302-AM ($435) + annual fee ($660); §1.1102' },
         { category: 'Professional Services',             low_usd: prof_low,          high_usd: prof_high,         notes: `Broadcast attorney + engineer; ${isDA_pf ? 'DA adds pattern modeling & §73.182 night analysis' : 'NDA simplifies attorney scope'}` },
         { category: 'Site Acquisition (excl. land)',     low_usd: site_acq_low,      high_usd: site_acq_high,     notes: 'Title search, survey, Phase I ESA, NEPA §1.1307 / §106 consultation, local permits' },
-        { category: 'Tower Construction',                low_usd: tower_low,         high_usd: tower_high,        notes: `λ/4 guyed monopole at ${frequency_khz} kHz = ${Math.round(lambda_q_m)} m (${tower_ft} ft); foundation, base insulator, guys, ASR reg.` },
-        { category: 'Ground Radial System',              low_usd: gnd_low,           high_usd: gnd_high,          notes: `${n_radials} radials × ${radial_len_m} m (λ/4); AWG-10 copper wire + burial/bonding labor; §73.190` },
+        { category: 'Tower Construction',                low_usd: tower_low,         high_usd: tower_high,        notes: `${h_frac_pf}λ guyed monopole at ${frequency_khz} kHz = ${Math.round(lambda_q_m)} m (${tower_ft} ft); foundation, base insulator, guys, ASR reg.` },
+        { category: 'Ground Radial System',              low_usd: gnd_low,           high_usd: gnd_high,          notes: `${n_radials} radials × ${radial_len_m} m (0.35λ per §73.186); AWG-10 copper wire + burial/bonding labor` },
         { category: 'Transmitter & ATU Equipment',       low_usd: equip_low,         high_usd: equip_high,        notes: `${tpo_kw} kW AM transmitter + ATU + hardline + base current monitoring` },
         { category: 'Transmitter Building',              low_usd: bldg_total_low,    high_usd: bldg_total_high,   notes: '1000 sq ft structure + HVAC + 200A electrical + 50 kW generator + security' },
         { category: 'STL System',                        low_usd: stl_low,           high_usd: stl_high,          notes: 'Microwave or IP studio-transmitter link; equipment + installation' },
@@ -20253,7 +20264,7 @@ async function scoreCandidate(pt, ctx, warnings){
         timeline_milestones,
         financing_options,
         n_financing_options:        financing_options.length,
-        reference: '47 CFR §73.21 (power); §73.154 (proof); §73.182 (interference); §73.190 (ground); §1.1102 (fees); §1.1307 (NEPA); NHPA §106; SBA 7(a)/504 program guidelines',
+        reference: '47 CFR §73.21 (power); §73.154 (proof); §73.182 (interference); §73.186 (ground radial system — 120 × 0.35λ); §1.1102 (fees); §1.1307 (NEPA); NHPA §106; SBA 7(a)/504 program guidelines',
         note: `Complete relocation budget for ${frequency_khz} kHz Class ${fcc_class} (${pattern_mode}) ${tpo_kw} kW: estimated $${total_low.toLocaleString()}–$${total_high.toLocaleString()} (typical $${total_typ.toLocaleString()}), including ${contingency_pct}% contingency. Excludes land purchase price. Timeline: ${total_timeline_months_low}–${total_timeline_months_high} months from CP filing to new license. All figures are 2024 screening-grade estimates.`
       };
     })(),
@@ -20708,7 +20719,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Avoid residential zones: most stringent and most likely to generate opposition
 
       const wavelength_m     = 300000 / frequency_khz;
-      const tower_height_m   = Math.round(wavelength_m * 0.25);
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
+      const h_frac_zn        = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const tower_height_m   = Math.round(wavelength_m * h_frac_zn);
       const tower_height_ft  = Math.round(tower_height_m * 3.281);
 
       // Typical zoning permit timeline for AM tower in rural/agricultural zone
@@ -20807,7 +20820,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //     current from flowing on lighting cable into the RF ground system
 
       const wavelength_m     = 300000 / frequency_khz;
-      const tower_height_m   = Math.round(wavelength_m * 0.25);   // λ/4
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
+      const h_frac_faa       = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const tower_height_m   = Math.round(wavelength_m * h_frac_faa);
       const tower_height_ft  = Math.round(tower_height_m * 3.281);
 
       // ASR requirement: structures > 60.96m (200ft) require registration
@@ -21030,7 +21045,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Subtotal tower: ~$215,000 (excludes ground radials, which are separate)
 
       const wavelength_m     = 300000 / frequency_khz;
-      const tower_height_m   = Math.round(wavelength_m * 0.25);  // λ/4 nominal
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
+      const h_frac_cc        = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const tower_height_m   = Math.round(wavelength_m * h_frac_cc);
       const tower_height_ft  = Math.round(tower_height_m * 3.281);
 
       const isDA_cc  = /^DA/i.test(pattern_mode);
@@ -21113,17 +21130,17 @@ async function scoreCandidate(pt, ctx, warnings){
 
     ground_radial_installation_cost_guide: (() => {
       // The AM ground radial system is the single most expensive and labor-intensive element
-      // of an AM transmitter site. FCC §73.190 requires a minimum of 120 radials of λ/4 length
-      // for a standard AM ground system. In practice, 120 × λ/4 radials is the engineering
-      // minimum; optimal efficiency is achieved with more radials or longer radials.
+      // of an AM transmitter site. §73.186 / NBS TN-24 specifies the standard AM ground system
+      // as 120 radials × 0.35λ length. In practice this is the FCC engineering minimum;
+      // optimal efficiency is achieved with more radials or longer radials.
       //
-      // Standard ground system specifications (FCC §73.190 / Terman formula):
-      //   - Minimum: 120 radials × λ/4 length
-      //   - Recommended: 120 radials × λ/2 length (for better efficiency)
+      // Standard ground system specifications (FCC §73.186 / NBS TN-24):
+      //   - Standard: 120 radials × 0.35λ length (per §73.186 / NBS Technical Note 24)
+      //   - Recommended upgrade: 120 radials × 0.50λ length (for better efficiency)
       //   - Wire: #10 AWG solid bare copper (most common); some engineers prefer #12 AWG
       //   - Burial depth: typically 2–6 inches; not deep-buried but lightly covered
       //   - Connection: all radials bonded to common ground ring at tower base
-      //   - Total wire length for 120 × λ/4: 120 × λ/4 meters
+      //   - Total wire length for 120 × 0.35λ: 120 × 0.35λ meters
       //
       // Cost components (2024 US market estimates):
       //   1. Copper wire material: ~$0.60–$1.20/m for #10 AWG bare copper
@@ -21145,9 +21162,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_gr   = /^DA/i.test(pattern_mode);
       const n_towers  = isDA_gr ? 2 : 1;
 
-      // Ground system specifications (standard: 120 radials × λ/4)
+      // Ground system specifications (standard: 120 radials × 0.35λ per §73.186 / NBS TN-24)
       const n_radials            = 120;
-      const radial_length_m      = lambda_quarter_m;
+      const radial_length_m      = Math.round(wavelength_m * 0.35);  // 0.35λ per §73.186 / NBS TN-24
       const total_wire_length_m  = n_radials * radial_length_m;
 
       // Per-meter costs (2024 US market estimates)
@@ -21207,9 +21224,9 @@ async function scoreCandidate(pt, ctx, warnings){
         half_wave_upgrade_cost_usd:     upgrade_cost_usd,
         copper_lbs_total:               copper_lbs_total,
         fcc_minimum_radials:            120,
-        radial_cfr:                     '47 CFR §73.190',
-        reference: '47 CFR §73.190 (AM ground system); FCC AM Engineering Handbook; Terman (1943) radial ground system efficiency; ARRL Antenna Book (copper wire specifications)',
-        note: `${frequency_khz} kHz, λ/4=${lambda_quarter_m}m. Standard ground system: ${n_radials} radials × ${radial_length_m}m = ${total_wire_length_m}m total wire${n_towers > 1 ? ` × ${n_towers} towers` : ''}. Estimated cost: $${total_cost_low.toLocaleString()}–$${total_cost_high.toLocaleString()} (typ. $${total_cost_typ.toLocaleString()}). Half-wave upgrade adds ~$${upgrade_cost_usd.toLocaleString()}.`
+        radial_cfr:                     '47 CFR §73.186',
+        reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ); NBS Technical Note 24 (radial ground system efficiency); FCC AM Engineering Handbook; ARRL Antenna Book (copper wire specifications)',
+        note: `${frequency_khz} kHz, 0.35λ=${radial_length_m}m. Standard ground system: ${n_radials} radials × ${radial_length_m}m (0.35λ) = ${total_wire_length_m}m total wire${n_towers > 1 ? ` × ${n_towers} towers` : ''}. Estimated cost: $${total_cost_low.toLocaleString()}–$${total_cost_high.toLocaleString()} (typ. $${total_cost_typ.toLocaleString()}). Half-wave upgrade adds ~$${upgrade_cost_usd.toLocaleString()}.`
       };
     })(),
 
@@ -22441,8 +22458,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Term: Typically 20–30 years with renewal options (AM licenses renew every 8 years; lease
       //     should span at least two license terms to avoid mid-license lease expiration risk)
       //   - Rent: Varies by geography; rural agricultural land $3,000–$8,000/yr; suburban $8,000–$20,000/yr
-      //   - Ground system easement: Must cover radial wire layout (ground radials extend up to λ/4 from base;
-      //     at 780 kHz, λ/4 ≈ 96m — but efficient systems often use 120-radial layouts extending to λ/2 ≈ 192m)
+      //   - Ground system easement: Must cover radial wire layout (ground radials extend 0.35λ per §73.186;
+      //     at 780 kHz, 0.35λ ≈ 134m; some install λ/2 ≈ 192m radials for further efficiency gain)
       //   - Tower access road: Must be all-weather; requires easement if crossing adjacent parcels
       //   - Transmitter building: Typically 12×20 ft minimum; may need HVAC (transmitter heat load)
       //   - Guy wire anchors: Must be within leased/owned parcel; min. distance from base = guy radius
@@ -22462,9 +22479,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Environmental: If wetland or floodplain is present, EIS may be required (§1.1307)
 
       // Estimate site area requirements based on tower height
-      const tower_height_m = 144.23; // 3/8λ at 780 kHz
+      const _lambda_gl    = 300000 / frequency_khz;
+      const tower_height_m = Math.round(_lambda_gl * (['A', 'B'].includes(fcc_class) ? 0.625 : 0.25));
       const guy_radius_m = Math.round(tower_height_m * 0.7); // approximate guy wire radius
-      const ground_radial_radius_m = Math.round((300000 / frequency_khz) / 4); // λ/4 in meters
+      const ground_radial_radius_m = Math.round(_lambda_gl * 0.35); // 0.35λ per §73.186 / NBS TN-24
       const fence_buffer_m = 3; // 3m minimum buffer inside fence
       const min_site_radius_m = Math.max(guy_radius_m, ground_radial_radius_m) + fence_buffer_m;
       const min_site_area_acres = parseFloat((Math.PI * (min_site_radius_m / 1000) ** 2 * 247.105).toFixed(2));
@@ -22492,7 +22510,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'ASSIGNMENT',      label: 'Assignment and sublease rights', priority: 'CRITICAL', note: 'Lease must be freely assignable to FCC permittees and successors-in-interest without landlord consent', cfr: '§73.3533' },
         { id: 'CONDEMNATION',    label: 'Condemnation proceeds', priority: 'HIGH', note: 'In the event of eminent domain taking, broadcaster receives share of condemnation award proportionate to lease value' },
         { id: 'FAA_ZONING',     label: 'Landlord cooperation for FAA/zoning filings', priority: 'HIGH', note: 'Landlord must sign as property owner on FAA Form 7460-1 and local CUP applications' },
-        { id: 'GROUND_SYSTEM',  label: 'Ground radial system easement', priority: 'HIGH', note: `Ground radials must extend to ${ground_radial_radius_m}m from tower base (λ/4 at ${frequency_khz} kHz). Easement must cover full radial sweep.` },
+        { id: 'GROUND_SYSTEM',  label: 'Ground radial system easement', priority: 'HIGH', note: `Ground radials must extend to ${ground_radial_radius_m}m from tower base (0.35λ per §73.186 at ${frequency_khz} kHz). Easement must cover full radial sweep.` },
         { id: 'ACCESS_ROAD',    label: 'All-weather access road easement', priority: 'MEDIUM', note: 'Broadcaster needs 24/7 unobstructed access to transmitter site for maintenance; road must support equipment delivery trucks' },
         { id: 'EXPANSION',      label: 'Right to expand tower or building', priority: 'MEDIUM', note: 'Broadcaster may need to add directional antenna elements, change tower height, or expand transmitter building during lease term' }
       ];
@@ -23032,10 +23050,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // Existing ASR for the current site does NOT transfer — a new ASR filing (FCC Form 854) is required.
       // FAA coordination under 14 CFR §77 is typically required before ASR can be granted.
 
-      // Tower height estimate (3/8λ at candidate frequency is most common AM tower height)
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
       const c_mps_asr = 299792458;
       const wavelength_m_asr = c_mps_asr / (frequency_khz * 1000);
-      const three_eights_m_asr = round2(wavelength_m_asr * 0.375);
+      const h_frac_asr = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const three_eights_m_asr = round2(wavelength_m_asr * h_frac_asr);  // class-dependent height
       const quarter_wave_m_asr = round2(wavelength_m_asr * 0.25);
 
       // ASR registration threshold: 60.96 m (200 ft) AMSL
@@ -23124,11 +23143,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const safe_work_power_threshold_kw = 0.050; // 50W — above this, RF PPE required on structure
       const rf_ppe_required = tpo_kw > safe_work_power_threshold_kw;
 
-      // Tower height for this candidate (from antenna system summary if available; else estimate)
-      // 3/8λ for 780 kHz ≈ 144 m; typical AM towers: 60–160 m
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
       const c_mps = 299792458;
       const wavelength_m_tc = c_mps / (frequency_khz * 1000);
-      const three_eights_height_m = round2(wavelength_m_tc * 0.375);
+      const h_frac_tc = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const three_eights_height_m = round2(wavelength_m_tc * h_frac_tc);  // class-dependent height
 
       // Fall protection zones and requirements per OSHA §1910.268 / ANSI/TIA-1019-A
       const FALL_PROTECTION_ZONES = [
@@ -25146,7 +25165,7 @@ async function scoreCandidate(pt, ctx, warnings){
           milestones: [
             { id: 'zoning',           task: 'Local zoning / conditional use permit', days: 90, rule: null, note: 'Often the longest local process; start as early as possible (parallel with FCC).' },
             { id: 'tower_permit',     task: 'Building / tower erection permit', days: 30, rule: null, note: 'State/local structural permit.' },
-            { id: 'radial_install',   task: 'Ground radial system installation', days: 21, rule: '§73.190', note: '120 buried radials, 0.4λ length minimum per §73.190 guidance.' },
+            { id: 'radial_install',   task: 'Ground radial system installation', days: 21, rule: '§73.186', note: '120 buried radials, 0.35λ standard length per §73.186 / NBS TN-24.' },
             { id: 'tower_erect',      task: 'Tower erection + FAA painting/lighting', days: 30, rule: '§17.21', note: 'FAA Form 7460-2 completion notice within 5 days of completion.' },
             { id: 'tx_install',       task: 'Transmitter installation + RF plumbing', days: 14, rule: null, note: 'Install and align transmission line, antenna tuning unit, phasor (if DA).' },
             { id: 'proof_of_perf',    task: 'Proof of performance (§73.154)', days: 14, rule: '§73.154', note: isDA_cpt ? 'DA proof: base current ratios, phases, monitor point field strengths, 36+ HRP radials.' : 'NDA proof: operating power measurement and base current/input power.' }
@@ -25201,12 +25220,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const optRadialLen_m = round2(0.4 * lambda_rs);             // Terman optimum: 0.4λ
       const optRadialLen_ft= round2(optRadialLen_m * 3.28084);
 
-      // Standard FCC radial counts: §73.190 footnote recommends 120 radials for efficient system
+      // Standard FCC radial counts: §73.186 / NBS TN-24 specifies 120 radials × 0.35λ for efficient system
       const N_RADIAL_TIERS = [
         { n: 16,  label: 'Minimum practical', efficiency_pct: 50, ground_loss_ohm: round2(1.65 / (16  * sigma_msm * 0.001)), note: 'Severely limited; acceptable only for very low TPO.' },
         { n: 30,  label: 'Reduced',           efficiency_pct: 70, ground_loss_ohm: round2(1.65 / (30  * sigma_msm * 0.001)), note: 'Common for low-power translators; 70% of optimum efficiency.' },
-        { n: 60,  label: 'Moderate',          efficiency_pct: 85, ground_loss_ohm: round2(1.65 / (60  * sigma_msm * 0.001)), note: 'FCC minimum guidance for Class C/D stations per §73.190.' },
-        { n: 120, label: 'FCC recommended',   efficiency_pct: 95, ground_loss_ohm: round2(1.65 / (120 * sigma_msm * 0.001)), note: '120 radials at 0.4λ: FCC §73.190 / Terman optimum. Diminishing returns beyond this.' },
+        { n: 60,  label: 'Moderate',          efficiency_pct: 85, ground_loss_ohm: round2(1.65 / (60  * sigma_msm * 0.001)), note: 'FCC minimum guidance for Class C/D stations; adequate for constrained sites.' },
+        { n: 120, label: 'FCC recommended',   efficiency_pct: 95, ground_loss_ohm: round2(1.65 / (120 * sigma_msm * 0.001)), note: '120 radials at 0.35λ: FCC §73.186 / NBS TN-24 standard. Diminishing returns beyond this.' },
         { n: 240, label: 'High-performance',  efficiency_pct: 98, ground_loss_ohm: round2(1.65 / (240 * sigma_msm * 0.001)), note: 'Used by clear-channel Class A stations. Marginal 3% gain over 120.' }
       ];
 
@@ -25429,7 +25448,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Standard AM tower: 5/8λ for max gain
       const lambda_tl   = round2(300000 / frequency_khz); // m
       const qwave_tl    = round2(lambda_tl / 4);           // m
-      const towerHeightEst_m  = round2(0.375 * lambda_tl);  // 3/8λ as typical for AM
+      const towerHeightEst_m  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_tl);  // 5/8λ Class A/B, λ/4 Class C/D
       const towerHeightEst_ft = round2(towerHeightEst_m * 3.28084);
 
       // ASR threshold: ≥ 61m AGL (200 ft) per §17.7
@@ -25477,7 +25496,7 @@ async function scoreCandidate(pt, ctx, warnings){
         frequency_khz,
         tower_height_estimate_m:   towerHeightEst_m,
         tower_height_estimate_ft:  towerHeightEst_ft,
-        tower_height_basis:        '3/8λ typical AM tower height estimate',
+        tower_height_basis:        ['A', 'B'].includes(fcc_class) ? '5/8λ (Class A/B optimum)' : 'λ/4 (Class C/D standard)',
         asr_required:              asrRequired_tl,
         asr_threshold_m:           ASR_THRESHOLD_M,
         faa_lighting_tier:         tier.label,
@@ -25488,7 +25507,7 @@ async function scoreCandidate(pt, ctx, warnings){
         maintenance_obligations:   maintenanceObs,
         n_maintenance_items:       maintenanceObs.length,
         reference: '47 CFR §17.7; §17.21; §17.23; §17.47; §17.56; §73.1213; FAA AC 70/7460-1M',
-        note: `Estimated tower height: ${towerHeightEst_m} m (${towerHeightEst_ft} ft) at 3/8λ. ASR ${asrRequired_tl ? 'REQUIRED' : 'not required (< 61m)'}. FAA tier: ${tier.label}.`
+        note: `Estimated tower height: ${towerHeightEst_m} m (${towerHeightEst_ft} ft) at ${['A', 'B'].includes(fcc_class) ? '5/8λ' : 'λ/4'}. ASR ${asrRequired_tl ? 'REQUIRED' : 'not required (< 61m)'}. FAA tier: ${tier.label}.`
       };
     })(),
 
@@ -25574,14 +25593,14 @@ async function scoreCandidate(pt, ctx, warnings){
       const landCostLow  = 50000;
       const landCostHigh = 250000; // wide range: rural vs suburban
 
-      // 2. Tower costs: scales with height (≈ 3/8λ) and class
-      const towerH_m = round2(0.375 * lambda_cost);
+      // 2. Tower costs: class-dependent height (5/8λ for Class A/B, λ/4 for C/D)
+      const towerH_m = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_cost);
       const baseTowerCostPerM = 2200; // USD/m installed (guy-wire self-supporting)
       const towerCostLow  = round2(towerH_m * baseTowerCostPerM * 0.8);
       const towerCostHigh = round2(towerH_m * baseTowerCostPerM * 1.6);
 
-      // 3. Ground radial system: 120 radials at 0.4λ, #8 AWG copper
-      const optLen_cost = round2(0.4 * lambda_cost);
+      // 3. Ground radial system: 120 radials at 0.35λ per §73.186 / NBS TN-24, #8 AWG copper
+      const optLen_cost = round2(0.35 * lambda_cost);
       const radialTotalLen_cost = round2(120 * optLen_cost);
       const radialMaterial_cost = round2(radialTotalLen_cost * 1.85); // #8 AWG USD/m
       const radialInstall_cost  = round2(radialTotalLen_cost * 1.50); // labor USD/m
@@ -25823,7 +25842,7 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       // Typical Class D and Class A physical height targets
-      const standardHeightFrac = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
+      const standardHeightFrac = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
       const standardHeightM    = round2(standardHeightFrac * lambda_ah);
       const standardHeightFt   = round2(standardHeightM * 3.28084);
       const standardElecDeg    = round2(standardHeightFrac * 360);
@@ -26215,7 +26234,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower height determines zoning review burden; §11.4 NEPA environmental filing
 
       const lambda_zl    = round2(300000 / frequency_khz);
-      const towerH_m_zl  = round2(0.375 * lambda_zl); // 3/8λ typical for Class D
+      const towerH_m_zl  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_zl); // 5/8λ Class A/B, λ/4 Class C/D
       const towerH_ft_zl = round2(towerH_m_zl * 3.28084);
 
       // Zoning district compatibility tiers
@@ -26462,7 +26481,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA_rc     = /^DA/i.test(pattern_mode);
       const isClear_rc  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
-      const needsASR_rc = round2(0.375 * 300000 / frequency_khz) > 61; // tower > 61m → ASR required
+      const needsASR_rc = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz) > 61; // class-dependent height for ASR check
 
       // Pre-filing requirements
       const PRE_FILING = [
@@ -26879,7 +26898,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC §11.4: NEPA checklist required for all construction permit applications
       // Eight categorical exclusions in §11.4(a) cover most standard AM sites
 
-      const towerH_eia    = round2(0.375 * 300000 / frequency_khz); // 3/8λ estimate
+      const towerH_eia    = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
 
       // NEPA categorical exclusion analysis (§11.4(a))
       // These conditions REMOVE the site from categorical exclusion (require full EA)
@@ -26974,7 +26993,7 @@ async function scoreCandidate(pt, ctx, warnings){
     site_security_perimeter_guide: (() => {
       // §73.49 requires a substantial fence or other enclosure around the base of each AM antenna.
       // OET Bulletin 65 / §1.1310 MPE zones require RF warning signage at perimeter.
-      const towerH_ssp = round2(0.375 * 300000 / frequency_khz); // 3/8λ in metres (Class D standard)
+      const towerH_ssp = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
       // Minimum fence radius: FCC requires enclosure that prevents casual contact; typically 3–5m radius from base
       const fenceRadius_m = Math.max(5, round2(towerH_ssp * 0.05));
       const perimeterCirc_m = round2(2 * Math.PI * fenceRadius_m);
@@ -27062,7 +27081,7 @@ async function scoreCandidate(pt, ctx, warnings){
     insurance_liability_analysis: (() => {
       // AM broadcast tower insurance: property, liability, E&O, cyber
       // §17.7 ASR non-compliance increases premium and voids aviation-related claims
-      const towerH_ins = round2(0.375 * 300000 / frequency_khz); // 3/8λ estimate
+      const towerH_ins = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
       const asr_required = towerH_ins > 60.96; // >200 ft requires ASR registration per §17.7
 
       // Replacement cost value: tower structure + equipment + transmitter building
@@ -27221,7 +27240,7 @@ async function scoreCandidate(pt, ctx, warnings){
         required: true,
         cfr: '47 CFR §73.154(e)',
         description: 'Non-directional measurement at standard monitoring point to verify antenna efficiency reference',
-        standard_monitoring_point_m: round2(0.375 * 300000 / frequency_khz * 0.02),
+        standard_monitoring_point_m: round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz * 0.02),
         base_current_tolerance_pct: 5
       };
 
@@ -27256,7 +27275,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Structural analysis for AM broadcast towers per TIA-222-H (2018) and ANSI/TIA-222
       // §73.49 requires substantial structure; §17.7 ASR requires PE-stamped structural analysis
       // Key: wind zone, ice loading, antenna weight, and foundation capacity all drive tower selection
-      const towerH_tsa = round2(0.375 * 300000 / frequency_khz); // 3/8λ standard
+      const towerH_tsa = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
       const asr_required_tsa = towerH_tsa > 60.96;
 
       // TIA-222-H wind speed exposure categories (ASCE 7-16 basis)
@@ -27413,7 +27432,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Land acquisition guidance for AM transmitter site relocation
       // §1.65 requires notification of changes in circumstances during pending applications
       // FCC Form 301-AM requires legal description of transmitter site; clean title is essential
-      const towerH_pag = round2(0.375 * 300000 / frequency_khz); // 3/8λ estimate
+      const towerH_pag = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
 
       // Minimum site area: tower height + guy wire span + buffer
       // For a guyed tower: guy radius ≈ 0.5 × tower height; buffer 15m for fence + access
@@ -27738,8 +27757,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // tower type, soil, and permitting complexity.
       //
       // Cost components:
-      //   1. Tower: λ/4 guyed monopole (most common NDA); DA adds tower(s)
-      //   2. Ground radial system: 90-radial standard (λ/4 radials)
+      //   1. Tower: 5/8λ for Class A/B, λ/4 for C/D (standard AM monopole heights); DA adds tower(s)
+      //   2. Ground radial system: 90-radial standard (0.35λ radials per §73.186)
       //   3. Transmitter building: prefab shelter including HVAC/generator
       //   4. Transmitter equipment: main + spare by power class
       //   5. ATU (antenna tuning unit) + phasor (DA only)
@@ -27766,7 +27785,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA = /^DA/i.test(pattern_mode);
       const lambda_m    = round2(300000 / frequency_khz);
-      const qwave_h_m   = round2(lambda_m / 4);
+      const std_h_frac  = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;  // 5/8λ Class A/B, λ/4 Class C/D
+      const qwave_h_m   = round2(lambda_m * std_h_frac);
 
       // Tower cost
       const towerCost = (h) => {
@@ -27782,8 +27802,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const tower_low  = primaryTower.low  + Math.round(extra_towers * primaryTower.low  * 0.6);
       const tower_high = primaryTower.high + Math.round(extra_towers * primaryTower.high * 0.6);
 
-      // Ground radial system (90-radial standard)
-      const radial_length_m = round2(lambda_m / 4);
+      // Ground radial system (90-radial standard, 0.35λ per §73.186 / NBS TN-24)
+      const radial_length_m = round2(lambda_m * 0.35);
       const gnd_wire_m      = 90 * radial_length_m;
       const gnd_low  = Math.round(gnd_wire_m * 2.80);
       const gnd_high = Math.round(gnd_wire_m * 4.20);
@@ -27938,13 +27958,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // the single largest capital cost item for most AM relocations outside of
       // the tower itself.
       //
-      // FCC/industry standards (§73.150(b); FCC AM engineering guidance):
-      //   - Optimum (minimum-loss) system: 120 radials, each λ/4 in length
+      // FCC/industry standards (§73.186; NBS TN-24; FCC AM engineering guidance):
+      //   - Optimum (minimum-loss) system: 120 radials, each 0.35λ in length per §73.186 / NBS TN-24
       //   - Practical minimum for licensed operation: 30–60 radials
       //   - Systems with <30 radials show significant efficiency degradation
       //
       // Radial length:
-      //   L_radial_m = λ/4 = 75,000 / frequency_khz  (metres)
+      //   L_radial_m = 0.35λ = 105,000 / frequency_khz  (metres, per §73.186 / NBS TN-24)
       //
       // Wire sizing:
       //   - Typical: #10 AWG (2.59mm) stranded copper, bare
@@ -27964,7 +27984,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Optimum: 120 radials (FCC-recommended, maximum efficiency)
 
       const lambda_m      = round2(300000 / frequency_khz);
-      const radial_length_m = round2(lambda_m / 4);
+      const radial_length_m = round2(lambda_m * 0.35);  // 0.35λ per §73.186 / NBS TN-24
 
       const CONFIGS = [
         { label: 'economy',  n_radials: 60,  r_loss_ohm: 5.0 },
@@ -28014,8 +28034,8 @@ async function scoreCandidate(pt, ctx, warnings){
         recommended_config: recommended,
         soil_note,
         wire_gauge_awg:     tpo_kw > 10 ? 8 : 10,
-        reference:          '47 CFR §73.150(b); FCC AM engineering guidance',
-        note:               `Radial length: ${radial_length_m}m (λ/4). Recommended: ${recommended?.n_radials} radials × ${radial_length_m}m = ${recommended?.total_wire_m}m wire. Est. installed cost: $${recommended?.cost_usd?.low?.toLocaleString()}–$${recommended?.cost_usd?.high?.toLocaleString()}.`
+        reference:          '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ); NBS Technical Note 24; FCC AM engineering guidance',
+        note:               `Radial length: ${radial_length_m}m (0.35λ per §73.186). Recommended: ${recommended?.n_radials} radials × ${radial_length_m}m = ${recommended?.total_wire_m}m wire. Est. installed cost: $${recommended?.cost_usd?.low?.toLocaleString()}–$${recommended?.cost_usd?.high?.toLocaleString()}.`
       };
     })(),
 
@@ -28679,7 +28699,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const colocation_base_high_usd   = isDA_cos ? greenfield_tower_high_usd
         : Math.round((greenfield_tower_high_usd * 0.45) / 1000) * 1000;
       // Ground system is always required regardless of colocation
-      const ground_system_usd_low      = Math.round(120 * round2(lambda_m_cos / 4 * 3.28084) * 1.5 / 1000) * 1000;
+      const ground_system_usd_low      = Math.round(120 * round2(lambda_m_cos * 0.35 * 3.28084) * 1.5 / 1000) * 1000; // 0.35λ per §73.186 / NBS TN-24
       const ground_system_usd_high     = Math.round(ground_system_usd_low * 1.8 / 1000) * 1000;
 
       // ---- RF interference checklist ----
@@ -30308,10 +30328,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_da = /^DA/i.test(pattern_mode);
       const is_da2 = /^DA-2/i.test(pattern_mode);
 
-      // ASR requirement: tower height proxy from wavelength.
-      // λ/4 at lowest common AM frequencies is a rough height proxy.
+      // ASR requirement: tower height from class-dependent standard height.
+      // 5/8λ for Class A/B (FCC optimum); λ/4 for Class C/D.
       const lambda_m      = 300000 / frequency_khz;   // speed of light / freq
-      const qw_m          = round2(lambda_m / 4);
+      const qw_m          = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_m);
       const asr_required  = qw_m > 61;                // >200 ft AGL triggers ASR
 
       // Annual database maintenance cost estimates (USD)
@@ -32804,12 +32824,12 @@ function frequencyChannelClass(frequency_khz){
 function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
   if (sigma_msm == null || !Number.isFinite(sigma_msm)) return null;
 
-  // Quarter-wave radial length for this frequency.
+  // Standard radial length per §73.186 / NBS TN-24: 0.35λ for optimum ground system.
   const lambda_m   = frequency_khz ? round2(300000 / frequency_khz) : null;
-  const qw_radial_m = lambda_m ? round2(lambda_m / 4) : null;
+  const qw_radial_m = lambda_m ? round2(lambda_m * 0.35) : null;  // 0.35λ per §73.186 / NBS TN-24
 
-  // Standard system: 120 radials at λ/4 length buried ≥5 cm.
-  // Extended system: 120–180 radials at λ/4–λ/2, + deep-driven rods, for poor σ.
+  // Standard system: 120 radials at 0.35λ length buried ≥5 cm (§73.186 / NBS TN-24).
+  // Extended system: 120–180 radials at 0.35λ–0.5λ, + deep-driven rods, for poor σ.
   // Copper weight: 120 × radial_length × AWG #10 wire (4.66 g/m) for rough cost estimate.
   // AWG #10 is commonly used; #8 is preferred for high-power installations.
   const aWireGPerM = 4.66;  // AWG #10 copper, g/m
@@ -32817,8 +32837,8 @@ function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
 
   const stdCount   = 120;
   const extCount   = 180;
-  const stdLen     = qw_radial_m;                           // λ/4 = standard
-  const extLen     = qw_radial_m ? round2(qw_radial_m * 1.5) : null; // λ×3/8 for poor σ
+  const stdLen     = qw_radial_m;                           // 0.35λ = standard per §73.186
+  const extLen     = qw_radial_m ? round2(qw_radial_m * 1.43) : null; // ~0.5λ for poor σ
 
   const stdCopperKg = stdLen ? copperKg(stdCount, stdLen) : null;
   const extCopperKg = extLen ? copperKg(extCount, extLen) : null;
@@ -32831,12 +32851,12 @@ function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
       sigma_quality: sigmaQuality(sigma_msm),
       recommended_radial_count: stdCount,
       recommended_radial_length_m: stdLen,
-      radial_length_description: 'λ/4 (quarter-wave) — optimal for σ ≥ 4 mS/m',
+      radial_length_description: '0.35λ (standard per §73.186 / NBS TN-24) — optimal for σ ≥ 4 mS/m',
       extended_system_required: false,
       deep_driven_rods_required: false,
       estimated_copper_kg: stdCopperKg,
       certification_method: certMethod,
-      note: `Standard 120-radial system at λ/4 (${stdLen ?? '?'} m) adequate for σ=${sigma_msm} mS/m. §73.190 survey still required for Form 302-AM certification.`
+      note: `Standard 120-radial system at 0.35λ (${stdLen ?? '?'} m per §73.186) adequate for σ=${sigma_msm} mS/m. §73.190(c) conductivity survey still required for Form 302-AM certification.`
     };
   }
   if (sigma_msm >= 2){
@@ -32845,12 +32865,12 @@ function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
       sigma_quality: sigmaQuality(sigma_msm),
       recommended_radial_count: stdCount,
       recommended_radial_length_m: stdLen,
-      radial_length_description: 'λ/4 (quarter-wave) — minimum adequate for σ ≥ 2 mS/m',
+      radial_length_description: '0.35λ (standard per §73.186) — minimum adequate for σ ≥ 2 mS/m',
       extended_system_required: false,
       deep_driven_rods_required: false,
       estimated_copper_kg: stdCopperKg,
       certification_method: certMethod,
-      note: `FAIR conductivity (σ=${sigma_msm} mS/m): 120-radial system at λ/4 (${stdLen ?? '?'} m) should be adequate; verify soil resistivity before site commitment. Extended system may be cost-effective if survey confirms σ < 3 mS/m.`
+      note: `FAIR conductivity (σ=${sigma_msm} mS/m): 120-radial system at 0.35λ (${stdLen ?? '?'} m per §73.186) should be adequate; verify soil resistivity before site commitment. Extended system may be cost-effective if survey confirms σ < 3 mS/m.`
     };
   }
   return {
@@ -32858,13 +32878,13 @@ function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
     sigma_quality: sigmaQuality(sigma_msm),
     recommended_radial_count: extCount,
     recommended_radial_length_m: extLen,
-    radial_length_description: '3λ/8 (1.5× quarter-wave) — extended for poor σ',
+    radial_length_description: '~0.5λ (extended per NBS TN-24 for poor σ) — extended for poor σ',
     extended_system_required: true,
     deep_driven_rods_required: true,
     estimated_copper_kg: extCopperKg,
     estimated_standard_copper_kg: stdCopperKg,
     certification_method: certMethod,
-    note: `POOR conductivity (σ=${sigma_msm} mS/m): §73.190 extended ground system required. Recommend ${extCount} radials at 3λ/8 (${extLen ?? '?'} m) + deep-driven copper rods (≥3 m at 3 m centers). Estimated copper: ${extCopperKg ?? '?'} kg. Soil survey urgently needed before site commitment.`
+    note: `POOR conductivity (σ=${sigma_msm} mS/m): §73.186 extended ground system required. Recommend ${extCount} radials at ~0.5λ (${extLen ?? '?'} m per NBS TN-24 extended) + deep-driven copper rods (≥3 m at 3 m centers). Estimated copper: ${extCopperKg ?? '?'} kg. Soil survey urgently needed before site commitment.`
   };
 }
 
