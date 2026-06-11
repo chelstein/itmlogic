@@ -555,7 +555,7 @@ const DEMO_RESULT = {
   candidate_count_by_status: {
     PROMISING: 58, REVIEW_REQUIRED: 142, NON_COMPLIANT: 34
   },
-  top_candidates_summary: 'Rank 1 scores 91.3 (PROMISING), 6 km NE of current site, σ=8 mS/m (EXCELLENT). COL field 18.4 mV/m (≥§73.24(j) 5 mV/m floor). est. 125K served @0.5 mV/m. vs current site: score +28.9, reach +5.6 km. top 4 σ quality: 3×EXCELLENT, 1×FAIR. statuses: 3 PROMISING, 1 REVIEW_REQUIRED (out of 234 evaluated).',
+  top_candidates_summary: 'Rank 1 scores 91.3 (PROMISING), 6 km NE of current site, σ=8 mS/m (EXCELLENT). COL field 18.4 mV/m (≥§73.24(i) 5 mV/m floor). est. 125K served @0.5 mV/m. vs current site: score +28.9, reach +5.6 km. top 4 σ quality: 3×EXCELLENT, 1×FAIR. statuses: 3 PROMISING, 1 REVIEW_REQUIRED (out of 234 evaluated).',
   candidate_shortlist: [
     {
       rank: 1, lat: 34.91, lon: -111.79, status_category: 'PROMISING',
@@ -572,8 +572,8 @@ const DEMO_RESULT = {
     {
       rank: 3, lat: 34.95, lon: -111.92, status_category: 'RECOVERABLE_WITH_POWER_INCREASE',
       score_with_band: 'score 71.8 [49.8–93.8]',
-      summary: 'Rank 3 @ 12.5 km NW: COL coverage 78% (below 80% floor), σ=10 mS/m (EXCELLENT), reach 28 km. Increase TPO to ≥8.5 kW to achieve §73.24(j) compliance, then advance to NIF study.',
-      recommended_next_step: 'Increase TPO to ≥8.5 kW to achieve §73.24(j) compliance, then advance to NIF study.'
+      summary: 'Rank 3 @ 12.5 km NW: COL coverage 78% (below 80% floor), σ=10 mS/m (EXCELLENT), reach 28 km. Increase TPO to ≥8.5 kW to achieve §73.24(i) compliance, then advance to NIF study.',
+      recommended_next_step: 'Increase TPO to ≥8.5 kW to achieve §73.24(i) compliance, then advance to NIF study.'
     }
   ],
   geographic_diversity_analysis: {
@@ -632,7 +632,7 @@ const DEMO_RESULT = {
     n_filing_grade: 0, n_screening: 4, n_not_evaluated: 3,
     dimensions: [
       { id: 'CONDUCTIVITY', label: 'Ground conductivity (σ)', confidence: 'SCREENING', score_impact_pts: 12, upgrade_action: 'Deploy AM_m3.tif GeoTIFF raster via S3/CDN — eliminates ±50% conductivity uncertainty. Commission site soil resistivity survey.', upgrade_value: 'Conductivity sub-score resolves from ±12 pts to ±3 pts.' },
-      { id: 'COL_COVERAGE', label: 'Principal community (§73.24(j)) coverage', confidence: 'SCREENING', score_impact_pts: 10, upgrade_action: 'Supply community_of_license_polygon as GeoJSON Polygon in the request body.', upgrade_value: 'COL sub-score resolves from ±10 pts to ±2 pts.' },
+      { id: 'COL_COVERAGE', label: 'Principal community (§73.24(i)) coverage', confidence: 'SCREENING', score_impact_pts: 10, upgrade_action: 'Supply community_of_license_polygon as GeoJSON Polygon in the request body.', upgrade_value: 'COL sub-score resolves from ±10 pts to ±2 pts.' },
       { id: 'POPULATION', label: 'Population / people served', confidence: 'SCREENING', score_impact_pts: 8, upgrade_action: 'Integrate Census TIGER block-level population raster or polygon-level data.', upgrade_value: 'Population sub-score uncertainty reduces from ±40% to ±10%.' },
       { id: 'BLANKET_POPULATION', label: 'Blanket population (§73.24(g)) fraction', confidence: 'SCREENING', score_impact_pts: 6, upgrade_action: 'Integrate Census TIGER block-level population within 1000 mV/m contour.', upgrade_value: 'Resolves blanket sub-score from ±50% to ±10% in urban areas.' },
       { id: 'NIGHTTIME_NIF', label: 'Nighttime skywave interference (§73.182)', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Integrate FCC OET-72 skywave propagation engine + LMS database lookup.', upgrade_value: 'Would add a 5th scoring dimension.' },
@@ -701,8 +701,8 @@ const DEMO_RESULT = {
     },
     {
       priority: 'MEDIUM',
-      action: 'Evaluate TPO increase for §73.24(j) COL coverage on 2 candidate(s) (Rank 3: increase to ≥8.5 kW).',
-      rationale: 'Ranks 3 and 4 fail the §73.24(j) 5 mV/m principal-community floor at current TPO. The engine has pre-computed the minimum TPO at which the 5 mV/m groundwave contour reaches the community-of-license centroid distance. Verify the increased power is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket population problems.'
+      action: 'Evaluate TPO increase for §73.24(i) COL coverage on 2 candidate(s) (Rank 3: increase to ≥8.5 kW).',
+      rationale: 'Ranks 3 and 4 fail the §73.24(i) 5 mV/m principal-community floor at current TPO. The engine has pre-computed the minimum TPO at which the 5 mV/m groundwave contour reaches the community-of-license centroid distance. Verify the increased power is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket population problems.'
     },
     {
       priority: 'MEDIUM',
@@ -712,7 +712,7 @@ const DEMO_RESULT = {
     {
       priority: 'MEDIUM',
       action: 'Supply the community-of-license GeoJSON polygon for filing-grade COL coverage scoring.',
-      rationale: 'Current run uses a 10 km disc proxy for §73.24(j) coverage. Providing the actual COL boundary as a GeoJSON Polygon enables Monte-Carlo polygon overlap scoring and significantly increases confidence in the coverage sub-score.'
+      rationale: 'Current run uses a 10 km disc proxy for §73.24(i) coverage. Providing the actual COL boundary as a GeoJSON Polygon enables Monte-Carlo polygon overlap scoring and significantly increases confidence in the coverage sub-score.'
     },
     {
       priority: 'INFORMATIONAL',
@@ -730,7 +730,7 @@ const DEMO_RESULT = {
     { id: 'ANTENNA_STUDY',     status: 'REQUIRED',    description: 'Design and model AM vertical antenna system for 780 kHz', rule: '47 CFR §73.316 / §73.45', note: 'Non-directional antenna — standard §73.45 field intensity / efficiency certification required' },
     { id: 'ASR_REGISTRATION',  status: 'REQUIRED',    description: 'Verify tower height; file FCC ASR registration if > 200 ft (60.96 m)', rule: '47 CFR §17.7', note: 'ASR REGISTRATION REQUIRED: typical λ/4 antenna height at 780 kHz (96.15 m) exceeds the 200-ft §17.7 threshold' },
     { id: 'RF_EXPOSURE_MPE',   status: 'REQUIRED',    description: 'Prepare RF exposure (MPE) evaluation per OET Bulletin 65', rule: '47 CFR §1.1307 / OET Bulletin 65', note: 'ERP = 5 kW. All AM broadcast stations must demonstrate general population MPE compliance.' },
-    { id: 'COL_COVERAGE',      status: 'REQUIRED',    description: 'Document ≥ 80% community-of-license coverage by the 5 mV/m daytime contour', rule: '47 CFR §73.24(j)', note: 'No COL polygon provided — polygon-based analysis required for filing' },
+    { id: 'COL_COVERAGE',      status: 'REQUIRED',    description: 'Document ≥ 80% community-of-license coverage by the 5 mV/m daytime contour', rule: '47 CFR §73.24(i)', note: 'No COL polygon provided — polygon-based analysis required for filing' },
     { id: 'BLANKET_POPULATION',status: 'REQUIRED',    description: 'Demonstrate blanket-area population does not exceed 1% of total service population', rule: '47 CFR §73.24(g)', note: 'Compute 1000 mV/m contour area and census population at proposed TPO.' },
     { id: 'PROTECTION_STUDIES',status: 'REQUIRED',    description: 'Submit co-channel and adjacent-channel interference protection studies', rule: '47 CFR §73.182 / §73.37', note: null },
     { id: 'SKYWAVE_NIF',       status: 'REQUIRED',    description: 'Prepare skywave interference analysis (NIF study) for nighttime operations', rule: '47 CFR §73.182', note: 'Clear channel (780 kHz) — full §73.182 NIF study required before nighttime authorization' },
@@ -851,7 +851,7 @@ const DEMO_RESULT = {
         components: { col_coverage: 12.1, population: 11.8, blanket: 3.6, conductivity: 6.3, confidence_penalty: -4.9 }
       },
       regulatory_compliance_summary: {
-        col_coverage: { status: 'PASS', value: 0.97, threshold: 0.80, rule: '47 CFR §73.24(j)' },
+        col_coverage: { status: 'PASS', value: 0.97, threshold: 0.80, rule: '47 CFR §73.24(i)' },
         blanket_pop:  { status: 'PASS', value: 0.40, threshold: 1.00, rule: '47 CFR §73.24(g)' },
         class_power:  { status: 'PASS', value: 5, ceiling: 50, rule: '47 CFR §73.21' },
         treaty_zone:  { status: 'CLEAR', value: null, rule: 'US/MX 1986 Agreement; US/CA 1991 LOU' }
@@ -930,10 +930,10 @@ const DEMO_RESULT = {
         nif_study_required: true,
         rule: '47 CFR §73.182 / §73.25'
       },
-      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' },
+      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(i)' },
       site_viability_summary: {
         go_no_go: 'GO', confidence: 'PROMISING',
-        one_line: 'Meets §73.24(j) COL floor (97%) and §73.24(g) blanket limit at current TPO.',
+        one_line: 'Meets §73.24(i) COL floor (97%) and §73.24(g) blanket limit at current TPO.',
         evaluated_at_tpo_kw: 5
       },
       tower_cost_estimate: {
@@ -958,7 +958,7 @@ const DEMO_RESULT = {
       seasonal_conductivity_note: {
         sigma_msm: 8, sigma_quality: 'EXCELLENT', seasonal_variability: 'LOW',
         risk_level: 'MINIMAL',
-        notes: ['High-conductivity soil (σ=8 mS/m) — seasonal moisture variation is modest (±10–20%) and unlikely to affect §73.24(j) compliance.',
+        notes: ['High-conductivity soil (σ=8 mS/m) — seasonal moisture variation is modest (±10–20%) and unlikely to affect §73.24(i) compliance.',
                 'Annual-average FCC M3 value is a reliable proxy for filing-grade conductivity at this site.'],
         rule: '47 CFR §73.190', disclaimer: 'Seasonal variability is a screening-grade proxy.'
       },
@@ -973,7 +973,7 @@ const DEMO_RESULT = {
       },
       population_reach_bands: {
         bands: [
-          { target_mvm: 5.0,  label: '5 mV/m (§73.24(j) principal community)', distance_km: 5.8,  area_km2: 105.7,  estimated_population: 179690 },
+          { target_mvm: 5.0,  label: '5 mV/m (§73.24(i) principal community)', distance_km: 5.8,  area_km2: 105.7,  estimated_population: 179690 },
           { target_mvm: 2.0,  label: '2 mV/m (urban fringe / primary coverage)', distance_km: 11.2, area_km2: 394.1, estimated_population: 669970 },
           { target_mvm: 1.0,  label: '1 mV/m (rural primary)', distance_km: 19.4, area_km2: 1183.8, estimated_population: 2012460 },
           { target_mvm: 0.5,  label: '0.5 mV/m (§73.24 secondary daytime)', distance_km: 34.1, area_km2: 3656.5, estimated_population: 6212050 },
@@ -1062,7 +1062,7 @@ const DEMO_RESULT = {
         overall_verdict: 'CONDITIONAL', overall_note: '4 gate(s) require additional studies — site is viable pending engineering work.',
         fail_count: 0, warn_count: 4,
         gates: [
-          { id: 'COL_COVERAGE', label: '§73.24(j) COL 5 mV/m coverage', status: 'PASS', value: '97% (need ≥80%)', rule: '47 CFR §73.24(j)', note: null },
+          { id: 'COL_COVERAGE', label: '§73.24(i) COL 5 mV/m coverage', status: 'PASS', value: '97% (need ≥80%)', rule: '47 CFR §73.24(i)', note: null },
           { id: 'BLANKET_POP', label: '§73.24(g) blanket population <1%', status: 'PASS', value: '0.5% (max 1%)', rule: '47 CFR §73.24(g)', note: null },
           { id: 'ASR_REGISTRATION', label: '§17.7 ASR tower registration', status: 'WARN', value: 'λ/4 ≈ 96 m (threshold 60.96 m)', rule: '47 CFR §17.7', note: 'FCC Form 854 + FAA aeronautical study (7460-1) required before construction.' },
           { id: 'RF_EXPOSURE_MPE', label: '§1.1307 RF exposure (MPE) evaluation', status: 'WARN', value: 'Near-field boundary λ/(2π) ≈ 61 m', rule: '47 CFR §1.1307 / OET Bulletin 65', note: 'OET-65 near-field evaluation required — fence at ≥61 m from antenna base.' },
@@ -1115,7 +1115,7 @@ const DEMO_RESULT = {
       signal_propagation_profile: {
         frequency_khz: 780, tpo_kw: 5, sigma_msm: 5,
         contours: [
-          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(j) COL floor)',         target_mvm: 5.0,    distance_km: 6.2,  area_km2: 120.8 },
+          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(i) COL floor)',         target_mvm: 5.0,    distance_km: 6.2,  area_km2: 120.8 },
           { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',                   target_mvm: 2.0,    distance_km: 14.1, area_km2: 624.8 },
           { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)',        target_mvm: 0.5,    distance_km: 34.1, area_km2: 3659 },
           { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',              target_mvm: 0.1,    distance_km: 68.5, area_km2: 14744 },
@@ -1130,7 +1130,7 @@ const DEMO_RESULT = {
         items: [
           { id: 'LMS_FORM_301', form: 'FCC Form 301-AM', exhibit: 'Section I — Basic Engineering', status: 'REQUIRED', rule: '47 CFR §73.3500 / §73.3525', responsible: 'Communications counsel + broadcast engineer', note: 'Primary change-of-site application. Include antenna system description, coordinates, ground system plan, and TPO.' },
           { id: 'LMS_GROUNDWAVE_STUDY', form: 'Form 301-AM — Exhibit B', exhibit: 'Groundwave field-intensity study (§73.184)', status: 'REQUIRED', rule: '47 CFR §73.183 / §73.184', responsible: 'Licensed broadcast engineer', note: 'FCC M3-zone conductivity σ=8 mS/m used for screening. Exhibit B requires groundwave distance/field table at compass bearings per §73.184.' },
-          { id: 'LMS_COL_EXHIBIT', form: 'Form 301-AM — Exhibit C', exhibit: 'Principal community (COL) 5 mV/m coverage certification', status: 'REQUIRED', rule: '47 CFR §73.24(j)', responsible: 'Licensed broadcast engineer', note: 'Demonstrate ≥80% of principal community (97% estimated at screening) is covered by the 5 mV/m daytime groundwave contour.' },
+          { id: 'LMS_COL_EXHIBIT', form: 'Form 301-AM — Exhibit C', exhibit: 'Principal community (COL) 5 mV/m coverage certification', status: 'REQUIRED', rule: '47 CFR §73.24(i)', responsible: 'Licensed broadcast engineer', note: 'Demonstrate ≥80% of principal community (97% estimated at screening) is covered by the 5 mV/m daytime groundwave contour.' },
           { id: 'LMS_BLANKET_POP', form: 'Form 301-AM — Exhibit D', exhibit: 'Blanket interference (§73.24(g)) population study', status: 'REQUIRED', rule: '47 CFR §73.24(g)', responsible: 'Licensed broadcast engineer', note: '1000 mV/m contour population must be <1% of service-area population. Current screen: 0.4%.' },
           { id: 'LMS_MPE_STUDY', form: 'Form 301-AM — Exhibit E', exhibit: 'RF exposure (MPE) evaluation (OET Bulletin 65 / §1.1307)', status: 'REQUIRED', rule: '47 CFR §1.1307', responsible: 'Licensed broadcast engineer', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz. Fence distance and restricted-zone perimeter must be documented.' },
           { id: 'LMS_NEPA', form: 'Form 301-AM — NEPA Checklist', exhibit: 'NEPA environmental review (§1.1306)', status: 'REQUIRED', rule: '47 CFR §1.1306 / §1.1307', responsible: 'Environmental consultant + counsel', note: 'Complete 13-item §1.1306 checklist. File EA if any trigger applies.' },
@@ -1153,9 +1153,9 @@ const DEMO_RESULT = {
         daytime_reach_variation_km: 6.1,
         daytime_reach_variation_pct: 17.9,
         col_compliance_risk_tier: 'LOW',
-        col_risk_note: 'GOOD conductivity — seasonal variation is unlikely to threaten §73.24(j) COL compliance.',
+        col_risk_note: 'GOOD conductivity — seasonal variation is unlikely to threaten §73.24(i) COL compliance.',
         reference: 'Seasonal conductivity variation factors are screening-grade proxies from NTIA 84-136 / FCC §73.190 guidance.',
-        note: 'Seasonal propagation summary is a planning tool only. All §73.24(j) compliance determinations must use FCC-approved groundwave software with measured soil data.'
+        note: 'Seasonal propagation summary is a planning tool only. All §73.24(i) compliance determinations must use FCC-approved groundwave software with measured soil data.'
       },
       fcc_class_power_ceiling_analysis: {
         fcc_class: 'D', current_tpo_kw: 5, class_power_ceiling_kw: 50,
@@ -1312,7 +1312,7 @@ const DEMO_RESULT = {
         col_bearing_deg: 212, dist_to_col_km: 3.8,
         col_required_field_mvm: 5.0, field_at_col_nda_mvm: 4.1, col_field_deficit_mvm: 0.9,
         da_recommended: 'STRONGLY_RECOMMENDED',
-        da_recommended_note: 'NDA field at COL (4.1 mV/m) is below the §73.24(j) 5 mV/m floor. A DA pattern toward 212° can add 3–5 dB gain and may achieve compliance without increasing TPO.',
+        da_recommended_note: 'NDA field at COL (4.1 mV/m) is below the §73.24(i) 5 mV/m floor. A DA pattern toward 212° can add 3–5 dB gain and may achieve compliance without increasing TPO.',
         element_spacing_options: [
           { spacing_label: 'λ/4', spacing_m: 96.2, spacing_deg: 90, pattern_type: 'CARDIOID', gain_over_nda_db: 3.0, note: 'Standard 2-element cardioid; deep null opposite COL; simplest to optimize' },
           { spacing_label: '3λ/8', spacing_m: 144.2, spacing_deg: 135, pattern_type: 'MODIFIED_CARDIOID', gain_over_nda_db: 3.5, note: 'Wider front lobe; reduced null depth; useful when suppression is partial' },
@@ -1324,11 +1324,11 @@ const DEMO_RESULT = {
           { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: true, note: '§73.316: D/U at interfered-with protected contour must meet §73.207 limits' },
           { id: 'DA_LICENSE_STATUS', item: 'DA pattern must be approved via FCC Form 302-AM (license to cover)', required: true, note: '§73.3533: proof-of-performance measurements required before DA operation authorized' },
           { id: 'MONITOR_POINT', item: 'FCC-specified monitor points during DA operation', required: true, note: '§73.61/§73.62: clear-channel DA stations require FCC-specified monitoring' },
-          { id: 'COL_MIN_FIELD', item: 'COL minimum field: 5.0 mV/m at 3.8 km toward 212°', required: true, note: '§73.24(j): 5 mV/m groundwave field must reach community of license. NDA estimate: 4.1 mV/m.' },
+          { id: 'COL_MIN_FIELD', item: 'COL minimum field: 5.0 mV/m at 3.8 km toward 212°', required: true, note: '§73.24(i): 5 mV/m groundwave field must reach community of license. NDA estimate: 4.1 mV/m.' },
           { id: 'NIGHTTIME_DA', item: 'DA-N (nighttime) pattern separate from DA-D (daytime)', required: true, note: '§73.150(b): separate pattern authorizations for DA-D and DA-N; skywave NIF for DA-N' }
         ],
         n_checklist_required: 7,
-        reference: '47 CFR §73.150; §73.152; §73.316; §73.24(j); §73.207/§73.215',
+        reference: '47 CFR §73.150; §73.152; §73.316; §73.24(i); §73.207/§73.215',
         note: 'Pattern optimization guidance is screening-grade. Actual DA element positions, current ratios, and phasing must be determined by a licensed broadcast engineer using full §73.182 analysis and field measurements per §73.154.'
       },
       propagation_confidence_interval: {
@@ -1602,13 +1602,13 @@ const DEMO_RESULT = {
       },
       community_of_license_profile: {
         col_data_source: 'NO_COL_DATA',
-        col_data_source_note: 'No CoL data supplied — distance proxy uses candidate-to-current-site distance. Commission GeoJSON polygon for §73.24(j) analysis.',
+        col_data_source_note: 'No CoL data supplied — distance proxy uses candidate-to-current-site distance. Commission GeoJSON polygon for §73.24(i) analysis.',
         col_centroid_lat: null, col_centroid_lon: null,
         candidate_lat: 34.86, candidate_lon: -111.82,
         candidate_to_col_dist_km: 8.2,
         bearing_from_candidate_to_col_deg: null,
         geographic_tier: 'NEAR',
-        geographic_tier_note: 'Candidate within 10 km of CoL. §73.24(j) compliance straightforward at typical class TPO. Blanket population monitoring advisable.',
+        geographic_tier_note: 'Candidate within 10 km of CoL. §73.24(i) compliance straightforward at typical class TPO. Blanket population monitoring advisable.',
         daytime_reach_km: 36.8,
         field_at_col_centroid_mvm: 12.4,
         col_5mvm_centroid_covered: true,
@@ -1616,7 +1616,7 @@ const DEMO_RESULT = {
         col_compliant: true,
         minimum_tpo_for_col_kw: null,
         engineering_recommendations: ['No immediate engineering actions required at screening grade.'],
-        reference: '47 CFR §73.24(j); §73.24(g); §73.150',
+        reference: '47 CFR §73.24(i); §73.24(g); §73.150',
         note: 'Community of license profile is a screening-grade geographic assessment. Coverage_pct uses a 10-km disc proxy when no CoL polygon is supplied.'
       },
       tower_structural_assessment_guide: {
@@ -1686,7 +1686,7 @@ const DEMO_RESULT = {
         filing_readiness: 'CONDITIONAL — no hard failures; outstanding items require professional study/consultation before filing',
         pass_count: 2, warn_count: 8, fail_count: 0, not_evaluated_count: 2,
         items: [
-          { id: 'col_coverage', label: 'Principal community 5 mV/m coverage', rule: '47 CFR §73.24(j)', status: 'PASS', note: '97% of principal community receives ≥5 mV/m (floor: 80%).', required_action: null },
+          { id: 'col_coverage', label: 'Principal community 5 mV/m coverage', rule: '47 CFR §73.24(i)', status: 'PASS', note: '97% of principal community receives ≥5 mV/m (floor: 80%).', required_action: null },
           { id: 'blanket_pop', label: 'Blanket population (1000 mV/m contour)', rule: '47 CFR §73.24(g)', status: 'PASS', note: 'Estimated blanket population 0.5% ≤ 1% ceiling.', required_action: null },
           { id: 'asr_registration', label: 'ASR tower registration (§17.7)', rule: '47 CFR §17.7 / FCC Form 854', status: 'WARN', note: 'λ/4 = 96.2 m at 780 kHz exceeds the 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 and FAA Form 7460-1 required before construction.', required_action: 'File FAA Form 7460-1 and obtain FAA determination before filing Form 854 with FCC. Marking/lighting per FAA determination (§17.21–§17.50).' },
           { id: 'mpe_evaluation', label: 'RF exposure MPE evaluation', rule: '47 CFR §1.1310 / OET Bulletin 65', status: 'WARN', note: 'TPO = 5 kW ≥ 5 kW threshold. Routine MPE evaluation required before license grant.', required_action: 'Compute uncontrolled MPE limit distance from antenna base; fence or post exclusion zone signage per OET-65 guidance.' },
@@ -3626,7 +3626,7 @@ const DEMO_RESULT = {
         frequency_khz: 780, tpo_kw: 5, sigma_msm: 9,
         n_contours: 3,
         contours: [
-          { id: 'col_min',  mvm: 5.0, label: 'COL (5 mV/m)',      rule: '§73.24(j)', radius_km: 18.4, area_km2: 1063, population_estimate: 15945,  pop_density_assumed_per_km2: 15, pop_data_source: 'Disc-area × conductivity-based density proxy' },
+          { id: 'col_min',  mvm: 5.0, label: 'COL (5 mV/m)',      rule: '§73.24(i)', radius_km: 18.4, area_km2: 1063, population_estimate: 15945,  pop_density_assumed_per_km2: 15, pop_data_source: 'Disc-area × conductivity-based density proxy' },
           { id: 'standard', mvm: 2.0, label: 'Standard (2 mV/m)', rule: 'FCC standard service', radius_km: 42.3, area_km2: 5621, population_estimate: 84315,  pop_density_assumed_per_km2: 15, pop_data_source: 'Disc-area × conductivity-based density proxy' },
           { id: 'primary',  mvm: 0.5, label: 'Primary (0.5 mV/m)',rule: '§73.182 protection', radius_km: 115.2, area_km2: 41710, population_estimate: 625650, pop_density_assumed_per_km2: 15, pop_data_source: 'Disc-area × conductivity-based density proxy' }
         ],
@@ -3642,7 +3642,7 @@ const DEMO_RESULT = {
           source: 'NAB State of Audio 2023; Nielsen Audio Monthly; Edison Research Share of Ear 2023'
         },
         pop_data_source: 'US Census ACS 5-year estimates (not yet integrated); disc-area approximation with conductivity-based density proxy',
-        reference: '47 CFR §73.24(j); §73.182; FCC Form 301-AM Schedule D; US Census Bureau ACS 5-year; NAB State of Audio 2023',
+        reference: '47 CFR §73.24(i); §73.182; FCC Form 301-AM Schedule D; US Census Bureau ACS 5-year; NAB State of Audio 2023',
         note: 'Population overlay at 780 kHz, 5 kW, σ=9 mS/m. COL radius: 18.4 km. Primary radius: 115.2 km. Replace density proxy with Census API for filing-grade estimates.'
       },
       power_line_interference_analysis: {
@@ -3976,7 +3976,7 @@ const DEMO_RESULT = {
             { id: 'blanket',  label: 'Blanket 1000 mV/m', color: '#ef4444' }
           ]
         },
-        reference: '47 CFR §73.24(g); §73.24(j); §73.182; FCC groundwave curves',
+        reference: '47 CFR §73.24(g); §73.24(i); §73.182; FCC groundwave curves',
         note: 'Radii computed via FCC groundwave curves at σ = 9 mS/m. Render as concentric circles using deck.gl ScatterplotLayer or MapLibre fill-circle layers.'
       },
       candidate_scoring_audit: {
@@ -4075,7 +4075,7 @@ const DEMO_RESULT = {
         nif_study_required: true,
         rule: '47 CFR §73.182 / §73.25'
       },
-      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' },
+      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(i)' },
       directional_antenna_study_guide: {
         recommended: true,
         primary_reason: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME',
@@ -4145,7 +4145,7 @@ const DEMO_RESULT = {
       signal_propagation_profile: {
         frequency_khz: 780, tpo_kw: 5, sigma_msm: 6,
         contours: [
-          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(j) COL floor)',   target_mvm: 5.0,    distance_km: 6.7,  area_km2: 141.0 },
+          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(i) COL floor)',   target_mvm: 5.0,    distance_km: 6.7,  area_km2: 141.0 },
           { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',             target_mvm: 2.0,    distance_km: 15.2, area_km2: 726.0 },
           { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)', target_mvm: 0.5,    distance_km: 37.8, area_km2: 4491 },
           { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',        target_mvm: 0.1,    distance_km: 74.1, area_km2: 17281 },
@@ -4177,13 +4177,13 @@ const DEMO_RESULT = {
       notes: 'Lower COL but excellent conductivity and minimal blanket exposure.',
       explanation: {
         score_breakdown: { col_coverage: 27.6, population: 20.7, blanket: 18.4, conductivity: 13.8, wildfire: 0, treaty_zone: 0, confidence_penalty: -5.63 },
-        ranking_rationale: 'Conductivity wins offset lower coverage; §73.24(j) COL coverage 78% is below 80% floor — increase TPO to ≥8.5 kW to fix.'
+        ranking_rationale: 'Conductivity wins offset lower coverage; §73.24(i) COL coverage 78% is below 80% floor — increase TPO to ≥8.5 kW to fix.'
       },
       status_labels: ['NON-COMPLIANT', 'ENGINEER REVIEW REQUIRED'],
       status_category: 'RECOVERABLE_WITH_POWER_INCREASE',
       blanket_pop_risk: 'OK', col_coverage_gap_pct: 0.02, population_delta_vs_baseline: -1500,
       regulatory_compliance_summary: {
-        col_coverage: { status: 'FAIL',  value: 0.78, threshold: 0.80, rule: '47 CFR §73.24(j)' },
+        col_coverage: { status: 'FAIL',  value: 0.78, threshold: 0.80, rule: '47 CFR §73.24(i)' },
         blanket_pop:  { status: 'PASS',  value: 0.30, threshold: 1.00, rule: '47 CFR §73.24(g)' },
         class_power:  { status: 'PASS',  value: 5, ceiling: 50, rule: '47 CFR §73.21' },
         treaty_zone:  { status: 'CLEAR', value: null, rule: 'US/MX 1986 Agreement; US/CA 1991 LOU' }
@@ -4208,14 +4208,14 @@ const DEMO_RESULT = {
         { id: 'SOIL_RESISTIVITY_SURVEY', priority: 'REQUIRED', label: 'Soil resistivity survey', note: 'Zone-table σ=10 mS/m used for screening. Commission a 4-electrode Wenner array survey.' },
         { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
         { id: 'MPE_STUDY', priority: 'REQUIRED', label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz.' },
-        { id: 'COL_COVERAGE_REMEDY', priority: 'REQUIRED', label: 'COL coverage remedy engineering', note: '78% COL coverage < §73.24(j) 80% floor. Increase TPO to ≥8.5 kW or design DA pattern (§73.150) to push coverage above floor.' }
+        { id: 'COL_COVERAGE_REMEDY', priority: 'REQUIRED', label: 'COL coverage remedy engineering', note: '78% COL coverage < §73.24(i) 80% floor. Increase TPO to ≥8.5 kW or design DA pattern (§73.150) to push coverage above floor.' }
       ],
       regulatory_risk_score: {
         risk_score: 45, risk_category: 'HIGH',
         risk_factors: [
           { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required' },
           { factor: 'MODERATE_CONDUCTIVITY', points: 5, note: 'σ=10 mS/m (EXCELLENT): standard 120-radial system adequate but soil survey still required' },
-          { factor: 'COL_COVERAGE_FAILS', points: 10, note: 'COL coverage 78% < §73.24(j) 80% floor (gap 2%): coverage remedy required before filing' },
+          { factor: 'COL_COVERAGE_FAILS', points: 10, note: 'COL coverage 78% < §73.24(i) 80% floor (gap 2%): coverage remedy required before filing' },
           { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required for all non-local-channel stations at a new transmitter site' },
           { factor: 'DA_PATTERN_REQUIRED', points: 5, note: 'DA pattern shaping may close coverage gap — §73.150 pattern design may be needed' }
         ],
@@ -4264,19 +4264,19 @@ const DEMO_RESULT = {
         da_col_coverage_estimate_pct: 97.4,
         would_recover_col_compliance: true,
         da_erp_boost_modeled: '4× NDA ERP toward COL bearing (best-case pattern)',
-        recommendation: 'DA pattern likely recovers §73.24(j) compliance — commission §73.150 DA study toward COL bearing',
-        rule: '47 CFR §73.150 / §73.24(j)'
+        recommendation: 'DA pattern likely recovers §73.24(i) compliance — commission §73.150 DA study toward COL bearing',
+        rule: '47 CFR §73.150 / §73.24(i)'
       },
       directional_antenna_study_guide: {
         recommended: true,
         primary_reason: 'COL_COVERAGE_GAP',
         study_type: 'FULL_DA_STUDY_DAY_NIGHT',
         triggers: [
-          { trigger: 'COL_COVERAGE_GAP', detail: 'NDA coverage 78% < §73.24(j) 80% floor. DA with max ERP toward COL centroid bearing can recover compliance.', cfr: '47 CFR §73.150 / §73.24(j)' },
+          { trigger: 'COL_COVERAGE_GAP', detail: 'NDA coverage 78% < §73.24(i) 80% floor. DA with max ERP toward COL centroid bearing can recover compliance.', cfr: '47 CFR §73.150 / §73.24(i)' },
           { trigger: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME', detail: 'Secondary Class D on clear channel 780 kHz — DA-N also required at night.', cfr: '47 CFR §73.25 / §73.182' }
         ],
         key_constraints: [
-          'Maximize ERP toward COL centroid bearing (§73.24(j) ≥80% coverage goal).',
+          'Maximize ERP toward COL centroid bearing (§73.24(i) ≥80% coverage goal).',
           'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
           '§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).',
           'Typical AM DA array: 2–4 tower elements; ground system must be extended to all towers.'
@@ -4338,7 +4338,7 @@ const DEMO_RESULT = {
       signal_propagation_profile: {
         frequency_khz: 780, tpo_kw: 8.5, sigma_msm: 4,
         contours: [
-          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(j) COL floor)',   target_mvm: 5.0,    distance_km: 7.5,  area_km2: 176.7 },
+          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(i) COL floor)',   target_mvm: 5.0,    distance_km: 7.5,  area_km2: 176.7 },
           { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',             target_mvm: 2.0,    distance_km: 16.1, area_km2: 814.9 },
           { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)', target_mvm: 0.5,    distance_km: 37.2, area_km2: 4352 },
           { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',        target_mvm: 0.1,    distance_km: 72.8, area_km2: 16638 },
@@ -4380,7 +4380,7 @@ const DEMO_RESULT = {
           { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction' },
           { factor: 'POOR_CONDUCTIVITY', points: 20, note: 'σ=1.5 mS/m (POOR): extended ground system required; adds cost, time, and uncertainty to §73.190 certification' },
           { factor: 'BLANKET_POP_EXCEEDS_LIMIT', points: 25, note: 'Estimated blanket pop 1.1% > §73.24(g) 1% limit: filing cannot proceed without power reduction or DA-N pattern' },
-          { factor: 'COL_COVERAGE_FAILS', points: 20, note: 'COL coverage 62% < §73.24(j) 80% floor (gap 18%): coverage remedy required before filing' },
+          { factor: 'COL_COVERAGE_FAILS', points: 20, note: 'COL coverage 62% < §73.24(i) 80% floor (gap 18%): coverage remedy required before filing' },
           { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required; failure likely due to coverage constraints' }
         ],
         interpretation: 'VERY HIGH regulatory complexity — multiple blocking issues; recommend deprioritizing unless site has exceptional propagation advantages.'
@@ -4428,21 +4428,21 @@ const DEMO_RESULT = {
         da_col_coverage_estimate_pct: 83.1,
         would_recover_col_compliance: true,
         da_erp_boost_modeled: '4× NDA ERP toward COL bearing (best-case pattern)',
-        recommendation: 'DA pattern likely recovers §73.24(j) compliance — commission §73.150 DA study toward COL bearing',
-        rule: '47 CFR §73.150 / §73.24(j)'
+        recommendation: 'DA pattern likely recovers §73.24(i) compliance — commission §73.150 DA study toward COL bearing',
+        rule: '47 CFR §73.150 / §73.24(i)'
       },
       directional_antenna_study_guide: {
         recommended: true,
         primary_reason: 'COL_COVERAGE_GAP',
         study_type: 'FULL_DA_STUDY_DAY_NIGHT',
         triggers: [
-          { trigger: 'COL_COVERAGE_GAP', detail: 'NDA coverage 62% < §73.24(j) 80% floor. DA with max ERP toward COL centroid bearing can recover compliance.', cfr: '47 CFR §73.150 / §73.24(j)' },
+          { trigger: 'COL_COVERAGE_GAP', detail: 'NDA coverage 62% < §73.24(i) 80% floor. DA with max ERP toward COL centroid bearing can recover compliance.', cfr: '47 CFR §73.150 / §73.24(i)' },
           { trigger: 'BLANKET_POP_SUPPRESSION', detail: 'Blanket pop 1.1% exceeding §73.24(g) 1% limit. DA must also null the 1000 mV/m lobe away from population centers.', cfr: '47 CFR §73.24(g) / §73.150' },
           { trigger: 'TREATY_CONSTRAINT', detail: 'Within US-MX treaty zone. DA likely required to reduce power toward the border.', cfr: '1986 US/Mexico AM Agreement' },
           { trigger: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME', detail: 'Secondary Class D on clear channel 780 kHz — DA-N required at night.', cfr: '47 CFR §73.25 / §73.182' }
         ],
         key_constraints: [
-          'Maximize ERP toward COL centroid bearing (§73.24(j) ≥80% coverage goal).',
+          'Maximize ERP toward COL centroid bearing (§73.24(i) ≥80% coverage goal).',
           'Null 1000 mV/m contour away from populated areas (§73.24(g) ≤1% blanket limit).',
           'Reduce power toward US-MX border for binational coordination.',
           'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
@@ -4508,7 +4508,7 @@ const DEMO_RESULT = {
       signal_propagation_profile: {
         frequency_khz: 780, tpo_kw: 5, sigma_msm: 3,
         contours: [
-          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(j) COL floor)',   target_mvm: 5.0,    distance_km: 5.4,  area_km2: 91.6 },
+          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(i) COL floor)',   target_mvm: 5.0,    distance_km: 5.4,  area_km2: 91.6 },
           { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',             target_mvm: 2.0,    distance_km: 11.9, area_km2: 444.7 },
           { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)', target_mvm: 0.5,    distance_km: 28.1, area_km2: 2479 },
           { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',        target_mvm: 0.1,    distance_km: 55.8, area_km2: 9785 },

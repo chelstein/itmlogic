@@ -93,7 +93,7 @@ test('Status RECOVERABLE_WITH_DA assigned when COL coverage fails but score othe
     lat: 34.87, lon: -111.83,
     distance_from_current_km: 15,    // within NEARBY_COMMUNITY_RADIUS_KM
     score: 80,                       // well above RECOVERY_SCORE_FLOOR (55)
-    col_coverage_pct: 0.40,          // below §73.24(j) 0.80 floor
+    col_coverage_pct: 0.40,          // below §73.24(i) 0.80 floor
     blanket_population_pct: 0.20,    // well under §73.24(g) 1% ceiling
     daytime_reach_km: 60,
     ground_sigma_mS_m: 4,
@@ -263,7 +263,7 @@ test('Status RECOVERABLE_WITH_COL_CHANGE when COL fails and site is far from cur
     lat: 34.0, lon: -112.5,                   // ~90 km south of KAZM
     distance_from_current_km: 90,
     score: 70,                                 // above RECOVERY_SCORE_FLOOR (55)
-    col_coverage_pct: 0.35,                    // fails §73.24(j) 0.80 floor
+    col_coverage_pct: 0.35,                    // fails §73.24(i) 0.80 floor
     blanket_population_pct: 0.10,
     daytime_reach_km: 60,
     ground_sigma_mS_m: 6,
@@ -374,7 +374,7 @@ test('RECOVERABLE_WITH_POWER_INCREASE assigned when minimum_tpo_for_col_coverage
   const c = {
     lat: 34.87, lon: -111.83, distance_from_current_km: 10,
     score: 80,
-    col_coverage_pct: 0.60,          // below §73.24(j) 0.80 floor
+    col_coverage_pct: 0.60,          // below §73.24(i) 0.80 floor
     blanket_population_pct: 0.20,    // OK
     daytime_reach_km: 50,
     ground_sigma_mS_m: 6,
@@ -970,7 +970,7 @@ test('colocation GRID candidates have da_array_design_guide', async () => {
   for (const c of out.candidates) {
     assert.ok(c.da_array_design_guide != null, `rank ${c.rank} missing da_array_design_guide`);
     assert.strictEqual(c.da_array_design_guide.applicable, true, `rank ${c.rank} DA-D must have applicable=true`);
-    assert.strictEqual(c.da_array_design_guide.n_hrp_radials, 36, `rank ${c.rank} must have 36 HRP radials`);
+    assert.strictEqual(c.da_array_design_guide.n_hrp_radials, 72, `rank ${c.rank} must have 72 HRP radials (§73.150 5° azimuth increments)`);
   }
 });
 
@@ -2066,8 +2066,8 @@ test('colocation GRID candidates have transmitter_power_upgrade_pathway_guide', 
   for (const c of out.candidates) {
     const g = c.transmitter_power_upgrade_pathway_guide;
     assert.ok(g != null, `rank ${c.rank} missing transmitter_power_upgrade_pathway_guide`);
-    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (5 kW → 10 kW headroom)`);
-    assert.strictEqual(g.coverage_gain_pct, 41, `rank ${c.rank} coverage_gain_pct must be 41`);
+    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (5 kW → 50 kW Class D ceiling per §73.21(b))`);
+    assert.strictEqual(g.coverage_gain_pct, 216, `rank ${c.rank} coverage_gain_pct must be 216 (√10 at the 50 kW ceiling)`);
   }
 });
 
@@ -3339,7 +3339,7 @@ test('am_rf_exposure_and_oet65_compliance_guide colocation: all colocation candi
     assert.ok(g, `candidate missing am_rf_exposure_and_oet65_compliance_guide`);
     assert.ok(g.exclusion_radius_m_general > 0, `exclusion_radius_m_general must be positive`);
     assert.ok(typeof g.evaluation_required === 'boolean', `evaluation_required must be boolean`);
-    assert.ok(g.mpe_general_mv_per_m === 614, `mpe_general_mv_per_m must be 614 mV/m (FCC limit)`);
+    assert.ok(g.mpe_general_v_per_m === 614, `mpe_general_v_per_m must be 614 V/m (§1.1310 Table 1, 0.3–1.34 MHz)`);
   }
 });
 
@@ -3660,7 +3660,8 @@ test('colocation candidates include am_auxiliary_backup_transmitter_compliance_g
   for (const c of out.candidates) {
     const g = c.am_auxiliary_backup_transmitter_compliance_guide;
     assert.ok(g, `candidate missing am_auxiliary_backup_transmitter_compliance_guide`);
-    assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 AM power tolerance ±10%');
+    assert.strictEqual(g.power_min_pct, 90,  '§73.1560(a) lower limit 90%');
+    assert.strictEqual(g.power_max_pct, 105, '§73.1560(a) upper limit 105%');
     assert.strictEqual(g.backup_tpo_kw, 5, 'backup_tpo_kw must equal authorized tpo_kw');
     assert.ok(g.total_backup_low_usd > 0, `total_backup_low_usd must be positive`);
   }
@@ -3779,7 +3780,7 @@ test('colocation candidates include am_contour_overlap_and_co_channel_interferen
   for (const c of out.candidates) {
     const g = c.am_contour_overlap_and_co_channel_interference_guide;
     assert.ok(g, `candidate missing am_contour_overlap_and_co_channel_interference_guide`);
-    assert.strictEqual(g.protection_db_required, 20, '§73.182(c) D/U requirement = 20 dB');
+    assert.strictEqual(g.protection_db_required, 26, '§73.182(r)/§73.37(a) D/U requirement = 26 dB (20:1)');
     assert.strictEqual(g.adjacent_ch_low_khz, 770, 'adjacent lower channel is 770 kHz');
     assert.strictEqual(g.adjacent_ch_high_khz, 790, 'adjacent upper channel is 790 kHz');
   }
@@ -3879,8 +3880,8 @@ test('am_remote_control_and_unattended_operation_guide present across colocation
   for (const c of out.candidates) {
     const g = c.am_remote_control_and_unattended_operation_guide;
     assert.ok(g !== undefined && g !== null, `candidate missing am_remote_control_and_unattended_operation_guide`);
-    assert.strictEqual(g.operator_response_time_hrs, 2, '§73.1300 operator response time must be 2 hours');
-    assert.strictEqual(g.rc_accuracy_pct, 2.0, '§73.1400 remote control accuracy must be ±2%');
+    assert.strictEqual(g.operator_response_time_hrs, 3, '§73.1350(c): correct or terminate within 3 hours');
+    assert.strictEqual(g.rc_accuracy_pct, 2.0, '§73.1215: indicating instruments accurate to 2% of full scale');
     assert.ok(g.total_rc_low_usd > 0, 'total_rc_low_usd must be positive');
   }
 });
@@ -4292,7 +4293,8 @@ test('am_transmitter_power_monitoring_and_operating_log_guide present across col
   for (const c of out.candidates) {
     const g = c.am_transmitter_power_monitoring_and_operating_log_guide;
     assert.ok(g !== undefined && g !== null, 'candidate missing am_transmitter_power_monitoring_and_operating_log_guide');
-    assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 tolerance must be 10%');
+    assert.strictEqual(g.power_min_pct, 90,  '§73.1560(a) lower limit 90%');
+    assert.strictEqual(g.power_max_pct, 105, '§73.1560(a) upper limit 105%');
     assert.ok(g.n_base_current_meters >= 1, 'must have at least 1 base current meter');
     assert.ok(Array.isArray(g.log_entry_triggers) && g.log_entry_triggers.length >= 3, 'must have at least 3 log entry triggers');
   }

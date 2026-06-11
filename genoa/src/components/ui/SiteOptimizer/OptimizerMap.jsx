@@ -222,7 +222,7 @@ export default function OptimizerMap({
       radius: 9, color: '#6fd3ff', weight: 2,
       fillColor: '#6fd3ff', fillOpacity: 0.25, interactive: true
     }).bindPopup(
-      `<b>COL centroid</b><br/>Supplied as field-strength target for §73.24(j).<br/>${clat.toFixed(4)}, ${clon.toFixed(4)}`
+      `<b>COL centroid</b><br/>Supplied as field-strength target for §73.24(i).<br/>${clat.toFixed(4)}, ${clon.toFixed(4)}`
     ).addTo(ctx.map);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colCentroid?.lat, colCentroid?.lon]);

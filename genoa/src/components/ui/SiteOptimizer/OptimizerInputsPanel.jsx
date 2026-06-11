@@ -169,7 +169,7 @@ export default function OptimizerInputsPanel({
           <legend className="rack-eyebrow px-1">COL centroid (optional)</legend>
           <p className="font-mono text-[9px] text-textDim leading-tight mb-2">
             If the community of license is not co-located with the transmitter, supply
-            the COL centre here for a more accurate §73.24(j) field calculation.
+            the COL centre here for a more accurate §73.24(i) field calculation.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField

@@ -49,12 +49,12 @@ function peanutPoly(lat0, lon0){
 
 const TEMPE_LAT = 33.4255, TEMPE_LON = -111.9400;
 
-test('§73.24(j) — applicable only to AM service', () => {
+test('§73.24(i) — applicable only to AM service', () => {
   const r = checkAm73_24j({ exhibit: { station_inputs: { service: 'FM' } } });
   assert.equal(r.applicable, false);
 });
 
-test('§73.24(j) — NOT_RUN when community boundary missing (no FAIL)', () => {
+test('§73.24(i) — NOT_RUN when community boundary missing (no FAIL)', () => {
   const exhibit = {
     station_inputs: { service: 'AM', community_of_license: 'TEMPE' },
     polygons: [{ id: 'city_5mvm', polygon_lonlat: circlePoly(TEMPE_LAT, TEMPE_LON, 20) }]
@@ -65,7 +65,7 @@ test('§73.24(j) — NOT_RUN when community boundary missing (no FAIL)', () => {
   assert.equal(finding.pass, null);
 });
 
-test('§73.24(j) — NOT_RUN when 5 mV/m polygon missing', () => {
+test('§73.24(i) — NOT_RUN when 5 mV/m polygon missing', () => {
   const exhibit = {
     station_inputs: {
       service: 'AM', community_of_license: 'TEMPE',
@@ -80,7 +80,7 @@ test('§73.24(j) — NOT_RUN when 5 mV/m polygon missing', () => {
   assert.equal(r.overall_pass, null);
 });
 
-test('§73.24(j) — circular 20 km service fully encompasses 5 km community → PASS', () => {
+test('§73.24(i) — circular 20 km service fully encompasses 5 km community → PASS', () => {
   const exhibit = {
     station_inputs: {
       service: 'AM', community_of_license: 'TEMPE',
@@ -96,7 +96,7 @@ test('§73.24(j) — circular 20 km service fully encompasses 5 km community →
   assert.ok(r.coverage_pct >= 0.999, `coverage ${r.coverage_pct} should be >= 99.9%`);
 });
 
-test('§73.24(j) — Monte Carlo handles non-convex DA service polygon', () => {
+test('§73.24(i) — Monte Carlo handles non-convex DA service polygon', () => {
   // The peanut polygon's waist sits over the community at the origin —
   // service polygon DOES contain the community but is non-convex.  S-H
   // would have dropped a lobe; Monte Carlo correctly counts the inside.
@@ -118,7 +118,7 @@ test('§73.24(j) — Monte Carlo handles non-convex DA service polygon', () => {
   assert.match(r.computed_method, /Monte Carlo/);
 });
 
-test('§73.24(j) — deterministic replay (identical inputs produce identical coverage)', () => {
+test('§73.24(i) — deterministic replay (identical inputs produce identical coverage)', () => {
   const exhibit = {
     station_inputs: {
       service: 'AM', community_of_license: 'TEMPE',
@@ -134,7 +134,7 @@ test('§73.24(j) — deterministic replay (identical inputs produce identical co
   assert.equal(r1.coverage_pct, r2.coverage_pct);
 });
 
-test('§73.24(j) — substantial-compliance band reported as FAIL with waiver guidance', () => {
+test('§73.24(i) — substantial-compliance band reported as FAIL with waiver guidance', () => {
   // 5 km community offset 6 km from a 7 km service polygon — much of
   // the community sits outside the contour.  Coverage will land below
   // the substantial-compliance threshold.

@@ -80,14 +80,14 @@ export function buildConclusionSection(exhibit){
     });
   }
 
-  // AM §73.24(j) principal-community 5 mV/m coverage — filing-controlling.
+  // AM §73.24(i) principal-community 5 mV/m coverage — filing-controlling.
   // overall_pass:null means prerequisites were missing (not measured); only
   // push a component when the check actually ran and returned a definitive fail.
   const cov73_24j = (svc === 'AM') ? (exhibit.am_city_coverage_compliance || null) : null;
   if (cov73_24j && cov73_24j.overall_pass === false){
     components.push({
-      name:   '§73.24(j) principal-community 5 mV/m coverage',
-      cite:   '47 CFR §73.24(j)',
+      name:   '§73.24(i) principal-community 5 mV/m coverage',
+      cite:   '47 CFR §73.24(i)',
       status: FindingStatus.FILING_BLOCKER,
       detail: { coverage_pct: cov73_24j.coverage_pct, summary: cov73_24j.summary }
     });
@@ -157,12 +157,12 @@ export function buildConclusionSection(exhibit){
         ? (cov73_24j.coverage_pct * 100).toFixed(1)
         : '?';
       narrative =
-        `The 47 CFR §73.24(j) principal-community coverage check indicates the 5 mV/m ` +
+        `The 47 CFR §73.24(i) principal-community coverage check indicates the 5 mV/m ` +
         `daytime groundwave contour encompasses only ${pct}% of the city-of-license boundary.  ` +
         `The rule requires the 5 mV/m contour to encompass the entire principal community.  ` +
         (_isExisting
           ? `This is an existing licensed facility; the coverage shortfall may reflect legacy site conditions or a historic waiver.  ` +
-            `Any modification or new-CP filing that affects the daytime contour must address the §73.24(j) standard.`
+            `Any modification or new-CP filing that affects the daytime contour must address the §73.24(i) standard.`
           : `Facility redesign (transmitter site relocation, increased TPO, or DA re-patterning) ` +
             `is required prior to filing.`);
     } else if (nifFailing && !nifSourceIsScreening){

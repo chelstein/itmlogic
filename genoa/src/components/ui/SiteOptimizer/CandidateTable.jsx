@@ -345,7 +345,7 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                     <td
                       className="px-2 py-1.5 text-right"
                       style={{ color: c.col_coverage_pct != null && c.col_coverage_pct < 0.80 ? '#ff7a7a' : '#b8d0cc' }}
-                      title={c.col_coverage_pct != null ? `${(c.col_coverage_pct * 100).toFixed(0)}% (floor 80% §73.24(j))` : ''}
+                      title={c.col_coverage_pct != null ? `${(c.col_coverage_pct * 100).toFixed(0)}% (floor 80% §73.24(i))` : ''}
                     >
                       {fmt('col_coverage_pct', c.col_coverage_pct)}
                     </td>

@@ -1,7 +1,7 @@
 // Regression tests for KJIM deferred evidence plumbing.
 //
 // P1: Population per-contour — §73.24(g) PASS/FAIL instead of NOT_MEASURED
-// P2: Community boundary — §73.24(j) auto-fetch via Census/Nominatim
+// P2: Community boundary — §73.24(i) auto-fetch via Census/Nominatim
 // P3: FAA OE error message — DATA SOURCE ERROR, not vague "not configured"
 // P4: FCCAM wired in app.yaml + docker-compose env vars present (config test)
 // P5: OET-65 near-field → ENGINEERING REVIEW REQUIRED, not overstatement
