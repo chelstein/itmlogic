@@ -45,6 +45,8 @@ import { buildAdvisoryReviewSection }              from './sections/advisoryRevi
 import { buildRemediationSection }                from './sections/remediation.js';
 import { buildCountyOverlaySection }              from './sections/countyOverlay.js';
 import { buildHaatBasisGovernanceSection }        from './sections/haatBasisGovernance.js';
+import { buildEngineerReviewChecklistSection }    from './sections/engineerReviewChecklist.js';
+import { computeExhibitMaturity }                 from './exhibitMaturity.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -159,6 +161,11 @@ export function buildEngineeringReport(exhibit, options){
   // null otherwise.  Slotted immediately before the certification page
   // per the section's own header doc.
   push(buildBuildAttestationSection(exhibit, opt));
+  // Engineer Review Checklist — the explicit review protocol the engineer
+  // of record completes before signing.  Sits immediately before the
+  // certification page so the checklist is the last thing read before
+  // the signature block.
+  push(buildEngineerReviewChecklistSection(exhibit, opt));
   push(buildCertificationSection(exhibit, opt));
   // Advisory "path to compliance" remediation — rendered only when an
   // export attached opt.remediation (the bounded ERP/HAAT sweep result),
@@ -222,7 +229,14 @@ export function buildEngineeringReport(exhibit, options){
     generated_by:    'Genoa FCC Propagation Studio',
     engine_version:  mv.engine_version || mv.curve_engine || 'genoa',
     generated_at:    new Date().toISOString(),
-    footer:          'Genoa FCC Propagation Studio'
+    footer:          'Genoa FCC Propagation Studio',
+    // INTERNAL QA ONLY — the exhibit maturity score is attached to the
+    // document model for QA tooling and the internal-diagnostics variant.
+    // The PDF/TXT renderers never read this field, so it is not displayed
+    // in any customer-facing output.
+    internal_qa: {
+      exhibit_maturity: computeExhibitMaturity(exhibit)
+    }
   };
 
   return { meta, sections };

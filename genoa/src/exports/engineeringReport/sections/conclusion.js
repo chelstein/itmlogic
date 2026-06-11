@@ -233,19 +233,25 @@ export function buildConclusionSection(exhibit){
     const interp      = String(rc.interpretation || '').toLowerCase();
     const isLegacyReview = studyIntent === 'existing_facility_review'
                         || interp.includes('legacy')
-                        || interp === 'licensed_with_legacy_conflicts';
+                        || interp === 'licensed_with_legacy_conflicts'
+                        || _isExisting
+                        || exhibit?.haat_authority?.provenance?.facility_status === 'licensed';
     if (isLegacyReview){
       narrative =
-        'Under current Part 73 rules, the subject facility does not qualify under ' +
-        `${failedPhrase} for all required protected facilities.  This is an ` +
-        'existing licensed facility, so the modeled conflicts may reflect ' +
-        'grandfathered, waived, or otherwise historically authorized operating ' +
-        'conditions; Genoa does not determine FCC legal authorization status.  ' +
-        'Treat this as a LEGACY/GRANDFATHERING REVIEW condition: the current ' +
-        'authorization is not invalidated by this finding, but any modification ' +
-        'application that would change parameters affecting the listed conflicts ' +
-        'will need engineering review, waiver analysis, or redesign before ' +
-        'filing.';
+        `Current-rule contour analysis identified conflicts under ${failedPhrase}.\n\n` +
+        'This facility is licensed and operating.\n\n' +
+        'The existence of current-rule conflicts does not independently determine ' +
+        'authorization status.\n\n' +
+        'Conflicts may reflect:\n' +
+        '• grandfathered facilities\n' +
+        '• waivers\n' +
+        '• legacy authorizations\n' +
+        '• previously approved facilities\n\n' +
+        'Further engineering review is required before drawing licensing ' +
+        'conclusions.  Genoa does not determine FCC legal authorization status; ' +
+        'any modification application that would change parameters affecting the ' +
+        'listed conflicts will need engineering review, waiver analysis, or ' +
+        'redesign before filing.';
     } else {
       narrative =
         'The interference study indicates the subject facility does not qualify under the applicable rule sets.  ' +
@@ -305,12 +311,33 @@ export function buildConclusionSection(exhibit){
     ...warnings.map(w => ({ severity: 'WARNING', code: w.code || w.id || '—', message: w.message || w.detail || '' }))
   ];
 
+  // ---------- Display status: licensed vs proposed distinction ----------
+  //
+  // "CONCLUSION: NON-COMPLIANT" is the wrong headline for a licensed,
+  // operating facility — current-rule conflicts on a licensed station may
+  // reflect grandfathered facilities, waivers, or legacy authorizations,
+  // and the label must not read as a determination of authorization
+  // status.  The machine-readable `status` field is unchanged (downstream
+  // consumers and the ontology contract depend on it); `display_status`
+  // is what the renderers print.
+  const legacyStatus = legacyConclusionStatus(v.status);
+  const isLicensedFacilityReview =
+    _isExisting ||
+    exhibit?.haat_authority?.provenance?.facility_status === 'licensed' ||
+    String(exhibit?.regulatory_compliance?.interpretation || '').toLowerCase().includes('legacy');
+  const display_status = (legacyStatus === 'NON-COMPLIANT' && isLicensedFacilityReview)
+    ? 'CURRENT-RULE CONFLICTS IDENTIFIED'
+    : legacyStatus;
+
   return {
     id:      'conclusion',
     type:    'conclusion',
     heading: 'ENGINEERING CONCLUSION',
-    // Legacy status string for backwards compatibility.
-    status:  legacyConclusionStatus(v.status),
+    // Legacy status string for backwards compatibility (machine-readable).
+    status:  legacyStatus,
+    // Engineer-facing label printed by the renderers.  Identical to
+    // `status` except for licensed facilities with current-rule conflicts.
+    display_status,
     // New ontology surface — additive.
     verdict:             v.status,
     confidence:          v.confidence,

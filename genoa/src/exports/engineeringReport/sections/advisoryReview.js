@@ -16,11 +16,20 @@ const DISCLAIMER =
   'distance, HAAT, spacing, or 47 CFR Part 73 compliance result. It is provided solely to ' +
   'surface possible internal inconsistencies for the engineer of record to review.';
 
+const SCOPE_STATEMENT =
+  'Scope of this review: the automated pass inspects internal consistency, source ' +
+  'provenance, traceability, and missing evidence ONLY.  It does not — and may not — ' +
+  'make compliance determinations, assess filing readiness, interpret rules, determine ' +
+  'which engineering value is correct, or draw engineering conclusions.  Those ' +
+  'determinations belong exclusively to the deterministic engines and the engineer of ' +
+  'record.  Findings are categorized as INCONSISTENCY, MISSING_EVIDENCE, ' +
+  'UNRESOLVED_CONFLICT, DOCUMENTATION_GAP, or TRACEABILITY_GAP.';
+
 export function buildAdvisoryReviewSection(exhibit, opt){
   const review = opt?.advisory_review;
   if (!review || review.available !== true) return null;
 
-  const paragraphs = [DISCLAIMER];
+  const paragraphs = [DISCLAIMER, SCOPE_STATEMENT];
 
   const findings = Array.isArray(review.findings) ? review.findings : [];
   if (findings.length){
@@ -28,7 +37,8 @@ export function buildAdvisoryReviewSection(exhibit, opt){
     for (const f of findings){
       const sev   = String(f?.severity || 'INFO').toUpperCase();
       const issue = String(f?.issue || '').trim();
-      if (issue) paragraphs.push(`• [${sev}] ${issue}`);
+      const cat   = String(f?.category || '').trim().toUpperCase();
+      if (issue) paragraphs.push(`• [${sev}] ${issue}${cat ? `  (${cat})` : ''}`);
     }
   } else {
     paragraphs.push(

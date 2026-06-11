@@ -11517,12 +11517,12 @@ test('am_site_grading_and_drainage_guide comparison table columns present', asyn
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('grd_terrain_class'   in row, 'grd_terrain_class missing from comparison table');
-    assert.ok('grd_total_low_usd'   in row, 'grd_total_low_usd missing from comparison table');
+    assert.ok('sgd_total_low_usd'   in row, 'sgd_total_low_usd missing from comparison table');
     assert.ok('grd_grading_low_usd' in row, 'grd_grading_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.grd_terrain_class,   'existing_or_improved', 'rank-1 grd_terrain_class should be existing_or_improved');
-  assert.strictEqual(r0.grd_total_low_usd,   4500,                   'rank-1 grd_total_low_usd should be $4,500');
+  assert.strictEqual(r0.sgd_total_low_usd,   4500,                   'rank-1 sgd_total_low_usd should be $4,500');
   assert.strictEqual(r0.grd_grading_low_usd, 2000,                   'rank-1 grd_grading_low_usd should be $2,000');
 });
 
@@ -11739,12 +11739,12 @@ test('am_transmission_line_and_antenna_tuning_unit_guide comparison table column
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('atu_is_da'        in row, 'atu_is_da missing from comparison table');
-    assert.ok('atu_total_low_usd' in row, 'atu_total_low_usd missing from comparison table');
+    assert.ok('tla_total_low_usd' in row, 'tla_total_low_usd missing from comparison table');
     assert.ok('atu_r_base_ohm'   in row, 'atu_r_base_ohm missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.atu_is_da,         false, 'rank-1 atu_is_da should be false');
-  assert.strictEqual(r0.atu_total_low_usd, 4500,  'rank-1 atu_total_low_usd should be $4,500');
+  assert.strictEqual(r0.tla_total_low_usd, 4500,  'rank-1 tla_total_low_usd should be $4,500');
   assert.strictEqual(r0.atu_r_base_ohm,    44,    'rank-1 atu_r_base_ohm should be 44 Ω');
 });
 
@@ -14381,7 +14381,7 @@ it('candidate_comparison_table fin columns are present and valid for KAZM', asyn
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
   assert.ok(Number.isFinite(r0.fin_npv_optimistic_10yr), 'fin_npv_optimistic_10yr must be finite');
-  assert.ok(r0.fin_payback_years_low > 0, 'fin_payback_years_low must be positive');
+  assert.ok(r0.sff_payback_years_low > 0, 'sff_payback_years_low must be positive');
   assert.ok(r0.fin_feasibility_flag != null, 'fin_feasibility_flag must not be null');
 });
 

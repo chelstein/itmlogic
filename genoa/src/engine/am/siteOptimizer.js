@@ -1256,7 +1256,7 @@ export async function runSiteOptimizer(body = {}){
     rfi_total_low_usd:          c.am_tower_base_insulator_and_rf_isolation_guide?.total_rf_isolation_low_usd ?? null,
     rfi_n_guy_levels:           c.am_tower_base_insulator_and_rf_isolation_guide?.n_guy_levels ?? null,
     atu_is_da:                  c.am_transmission_line_and_antenna_tuning_unit_guide?.is_da ?? null,
-    atu_total_low_usd:          c.am_transmission_line_and_antenna_tuning_unit_guide?.total_atu_system_low_usd ?? null,
+    tla_total_low_usd:          c.am_transmission_line_and_antenna_tuning_unit_guide?.total_atu_system_low_usd ?? null,
     atu_r_base_ohm:             c.am_transmission_line_and_antenna_tuning_unit_guide?.r_base_est_ohm ?? null,
     pwr_service_type:           c.am_utility_power_service_and_metering_guide?.service_type ?? null,
     pwr_monthly_cost_usd:       c.am_utility_power_service_and_metering_guide?.monthly_power_cost_usd ?? null,
@@ -1271,7 +1271,7 @@ export async function runSiteOptimizer(body = {}){
     ins_surety_bond_low_usd:    c.am_insurance_and_bonding_guide?.surety_bond_low_usd ?? null,
     ins_wc_construction_low_usd: c.am_insurance_and_bonding_guide?.wc_during_construction_low_usd ?? null,
     grd_terrain_class:          c.am_site_grading_and_drainage_guide?.terrain_class ?? null,
-    grd_total_low_usd:          c.am_site_grading_and_drainage_guide?.total_site_prep_low_usd ?? null,
+    sgd_total_low_usd:          c.am_site_grading_and_drainage_guide?.total_site_prep_low_usd ?? null,
     grd_grading_low_usd:        c.am_site_grading_and_drainage_guide?.grading_low_usd ?? null,
     txp_tx_type:                c.am_transmitter_procurement_and_upgrade_guide?.tx_type ?? null,
     txp_total_low_usd:          c.am_transmitter_procurement_and_upgrade_guide?.total_tx_low_usd ?? null,
@@ -1409,7 +1409,7 @@ export async function runSiteOptimizer(body = {}){
     fmtc_total_monitoring_equip_low_usd: c.am_frequency_monitoring_and_technical_compliance_guide?.total_monitoring_equip_low_usd ?? null,
     fmtc_annual_compliance_low_usd:     c.am_frequency_monitoring_and_technical_compliance_guide?.annual_fcc_compliance_low_usd ?? null,
     fin_npv_optimistic_10yr:            c.am_station_financial_feasibility_guide?.npv_optimistic_10yr ?? null,
-    fin_payback_years_low:              c.am_station_financial_feasibility_guide?.payback_years_low ?? null,
+    sff_payback_years_low:              c.am_station_financial_feasibility_guide?.payback_years_low ?? null,
     fin_feasibility_flag:               c.am_station_financial_feasibility_guide?.feasibility_flag ?? null,
     pm_total_construction_weeks_low:    c.am_construction_contractor_and_pm_guide?.total_construction_weeks_low ?? null,
     pm_tower_erection_cost_low_usd:     c.am_construction_contractor_and_pm_guide?.tower_erection_cost_low_usd ?? null,
@@ -1778,7 +1778,7 @@ export async function runSiteOptimizer(body = {}){
     atu_n_towers:                       c.am_antenna_phasing_unit_installation_guide?.n_towers ?? null,
     atu_phase_tolerance_deg:            c.am_antenna_phasing_unit_installation_guide?.phase_tolerance_deg ?? null,
     atu_n_installation_steps:           c.am_antenna_phasing_unit_installation_guide?.n_installation_steps ?? null,
-    atu_total_low_usd:                  c.am_antenna_phasing_unit_installation_guide?.cost_estimates?.total_low_usd ?? null,
+    phu_total_low_usd:                  c.am_antenna_phasing_unit_installation_guide?.cost_estimates?.total_low_usd ?? null,
     tlm_line_type:                      c.am_transmission_line_coax_maintenance_guide?.line_type ?? null,
     tlm_inspection_interval_months:     c.am_transmission_line_coax_maintenance_guide?.inspection_interval_months ?? null,
     tlm_n_failure_modes:                c.am_transmission_line_coax_maintenance_guide?.n_failure_modes ?? null,
@@ -1799,7 +1799,7 @@ export async function runSiteOptimizer(body = {}){
     ada_n_features:                     c.am_site_accessibility_and_ada_compliance_guide?.n_accessibility_features ?? null,
     ada_is_staffed:                     c.am_site_accessibility_and_ada_compliance_guide?.is_likely_staffed ?? null,
     ada_access_low_usd:                 c.am_site_accessibility_and_ada_compliance_guide?.cost_estimates?.accessibility_low_usd ?? null,
-    faa_tower_height_ft:                c.am_faa_tower_lighting_and_obstruction_marking_guide?.tower_height_ft ?? null,
+    ltg_tower_height_ft:                c.am_faa_tower_lighting_and_obstruction_marking_guide?.tower_height_ft ?? null,
     faa_asr_required:                   c.am_faa_tower_lighting_and_obstruction_marking_guide?.asr_required ?? null,
     faa_lighting_type:                  c.am_faa_tower_lighting_and_obstruction_marking_guide?.lighting_type ?? null,
     faa_lighting_install_low_usd:       c.am_faa_tower_lighting_and_obstruction_marking_guide?.cost_estimates?.lighting_install_low_usd ?? null,
@@ -16221,12 +16221,14 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Man-made noise figure by inferred land use (ITU-R P.372 Table 1)
       // Use distance from current site as a proxy for rural vs urban character.
-      // >20 km from current site (which is typically in/near town): likely rural
-      // 8-20 km: suburban/agricultural edge
-      // <8 km: urban edge / mixed-use
+      // >9.5 km from current site (which is typically in/near town): likely rural
+      // >4.5 km: suburban/agricultural edge
+      // <=4.5 km: urban edge / mixed-use
+      // Thresholds are set slightly below grid spacing (10 km / 5 km) to account
+      // for haversine distances that fall just under the nominal grid step.
       const dist_nf_km = pt.distance_from_current_km ?? 0;
-      const land_use_noise_class = dist_nf_km > 20 ? 'rural'
-        : dist_nf_km > 8 ? 'suburban'
+      const land_use_noise_class = dist_nf_km > 9.5 ? 'rural'
+        : dist_nf_km > 4.5 ? 'suburban'
         : 'urban_edge';
       const fa_man_made_db = land_use_noise_class === 'rural' ? 20
         : land_use_noise_class === 'suburban' ? 32

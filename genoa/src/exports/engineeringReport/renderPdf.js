@@ -604,7 +604,7 @@ function renderVerdict(pdf, v){
 
 function renderConclusion(pdf, s){
   pdf.font(BOLD_FONT).fontSize(BODY_SIZE + 1).fillColor(TEAL_DARK)
-     .text(`Conclusion: ${(s.status || '').toString().toUpperCase()}`);
+     .text(`Conclusion: ${(s.display_status || s.status || '').toString().toUpperCase()}`);
   pdf.fillColor('black').moveDown(0.4);
   pdf.font(BODY_FONT).fontSize(BODY_SIZE).text(s.narrative || '', { align: 'left' });
   if (Array.isArray(s.findings) && s.findings.length){
