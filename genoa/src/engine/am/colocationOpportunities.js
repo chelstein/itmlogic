@@ -92,7 +92,7 @@ export async function runColocationOpportunities(body = {}){
   }
 
   // ---- 1c. FCC class power limit advisory (mirrors siteOptimizer §73.21 check) ----
-  const FCC_CLASS_POWER_KW = { A:{min:10,max:50}, B:{min:0.25,max:50}, C:{min:0.001,max:0.25}, D:{min:0.001,max:50} };
+  const FCC_CLASS_POWER_KW = { A:{min:10,max:50}, B:{min:0.25,max:50}, C:{min:0.25,max:1}, D:{min:0.25,max:50} }; // §73.21; D night < 0.25 kW
   const classLimits = FCC_CLASS_POWER_KW[fcc_class];
   if (classLimits){
     if (tpo_kw > classLimits.max){

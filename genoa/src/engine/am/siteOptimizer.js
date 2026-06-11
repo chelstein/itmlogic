@@ -65,7 +65,7 @@ const US_POPULATION_M = 335e6;                    // 2024 US population (persons
 const US_AVG_POP_DENSITY_PER_KM2 = 34.0;          // national avg (USCB, 2023)
 
 // FCC AM channel classification (47 CFR §73.25-27)
-// Local channels run Class C stations at ≤250 W (§73.27).
+// Local channels run Class C stations at 0.25–1 kW unlimited time (§73.21(c)).
 const LOCAL_CHANNEL_KHZ = Object.freeze(new Set([1230, 1240, 1340, 1400, 1450, 1490]));
 // Clear channels are §73.25 dominant Class A channels where skywave protection applies.
 const CLEAR_CHANNEL_KHZ = Object.freeze(new Set([
@@ -77,10 +77,10 @@ const CLEAR_CHANNEL_KHZ = Object.freeze(new Set([
 // FCC class daytime TPO limits (47 CFR §73.21).
 // Nighttime limits for Class D are not enforced here (require separate analysis).
 const FCC_CLASS_POWER_KW = Object.freeze({
-  A: { min: 10,    max: 50   },
-  B: { min: 0.25,  max: 50   },
-  C: { min: 0.001, max: 0.25 },
-  D: { min: 0.001, max: 50   }   // daytime only
+  A: { min: 10,   max: 50 },
+  B: { min: 0.25, max: 50 },   // 10 kW max in the 1605–1705 kHz expanded band
+  C: { min: 0.25, max: 1  },   // §73.21(c)(1): 0.25–1 kW, unlimited time
+  D: { min: 0.25, max: 50 }    // daytime; nighttime < 0.25 kW per §73.21(b)(2)
 });
 
 // Goals enum — these are the keys the API exposes.  The set is fixed;
@@ -523,7 +523,7 @@ export async function runSiteOptimizer(body = {}){
     } else if (skywave_risk_level === 'MODERATE'){
       c.nif_status += ' — MODERATE skywave risk';
     }
-    // LOW risk (local channel ≤250 W): no suffix — the label is already clear.
+    // LOW risk (local channel ≤1 kW Class C): no suffix — the label is already clear.
   }
 
   // ---- 11. Recommended actions ----
@@ -1853,7 +1853,7 @@ export async function runSiteOptimizer(body = {}){
       ? `${frequency_khz} kHz is a clear channel with a designated Class A dominant station. All other stations (Class B/D) must protect the dominant's primary service area at night.`
       : isRegional
       ? `${frequency_khz} kHz is a regional channel. Class B stations share the frequency with §73.37 co-channel protections; no single dominant station exists.`
-      : `${frequency_khz} kHz is a local channel. Class C stations operate at 250 W maximum with simplified §73.37 separations. Daytime-only or limited-time operations are common.`;
+      : `${frequency_khz} kHz is a local channel. Class C stations operate at 0.25–1 kW (§73.21(c)) unlimited time with simplified §73.37 separations.`;
 
     // NIF obligation
     const nif_obligation = isLocal
@@ -4436,12 +4436,12 @@ async function scoreCandidate(pt, ctx, warnings){
       let eligibility, nif_complexity, protection_class, key_constraint, nighttime_power_max_kw;
 
       if (isLocal){
-        // Local channels: 6 clear local channels at ≤250 W daytime; limited/shared nighttime.
+        // Local channels: Class C 0.25–1 kW unlimited time (§73.21(c)); channel shared among many stations.
         eligibility = 'LIMITED';
         nif_complexity = 'LOW';
         protection_class = 'local_channel';
-        key_constraint = `Local channel (${frequency_khz} kHz, §73.27): nighttime operation at ≤250 W with sharing on most local channels. §73.182 NIF not required for local-channel stations — share the channel with others.`;
-        nighttime_power_max_kw = 0.25;
+        key_constraint = `Local channel (${frequency_khz} kHz, §73.27): Class C 0.25–1 kW unlimited time (§73.21(c)) with channel sharing. §73.182 NIF not required for local-channel stations — share the channel with others.`;
+        nighttime_power_max_kw = 1;
       } else if (isClassA && isClear){
         // Class A dominant on clear channel — full nighttime, most protected status.
         eligibility = 'YES';
@@ -4455,7 +4455,7 @@ async function scoreCandidate(pt, ctx, warnings){
         nif_complexity = 'VERY_HIGH';
         protection_class = `class_${fcc_class}_secondary_clear_channel`;
         key_constraint = `Class ${fcc_class} secondary on clear channel (${frequency_khz} kHz, §73.25): nighttime operation restricted — must not increase interference to dominant Class A protected contours (0.5 mV/m and 25 µV/m). Complex §73.182 NIF study required; authorization may be limited or denied.`;
-        nighttime_power_max_kw = fcc_class === 'B' ? 50 : fcc_class === 'C' ? 0.25 : 50;
+        nighttime_power_max_kw = fcc_class === 'B' ? 50 : fcc_class === 'C' ? 1 : 0.25; // C: §73.21(c); D night < 0.25 kW per §73.21(b)(2)
       } else if (isClassA){
         // Class A on regional channel.
         eligibility = 'YES';
@@ -4475,15 +4475,15 @@ async function scoreCandidate(pt, ctx, warnings){
         eligibility = 'LIMITED';
         nif_complexity = 'LOW';
         protection_class = 'class_C_local';
-        key_constraint = `Class C local (${frequency_khz} kHz, §73.27): ≤250 W with same-channel sharing. Full §73.182 NIF not required — follow local sharing framework.`;
-        nighttime_power_max_kw = 0.25;
+        key_constraint = `Class C local (${frequency_khz} kHz, §73.27): 0.25–1 kW (§73.21(c)) with same-channel sharing. Full §73.182 NIF not required — follow local sharing framework.`;
+        nighttime_power_max_kw = 1;
       } else {
         // Class D regional.
         eligibility = 'LIMITED';
         nif_complexity = 'MODERATE';
         protection_class = 'class_D_regional';
         key_constraint = `Class D secondary (${frequency_khz} kHz): daytime-only authorization is common. Nighttime requires §73.182 NIF demonstrating no interference — Class D nighttime is discretionary and may be denied.`;
-        nighttime_power_max_kw = 50; // daytime limit; nighttime may be less
+        nighttime_power_max_kw = 0.25; // §73.21(b)(2): Class D nighttime, where authorized, is < 0.25 kW
       }
 
       if (treaty_zone){
@@ -4718,12 +4718,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const isLocal       = LOCAL_CHANNEL_KHZ.has(frequency_khz);
       const isClassC      = fcc_class === 'C';
 
-      // Local/Class C: DA not applicable (250 W max; no meaningful pattern optimization).
+      // Local/Class C: DA not applicable (≤1 kW; no meaningful pattern optimization).
       if (isLocal || isClassC) {
         return {
           recommended: false,
           primary_reason: 'NOT_APPLICABLE',
-          note: `Class ${fcc_class} on local channel — DA not applicable at ≤250 W. No §73.150 study needed.`
+          note: `Class ${fcc_class} on local channel — DA not applicable at ≤1 kW. No §73.150 study needed.`
         };
       }
 
@@ -5485,9 +5485,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // Power ceilings per §73.21 (kW):
       //   Class A: 50 kW (day and night)
       //   Class B: 50 kW (day), 50 kW (night local), 5 kW (night regional)
-      //   Class C: 0.25 kW (day), 0.25 kW night
-      //   Class D: 50 kW (day); night severely restricted on clear channel
-      const CLASS_CEILINGS = { A: 50, B: 50, C: 0.25, D: 50 };
+      //   Class C: 1 kW (day and night, §73.21(c))
+      //   Class D: 50 kW (day); nighttime < 0.25 kW where authorized (§73.21(b)(2))
+      const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 50 };
       const ceiling_kw = CLASS_CEILINGS[fcc_class] ?? 50;
       const headroom_kw = round2(ceiling_kw - tpo_kw);
       const headroom_pct = round2((headroom_kw / ceiling_kw) * 100);
@@ -7064,7 +7064,7 @@ async function scoreCandidate(pt, ctx, warnings){
         ? item('nif_study', 'Nighttime interference-free (NIF) contour study', '47 CFR §73.182', 'WARN',
           nifNote_rc, 'Commission §73.182 NIF study from consulting engineer before Form 301-AM filing.')
         : item('nif_study', 'Nighttime interference-free (NIF) contour study', '47 CFR §73.182', 'PASS',
-          'Local channel (§73.27): §73.182 NIF study not required for local-channel stations. Confirm TPO ≤ 250 W daytime / 25 W nighttime.');
+          'Local channel (§73.27): §73.182 NIF study not required for local-channel stations. Confirm TPO within the Class C 0.25–1 kW range (§73.21(c)).');
 
       // 6. Treaty zone coordination
       const i6 = (() => {
@@ -13742,10 +13742,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const channel_type  = is_clear_fac ? 'clear' : is_local_fac ? 'local' : 'regional';
       // Class-specific characteristics per FCC rules:
       const class_descriptions = {
-        A: { max_day_kw: 50, max_night_kw: 50, protection: 'dominant — nationwide co-channel protection', nighttime: 'full nighttime operation', coverage: 'national', ref: '§73.21' },
-        B: { max_day_kw: 50, max_night_kw: 50, protection: 'regional — limited co-channel protection',    nighttime: 'with interference study',  coverage: 'regional', ref: '§73.22' },
-        C: { max_day_kw:  1, max_night_kw:  0.25, protection: 'local — no co-channel protection',            nighttime: 'limited (0.25 kW max)',   coverage: 'local',    ref: '§73.24' },
-        D: { max_day_kw:  1, max_night_kw:  0,    protection: 'secondary — must protect Class A/B',          nighttime: 'secondary only (may be restricted)', coverage: 'secondary', ref: '§73.25' },
+        A: { max_day_kw: 50, max_night_kw: 50,   protection: 'dominant — nationwide co-channel protection', nighttime: 'full nighttime operation', coverage: 'national', ref: '§73.21(a)' },
+        B: { max_day_kw: 50, max_night_kw: 50,   protection: 'regional — limited co-channel protection',    nighttime: 'with interference study',  coverage: 'regional', ref: '§73.21(b)' },
+        C: { max_day_kw:  1, max_night_kw:  1,   protection: 'local — no co-channel protection',            nighttime: 'unlimited time at licensed power (0.25–1 kW)', coverage: 'local', ref: '§73.21(c)' },
+        D: { max_day_kw: 50, max_night_kw: 0.25, protection: 'secondary — must protect Class A/B',          nighttime: 'less than 0.25 kW where authorized (§73.21(b)(2))', coverage: 'secondary', ref: '§73.21(b)' },
       };
       const class_key     = fcc_class.toUpperCase();
       const class_info    = class_descriptions[class_key] ?? class_descriptions['D'];
@@ -17465,7 +17465,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // to Class A/B dominant stations (§73.21, §73.22)
       const is_secondary = (fcc_class === 'D' || fcc_class === 'C') && is_clear_ch_int;
 
-      // Nighttime power limit for secondary Class D on clear channel: 250 W per §73.21
+      // Class D nighttime, where authorized, is less than 0.25 kW per §73.21(b)(2)
       const night_power_limit_kw = (fcc_class === 'D' && is_clear_ch_int) ? 0.25 : null;
 
       // Co-channel D/U protection ratios per §73.182 (daytime)
@@ -19720,7 +19720,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Monthly gross revenue scales approximately with:
       //     Class A (50 kW, clear): $30,000–$150,000/mo
       //     Class B (0.25–50 kW):   $15,000–$50,000/mo
-      //     Class C (≤250 W):        $3,000–$12,000/mo
+      //     Class C (≤1 kW):         $3,000–$12,000/mo
       //     Class D (≤10 kW, clear): $6,000–$28,000/mo
       //   These are gross (before agency commission ~15%; rep firm ~10–15%).
 
@@ -20364,24 +20364,20 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_pu      = /^DA/i.test(pattern_mode);
 
       // Daytime TPO ceiling per §73.21.
-      // Class A/B: up to 50 kW.  Class C (local channels): 250 W.
-      // Class D on clear channel: 10 kW day per §73.21(e).
-      // Class D on regional channel: 5 kW day typical.
-      const day_max_kw = is_local_ch       ? 0.25
+      // Class A/B/D: up to 50 kW day.  Class C (local channels): 1 kW (§73.21(c)).
+      const day_max_kw = is_local_ch       ? 1
                        : fcc_class === 'A' ? 50
                        : fcc_class === 'B' ? 50
-                       : fcc_class === 'C' ? 0.25
-                       : is_clear_ch       ? 10
-                       : 5;      // Class D regional: 5 kW
+                       : fcc_class === 'C' ? 1
+                       : 50;     // Class D: 50 kW day per §73.21(b)
 
-      // Nighttime ceiling for secondary stations on clear channels (§73.182).
-      // Class D secondary: 1 kW night if protected from dominant Class A skywave.
-      const night_max_kw = is_local_ch       ? 0.25
+      // Nighttime ceiling (§73.21): Class C unlimited time at licensed power;
+      // Class D nighttime, where authorized, is less than 0.25 kW (§73.21(b)(2)).
+      const night_max_kw = is_local_ch       ? 1
                          : fcc_class === 'A' ? 50
                          : fcc_class === 'B' ? 50
-                         : fcc_class === 'C' ? 0.25
-                         : is_clear_ch       ? 1
-                         : 5;    // Class D regional: same as day for night if ND-N
+                         : fcc_class === 'C' ? 1
+                         : 0.25; // Class D night < 0.25 kW where authorized
 
       const day_headroom_kw  = Math.max(0, day_max_kw - tpo_kw);
       const can_upgrade_day  = day_headroom_kw > 0;
@@ -24091,10 +24087,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const nighttime_power = (() => {
         if (LOCAL_CHANNEL_KHZ.has(frequency_khz)) {
           return {
-            required: true,
-            rule: '47 CFR §73.99 / §73.27',
-            nighttime_tpo_limit_kw: 0.025,  // 25 W local channel night limit
-            note: 'Local channel (§73.27): nighttime operation limited to 25 W maximum. Station must reduce power at local sunset and may resume daytime power at local sunrise. Automatic power-reduction controls required.'
+            required: false,
+            rule: '47 CFR §73.21(c)',
+            nighttime_tpo_limit_kw: 1,  // Class C ceiling — same day and night
+            note: 'Local channel: Class C stations operate unlimited time at licensed power (0.25–1 kW per §73.21(c)) — no sunset power reduction required. (§73.99 PSRA/PSSA applies to Class D daytimers, not Class C.)'
           };
         }
         if (fcc_class === 'D') {
