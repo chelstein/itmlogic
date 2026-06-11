@@ -1488,7 +1488,8 @@ export async function runSiteOptimizer(body = {}){
     prl_lease_annual_low_usd:           c.am_transmitter_site_lease_and_property_rights_guide?.lease_annual_low_usd ?? null,
     prl_total_acquisition_low_usd:      c.am_transmitter_site_lease_and_property_rights_guide?.total_acquisition_low_usd ?? null,
     mod_max_positive_peak_pct:          c.am_modulation_monitoring_and_audio_processing_guide?.max_positive_peak_pct ?? null,
-    mod_power_tolerance_pct:            c.am_modulation_monitoring_and_audio_processing_guide?.power_tolerance_pct ?? null,
+    mod_power_min_pct:                  c.am_modulation_monitoring_and_audio_processing_guide?.power_min_pct ?? null,
+    mod_power_max_pct:                  c.am_modulation_monitoring_and_audio_processing_guide?.power_max_pct ?? null,
     mod_total_audio_low_usd:            c.am_modulation_monitoring_and_audio_processing_guide?.total_audio_low_usd ?? null,
     opf_political_file_upload_days:     c.am_public_inspection_file_and_online_compliance_guide?.political_file_upload_days ?? null,
     opf_issues_programs_filing_days:    c.am_public_inspection_file_and_online_compliance_guide?.issues_programs_list_filing_days ?? null,
@@ -1677,7 +1678,8 @@ export async function runSiteOptimizer(body = {}){
     fcs_coch_radius_km:                 c.am_frequency_coordination_and_channel_study_guide?.co_channel_search_radius_km ?? null,
     fcs_adj_radius_km:                  c.am_frequency_coordination_and_channel_study_guide?.adj_channel_search_radius_km ?? null,
     fcs_study_effort_max_hrs:           c.am_frequency_coordination_and_channel_study_guide?.study_effort_hrs?.max ?? null,
-    pml_power_tolerance_pct:            c.am_transmitter_power_monitoring_and_operating_log_guide?.power_tolerance_pct ?? null,
+    pml_power_min_pct:                  c.am_transmitter_power_monitoring_and_operating_log_guide?.power_min_pct ?? null,
+    pml_power_max_pct:                  c.am_transmitter_power_monitoring_and_operating_log_guide?.power_max_pct ?? null,
     pml_n_base_current_meters:          c.am_transmitter_power_monitoring_and_operating_log_guide?.n_base_current_meters ?? null,
     pml_antenna_monitor_required:       c.am_transmitter_power_monitoring_and_operating_log_guide?.antenna_monitor_required ?? null,
     pml_apc_required:                   c.am_transmitter_power_monitoring_and_operating_log_guide?.automatic_power_control_required ?? null,
@@ -6674,8 +6676,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC base current monitor requirements
       const monitorRequired = !isLocal_ts && tpo_kw >= 1;
       const monitorNote = monitorRequired
-        ? `§73.61: licensed AM stations ≥1 kW must install base current monitors on each tower. DA stations: monitors on all elements. Monitor must be readable from the transmitter control point.`
-        : `§73.61: base current monitor recommended; required if ≥1 kW operation. Local channel stations typically install for operational convenience.`;
+        ? `§73.51: antenna/common point current metering required to determine operating power by the direct method. DA stations: FCC-approved antenna monitor on all elements per §73.69 (tolerances ±5%/±3° per §73.62(a)).`
+        : `§73.51: antenna current metering required for direct-method power determination (instrument accuracy 2% per §73.1215). Local channel stations typically add remote metering for operational convenience.`;
 
       // Detuning requirements (DA arrays)
       const detuning = isDA_ts ? {
@@ -6705,7 +6707,7 @@ async function scoreCandidate(pt, ctx, warnings){
         base_current_monitor_required: monitorRequired,
         base_current_monitor_note: monitorNote,
         detuning,
-        reference: '47 CFR §73.61 (base current monitoring); §73.150(c) (detuning); §73.186 (ground system design); §73.190 (conductivity/certification); ARRL Antenna Handbook (ATU design); Andrew/Commscope heliax data',
+        reference: '47 CFR §73.51 (direct method power); §73.69 (antenna monitors); §73.150(c) (detuning); §73.186 (ground system design); §73.190 (conductivity/certification); ARRL Antenna Handbook (ATU design); Andrew/Commscope heliax data',
         note: 'Transmission system design guide is a screening-grade engineering reference. All impedances, efficiencies, and current values are based on ideal monopole theory and the Terman/Belrose ground loss formula. Actual values require field measurements and full RF system design by a licensed broadcast engineer.'
       };
     })(),
@@ -7270,7 +7272,7 @@ async function scoreCandidate(pt, ctx, warnings){
           interpretation:  `Measured ρ (Ω·m) → σ (mS/m) = 1000/ρ. Compare to M3 zone value (${sigma_msm} mS/m). If measured σ differs > ±30%, update groundwave reach and coverage calculations.`
         },
         certification_requirements: cert_requirements,
-        reference: '47 CFR §73.186 (AM ground system design); §73.190 (conductivity/certification); §73.61 (base current monitoring); ARRL Antenna Handbook (Ch. 9); Terman (1943) Radio Engineers Handbook; Belrose (1992) HF Antennas for All Locations; FCC M3 zone data',
+        reference: '47 CFR §73.186 (AM ground system design); §73.190 (conductivity/certification); §73.51 (direct method power); ARRL Antenna Handbook (Ch. 9); Terman (1943) Radio Engineers Handbook; Belrose (1992) HF Antennas for All Locations; FCC M3 zone data',
         note: `Ground system design guide based on Terman/Belrose ground loss formula and FCC M3 conductivity σ = ${sigma_msm} mS/m at this candidate location. All efficiency and ground loss values are theoretical screening estimates. Actual values require soil resistivity survey and field measurements by a licensed broadcast engineer.`
       };
     })(),
@@ -7674,16 +7676,16 @@ async function scoreCandidate(pt, ctx, warnings){
       };
       const traversal_spec = isDA_pp ? da_traversal_spec : nda_traversal_spec;
 
-      // Base current monitoring requirements (§73.61)
+      // Antenna current metering requirements (§73.51 direct method)
       const base_current_req = {
         required:     tpo_kw >= 1,
-        rule:         '47 CFR §73.61',
+        rule:         '47 CFR §73.51',
         location:     'Base of each tower in the antenna array',
         monitor_type: 'RF ammeter or equivalent licensed measuring instrument',
         reading_method: 'Readable from the transmitter control point',
         note: tpo_kw >= 1
-          ? `§73.61: AM stations ≥ 1 kW licensed power must install base current monitors on each tower. Monitor must be readable from the transmitter control point. Record base current at beginning and end of each proof traversal run.`
-          : `§73.61 base current monitoring required only for stations ≥ 1 kW. At ${tpo_kw} kW, monitoring not required but recommended.`
+          ? `§73.51: antenna current metering required to determine operating power by the direct method (instrument accuracy 2% per §73.1215). Record base current at beginning and end of each proof traversal run.`
+          : `§73.51: antenna current metering required for direct-method power determination at any power level; record base current during each proof run.`
       };
 
       // MPE measurement requirement (§1.1310 / OET-65)
@@ -7719,7 +7721,7 @@ async function scoreCandidate(pt, ctx, warnings){
         'Calibrated field intensity meter (FIM-41, FIM-71, or equivalent; calibrated within 2 years)',
         'GPS receiver with WAAS accuracy (for traversal point coordinates)',
         'Calibrated dipole or whip antenna appropriate for AM broadcast band',
-        'RF base current monitor (for §73.61 compliance)',
+        'RF base current meter (for §73.51 direct-method power determination)',
         mpe_required ? 'Broadband RF power density meter (Narda SRM-3006 or equivalent) for MPE measurement' : null,
         isDA_pp ? 'Phase and ratio monitoring equipment for DA element measurements during proof' : null,
         'Data recording system: GPS-tagged FIM readings at each traversal point'
@@ -7742,7 +7744,7 @@ async function scoreCandidate(pt, ctx, warnings){
         proof_timeline_weeks_low:   proof_weeks_low,
         proof_timeline_weeks_high:  proof_weeks_high,
         filing_form:                'FCC Form 302-AM (license to cover)',
-        reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.186 (ground system design); §73.190 (conductivity/certification); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
+        reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.51 (direct method power); §73.186 (ground system design); §73.190 (conductivity/certification); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
       };
     })(),
@@ -8234,7 +8236,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { item: 'All radials bonded at tower base with low-resistance clamp', ref: '§73.186', required: true },
         { item: 'Ground conductivity (M3 zone) verified per §73.184', ref: '§73.184; §73.186', required: true },
         { item: isDA_gs ? 'Separate full ground system per tower in DA array' : null, ref: '§73.186', required: true },
-        { item: 'Base insulator clearance ≥ 3 ft from any buried conductor', ref: '§73.186; §73.61', required: true },
+        { item: 'Base insulator clearance ≥ 3 ft from any buried conductor', ref: '§73.186 (engineering practice)', required: true },
         { item: 'Optional: augmented radial count (>120) for low-conductivity sites', ref: '§73.186', required: false },
         { item: 'RF bonding of guy anchors and buried metalwork per §73.190(c)', ref: '§73.190(c)', required: true }
       ].filter(d => d.item !== null);
@@ -8258,7 +8260,7 @@ async function scoreCandidate(pt, ctx, warnings){
         install_weeks_high,
         ground_efficiency_note,
         design_items,
-        reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ); §73.184 (groundwave conductivity map); §73.61 (base current monitors); §73.190(c) (bonding); NBS Technical Note 24',
+        reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ); §73.184 (groundwave conductivity map); §73.51 (direct method power); §73.190(c) (bonding); NBS Technical Note 24',
         note: `Standard AM ground system: ${radials_standard} radials × ${Math.round(radial_len_m * 3.28084)} ft (0.35λ) = ${wire_length_per_tower_ft.toLocaleString()} LF per tower. DA: ${da_tower_est_gs} tower estimate × = ${Math.round(total_wire_ft).toLocaleString()} LF total. Installed cost: $${ground_cost_low_usd.toLocaleString()}–$${ground_cost_high_usd.toLocaleString()}.`
       };
     })(),
@@ -8391,8 +8393,8 @@ async function scoreCandidate(pt, ctx, warnings){
         { item: 'D/U protection margin ≥ required threshold at each protected station', required: true, ref: '§73.207; §73.215' },
         { item: 'Proof-of-performance field measurement plan (72-radial FI traversal)', required: true, ref: '§73.154(a)' },
         { item: 'FCC Form 302-AM proof within 6 months of CP grant', required: true, ref: '§73.154' },
-        { item: 'Base current ratio monitors at each tower base', required: true, ref: '§73.61; §73.68' },
-        { item: 'Common point ammeter and sample loop calibration', required: true, ref: '§73.61' },
+        { item: 'Antenna monitor with sample loops at each tower', required: true, ref: '§73.69; §73.68' },
+        { item: 'Common point ammeter and sample loop calibration', required: true, ref: '§73.51; §73.68' },
         { item: 'Emergency NDA operation capability (automatic direction-finder failure)', required: true, ref: '§73.69' },
         { item: 'RF exposure (MPE) evaluation — near-field more complex for multi-tower DA', required: tpo_kw >= 5, ref: '§1.1310; OET Bulletin 65' }
       ];
@@ -8419,7 +8421,7 @@ async function scoreCandidate(pt, ctx, warnings){
         design_weeks_high,
         construction_premium_pct_low,
         construction_premium_pct_high,
-        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.207 (mileage separations); §73.215 (interference standards); §73.154 (proof of performance); §73.61 (base current monitors); §73.68 (monitor points); §73.69 (emergency NDA); §73.186 (ground system design); §73.190 (conductivity/certification); §1.1310 (MPE)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.207 (mileage separations); §73.215 (interference standards); §73.154 (proof of performance); §73.61 (DA field strength measurements); §73.68 (sampling systems); §73.69 (antenna monitors); §73.186 (ground system design); §73.190 (conductivity/certification); §1.1310 (MPE)',
         note: `Class ${fcc_class} ${pattern_mode} on ${frequency_khz} kHz (${isClearCh_da ? 'clear' : isRegionalCh_da ? 'regional' : 'local'} channel) — estimated ${tower_count_low}–${tower_count_high} tower array, ${supp_low_db}–${supp_high_db} dB suppression depth. Pattern design: ${design_weeks_low}–${design_weeks_high} weeks, $${design_cost_low_usd.toLocaleString()}–$${design_cost_high_usd.toLocaleString()}.`
       };
     })(),
@@ -10756,7 +10758,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Measurements must be logged at regular intervals when transmitter is in operation.
       //   Minimum log entries: transmitter power output, antenna base current, and modulation
       //   must be recorded at least once per day (§73.1820(a)).
-      //   For DA stations: all antenna monitor parameters logged per §73.61.
+      //   For DA stations: antenna monitor parameters logged (§73.69 antenna monitors; §73.61 field strength measurements).
       //
       // Remote control system types:
       //   1. IP-based remote control (modern): internet-connected IOTA, TeleCommunications,
@@ -10779,7 +10781,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Monthly cost: $50–$200/month for dedicated broadband or cellular data.
       //
       // DA-specific remote monitoring:
-      //   §73.61 / §73.69: DA stations must continuously monitor antenna monitor data
+      //   §73.69: DA stations must have antenna monitors and observe monitor data
       //   (base currents, phases, ratios) and log deviations.
       //   DA remote control must include antenna monitor data channel.
       //
@@ -10807,7 +10809,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Logging requirement per §73.1820(a):
       const log_min_frequency         = 'daily';   // at minimum once per day
-      const da_log_frequency          = isDA_rc ? 'continuous' : null;  // §73.61 DA continuous
+      const da_log_frequency          = isDA_rc ? 'continuous' : null;  // §73.69 antenna monitor
 
       // Connectivity recommendation:
       const preferred_connection      = cellular_coverage_likely ? 'IP_OVER_LTE' : 'IP_FIBER';
@@ -10854,8 +10856,8 @@ async function scoreCandidate(pt, ctx, warnings){
         install_high_usd,
         total_rc_low_usd,
         total_rc_high_usd,
-        reference: '47 CFR §73.1300 (unattended operation — 2-hour operator response); §73.1400 (remote control requirements); §73.1410 (remote control system specs); §73.1350 (transmitter control and monitoring); §73.1820(a) (daily log requirement); §73.61 (DA antenna monitor logging)',
-        note: `Remote control ${remote_required ? 'RECOMMENDED' : 'OPTIONAL'} for site ${round2(dist_km)} km from current location. Required capabilities: transmitter on/off, TPO/antenna current monitoring (±${rc_accuracy_pct}%), modulation monitoring.${isDA_rc ? ` DA station (${pattern_mode}): antenna monitor data channel required per §73.61.` : ''} Operator must respond within ${operator_response_time_hrs} hours per §73.1300. Preferred connection: ${preferred_connection}. POTS line-based legacy remote control: high risk in rural AZ. Log minimum: ${log_min_frequency}.`
+        reference: '47 CFR §73.1300 (unattended operation — 2-hour operator response); §73.1400 (remote control requirements); §73.1410 (remote control system specs); §73.1350 (transmitter control and monitoring); §73.1820(a) (daily log requirement); §73.69 (antenna monitors); §73.61 (DA field strength measurements)',
+        note: `Remote control ${remote_required ? 'RECOMMENDED' : 'OPTIONAL'} for site ${round2(dist_km)} km from current location. Required capabilities: transmitter on/off, TPO/antenna current monitoring (±${rc_accuracy_pct}%), modulation monitoring.${isDA_rc ? ` DA station (${pattern_mode}): antenna monitor data channel required per §73.69.` : ''} Operator must respond within ${operator_response_time_hrs} hours per §73.1300. Preferred connection: ${preferred_connection}. POTS line-based legacy remote control: high risk in rural AZ. Log minimum: ${log_min_frequency}.`
       };
     })(),
 
@@ -11421,12 +11423,13 @@ async function scoreCandidate(pt, ctx, warnings){
       const max_positive_peak_pct = 125;
       const max_negative_peak_pct = 100;
 
-      // Power tolerance per §73.1560(a)
-      const power_tolerance_pct   = 2.0;
+      // Power limits per §73.1560(a): 90%–105% of authorized (asymmetric)
+      const power_min_pct = 90;
+      const power_max_pct = 105;
 
       // TPO operating range
-      const tpo_min_kw = round2(tpo_kw * (1 - power_tolerance_pct / 100));
-      const tpo_max_kw = round2(tpo_kw * (1 + power_tolerance_pct / 100));
+      const tpo_min_kw = round2(tpo_kw * power_min_pct / 100);
+      const tpo_max_kw = round2(tpo_kw * power_max_pct / 100);
 
       // Carrier frequency bandwidth limit per NRSC-1-A §73.44:
       //   Audio bandwidth controlled to ≤10 kHz to keep sidebands within ±10 kHz of carrier.
@@ -11440,8 +11443,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // DA-specific: base current ratios and phases must also be monitored per §73.69
       const da_base_current_monitoring_required = isDA_mm;
-      const da_ratio_tolerance_pct              = isDA_mm ? 5.0  : null;  // §73.51(b)
-      const da_phase_tolerance_deg              = isDA_mm ? 3.0  : null;  // §73.51(b)
+      const da_ratio_tolerance_pct              = isDA_mm ? 5.0  : null;  // §73.62(a)
+      const da_phase_tolerance_deg              = isDA_mm ? 3.0  : null;  // §73.62(a)
 
       // Audio processor recommendation:
       //   High-power stations: professional broadcast processor ($8,000–$15,000)
@@ -11475,7 +11478,8 @@ async function scoreCandidate(pt, ctx, warnings){
         monitor_type,
         max_positive_peak_pct,
         max_negative_peak_pct,
-        power_tolerance_pct,
+        power_min_pct,
+        power_max_pct,
         tpo_min_kw,
         tpo_max_kw,
         audio_bandwidth_khz,
@@ -11495,8 +11499,8 @@ async function scoreCandidate(pt, ctx, warnings){
         install_high_usd,
         total_audio_low_usd,
         total_audio_high_usd,
-        reference: '47 CFR §73.1570 (modulation monitor requirement); §73.1560(a) (power tolerance ±2%); §73.51(b) (DA base current tolerances); §73.44 (audio bandwidth NRSC-1-A); §73.1570(d) (overmodulation reporting)',
-        note: `Modulation monitor (${monitor_type}) and broadcast audio processor are required at this site. Licensed TPO of ${tpo_kw} kW must be maintained within ±${power_tolerance_pct}% (${tpo_min_kw}–${tpo_max_kw} kW). Positive peaks must not exceed ${max_positive_peak_pct}%; negative peaks must not exceed ${max_negative_peak_pct}%. NRSC-1-A audio bandwidth limit: ±${audio_bandwidth_khz} kHz sidebands from carrier.${isDA_mm ? ` DA station (${pattern_mode}): §73.51(b) base current ratios must remain within ±${da_ratio_tolerance_pct}%, phases within ±${da_phase_tolerance_deg}°.` : ''}`
+        reference: '47 CFR §73.1570 (modulation monitor requirement); §73.1560(a) (operating power 90–105% of authorized); §73.62(a) (DA tolerances ±5%/±3°); §73.44 (audio bandwidth NRSC-1-A); §73.1570(d) (overmodulation reporting)',
+        note: `Modulation monitor (${monitor_type}) and broadcast audio processor are required at this site. Licensed TPO of ${tpo_kw} kW must stay within ${power_min_pct}–${power_max_pct}% of authorized (${tpo_min_kw}–${tpo_max_kw} kW) per §73.1560(a). Positive peaks must not exceed ${max_positive_peak_pct}%; negative peaks must not exceed ${max_negative_peak_pct}%. NRSC-1-A audio bandwidth limit: ±${audio_bandwidth_khz} kHz sidebands from carrier.${isDA_mm ? ` DA station (${pattern_mode}): §73.62(a) sample current ratios must remain within ±${da_ratio_tolerance_pct}%, phases within ±${da_phase_tolerance_deg}°.` : ''}`
       };
     })(),
 
@@ -11944,7 +11948,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   (typically twice per day: once near noon, once near midnight) and log the readings.
       //   Measurements must be compared to FCC-authorized values (from proof of performance).
       //
-      // §73.61(b): Base current ratio tolerance: ±5% of reference element; if exceeded the
+      // §73.62(a): sample current ratio tolerance: ±5% of licensed value; if exceeded the
       //   station must reduce power to a level where it does not cause prohibited interference.
       //
       // §73.68(a): Phase tolerance: ±3° of FCC-authorized phase angle.
@@ -11986,7 +11990,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA = /^DA/i.test(pattern_mode);
 
       const phase_tolerance_deg  = 3;    // §73.68(a) — ±3°
-      const ratio_tolerance_pct  = 5;    // §73.61(b) — ±5% of reference element current
+      const ratio_tolerance_pct  = 5;    // §73.62(a) — ±5% of licensed sample current ratio
       const proof_radials        = 72;   // §73.154(a)
       const proof_increment_deg  = 9;    // 360/72 = 5° intervals; §73.154 says 0 through 355° at 5°... adjusted per rule
       const emergency_nda_days   = 10;   // §73.68(c) — up to 10 days without STA
@@ -12027,9 +12031,9 @@ async function scoreCandidate(pt, ctx, warnings){
         amendment_high_usd,
         total_da_low_usd,
         total_da_high_usd,
-        reference: '47 CFR §73.55 (DA logging); §73.61(b) (current ratio tolerance); §73.68 (phase/ratio verification); §73.154(a) (DA proof of performance); §73.150(a) (horizontal pattern — 72 radials at 5°)',
+        reference: '47 CFR §73.55 (DA logging); §73.62(a) (current ratio ±5% / phase ±3°); §73.68 (sampling systems); §73.154(a) (DA proof of performance); §73.150(a) (horizontal pattern — 72 radials at 5°)',
         note: isDA
-          ? `DA station (${pattern_mode}): phase tolerance ±${phase_tolerance_deg}°, ratio tolerance ±${ratio_tolerance_pct}% per §73.61(b)/§73.68. ${proof_radials}-radial proof required per §73.154(a). Emergency NDA allowed ≤${emergency_nda_days} days without STA (§73.68(c)). Total first-year DA compliance: $${total_da_low_usd.toLocaleString()}–$${total_da_high_usd.toLocaleString()}.`
+          ? `DA station (${pattern_mode}): phase tolerance ±${phase_tolerance_deg}°, ratio tolerance ±${ratio_tolerance_pct}% per §73.62(a). ${proof_radials}-radial proof required per §73.154(a). Emergency NDA allowed ≤${emergency_nda_days} days without STA (§73.68(c)). Total first-year DA compliance: $${total_da_low_usd.toLocaleString()}–$${total_da_high_usd.toLocaleString()}.`
           : `NDA station (${pattern_mode}): no DA phase/ratio monitoring required. DA-specific compliance cost = $0.`
       };
     })(),
@@ -12128,7 +12132,7 @@ async function scoreCandidate(pt, ctx, warnings){
         report_high_usd,
         total_protection_low_usd,
         total_protection_high_usd,
-        reference: '47 CFR §73.1215 (equipment maintenance); §73.49 (antenna enclosure); ANSI/IEEE Std 1313.1 (insulation coordination); NFPA 780 (lightning protection); §73.61 (base current)',
+        reference: '47 CFR §73.1215 (equipment maintenance); §73.49 (antenna enclosure); ANSI/IEEE Std 1313.1 (insulation coordination); NFPA 780 (lightning protection); §73.51 (direct method power)',
         note: `V_peak = ${V_peak_kv} kV at ${tpo_kw} kW / ${R_base} Ω nominal base impedance. Insulator rating ≥ ${insulator_rating_kv_min} kV BIL (margin factor ${insulator_margin_ratio.toFixed(1)}×). ${n_elements > 1 ? `DA station: ${n_elements} tower elements, inspect all bases. ` : ''}RF choke + spark gap + MOV provide DC bonding and lightning protection across base insulator per NFPA 780.`
       };
     })(),
@@ -12418,10 +12422,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const total_backup_low_usd  = backup_tx_low_usd  + ats_low_usd  + feedline_low_usd  + fcc_exhibit_low_usd  + da_verify_low_usd;
       const total_backup_high_usd = backup_tx_high_usd + ats_high_usd + feedline_high_usd + fcc_exhibit_high_usd + da_verify_high_usd;
 
-      // Power tolerance: ±10% AM per §73.1560
-      const power_tolerance_pct = 10;
-      const tpo_low_kw          = round2(p_kw * (1 - power_tolerance_pct / 100));
-      const tpo_high_kw         = round2(p_kw * (1 + power_tolerance_pct / 100));
+      // Operating power limits: 90%–105% of authorized per §73.1560(a)
+      const power_min_pct = 90;
+      const power_max_pct = 105;
+      const tpo_low_kw    = round2(p_kw * power_min_pct / 100);
+      const tpo_high_kw   = round2(p_kw * power_max_pct / 100);
 
       // Separate backup antenna needed? Flag if PT candidate is at significant distance from TX
       const separate_antenna_needed = (pt.distance_from_current_km ?? 0) > 5;
@@ -12431,7 +12436,8 @@ async function scoreCandidate(pt, ctx, warnings){
       return {
         backup_transmitter_authorized_required: true,          // best practice; §73.1675 encouraged
         backup_tpo_kw:                          p_kw,          // must not exceed authorized
-        power_tolerance_pct,
+        power_min_pct,
+        power_max_pct,
         tpo_authorized_low_kw:                  tpo_low_kw,
         tpo_authorized_high_kw:                 tpo_high_kw,
         is_da_station:                          isDA,
@@ -12452,7 +12458,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_backup_low_usd:  total_backup_low_usd  + separate_antenna_low_usd,
         total_backup_high_usd: total_backup_high_usd + separate_antenna_high_usd,
         reference: '47 CFR §73.1675 (auxiliary transmitters); §73.1560 (power tolerances); §73.1350(e) (technical violations); §73.49 (antenna enclosure)',
-        note: `${p_kw} kW ${isDA ? 'DA' : 'NDA'} auxiliary transmitter at ≤${p_kw} kW authorized power per §73.1675. §73.1560: ±${power_tolerance_pct}% tolerance → operating range ${tpo_low_kw}–${tpo_high_kw} kW. ${separate_antenna_needed ? 'Candidate > 5 km from current site — separate backup antenna likely needed (add $' + separate_antenna_low_usd.toLocaleString() + '–$' + separate_antenna_high_usd.toLocaleString() + ').' : 'Same antenna system usable — no new CP for aux TX.'}${isDA ? ' DA station: backup must replicate approved pattern or operate at reduced power per §73.1675(b).' : ''}`
+        note: `${p_kw} kW ${isDA ? 'DA' : 'NDA'} auxiliary transmitter at ≤${p_kw} kW authorized power per §73.1675. §73.1560(a): ${power_min_pct}–${power_max_pct}% of authorized → operating range ${tpo_low_kw}–${tpo_high_kw} kW. ${separate_antenna_needed ? 'Candidate > 5 km from current site — separate backup antenna likely needed (add $' + separate_antenna_low_usd.toLocaleString() + '–$' + separate_antenna_high_usd.toLocaleString() + ').' : 'Same antenna system usable — no new CP for aux TX.'}${isDA ? ' DA station: backup must replicate approved pattern or operate at reduced power per §73.1675(b).' : ''}`
       };
     })(),
 
@@ -12694,14 +12700,15 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_antenna_base_current_and_impedance_monitoring_guide: (() => {
-      // Base current and impedance monitoring — §73.61, §73.68, §73.150.
-      // 47 CFR §73.61: AM stations must maintain the licensed base current at each tower
-      //   within 2% of the authorized value at all times (tolerance), with continuous monitoring.
-      //   Each AM tower requires a calibrated base current meter (thermocouple or RF ammeter).
-      // 47 CFR §73.68: DA stations must perform field-intensity measurements after any change
-      //   to the antenna system to verify the array is operating within authorized limits.
-      // 47 CFR §73.150(b)(3): antenna monitoring points (AMPs) at each tower or phase/ratio
-      //   monitor required for DA systems to track base current and phase continuously.
+      // Base current and impedance monitoring — §73.51, §73.1215, §73.62, §73.69.
+      // 47 CFR §73.51: operating power by the direct method = I²R at the antenna/common
+      //   point — requires a calibrated current meter (thermocouple or RF ammeter).
+      // 47 CFR §73.1215: indicating instruments must be accurate to 2% of full scale —
+      //   the ±2% figure used here is that instrument-accuracy budget, not an operating
+      //   tolerance (operating power itself must stay within 90–105% per §73.1560(a)).
+      // 47 CFR §73.62(a): DA tolerances — sample current ratios within ±5%, phase within ±3°.
+      // 47 CFR §73.69: DA stations must have FCC-approved antenna monitors; §73.61 requires
+      //   periodic field strength measurements at DA monitoring points.
       // Base current I_base = sqrt(P_w / R_rad_Ω).  Typical R_rad for vertical monopole:
       //   λ/4 → R_rad ≈ 36.6 Ω; 0.2λ (short) → R_rad ≈ 10 Ω; 0.6λ → R_rad ≈ 74 Ω.
       // ATU re-tuning trigger: base current deviation > 2% or SWR change > 10%.
@@ -12714,7 +12721,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // R_rad screening estimate: λ/4 monopole reference (36.6 Ω); actual R_rad varies with height.
       const r_rad_est_ohm = 36.6;
       const i_base_a = round2(Math.sqrt((tpo_kw * 1000) / r_rad_est_ohm));
-      // §73.61 tolerance: ±2% of authorized base current
+      // ±2% instrument-accuracy budget per §73.1215 (not an operating tolerance)
       const i_base_tolerance_a   = round2(i_base_a * 0.02);
       const i_base_low_a         = round2(i_base_a - i_base_tolerance_a);
       const i_base_high_a        = round2(i_base_a + i_base_tolerance_a);
@@ -12758,8 +12765,8 @@ async function scoreCandidate(pt, ctx, warnings){
         field_meas_required_after_change,
         field_meas_cost_usd,
         atu_retune_trigger: 'base current deviation >2% OR SWR change >10%',
-        reference: '47 CFR §73.61 (base current monitoring, ±2% tolerance); §73.68 (DA field measurements after change); §73.150(b)(3) (antenna monitoring points for DA); §73.154 (proof of performance); FCC Form 302-AM; ARRL Antenna Impedance Handbook (typical R_rad values for vertical monopoles)',
-        note: `${frequency_khz} kHz, ${tpo_kw} kW, Class ${fcc_class} std height (${isHighCls_bcim ? '5/8λ' : '3/8λ'}) = ${standard_height_m_bcim} m: I_base ≈ ${i_base_a} A (R_rad ≈ ${r_rad_est_ohm} Ω, λ/4 ref). §73.61 tolerance ±2% → ${i_base_low_a}–${i_base_high_a} A. ${is_da_bcim ? `DA: §73.150 phase/ratio monitor required. §73.68 full field proof triggered after any ATU change. Field meas. budget ~$${field_meas_cost_usd.toLocaleString()}.` : 'NDA: single thermocouple ammeter + annual calibration.'}`
+        reference: '47 CFR §73.51 (direct method power = I²R); §73.1215 (indicating instruments — 2% accuracy); §73.1560(a) (operating power 90–105%); §73.62(a) (DA tolerances ±5%/±3°); §73.69 (antenna monitors); §73.61 (DA field strength measurements); §73.68 (sampling systems); §73.154 (proof of performance); FCC Form 302-AM; ARRL Antenna Impedance Handbook (typical R_rad values for vertical monopoles)',
+        note: `${frequency_khz} kHz, ${tpo_kw} kW, Class ${fcc_class} std height (${isHighCls_bcim ? '5/8λ' : '3/8λ'}) = ${standard_height_m_bcim} m: I_base ≈ ${i_base_a} A (R_rad ≈ ${r_rad_est_ohm} Ω, λ/4 ref). ±2% instrument accuracy (§73.1215) → ${i_base_low_a}–${i_base_high_a} A; operating power must stay within 90–105% of authorized (§73.1560(a)). ${is_da_bcim ? `DA: antenna monitor required (§73.69; tolerances ±5%/±3° per §73.62(a)). Partial proof (§73.154) after antenna system changes. Field meas. budget ~$${field_meas_cost_usd.toLocaleString()}.` : 'NDA: single thermocouple ammeter + annual calibration.'}`
       };
     })(),
 
@@ -12774,8 +12781,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   the industry/insurance standard used here.
       // Detuning (§73.150(a)(5) and §73.1030): towers used for DA arrays must be detuned when
       //   the primary array is not operating. Detuning shack (ATU bypass, shorting switch) required.
-      // Base current monitoring (§73.61): authorized base current must be within 2% continuously;
-      //   automated base current monitor required at each tower.
+      // Antenna current metering (§73.51 direct method): calibrated meter at each tower
+      //   (instrument accuracy 2% per §73.1215); DA stations need antenna monitors (§73.69).
       const is_da_base = /^DA/i.test(pattern_mode);
       // R_base estimate: short monopole (< λ/4) has higher radiation resistance.
       // Typical range: 50–120 Ω NDA, 80–200 Ω per-tower DA.
@@ -29588,17 +29595,18 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA2      = /^DA-2/i.test(pattern_mode);
       const isNDA      = !isDA;
 
-      // §73.1560 power tolerance — same for all AM
-      const power_tolerance_pct = 10;  // ±10% AIP
+      // §73.1560(a) operating power limits — 90%–105% of authorized, all AM
+      const power_min_pct = 90;
+      const power_max_pct = 105;
 
       // Base current meters required — one per antenna element for DA
       const n_da_towers = isDA2 ? 3 : (isDA ? 2 : 1);
       const n_base_current_meters = n_da_towers;  // one per tower
       const calibration_interval_months = 12;
 
-      // Antenna monitor required for DA per §73.68
+      // Antenna monitor required for DA per §73.69
       const antenna_monitor_required = isDA;
-      const antenna_monitor_cfr      = '47 CFR §73.68';
+      const antenna_monitor_cfr      = '47 CFR §73.69';
 
       // Wattmeter / directional power meter
       const WATTMETER_TYPES = [
@@ -29666,7 +29674,8 @@ async function scoreCandidate(pt, ctx, warnings){
         is_da_station:               isDA,
         is_nda_station:              isNDA,
         is_da2:                      isDA2,
-        power_tolerance_pct,
+        power_min_pct,
+        power_max_pct,
         n_antenna_elements:          n_da_towers,
         n_base_current_meters,
         calibration_interval_months,
@@ -29689,7 +29698,7 @@ async function scoreCandidate(pt, ctx, warnings){
         reference: '47 CFR §73.68; §73.1201; §73.1215; §73.1560; §73.1800–§73.1870',
         note: isDA
           ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: ${n_base_current_meters} base current meters required (one/element), antenna monitor required per §73.68, APC ${apc_required ? 'required for day/night switch' : 'not required'}. Operating log must record all pattern changes. Log retention: ${log_retention_years} years.`
-          : `NDA station at ${frequency_khz} kHz: 1 base current meter required (§73.1215), no antenna monitor, ±${power_tolerance_pct}% AIP tolerance (§73.1560). Operating log required (§73.1820); retain ${log_retention_years} years.`
+          : `NDA station at ${frequency_khz} kHz: 1 base current meter required (§73.1215), no antenna monitor, AIP within ${power_min_pct}–${power_max_pct}% of authorized (§73.1560(a)). Operating log required (§73.1820); retain ${log_retention_years} years.`
       };
     })(),
 

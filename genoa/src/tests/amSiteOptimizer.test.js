@@ -14636,17 +14636,18 @@ it('am_antenna_base_current_and_impedance_monitoring_guide i_base_authorized_a i
     `i_base_authorized_a ${g.i_base_authorized_a} should be 8–20 A for 5 kW NDA`);
 });
 
-it('am_antenna_base_current_and_impedance_monitoring_guide §73.61 tolerance is ±2%', async () => {
+it('am_antenna_base_current_and_impedance_monitoring_guide instrument accuracy is 2% (§73.1215)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_antenna_base_current_and_impedance_monitoring_guide;
-  assert.strictEqual(g.i_base_tolerance_pct, 2, '§73.61 requires ±2% base current tolerance');
+  // 2% is the §73.1215 indicating-instrument accuracy budget, not an operating tolerance
+  assert.strictEqual(g.i_base_tolerance_pct, 2, '§73.1215 instrument accuracy is 2% of full scale');
 });
 
-it('am_antenna_base_current_and_impedance_monitoring_guide reference cites §73.61 and §73.68', async () => {
+it('am_antenna_base_current_and_impedance_monitoring_guide reference cites §73.51 and §73.62', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_antenna_base_current_and_impedance_monitoring_guide;
-  assert.ok(g.reference.includes('§73.61'), 'reference must cite §73.61');
-  assert.ok(g.reference.includes('§73.68'), 'reference must cite §73.68');
+  assert.ok(g.reference.includes('§73.51'), 'reference must cite §73.51 (direct method power)');
+  assert.ok(g.reference.includes('§73.62'), 'reference must cite §73.62 (DA tolerances)');
 });
 
 it('candidate_comparison_table bcim columns are present and valid for KAZM', async () => {
@@ -14782,12 +14783,13 @@ it('am_auxiliary_backup_transmitter_compliance_guide backup_tpo_kw matches stati
   assert.strictEqual(g.backup_tpo_kw, KAZM.tpo_kw, 'backup_tpo_kw must match authorized tpo_kw');
 });
 
-it('am_auxiliary_backup_transmitter_compliance_guide power tolerance is ±10% per §73.1560', async () => {
+it('am_auxiliary_backup_transmitter_compliance_guide power limits are 90–105% per §73.1560(a)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_auxiliary_backup_transmitter_compliance_guide;
-  assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 AM power tolerance is ±10%');
-  assert.ok(Math.abs(g.tpo_authorized_low_kw - KAZM.tpo_kw * 0.9) < 0.01, 'tpo_authorized_low_kw = tpo × 0.9');
-  assert.ok(Math.abs(g.tpo_authorized_high_kw - KAZM.tpo_kw * 1.1) < 0.01, 'tpo_authorized_high_kw = tpo × 1.1');
+  assert.strictEqual(g.power_min_pct, 90,  '§73.1560(a) lower limit is 90% of authorized');
+  assert.strictEqual(g.power_max_pct, 105, '§73.1560(a) upper limit is 105% of authorized');
+  assert.ok(Math.abs(g.tpo_authorized_low_kw - KAZM.tpo_kw * 0.90) < 0.01, 'tpo_authorized_low_kw = tpo × 0.90');
+  assert.ok(Math.abs(g.tpo_authorized_high_kw - KAZM.tpo_kw * 1.05) < 0.01, 'tpo_authorized_high_kw = tpo × 1.05');
 });
 
 it('am_auxiliary_backup_transmitter_compliance_guide total_backup_low_usd > 0', async () => {
@@ -15138,15 +15140,16 @@ it('KAZM modulation limits match FCC §73.1570(b)', async () => {
   const g = out.candidates[0].am_modulation_monitoring_and_audio_processing_guide;
   assert.strictEqual(g.max_positive_peak_pct, 125, 'positive peak limit must be 125% per §73.1570(b)');
   assert.strictEqual(g.max_negative_peak_pct, 100, 'negative peak limit must be 100% per §73.1570(b)');
-  assert.strictEqual(g.power_tolerance_pct, 2.0, 'power tolerance must be ±2% per §73.1560(a)');
+  assert.strictEqual(g.power_min_pct, 90,  '§73.1560(a) lower limit is 90%');
+  assert.strictEqual(g.power_max_pct, 105, '§73.1560(a) upper limit is 105%');
 });
 
-it('KAZM TPO operating range reflects ±2% tolerance', async () => {
+it('KAZM TPO operating range reflects §73.1560(a) 90–105% limits', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_modulation_monitoring_and_audio_processing_guide;
-  // KAZM fixture: tpo_kw = 5.0 → min 4.90, max 5.10
-  assert.ok(Math.abs(g.tpo_min_kw - 4.9) < 0.01, `tpo_min_kw should be ~4.90, got ${g.tpo_min_kw}`);
-  assert.ok(Math.abs(g.tpo_max_kw - 5.1) < 0.01, `tpo_max_kw should be ~5.10, got ${g.tpo_max_kw}`);
+  // KAZM fixture: tpo_kw = 5.0 → min 4.50 (90%), max 5.25 (105%)
+  assert.ok(Math.abs(g.tpo_min_kw - 4.5) < 0.01, `tpo_min_kw should be ~4.50, got ${g.tpo_min_kw}`);
+  assert.ok(Math.abs(g.tpo_max_kw - 5.25) < 0.01, `tpo_max_kw should be ~5.25, got ${g.tpo_max_kw}`);
   assert.strictEqual(g.audio_bandwidth_khz, 10.0, 'NRSC-1-A audio bandwidth must be 10 kHz');
 });
 
@@ -15163,7 +15166,8 @@ it('candidate_comparison_table mod columns are present and valid for KAZM', asyn
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.mod_max_positive_peak_pct, 125, 'mod_max_positive_peak_pct must be 125');
-  assert.strictEqual(r0.mod_power_tolerance_pct, 2.0, 'mod_power_tolerance_pct must be 2.0');
+  assert.strictEqual(r0.mod_power_min_pct, 90,  'mod_power_min_pct must be 90');
+  assert.strictEqual(r0.mod_power_max_pct, 105, 'mod_power_max_pct must be 105');
   assert.ok(r0.mod_total_audio_low_usd > 0, 'mod_total_audio_low_usd must be positive');
 });
 
@@ -17372,7 +17376,8 @@ test('#110 KAZM NDA: power monitoring guide present with correct NDA shape', asy
   const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
   const g = out.candidates[0].am_transmitter_power_monitoring_and_operating_log_guide;
   assert.ok(g, 'am_transmitter_power_monitoring_and_operating_log_guide must be present');
-  assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 tolerance must be ±10%');
+  assert.strictEqual(g.power_min_pct, 90,  '§73.1560(a) lower limit is 90%');
+  assert.strictEqual(g.power_max_pct, 105, '§73.1560(a) upper limit is 105%');
   assert.strictEqual(g.n_base_current_meters, 1, 'NDA must have exactly 1 base current meter');
   assert.strictEqual(g.antenna_monitor_required, false, 'NDA must not require antenna monitor');
   assert.strictEqual(g.automatic_power_control_required, false, 'NDA must not require APC');
@@ -17415,7 +17420,8 @@ test('#110 total_monitoring_low_usd is sum of component costs', async () => {
 test('#110 candidate_comparison_table has pml_* columns', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('pml_power_tolerance_pct'      in row, 'pml_power_tolerance_pct missing');
+    assert.ok('pml_power_min_pct'            in row, 'pml_power_min_pct missing');
+    assert.ok('pml_power_max_pct'            in row, 'pml_power_max_pct missing');
     assert.ok('pml_n_base_current_meters'    in row, 'pml_n_base_current_meters missing');
     assert.ok('pml_antenna_monitor_required' in row, 'pml_antenna_monitor_required missing');
     assert.ok('pml_apc_required'             in row, 'pml_apc_required missing');
