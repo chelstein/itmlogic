@@ -22558,7 +22558,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Regulatory considerations:
       //   - §73.49: Antenna towers must be enclosed within an effective locked fence
       //   - Ground lease must include fence line and buffer area within leased parcel
-      //   - §73.1560: Authorized antenna height must match the leased tower height
+      //   - §73.685: Licensed RCAMSL/HAAT — authorized antenna height must match the leased tower height
+      //     (§73.1560 covers operating power limits — not antenna height)
       //   - Interference protection radius: Site must maintain protection ratios under §73.182
       //   - FAA considerations: If tower exceeds 61m AGL (200 ft), requires FAA study (§17.7)
       //   - Zoning: AM tower sites often require conditional use permits (CUP) or special exceptions
@@ -22592,7 +22593,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Key lease provisions that must be negotiated
       const KEY_PROVISIONS = [
-        { id: 'QUIET_ENJOYMENT', label: 'Quiet enjoyment covenant', priority: 'CRITICAL', note: 'Protects broadcaster from landlord interference with tower or radial ground system during lease term', cfr: '§73.49; §73.1560' },
+        { id: 'QUIET_ENJOYMENT', label: 'Quiet enjoyment covenant', priority: 'CRITICAL', note: 'Protects broadcaster from landlord interference with tower or radial ground system during lease term', cfr: '§73.49; §73.685' },
         { id: 'ASSIGNMENT',      label: 'Assignment and sublease rights', priority: 'CRITICAL', note: 'Lease must be freely assignable to FCC permittees and successors-in-interest without landlord consent', cfr: '§73.3533' },
         { id: 'CONDEMNATION',    label: 'Condemnation proceeds', priority: 'HIGH', note: 'In the event of eminent domain taking, broadcaster receives share of condemnation award proportionate to lease value' },
         { id: 'FAA_ZONING',     label: 'Landlord cooperation for FAA/zoning filings', priority: 'HIGH', note: 'Landlord must sign as property owner on FAA Form 7460-1 and local CUP applications' },
@@ -22626,7 +22627,7 @@ async function scoreCandidate(pt, ctx, warnings){
         option_to_purchase_recommended: true,
         option_to_purchase_note: 'Negotiate right of first refusal or option to purchase the site at fair market value. AM transmitter sites are difficult to replicate once lost.',
         relocation_note: `New transmitter site lease must cover: tower base, ${ground_radial_radius_m}m radial ground system, guy wire anchors (${guy_radius_m}m radius), transmitter building, and all-weather access road. Minimum site area: ~${min_site_area_acres} acres. Lease term: ${LEASE_TERM.recommended_years} years minimum.`,
-        reference: '47 CFR §73.49; §73.1560; §73.3533; §73.182; §17.7; §1.1307; FAA Form 7460-1; local zoning/CUP requirements',
+        reference: '47 CFR §73.49; §73.685 (licensed height/RCAMSL); §73.3533; §73.182; §17.7; §1.1307; FAA Form 7460-1; local zoning/CUP requirements',
         note: `Ground lease: ${LEASE_TERM.recommended_years}-year recommended term, 2×10-year renewals. Minimum site area ~${min_site_area_acres} acres (${min_site_radius_m}m radius). ${KEY_PROVISIONS.length} key provisions; ${critical_provisions} CRITICAL. Option to purchase recommended.`
       };
     })(),
@@ -23433,7 +23434,8 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     interference_complaint_resolution_guide: (() => {
-      // §73.88 (AM co-channel), §73.182 (AM interference calculations), §73.814 (FM/AM interference complaint process)
+      // §73.88 (AM co-channel), §73.182 (AM interference calculations), §73.3587 (informal complaints), §1.106 (petitions)
+      // (§73.814 is an LPFM rule — Subpart G — not an FM/AM interference complaint process rule.)
       // AM stations are secondary to their protected contours only; interference "by-right" to other stations
       // is a function of whether the complaining station is within a protected service area.
       // Relocation can trigger NEW interference complaints from neighbors OR resolve existing ones.
@@ -29751,7 +29753,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   For AM, changes to power, pattern, antenna configuration, or
       //   operating frequency require prior FCC authorization.
       //
-      // 47 CFR §73.801 — Unattended transmitter operation.
+      // 47 CFR §73.1300 — Unattended operation of broadcast stations.
       //   AM stations may operate unattended (no operator on duty) if:
       //     (a) The transmitter has automatic reset or shutoff capability
       //     (b) The licensee can be reached by telephone within 3 hours
@@ -29759,16 +29761,17 @@ async function scoreCandidate(pt, ctx, warnings){
       //   No FCC license is required for persons who operate remote-controlled
       //   equipment if operation is per §73.1400 and no changes to licensed
       //   parameters are made.
+      //   (§73.801 is an LPFM rule — Subpart G — not applicable to AM broadcast.)
       //
       // FCC Restricted Radiotelephone Operator Permit (RP):
       //   - Required for anyone who adjusts or operates a transmitter
       //   - Application: FCC Form 605, no exam required, no expiration
       //   - Available electronically via FCC ULS system
-      //   - Exception: §73.801 unattended operation under a §73.1400 remote
+      //   - Exception: §73.1300 unattended operation under a §73.1400 remote
       //     control setup does not require an operator permit
       //
       // References:
-      //   47 CFR §73.801; §73.1400; §73.1560; §73.1690; §73.1870
+      //   47 CFR §73.1300; §73.1400; §73.1560; §73.1690; §73.1870
       //   FCC Form 605 (operator permit application)
 
       const isDA = /^DA/i.test(pattern_mode);
@@ -29810,10 +29813,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const unattended_eligible = true;  // all licensed AM stations with remote control
       const UNATTENDED_REQUIREMENTS = {
         authorized: unattended_eligible,
-        cfr: '§73.801',
+        cfr: '§73.1300',
         conditions: [
-          'Transmitter must have automatic reset or automatic shutoff (§73.801(a))',
-          'Licensee reachable by telephone within 3 hours of any contact (§73.801(b))',
+          'Transmitter must have automatic reset or automatic shutoff (§73.1300(a))',
+          'Licensee reachable by telephone within 3 hours of any contact (§73.1300(b))',
           'Remote control system must meet §73.1400 requirements'
         ],
         operator_permit_required_for_remote: false,
@@ -29849,10 +29852,10 @@ async function scoreCandidate(pt, ctx, warnings){
         rp_permit_required:          true,
         rp_permit_cost_usd,
         rp_permit_processing_days,
-        reference: '47 CFR §73.801; §73.1400; §73.1560; §73.1690; §73.1870; FCC Form 605',
+        reference: '47 CFR §73.1300 (unattended operation); §73.1400; §73.1560; §73.1690; §73.1870; FCC Form 605',
         note: isDA
-          ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: chief operator required (§73.1870); must review logs weekly and check antenna monitor readings. DA pattern modification requires prior CP/STA. Unattended operation authorized under §73.801 with remote control.`
-          : `NDA station at ${frequency_khz} kHz: chief operator required (§73.1870); weekly log review and transmitter power verification. Transmitter modifications to power or antenna require prior FCC authorization (§73.1690). Unattended operation authorized under §73.801.`
+          ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: chief operator required (§73.1870); must review logs weekly and check antenna monitor readings. DA pattern modification requires prior CP/STA. Unattended operation authorized under §73.1300 with remote control.`
+          : `NDA station at ${frequency_khz} kHz: chief operator required (§73.1870); weekly log review and transmitter power verification. Transmitter modifications to power or antenna require prior FCC authorization (§73.1690). Unattended operation authorized under §73.1300.`
       };
     })(),
 
