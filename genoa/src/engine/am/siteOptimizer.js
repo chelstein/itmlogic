@@ -4001,7 +4001,7 @@ async function scoreCandidate(pt, ctx, warnings){
         items.push({
           id: 'EXTENDED_GROUND_SYSTEM',
           priority: 'HIGH',
-          label: 'Extended ground system design (§73.190)',
+          label: 'Extended ground system design (§73.186)',
           note: `σ=${sigma_msm} mS/m (POOR). Standard 120-radial system will have significant losses. Commission deep-driven rod grid and extended buried radial design before finalizing tower height.`
         });
       }
@@ -4151,7 +4151,7 @@ async function scoreCandidate(pt, ctx, warnings){
         : null;                            // EXCELLENT already — no upgrade possible
 
       if (nextTierSigma == null){
-        return { upgrade_possible: false, note: `σ already in EXCELLENT range (${sigma_msm} mS/m) — filing-grade survey still required for §73.190 design but score impact would be minimal.` };
+        return { upgrade_possible: false, note: `σ already in EXCELLENT range (${sigma_msm} mS/m) — filing-grade survey still required for §73.186 ground system design / §73.190 certification but score impact would be minimal.` };
       }
 
       let upgrade_reach_km = null;
@@ -4192,7 +4192,7 @@ async function scoreCandidate(pt, ctx, warnings){
           ? 'HIGH VALUE — reach improvement > 5 km projected; survey strongly recommended before site commitment.'
           : reach_delta_km != null && reach_delta_km > 2
           ? 'MODERATE VALUE — some reach improvement projected; survey recommended if site is a finalist.'
-          : 'LIMITED VALUE — conductivity upgrade would have minor coverage impact; survey still required for §73.190 ground system design.'
+          : 'LIMITED VALUE — conductivity upgrade would have minor coverage impact; survey still required for §73.186 ground system design / §73.190 certification.'
       };
     })(),
     // Antenna height profile — standard vertical heights for this frequency and their
@@ -6322,7 +6322,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const lineItems = [
         { id: 'LAND_PURCHASE',      label: 'Land acquisition',            low_usd: landLow,    high_usd: landHigh,    note: `${parcelArea_ha} ha min for ${nRadials}-radial ground system (${parcelRadius_m} m radius)` },
         { id: 'TOWER_CONSTRUCTION', label: 'Tower (guyed monopole)',       low_usd: towerLow,   high_usd: towerHigh,   note: towerNote },
-        { id: 'GROUND_SYSTEM',      label: `Ground system (${nRadials} radials × ${radialLen_m} m)`, low_usd: groundLow, high_usd: groundHigh, note: '§73.190 buried copper radial system; includes trenching and conductivity survey' },
+        { id: 'GROUND_SYSTEM',      label: `Ground system (${nRadials} radials × ${radialLen_m} m)`, low_usd: groundLow, high_usd: groundHigh, note: '§73.186 buried copper radial system (design); includes trenching and §73.190 conductivity survey' },
         { id: 'TRANSMITTER',        label: `Transmitter (${tpo_kw} kW)`,  low_usd: txLow,      high_usd: txHigh,      note: 'Primary + backup transmitters; includes installation and initial alignment' },
         { id: 'TRANSMISSION_LINE',  label: 'Transmission line + ATU',     low_usd: txLineLow,  high_usd: txLineHigh,  note: 'Heliax / rigid line from transmitter building to tower base + antenna tuning unit' },
         { id: 'ENGINEERING',        label: 'Broadcast + structural engineering', low_usd: engLow, high_usd: engHigh,  note: isDA_ff ? 'DA array engineering + §73.150 pattern design + §73.182 NIF analysis' : '§73.182 NIF study, §73.154 proof design, structural PE' },
@@ -6580,7 +6580,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Actual R_r varies with height; we use the ideal value as a screening reference.
       const R_RADIATION_IDEAL = 36.6;
 
-      // Ground loss resistance — Terman/Belrose formula (§73.190 reference)
+      // Ground loss resistance — Terman/Belrose formula (§73.186 / NBS TN-24 reference)
       // R_ground ≈ 1.65 / (N_radials × σ_msm) for N >= 120 radials, λ/4 length.
       // Simplified for screening:
       const N_RADIALS_STANDARD = 120;
@@ -6674,7 +6674,7 @@ async function scoreCandidate(pt, ctx, warnings){
         base_current_monitor_required: monitorRequired,
         base_current_monitor_note: monitorNote,
         detuning,
-        reference: '47 CFR §73.61 (base current monitoring); §73.150(c) (detuning); §73.190 (ground system); ARRL Antenna Handbook (ATU design); Andrew/Commscope heliax data',
+        reference: '47 CFR §73.61 (base current monitoring); §73.150(c) (detuning); §73.186 (ground system design); §73.190 (conductivity/certification); ARRL Antenna Handbook (ATU design); Andrew/Commscope heliax data',
         note: 'Transmission system design guide is a screening-grade engineering reference. All impedances, efficiencies, and current values are based on ideal monopole theory and the Terman/Belrose ground loss formula. Actual values require field measurements and full RF system design by a licensed broadcast engineer.'
       };
     })(),
@@ -7246,7 +7246,7 @@ async function scoreCandidate(pt, ctx, warnings){
           interpretation:  `Measured ρ (Ω·m) → σ (mS/m) = 1000/ρ. Compare to M3 zone value (${sigma_msm} mS/m). If measured σ differs > ±30%, update groundwave reach and coverage calculations.`
         },
         certification_requirements: cert_requirements,
-        reference: '47 CFR §73.190 (ground system); §73.61 (base current monitoring); ARRL Antenna Handbook (Ch. 9); Terman (1943) Radio Engineers Handbook; Belrose (1992) HF Antennas for All Locations; FCC M3 zone data',
+        reference: '47 CFR §73.186 (AM ground system design); §73.190 (conductivity/certification); §73.61 (base current monitoring); ARRL Antenna Handbook (Ch. 9); Terman (1943) Radio Engineers Handbook; Belrose (1992) HF Antennas for All Locations; FCC M3 zone data',
         note: `Ground system design guide based on Terman/Belrose ground loss formula and FCC M3 conductivity σ = ${sigma_msm} mS/m at this candidate location. All efficiency and ground loss values are theoretical screening estimates. Actual values require soil resistivity survey and field measurements by a licensed broadcast engineer.`
       };
     })(),
@@ -7713,7 +7713,7 @@ async function scoreCandidate(pt, ctx, warnings){
         proof_timeline_weeks_low:   proof_weeks_low,
         proof_timeline_weeks_high:  proof_weeks_high,
         filing_form:                'FCC Form 302-AM (license to cover)',
-        reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
+        reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.186 (ground system design); §73.190 (conductivity/certification); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
       };
     })(),
@@ -8383,7 +8383,7 @@ async function scoreCandidate(pt, ctx, warnings){
         design_weeks_high,
         construction_premium_pct_low,
         construction_premium_pct_high,
-        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.207 (mileage separations); §73.215 (interference standards); §73.154 (proof of performance); §73.61 (base current monitors); §73.68 (monitor points); §73.69 (emergency NDA); §73.190 (ground system); §1.1310 (MPE)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.207 (mileage separations); §73.215 (interference standards); §73.154 (proof of performance); §73.61 (base current monitors); §73.68 (monitor points); §73.69 (emergency NDA); §73.186 (ground system design); §73.190 (conductivity/certification); §1.1310 (MPE)',
         note: `Class ${fcc_class} ${pattern_mode} on ${frequency_khz} kHz (${isClearCh_da ? 'clear' : isRegionalCh_da ? 'regional' : 'local'} channel) — estimated ${tower_count_low}–${tower_count_high} tower array, ${supp_low_db}–${supp_high_db} dB suppression depth. Pattern design: ${design_weeks_low}–${design_weeks_high} weeks, $${design_cost_low_usd.toLocaleString()}–$${design_cost_high_usd.toLocaleString()}.`
       };
     })(),
@@ -8415,7 +8415,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const eaLikely_mt = isUrban_mt; // proxy — matches NEPA guide
 
       const lambda_mt   = round2(300000 / frequency_khz);
-      const h_frac_mt   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_frac_mt   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D design height
       const h_m_mt      = round2(h_frac_mt * lambda_mt);
       const h_ft_mt     = Math.round(h_m_mt * 3.28084);
       const asrReq_mt   = h_m_mt > 60.96;
@@ -8698,7 +8698,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const is_da_ne    = /^DA/i.test(pattern_mode);
       const lambda_ne   = round2(300000 / frequency_khz);
-      const h_frac_ne   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_frac_ne   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D design height
       const h_m_ne      = round2(h_frac_ne * lambda_ne);
       const h_ft_ne     = Math.round(h_m_ne * 3.28084);
 
@@ -8845,7 +8845,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // ── Environmental triggers (§1.1307) ──
       const is_da_lu = /^DA/i.test(pattern_mode);
       const lambda_lu = round2(300000 / frequency_khz);
-      const h_frac_lu = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_frac_lu = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D design height
       const h_m_lu    = round2(h_frac_lu * lambda_lu);
       const h_ft_lu   = Math.round(h_m_lu * 3.28084);
 
@@ -9696,12 +9696,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM ground radial system design guide.
       //
       // Regulatory framework:
-      //   47 CFR §73.68: Grounding requirements for AM antenna systems.  The rules do
-      //     not mandate a specific number of radials, but the FCC engineering standard
-      //     model assumes a 120-radial, quarter-wave (λ/4) buried copper system as the
-      //     reference for the 36.5 Ω radiation resistance used in §73.68(b) base-current
-      //     calculations.  Fewer radials elevate ground-loss resistance and increase
-      //     base current.
+      //   47 CFR §73.186: AM ground system design standard — 120 radials × 0.35λ buried
+      //     copper (NBS TN-24). The rules do not mandate a specific number of radials for
+      //     all stations, but §73.186 / NBS TN-24 define the FCC engineering reference
+      //     system. R_rad = 36.5 Ω for a λ/4 monopole (Terman, 1955, p.895 — Terman
+      //     rounding; more precise value is 36.6 Ω). Fewer radials elevate ground-loss
+      //     resistance and reduce antenna efficiency.
       //   §73.190: FCC ground conductivity measurement program (σ map). The realized
       //     ground resistance at a site depends on soil resistivity, moisture, and the
       //     number and length of buried radials.
@@ -9819,7 +9819,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_radial_eco_low_usd:  total_radial_eco_low,
         total_radial_eco_high_usd: total_radial_eco_high,
         recommended_n_radials:     n_radials_full,
-        reference: '47 CFR §73.68 (grounding); §73.186 (AM ground system standard — 120 × 0.35λ); §73.190 (conductivity map); §73.154 (proof of performance); NBS TN-24; Sevick, Antenna Engineering Handbook ch. 3; ITU-R BS.598',
+        reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ); §73.190 (conductivity map); §73.68 (AM antenna system / base current measurement); §73.154 (proof of performance); NBS TN-24; Sevick, Antenna Engineering Handbook ch. 3; ITU-R BS.598',
         note: `At ${frequency_khz} kHz, standard radial length = 0.35λ ≈ ${standard_radial_ft} ft (${standard_radial_m} m) per §73.186 / NBS TN-24 (physics ref: λ/4 ≈ ${quarter_wave_ft} ft for R_rad = 36.5Ω). 120-radial full system: R_loss=${r_loss_full} Ω, η=${efficiency_full}%, I_base=${i_full} A. Installed cost ≈ $${total_radial_system_low_usd.toLocaleString()}–$${total_radial_system_high_usd.toLocaleString()}. Site must clear ≥${min_site_radius_ft} ft radius for full radial fan.`
       };
     })(),
@@ -13744,7 +13744,7 @@ async function scoreCandidate(pt, ctx, warnings){
         erp_excellent_kw, erp_good_kw, erp_poor_kw,
         p_loss_excellent_w, p_loss_poor_w,
         base_current_excellent_a, base_current_poor_a,
-        reference: '47 CFR §73.51 (base current monitoring); §73.54 (antenna resistance); §73.190 (ground system); Terman "Radio Engineers Handbook" Ch. 9; Brown/Lewis/Epstein (1937) ground system study; NAB Engineering Handbook (10th ed.)',
+        reference: '47 CFR §73.51 (base current monitoring); §73.54 (antenna resistance); §73.186 (AM ground system design); §73.190 (conductivity/certification); Terman "Radio Engineers Handbook" Ch. 9; Brown/Lewis/Epstein (1937) ground system study; NAB Engineering Handbook (10th ed.)',
         note: `${tpo_kw} kW TPO at ${frequency_khz} kHz: ERP ${erp_excellent_kw} kW (120-radial η=${(eta_excellent*100).toFixed(1)}%) to ${erp_poor_kw} kW (poor ground η=${(eta_poor*100).toFixed(1)}%). Base current: ${base_current_excellent_a}–${base_current_poor_a} A.`
       };
     })(),
@@ -17445,9 +17445,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // obligation (FCC/ACHP Nationwide Programmatic Agreement; §1.1307(a)(4)),
       // and local opposition risk.
 
-      // Wavelength and estimated tower height
+      // Wavelength and estimated tower height (3/8λ design height for Class C/D, 5/8λ for A/B)
       const lambda_m        = round2(300000 / frequency_khz);
-      const tower_height_m  = round2(lambda_m * 0.25);
+      const tower_height_m  = round2(lambda_m * (['A', 'B'].includes(fcc_class) ? 0.625 : 0.375));
       const tower_height_ft = round2(tower_height_m * 3.28084);
 
       // Distance from COL centroid (urbanization proxy)
@@ -17951,14 +17951,14 @@ async function scoreCandidate(pt, ctx, warnings){
     am_antenna_tower_lighting_and_faa_guide: (() => {
       // Models FAA tower lighting requirements (14 CFR Part 77, FCC §17.21) and
       // FCC Antenna Structure Registration (ASR) obligations under §17.7 for the
-      // candidate tower.  Tower height is estimated from the standard λ/4 monopole
-      // height at the station frequency.
+      // candidate tower.  Tower height is estimated from the design height:
+      // 3/8λ for Class C/D, 5/8λ for Class A/B.
 
       const isDA_ltg = /^DA/i.test(pattern_mode);
 
-      // Wavelength and standard quarter-wave tower height estimate
+      // Wavelength and design tower height (3/8λ Class C/D, 5/8λ Class A/B)
       const lambda_m            = round2(300000 / frequency_khz);
-      const std_tower_height_m  = round2(lambda_m * 0.25);
+      const std_tower_height_m  = round2(lambda_m * (['A', 'B'].includes(fcc_class) ? 0.625 : 0.375));
       const std_tower_height_ft = round2(std_tower_height_m * 3.28084);
 
       // FAA notification and FCC ASR threshold: 200 ft (60.96m) AGL per 14 CFR
@@ -20085,7 +20085,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_atu_networks,
         is_directional:       isDA_atu,
         atu_network_type:     'L-network (shunt inductor / series capacitor)',
-        reference: '47 CFR §73.190 (ground system/detuning); §73.62 (antenna base current monitoring); §73.154 (proof of performance); ITU-R BS.346-1 (monopole radiation resistance); IEEE Std 100 (ATU design)',
+        reference: '47 CFR §73.186 (ground system design); §73.190 (detuning/conductivity); §73.62 (antenna base current monitoring); §73.154 (proof of performance); ITU-R BS.346-1 (monopole radiation resistance); IEEE Std 100 (ATU design)',
         note: `${frequency_khz} kHz λ/4 monopole (${Math.round(lambda_q_m)} m): base impedance ~${R_base_low}–${R_base_high} Ω (Rr=${Rr_ohm} Ω + Rg=${Rg_low_ohm}–${Rg_high_ohm} Ω). ATU: ${lambda_m.toFixed(0)}-m-wavelength L-network; shunt L ≈ ${L_shunt_uH} μH, series C ≈ ${C_ser_pF} pF; -3 dB BW ≈ ${BW_3dB_khz} kHz. Antenna efficiency ≈ ${eta_typ_pct}% (increases to ~95% with low-Rg ground system). Base current at ${tpo_kw} kW TPO: ≈ ${I_base_typ_a} A (monitor per §73.62). Guy wire detuning coils required within ${detuning_radius_m} m of tower base (§73.190).`
       };
     })(),
@@ -23050,11 +23050,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // Existing ASR for the current site does NOT transfer — a new ASR filing (FCC Form 854) is required.
       // FAA coordination under 14 CFR §77 is typically required before ASR can be granted.
 
-      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 3/8λ for C/D (design height)
       const c_mps_asr = 299792458;
       const wavelength_m_asr = c_mps_asr / (frequency_khz * 1000);
-      const h_frac_asr = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
-      const three_eights_m_asr = round2(wavelength_m_asr * h_frac_asr);  // class-dependent height
+      const h_frac_asr = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D
+      const three_eights_m_asr = round2(wavelength_m_asr * h_frac_asr);  // class-dependent design height (3/8λ for C/D)
       const quarter_wave_m_asr = round2(wavelength_m_asr * 0.25);
 
       // ASR registration threshold: 60.96 m (200 ft) AMSL
@@ -33335,7 +33335,7 @@ function buildRecommendedActions({
     actions.push({
       priority: 'INFORMATIONAL',
       action: 'Commission soil resistivity survey at POOR/FAIR conductivity candidate sites.',
-      rationale: `One or more top candidates have FAIR or POOR ground conductivity (σ < 4 mS/m). The §73.190 ground radial system requirements and achievable antenna efficiency are highly sensitive to soil resistivity at these levels. A resistivity survey before site commitment can avoid costly ground system overruns.`
+      rationale: `One or more top candidates have FAIR or POOR ground conductivity (σ < 4 mS/m). The §73.186 ground radial system design requirements and achievable antenna efficiency are highly sensitive to soil resistivity at these levels. A resistivity survey before site commitment can avoid costly ground system overruns.`
     });
   }
 
