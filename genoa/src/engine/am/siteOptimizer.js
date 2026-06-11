@@ -4533,8 +4533,9 @@ async function scoreCandidate(pt, ctx, warnings){
     // high regulatory risk still gets flagged for early mitigation planning.
     regulatory_risk_score: (() => {
       const lambdaM_r = 300000 / frequency_khz;
-      const qwM_r     = lambdaM_r / 4;
-      const asrRequired = qwM_r > 60.96;
+      const isHighClass_r = /^[AB]/i.test(fcc_class);
+      const planH_r = lambdaM_r * (isHighClass_r ? 0.625 : 0.375);  // 5/8λ A/B, 3/8λ C/D
+      const asrRequired = planH_r > 60.96;
       const risks = [];
       let total = 0;
 
@@ -4543,7 +4544,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total += 40;
       }
       if (asrRequired){
-        risks.push({ factor: 'ASR_REQUIRED', points: 15, note: `λ/4=${Math.round(qwM_r)} m > 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction; adds 8–16 weeks` });
+        risks.push({ factor: 'ASR_REQUIRED', points: 15, note: `Tower height (${Math.round(planH_r)} m) > 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction; adds 8–16 weeks` });
         total += 15;
       }
       if (sigma_msm < 2){
@@ -5008,22 +5009,24 @@ async function scoreCandidate(pt, ctx, warnings){
       });
 
       // Gate 3: §17.7 ASR registration
-      // WARN when λ/4 > 60.96m (standard antenna definitely exceeds threshold).
-      // WARN when λ/4 ≤ 60.96m but λ/2 > 60.96m (final height determines applicability).
-      // PASS when even λ/2 < 60.96m (very high frequency — both standard heights clear threshold).
+      // WARN when class-appropriate design height > 60.96m (certain — 3/8λ C/D, 5/8λ A/B).
+      // WARN when design height ≤ 60.96m but max practical height (5/8λ) > 60.96m (possible).
+      // PASS when even 5/8λ < 60.96m (extremely high frequency — practically never in AM band).
       const lambdaM_g = 300000 / frequency_khz;
-      const qwM_g = lambdaM_g / 4;
-      const hwM_g = lambdaM_g / 2;
-      const asrCertain  = qwM_g > 60.96;
+      const isHighClass_g = /^[AB]/i.test(fcc_class);
+      const qwM_g  = lambdaM_g / 4;   // λ/4 physics reference
+      const planH_g = lambdaM_g * (isHighClass_g ? 0.625 : 0.375);  // design height
+      const hwM_g  = lambdaM_g * 0.625;  // 5/8λ practical maximum
+      const asrCertain  = planH_g > 60.96;
       const asrPossible = !asrCertain && hwM_g > 60.96;
       const asrStatus   = (asrCertain || asrPossible) ? WARN : PASS;
       gates.push({
         id: 'ASR_REGISTRATION', label: '§17.7 ASR tower registration',
         status: asrStatus,
-        value: `λ/4 ≈ ${Math.round(qwM_g)} m, λ/2 ≈ ${Math.round(hwM_g)} m (threshold 60.96 m)`,
+        value: `λ/4 ≈ ${Math.round(qwM_g)} m, design ≈ ${Math.round(planH_g)} m (threshold 60.96 m)`,
         rule: '47 CFR §17.7',
         note: asrCertain
-          ? `FCC Form 854 + FAA aeronautical study (7460-1) required before construction (λ/4 exceeds 200 ft).`
+          ? `FCC Form 854 + FAA aeronautical study (7460-1) required before construction (design height ${Math.round(planH_g)} m exceeds 200 ft).`
           : asrPossible
           ? `Final tower height determines ASR applicability — if > 60.96 m (200 ft), FCC Form 854 + FAA Form 7460-1 required.`
           : null
@@ -5243,8 +5246,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Each item carries a status (REQUIRED / CONDITIONAL / INFORMATIONAL), the responsible
       // party, LMS form/exhibit code, and rule cite.  This is a screening-grade checklist —
       // consult FCC communications counsel before filing.
-      const qwM_fl     = (300000 / frequency_khz) / 4;
-      const asrNeeded  = qwM_fl > 60.96;
+      const lambdaM_fl  = 300000 / frequency_khz;
+      const isHighClass_fl = /^[AB]/i.test(fcc_class);
+      const towerH_fl   = lambdaM_fl * (isHighClass_fl ? 0.625 : 0.375);
+      const asrNeeded  = towerH_fl > 60.96;
       const hasTreaty  = !!treaty_zone;
       const isCC_fl    = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const chanClass_fl = frequencyChannelClass(frequency_khz);
@@ -5321,8 +5326,8 @@ async function scoreCandidate(pt, ctx, warnings){
           rule:        '47 CFR §17.7',
           responsible: 'Tower owner / communications counsel',
           note:        asrNeeded
-            ? `λ/4 ≈ ${round2(qwM_fl)} m exceeds 200 ft (60.96 m) §17.7 threshold. Form 854 + FAA Form 7460-1 required before construction. FAA review can take 45–90 days.`
-            : `Tower height (${round2(qwM_fl)} m) is at or below §17.7 threshold. ASR may not be required, but verify actual proposed height.`
+            ? `Tower height (${round2(towerH_fl)} m) exceeds 200 ft (60.96 m) §17.7 threshold. Form 854 + FAA Form 7460-1 required before construction. FAA review can take 45–90 days.`
+            : `Tower height (${round2(towerH_fl)} m) is at or below §17.7 threshold. ASR may not be required, but verify actual proposed height.`
         },
         {
           id:          'LMS_NIGHTTIME_NIF',
