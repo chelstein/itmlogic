@@ -1,5 +1,5 @@
 // Community boundary resolver — fetches the legal city-limits polygon for a
-// principal community of license so §73.24(j) can run the 5 mV/m coverage
+// principal community of license so §73.24(i) can run the 5 mV/m coverage
 // check rather than returning NOT_MEASURED.
 //
 // Two-tier lookup (US-focused, no API key required):
@@ -16,7 +16,7 @@
 //   const result = await client.getByName({ community: 'Sherman', state: 'TX' });
 //   // → { available: true, geojson: GeoJSON.Feature<Polygon>, source, ... }
 //
-// The returned geojson shape matches what §73.24(j)'s extractFirstPolygon()
+// The returned geojson shape matches what §73.24(i)'s extractFirstPolygon()
 // expects: a GeoJSON Feature or FeatureCollection in WGS-84.
 
 const TIGER_BASE  = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/56/query';

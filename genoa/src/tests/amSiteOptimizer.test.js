@@ -512,7 +512,7 @@ test('every candidate carries ground_sigma_quality from the engine', async () =>
   }
 });
 
-test('every candidate carries principal_community_5mvm_km (§73.24(j) 5 mV/m contour radius)', async () => {
+test('every candidate carries principal_community_5mvm_km (§73.24(i) 5 mV/m contour radius)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5,
     optimization_goals: { maximize_col_coverage: true }
   });
@@ -1046,8 +1046,8 @@ test('recommended_actions: MEDIUM COL power action fires when top-5 candidate ha
     `COL power action should be MEDIUM priority; got: ${colPwrAction.priority}`);
   assert.ok(/9\.8/i.test(colPwrAction.action),
     `COL power action should mention the required TPO (9.8 kW); got: ${colPwrAction.action}`);
-  assert.ok(/§73\.24\(j\)/i.test(colPwrAction.rationale),
-    `COL power rationale should cite §73.24(j); got: ${colPwrAction.rationale}`);
+  assert.ok(/§73\.24\(i\)/i.test(colPwrAction.rationale),
+    `COL power rationale should cite §73.24(i); got: ${colPwrAction.rationale}`);
 });
 
 test('recommended_actions: COL power action does NOT fire when no candidate has minimum_tpo_for_col_coverage_kw', () => {
@@ -1990,8 +1990,8 @@ test('tpo_to_coverage_table present on every candidate with correct structure', 
         assert.ok(row.tpo_needed_kw > 0,
           `tpo_needed_kw must be positive (rank ${c.rank}, dist ${row.col_distance_km} km)`);
       }
-      assert.equal(row.rule, '47 CFR §73.24(j) 5 mV/m floor',
-        `rule must cite §73.24(j) (rank ${c.rank})`);
+      assert.equal(row.rule, '47 CFR §73.24(i) 5 mV/m floor',
+        `rule must cite §73.24(i) (rank ${c.rank})`);
     }
   }
 });

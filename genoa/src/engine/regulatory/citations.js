@@ -83,7 +83,7 @@ export const FCC_CITES = Object.freeze({
     verified_at: '2026-05-23'
   }),
   AM_CITY_COVERAGE: Object.freeze({
-    rule: '§73.24(j)',
+    rule: '§73.24(i)',
     caption: 'Principal community coverage (AM)',
     subject: 'AM 5 mV/m city-grade principal-community coverage requirement.',
     verified_at: '2026-05-23'

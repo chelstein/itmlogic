@@ -158,7 +158,7 @@ export default function BaselinePanel({ callsign, baseline, comparedTo }){
         <div className="mt-2 space-y-1">
           {baseline.minimum_tpo_for_col_coverage_kw != null && (
             <div className="font-mono text-[9px] leading-tight" style={{ color: '#ffb347' }}>
-              §73.24(j): current site needs ≥ {baseline.minimum_tpo_for_col_coverage_kw} kW to reach 5 mV/m at COL centroid
+              §73.24(i): current site needs ≥ {baseline.minimum_tpo_for_col_coverage_kw} kW to reach 5 mV/m at COL centroid
             </div>
           )}
           {baseline.minimum_tpo_for_compliance_kw != null && (
@@ -172,7 +172,7 @@ export default function BaselinePanel({ callsign, baseline, comparedTo }){
         const rcs = baseline.regulatory_compliance_summary;
         const rowColor = s => s === 'PASS' ? '#63d471' : s === 'FAIL' ? '#ff5a5a' : s === 'ADVISORY' ? '#ffb347' : '#a89c84';
         const entries = [
-          { label: '§73.24(j) COL', entry: rcs.col_coverage },
+          { label: '§73.24(i) COL', entry: rcs.col_coverage },
           { label: '§73.24(g) Blanket', entry: rcs.blanket_pop },
           { label: '§73.21 Class power', entry: rcs.class_power },
           { label: 'Treaty zone', entry: rcs.treaty_zone }

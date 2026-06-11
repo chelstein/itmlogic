@@ -25,7 +25,7 @@
 //
 // REFERENCES
 //   - 47 CFR §73.24(g) blanket-interference 1% population limit
-//   - 47 CFR §73.24(j) principal community 5 mV/m coverage rule
+//   - 47 CFR §73.24(i) principal community 5 mV/m coverage rule
 //   - 47 CFR §73.184 groundwave method (FCC gwave.js)
 //   - US/Mexico AM Agreement (1986); US/Canada AM treaty
 
@@ -37,7 +37,7 @@ import { lookupM3Conductivity, lookupM3ZoneFallback, m3LoadStatus } from './m3.j
 
 // Hard non-compliance bars.  Failing any of these flags a candidate
 // NON-COMPLIANT and excludes it from the PROMISING pool (§73.24 floors).
-const COL_COVERAGE_HARD_FLOOR    = 0.80;   // §73.24(j) substantial-compliance threshold
+const COL_COVERAGE_HARD_FLOOR    = 0.80;   // §73.24(i) substantial-compliance threshold
 const BLANKET_POP_HARD_CEIL_PCT  = 1.0;    // §73.24(g) 1% limit on persons inside 1000 mV/m
 const PROMISING_TOP_QUANTILE     = 0.75;   // top 25% of score → PROMISING (and no NON-COMPLIANT)
 
@@ -377,7 +377,7 @@ export async function runSiteOptimizer(body = {}){
   if (!community_of_license_polygon && !col_centroid){
     warnings.push({
       code: 'COL_CENTROID_UNVERIFIED',
-      message: 'No community_of_license_polygon or col_centroid supplied. COL service coverage uses a 10-km disc proxy centered on the current site. Provide the COL polygon for §73.24(j) filing-grade overlap analysis.',
+      message: 'No community_of_license_polygon or col_centroid supplied. COL service coverage uses a 10-km disc proxy centered on the current site. Provide the COL polygon for §73.24(i) filing-grade overlap analysis.',
       blocking: false
     });
   } else if (!community_of_license_polygon && col_centroid){
@@ -437,7 +437,7 @@ export async function runSiteOptimizer(body = {}){
   }
 
   // Stamp col_coverage_gap_pct on candidates that fall below the 80% hard floor.
-  // Tells the engineer how much additional coverage is needed to clear §73.24(j).
+  // Tells the engineer how much additional coverage is needed to clear §73.24(i).
   for (const c of scored){
     if (c.col_coverage_pct != null && c.col_coverage_pct < COL_COVERAGE_HARD_FLOOR){
       c.col_coverage_gap_pct = round2(COL_COVERAGE_HARD_FLOOR - c.col_coverage_pct);
@@ -564,7 +564,7 @@ export async function runSiteOptimizer(body = {}){
       const action = c.status_category === 'PROMISING'
         ? `Advance to full §73.182 NIF study and parcel investigation.`
         : c.status_category === 'RECOVERABLE_WITH_POWER_INCREASE'
-        ? `Increase TPO to ≥${c.minimum_tpo_for_col_coverage_kw} kW to achieve §73.24(j) compliance, then advance to NIF study.`
+        ? `Increase TPO to ≥${c.minimum_tpo_for_col_coverage_kw} kW to achieve §73.24(i) compliance, then advance to NIF study.`
         : c.status_category === 'RECOVERABLE_WITH_DA'
         ? `Commission §73.150 directional antenna study to push 5 mV/m contour toward community of license.`
         : c.status_category === 'TREATY_REVIEW'
@@ -1917,7 +1917,7 @@ export async function runSiteOptimizer(body = {}){
     const sitePoolStatement = nPromising > 0
       ? `Screening of ${scored.length} grid candidates within ${search_radius_km} km of ${callsign}'s current site (${current_site.lat.toFixed(4)}°N, ${Math.abs(current_site.lon).toFixed(4)}°W) identified ${nPromising} PROMISING candidate(s) and ${nReview} candidates requiring engineering review.`
       : nCompliant < scored.length
-      ? `Screening of ${scored.length} grid candidates identified no PROMISING candidates — ${nCompliant} are non-compliant with §73.24(j)/(g) at current TPO and ${scored.length - nCompliant} require engineering review.`
+      ? `Screening of ${scored.length} grid candidates identified no PROMISING candidates — ${nCompliant} are non-compliant with §73.24(i)/(g) at current TPO and ${scored.length - nCompliant} require engineering review.`
       : `All ${scored.length} grid candidates evaluated at ${tpo_kw} kW TPO are non-compliant at current power. Power increase or DA pattern may recover some candidates.`;
 
     // Top candidate statement
@@ -2225,12 +2225,12 @@ export async function runSiteOptimizer(body = {}){
       },
       {
         id:          'COL_COVERAGE',
-        label:       'Principal community (§73.24(j)) coverage',
+        label:       'Principal community (§73.24(i)) coverage',
         confidence:  hasColPolygon ? 'HIGH' : 'SCREENING',
         data_source: hasColPolygon ? 'GeoJSON polygon overlap (Monte-Carlo)' : `10 km disc proxy centred on current site`,
         score_impact_pts: 10,
         upgrade_action: hasColPolygon ? null : 'Supply community_of_license_polygon as GeoJSON Polygon in the request body. FCC LMS has boundary data for all licensed service areas.',
-        upgrade_value: hasColPolygon ? null : 'COL sub-score resolves from ±10 pts to ±2 pts; critical for candidates near the 80% §73.24(j) threshold.'
+        upgrade_value: hasColPolygon ? null : 'COL sub-score resolves from ±10 pts to ±2 pts; critical for candidates near the 80% §73.24(i) threshold.'
       },
       {
         id:          'POPULATION',
@@ -2621,7 +2621,7 @@ async function scoreCandidate(pt, ctx, warnings){
   //     Useful for comparing relative audience reach across candidates without full §73.183 study.
   const population_reach_bands = (() => {
     const targets = [
-      { mvm: 5.0,  label: '5 mV/m (§73.24(j) principal community)' },
+      { mvm: 5.0,  label: '5 mV/m (§73.24(i) principal community)' },
       { mvm: 2.0,  label: '2 mV/m (urban fringe / primary coverage)' },
       { mvm: 1.0,  label: '1 mV/m (rural primary)' },
       { mvm: 0.5,  label: '0.5 mV/m (§73.24 secondary daytime)' },
@@ -2648,7 +2648,7 @@ async function scoreCandidate(pt, ctx, warnings){
     return { bands, note: 'Screening-grade circular-area population estimate using distance-adjusted density proxy. Not a §73.183 propagation contour.' };
   })();
 
-  // 2. Principal-community coverage (§73.24(j)).  When a polygon was
+  // 2. Principal-community coverage (§73.24(i)).  When a polygon was
   //    supplied we compute the fraction of the COL boundary inside the
   //    5 mV/m daytime contour (modeled as a circle of radius =
   //    fccAmDistanceKm(target=5 mV/m)).  When no polygon was supplied
@@ -2728,16 +2728,16 @@ async function scoreCandidate(pt, ctx, warnings){
   } catch (_){ /* leave null */ }
 
   // 3a-c. Groundwave contour table — distances to the four key FCC service contours.
-  // 25 mV/m = §73.24(j) "principal community" service for dominant stations;
-  //  5 mV/m = §73.24(j) standard COL floor;
+  // 25 mV/m = §73.24(i) "principal community" service for dominant stations;
+  //  5 mV/m = §73.24(i) standard COL floor;
   //  2 mV/m = §73.24 secondary service;
   //  0.5 mV/m = protected daytime contour.
   // Reuses the same M3 conductivity already computed above.
   // Returns null for a contour if the curve lookup throws.
   const groundwave_contour_table = (() => {
     const levels = [
-      { mvm: 25,  label: '25 mV/m', note: '§73.24(j) dominant principal-community contour' },
-      { mvm: 5,   label: '5 mV/m',  note: '§73.24(j) COL service floor' },
+      { mvm: 25,  label: '25 mV/m', note: '§73.24(i) dominant principal-community contour' },
+      { mvm: 5,   label: '5 mV/m',  note: '§73.24(i) COL service floor' },
       { mvm: 2,   label: '2 mV/m',  note: 'Secondary service area' },
       { mvm: 0.5, label: '0.5 mV/m', note: 'Protected daytime contour' }
     ];
@@ -2766,7 +2766,7 @@ async function scoreCandidate(pt, ctx, warnings){
           // FCC service tier labels.
           tier: mvmR >= 1000 ? 'blanket (§73.24(g))'
               : mvmR >= 25   ? 'local dominant (25 mV/m)'
-              : mvmR >= 5    ? 'COL service (§73.24(j))'
+              : mvmR >= 5    ? 'COL service (§73.24(i))'
               : mvmR >= 2    ? 'secondary service'
               : mvmR >= 0.5  ? 'protected daytime'
               : mvmR >= 0.1  ? 'fringe'
@@ -2799,10 +2799,10 @@ async function scoreCandidate(pt, ctx, warnings){
           col_distance_km: d,
           tpo_needed_kw: tpoNeeded,
           within_class_ceiling: tpoNeeded <= classCeil,
-          rule: '47 CFR §73.24(j) 5 mV/m floor'
+          rule: '47 CFR §73.24(i) 5 mV/m floor'
         };
       } catch (_){
-        return { col_distance_km: d, tpo_needed_kw: null, within_class_ceiling: null, rule: '47 CFR §73.24(j) 5 mV/m floor' };
+        return { col_distance_km: d, tpo_needed_kw: null, within_class_ceiling: null, rule: '47 CFR §73.24(i) 5 mV/m floor' };
       }
     });
   })();
@@ -2835,7 +2835,7 @@ async function scoreCandidate(pt, ctx, warnings){
   //     supplied we use the great-circle distance from the candidate to that
   //     point; otherwise we fall back to the candidate's distance from the
   //     current transmitter site as a proxy.
-  //     §73.24(j) requires the community receive ≥ 5 mV/m daytime.
+  //     §73.24(i) requires the community receive ≥ 5 mV/m daytime.
   let field_at_col_centroid_mvm = null;
   const colDist = col_centroid
     ? greatCircleKm(pt.lat, pt.lon, col_centroid.lat, col_centroid.lon)
@@ -2856,7 +2856,7 @@ async function scoreCandidate(pt, ctx, warnings){
     } catch (_){ /* leave null */ }
   }
 
-  // 3d. Minimum TPO for §73.24(j) COL coverage compliance.
+  // 3d. Minimum TPO for §73.24(i) COL coverage compliance.
   //     Only computed when field_at_col_centroid_mvm < 5 mV/m (coverage fails).
   //     Binary-searches TPO to find the minimum power where the 5 mV/m contour
   //     extends to the COL centroid distance.  Limited to [tpo_kw, 50 kW] so
@@ -2990,7 +2990,7 @@ async function scoreCandidate(pt, ctx, warnings){
   // Each entry: { key, label, points, max_points, reason }
   // Enables "no hidden scoring" principle: every rank is explainable.
   const SCORE_LABELS = {
-    col_coverage:  'COL service coverage (§73.24(j))',
+    col_coverage:  'COL service coverage (§73.24(i))',
     population:    'Daytime population served',
     blanket:       'Blanket population risk (§73.24(g))',
     conductivity:  'Ground conductivity (σ mS/m)',
@@ -3015,7 +3015,7 @@ async function scoreCandidate(pt, ctx, warnings){
     if (sk === 'col_coverage'){
       reason = coverage_pct == null
         ? 'COL polygon not provided — using 10-km disc proxy (low confidence)'
-        : `${Math.round(coverage_pct * 100)}% of community polygon covered (§73.24(j) floor: 80%)`;
+        : `${Math.round(coverage_pct * 100)}% of community polygon covered (§73.24(i) floor: 80%)`;
     } else if (sk === 'population'){
       reason = daytime_reach_km == null
         ? 'Reach estimate unavailable'
@@ -3059,7 +3059,7 @@ async function scoreCandidate(pt, ctx, warnings){
   // --- compliance & label flags ---
   const flags = [];
   if (coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR){
-    flags.push(`COL coverage ${(coverage_pct * 100).toFixed(0)}% < §73.24(j) ${(COL_COVERAGE_HARD_FLOOR * 100).toFixed(0)}% floor`);
+    flags.push(`COL coverage ${(coverage_pct * 100).toFixed(0)}% < §73.24(i) ${(COL_COVERAGE_HARD_FLOOR * 100).toFixed(0)}% floor`);
   }
   if (blanket_population_pct != null && blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT){
     flags.push(`Blanket population ${blanket_population_pct.toFixed(2)}% > §73.24(g) 1% ceiling`);
@@ -3083,8 +3083,8 @@ async function scoreCandidate(pt, ctx, warnings){
     const colPctNum   = coverage_pct != null ? Math.round(coverage_pct * 100) : null;
     const colStatus   = coverage_pct == null  ? 'unknown COL coverage'
       : coverage_pct >= COL_COVERAGE_HARD_FLOOR
-        ? `${colPctNum}% COL coverage (§73.24(j) PASS)`
-        : `${colPctNum}% COL coverage (BELOW §73.24(j) 80% floor)`;
+        ? `${colPctNum}% COL coverage (§73.24(i) PASS)`
+        : `${colPctNum}% COL coverage (BELOW §73.24(i) 80% floor)`;
     const sigmaDesc   = sigma_msm >= 8 ? 'excellent' : sigma_msm >= 4 ? 'good' : sigma_msm >= 2 ? 'fair' : 'poor';
     const blankNote   = blanket_population_pct != null && blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT
       ? ` Blanket pop ${round2(blanket_population_pct)}% exceeds §73.24(g) 1% limit — DA pattern or TPO reduction required.`
@@ -3131,7 +3131,7 @@ async function scoreCandidate(pt, ctx, warnings){
   // All distances in km from the candidate transmitter site.
   const signal_propagation_profile = (() => {
     const targets = [
-      { id: 'DAYTIME_5MVM',    mvm: 5.0,    label: '5 mV/m (city-grade / §73.24(j) COL floor)' },
+      { id: 'DAYTIME_5MVM',    mvm: 5.0,    label: '5 mV/m (city-grade / §73.24(i) COL floor)' },
       { id: 'DAYTIME_2MVM',    mvm: 2.0,    label: '2 mV/m (primary service contour)' },
       { id: 'DAYTIME_05MVM',   mvm: 0.5,    label: '0.5 mV/m (secondary daytime / §73.24 reach)' },
       { id: 'DAYTIME_01MVM',   mvm: 0.1,    label: '0.1 mV/m (daytime interference floor)' },
@@ -3225,7 +3225,7 @@ async function scoreCandidate(pt, ctx, warnings){
           : coverage_pct >= COL_COVERAGE_HARD_FLOOR ? 'PASS' : 'FAIL',
         value: coverage_pct == null ? null : round2(coverage_pct),
         threshold: COL_COVERAGE_HARD_FLOOR,
-        rule: '47 CFR §73.24(j)'
+        rule: '47 CFR §73.24(i)'
       },
       blanket_pop: {
         status: blanket_population_pct == null ? 'NOT_EVALUATED'
@@ -3282,7 +3282,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
     // Coverage feasibility assessment — synthesizes coverage, power, and class limits
     // into a single engineer-facing verdict.  Tells the operator whether this site can
-    // satisfy §73.24(j) 80% COL coverage at any power within class limits.
+    // satisfy §73.24(i) 80% COL coverage at any power within class limits.
     coverage_feasibility_assessment: (() => {
       const classCeil = FCC_CLASS_POWER_KW[fcc_class]?.max ?? null;
       const colMet    = coverage_pct == null ? null : coverage_pct >= COL_COVERAGE_HARD_FLOOR;
@@ -3366,7 +3366,7 @@ async function scoreCandidate(pt, ctx, warnings){
       if (colOk === true && blankOk !== false && !treaty_zone) {
         go_no_go = 'GO';
         confidence = 'PROMISING';
-        one_line = `Meets §73.24(j) COL floor (${Math.round((coverage_pct ?? 0) * 100)}%) and §73.24(g) blanket limit at current TPO.`;
+        one_line = `Meets §73.24(i) COL floor (${Math.round((coverage_pct ?? 0) * 100)}%) and §73.24(g) blanket limit at current TPO.`;
       } else if (colOk === true && blankOk !== false && treaty_zone) {
         go_no_go = 'CONDITIONAL';
         confidence = 'TREATY_REVIEW';
@@ -3386,11 +3386,11 @@ async function scoreCandidate(pt, ctx, warnings){
       } else if (colOk === false) {
         go_no_go = 'NO_GO';
         confidence = 'NON_COMPLIANT';
-        one_line = `COL coverage ${coverage_pct != null ? Math.round(coverage_pct * 100) + '%' : 'unavailable'} — below §73.24(j) 80% floor with no feasible recovery within class limits at current frequency/power.`;
+        one_line = `COL coverage ${coverage_pct != null ? Math.round(coverage_pct * 100) + '%' : 'unavailable'} — below §73.24(i) 80% floor with no feasible recovery within class limits at current frequency/power.`;
       } else {
         go_no_go = 'INSUFFICIENT_DATA';
         confidence = 'LOW';
-        one_line = 'COL polygon not provided; §73.24(j) compliance cannot be screened. Provide community_of_license_polygon for a complete assessment.';
+        one_line = 'COL polygon not provided; §73.24(i) compliance cannot be screened. Provide community_of_license_polygon for a complete assessment.';
       }
 
       return { go_no_go, confidence, one_line, evaluated_at_tpo_kw: tpo_kw };
@@ -3467,7 +3467,7 @@ async function scoreCandidate(pt, ctx, warnings){
         variability = 'LOW';
         risk_level  = 'MINIMAL';
         notes = [
-          `High-conductivity soil (σ=${sigma_msm} mS/m) is typically deep clay or agricultural flatland — seasonal moisture variation is modest (±10–20%) and unlikely to affect §73.24(j) compliance.`,
+          `High-conductivity soil (σ=${sigma_msm} mS/m) is typically deep clay or agricultural flatland — seasonal moisture variation is modest (±10–20%) and unlikely to affect §73.24(i) compliance.`,
           'Annual-average FCC M3 value is a reliable proxy for filing-grade conductivity at this site.'
         ];
       } else if (sigma_msm >= 4) {
@@ -3491,7 +3491,7 @@ async function scoreCandidate(pt, ctx, warnings){
         variability = 'HIGH';
         risk_level  = 'HIGH';
         notes = [
-          `Poor-conductivity soil (σ=${sigma_msm} mS/m) will exhibit large seasonal swings — a dry-season effective σ could fall below 1 mS/m, severely limiting groundwave reach and potentially dropping §73.24(j) COL coverage below the 80% floor.`,
+          `Poor-conductivity soil (σ=${sigma_msm} mS/m) will exhibit large seasonal swings — a dry-season effective σ could fall below 1 mS/m, severely limiting groundwave reach and potentially dropping §73.24(i) COL coverage below the 80% floor.`,
           'This site carries high seasonal risk. Commission at least three-season soil resistivity surveys before site commitment.',
           'Consider requiring a contractual TPO cap reduction during certified dry seasons to maintain §73.24(g) blanket compliance.',
           'If no alternative sites are available, engineer for the worst-case (dry-season) conductivity throughout the ground system design.'
@@ -3558,7 +3558,7 @@ async function scoreCandidate(pt, ctx, warnings){
           estimated_erp_kw: round2(tpo_kw * Math.pow(10, -3.0 / 10)),
           asr_required:    (lambdaM * 0.19) > 60.96,
           pros:            'May avoid ASR/FAA at some frequencies (check exact height_m). Lower steel cost. Useful for DA-in, series-capacitor base tuning.',
-          cons:            '~3 dB ERP penalty vs. λ/4; requires larger ground system to partially compensate. Coverage loss may push below §73.24(j) floor.'
+          cons:            '~3 dB ERP penalty vs. λ/4; requires larger ground system to partially compensate. Coverage loss may push below §73.24(i) floor.'
         }
       ];
 
@@ -3996,7 +3996,7 @@ async function scoreCandidate(pt, ctx, warnings){
           id: 'COL_COVERAGE_REMEDY',
           priority: 'REQUIRED',
           label: 'COL coverage remedy engineering',
-          note: `${(coverage_pct * 100).toFixed(0)}% COL coverage < §73.24(j) 80% floor. Engineering options: (a) power increase to ${minimum_tpo_for_col_coverage_kw != null ? `${minimum_tpo_for_col_coverage_kw} kW` : '>50 kW'}, (b) DA pattern design (§73.150), or (c) COL boundary amendment. Commission a full §73.24(j) coverage study.`
+          note: `${(coverage_pct * 100).toFixed(0)}% COL coverage < §73.24(i) 80% floor. Engineering options: (a) power increase to ${minimum_tpo_for_col_coverage_kw != null ? `${minimum_tpo_for_col_coverage_kw} kW` : '>50 kW'}, (b) DA pattern design (§73.150), or (c) COL boundary amendment. Commission a full §73.24(i) coverage study.`
         });
       }
       // 6. Blanket pop fails.
@@ -4086,7 +4086,7 @@ async function scoreCandidate(pt, ctx, warnings){
           steps.push({
             step: steps.length + 1,
             phase: 'POWER_ENGINEERING',
-            action: `Increase TPO to ≥${minimum_tpo_for_col_coverage_kw} kW to satisfy §73.24(j) 5 mV/m COL floor (current coverage ${coverage_pct != null ? (coverage_pct * 100).toFixed(0) : '?'}%)`,
+            action: `Increase TPO to ≥${minimum_tpo_for_col_coverage_kw} kW to satisfy §73.24(i) 5 mV/m COL floor (current coverage ${coverage_pct != null ? (coverage_pct * 100).toFixed(0) : '?'}%)`,
             timeline_weeks: '1–2',
             blocking: false
           });
@@ -4588,7 +4588,7 @@ async function scoreCandidate(pt, ctx, warnings){
       }
       if (coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR){
         const gap = Math.round((COL_COVERAGE_HARD_FLOOR - coverage_pct) * 100);
-        risks.push({ factor: 'COL_COVERAGE_FAILS', points: gap > 20 ? 20 : 10, note: `COL coverage ${(coverage_pct * 100).toFixed(0)}% < §73.24(j) 80% floor (gap ${gap}%): coverage remedy required before filing` });
+        risks.push({ factor: 'COL_COVERAGE_FAILS', points: gap > 20 ? 20 : 10, note: `COL coverage ${(coverage_pct * 100).toFixed(0)}% < §73.24(i) 80% floor (gap ${gap}%): coverage remedy required before filing` });
         total += gap > 20 ? 20 : 10;
       }
       if (!LOCAL_CHANNEL_KHZ.has(frequency_khz)){
@@ -4664,8 +4664,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // DA is most useful when NDA coverage is between 40–95%: too low means DA can't
       // bridge the gap; at ≥100% it's already compliant.
       const pct = coverage_pct * 100;
-      if (pct >= 100) return { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' };
-      if (pct < 40)   return { applicable: false, reason: `NDA coverage ${pct.toFixed(0)}% is too low for DA to recover §73.24(j) compliance at current TPO — power increase required first` };
+      if (pct >= 100) return { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(i)' };
+      if (pct < 40)   return { applicable: false, reason: `NDA coverage ${pct.toFixed(0)}% is too low for DA to recover §73.24(i) compliance at current TPO — power increase required first` };
 
       // A DA pattern can redistribute ERP asymmetrically toward the COL centroid.
       // Typical DA gain toward the target bearing: +3 to +6 dB relative to NDA.
@@ -4686,7 +4686,7 @@ async function scoreCandidate(pt, ctx, warnings){
         }
       } catch (_) { /* ignore curve errors */ }
 
-      const gap_pct = round2(80 - pct); // gap to §73.24(j) 80% floor
+      const gap_pct = round2(80 - pct); // gap to §73.24(i) 80% floor
       const would_recover = da_col_pct_estimate != null && da_col_pct_estimate >= 80;
       return {
         applicable: true,
@@ -4696,11 +4696,11 @@ async function scoreCandidate(pt, ctx, warnings){
         would_recover_col_compliance: would_recover,
         da_erp_boost_modeled: `${DA_ERP_BOOST_FACTOR}× NDA ERP toward COL bearing (best-case pattern)`,
         recommendation: would_recover
-          ? `DA pattern likely recovers §73.24(j) compliance — commission §73.150 DA study toward COL bearing`
+          ? `DA pattern likely recovers §73.24(i) compliance — commission §73.150 DA study toward COL bearing`
           : da_col_pct_estimate != null && da_col_pct_estimate > pct
-          ? `DA pattern improves coverage to ~${da_col_pct_estimate.toFixed(0)}% but may not reach §73.24(j) floor; consider DA + TPO increase`
+          ? `DA pattern improves coverage to ~${da_col_pct_estimate.toFixed(0)}% but may not reach §73.24(i) floor; consider DA + TPO increase`
           : `DA pattern analysis inconclusive — full §73.150 study required before ruling out`,
-        rule: '47 CFR §73.150 / §73.24(j)'
+        rule: '47 CFR §73.150 / §73.24(i)'
       };
     })(),
     // Directional antenna study guide — actionable guidance on whether to pursue
@@ -4732,8 +4732,8 @@ async function scoreCandidate(pt, ctx, warnings){
       if (colNeedsDA) {
         triggers.push({
           trigger:  'COL_COVERAGE_GAP',
-          detail:   `NDA coverage ${colPct.toFixed(0)}% < §73.24(j) 80% floor. DA with maximum ERP toward the COL centroid bearing can recover compliance.`,
-          cfr:      '47 CFR §73.150 / §73.24(j)'
+          detail:   `NDA coverage ${colPct.toFixed(0)}% < §73.24(i) 80% floor. DA with maximum ERP toward the COL centroid bearing can recover compliance.`,
+          cfr:      '47 CFR §73.150 / §73.24(i)'
         });
       }
       if (blankHigh) {
@@ -4777,7 +4777,7 @@ async function scoreCandidate(pt, ctx, warnings){
         : 'DA_D_DAYTIME_ONLY';
 
       const key_constraints = [];
-      if (colNeedsDA)     key_constraints.push(`Maximize ERP toward COL centroid bearing (§73.24(j) ≥80% coverage goal).`);
+      if (colNeedsDA)     key_constraints.push(`Maximize ERP toward COL centroid bearing (§73.24(i) ≥80% coverage goal).`);
       if (blankHigh)      key_constraints.push(`Null 1000 mV/m contour away from populated areas (§73.24(g) ≤1% blanket limit).`);
       if (treaty_zone)    key_constraints.push(`Reduce power toward ${treaty_zone} border for binational coordination.`);
       if (secondaryClear) key_constraints.push(`DA-N pattern must protect Class A dominant's 0.5 mV/m and 25 µV/m contours.`);
@@ -5001,14 +5001,14 @@ async function scoreCandidate(pt, ctx, warnings){
       const PASS = 'PASS'; const WARN = 'WARN'; const FAIL = 'FAIL'; const NA = 'N/A';
       const gates = [];
 
-      // Gate 1: §73.24(j) COL coverage
+      // Gate 1: §73.24(i) COL coverage
       const colPct = coverage_pct != null ? Math.round(coverage_pct * 100) : null;
       const colStatus = colPct == null ? WARN : colPct >= 80 ? PASS : FAIL;
       gates.push({
-        id: 'COL_COVERAGE', label: '§73.24(j) COL 5 mV/m coverage',
+        id: 'COL_COVERAGE', label: '§73.24(i) COL 5 mV/m coverage',
         status: colStatus,
         value: colPct != null ? `${colPct}% (need ≥80%)` : 'unknown — no COL polygon',
-        rule: '47 CFR §73.24(j)',
+        rule: '47 CFR §73.24(i)',
         note: colStatus === FAIL ? `COL coverage ${colPct}% below 80% floor — power increase or DA required.`
           : colStatus === WARN ? 'COL polygon not supplied; disc proxy used. Commission polygon-based study.'
           : null
@@ -5306,7 +5306,7 @@ async function scoreCandidate(pt, ctx, warnings){
           form:        'Form 301-AM — Exhibit C',
           exhibit:     'Principal community (COL) 5 mV/m coverage certification',
           status:      'REQUIRED',
-          rule:        '47 CFR §73.24(j)',
+          rule:        '47 CFR §73.24(i)',
           responsible: 'Licensed broadcast engineer',
           note:        `Demonstrate ≥80% of principal community (${coverage_pct != null ? Math.round(coverage_pct * 100) : 'N/A'}% estimated at screening) is covered by the 5 mV/m daytime groundwave contour. GeoJSON community polygon required for polygon-based filing.`
         },
@@ -5459,10 +5459,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Compliance risk: if summer-dry σ causes 5 mV/m COL contour to shrink, COL coverage may slip
       const col_risk_tier = sigma_ann < 3 ? 'HIGH' : sigma_ann < 6 ? 'MODERATE' : 'LOW';
       const col_risk_note = col_risk_tier === 'HIGH'
-        ? 'POOR conductivity site — summer-dry σ may reduce 5 mV/m contour enough to threaten §73.24(j) COL floor. Commission a soil survey and seasonal monitoring before filing.'
+        ? 'POOR conductivity site — summer-dry σ may reduce 5 mV/m contour enough to threaten §73.24(i) COL floor. Commission a soil survey and seasonal monitoring before filing.'
         : col_risk_tier === 'MODERATE'
         ? 'MARGINAL conductivity — summer conductivity dip could reduce COL reach by 2–4 km. Verify COL compliance with worst-case seasonal σ.'
-        : 'GOOD conductivity — seasonal variation is unlikely to threaten §73.24(j) COL compliance.';
+        : 'GOOD conductivity — seasonal variation is unlikely to threaten §73.24(i) COL compliance.';
 
       return {
         frequency_khz: f_khz,
@@ -5473,14 +5473,14 @@ async function scoreCandidate(pt, ctx, warnings){
         col_compliance_risk_tier: col_risk_tier,
         col_risk_note,
         reference: 'Seasonal conductivity variation factors are screening-grade proxies from NTIA 84-136 / FCC §73.190 guidance. Actual seasonal variation must be measured on-site (minimum 12-month conductivity record recommended for §73.190 certification).',
-        note: 'Seasonal propagation summary is a planning tool only. All §73.24(j) compliance determinations must use FCC-approved groundwave software with measured soil data.'
+        note: 'Seasonal propagation summary is a planning tool only. All §73.24(i) compliance determinations must use FCC-approved groundwave software with measured soil data.'
       };
     })(),
     fcc_class_power_ceiling_analysis: (() => {
       // Analyzes the candidate against its licensed class power ceiling (§73.21),
       // how much headroom remains for future power increases, and what regulatory
       // steps a power upgrade would require.  Also estimates the minimum TPO needed
-      // for §73.24(j) COL compliance so operators can plan for it immediately.
+      // for §73.24(i) COL compliance so operators can plan for it immediately.
       //
       // Power ceilings per §73.21 (kW):
       //   Class A: 50 kW (day and night)
@@ -6443,7 +6443,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const dLon_km = dLon * Math.cos(ptLatR) * R_EARTH_KM;
       const dist_to_col_km = round2(Math.sqrt(dLat_km * dLat_km + dLon_km * dLon_km));
 
-      // Required field at COL per §73.24(j): 5 mV/m at the community of license
+      // Required field at COL per §73.24(i): 5 mV/m at the community of license
       const colReqdMvm = 5.0;
 
       // Field this station delivers at the COL distance (non-directional estimate)
@@ -6468,7 +6468,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: isDA_ap, note: '§73.207 / §73.182: D/U at interfered-with protected contour must meet minimum spacing table limits; not a §73.316 requirement (which applies to FM)' },
         { id: 'DA_LICENSE_STATUS', item: 'DA pattern must be approved via FCC Form 302-AM (license to cover)', required: isDA_ap, note: '§73.3533: proof-of-performance measurements required before DA operation authorized' },
         { id: 'MONITOR_POINT', item: 'FCC-specified monitor points during DA operation', required: isDA_ap && isClear_ap, note: '§73.61/§73.62: clear-channel DA stations require FCC-specified monitoring' },
-        { id: 'COL_MIN_FIELD', item: `COL minimum field: ${colReqdMvm} mV/m at ${dist_to_col_km} km toward ${col_bearing_deg}°`, required: true, note: `§73.24(j): 5 mV/m groundwave field must reach community of license from candidate site. NDA estimate: ${field_at_col_nda_mvm != null ? `${field_at_col_nda_mvm} mV/m` : 'N/A'}.` },
+        { id: 'COL_MIN_FIELD', item: `COL minimum field: ${colReqdMvm} mV/m at ${dist_to_col_km} km toward ${col_bearing_deg}°`, required: true, note: `§73.24(i): 5 mV/m groundwave field must reach community of license from candidate site. NDA estimate: ${field_at_col_nda_mvm != null ? `${field_at_col_nda_mvm} mV/m` : 'N/A'}.` },
         { id: 'NIGHTTIME_DA', item: 'DA-N (nighttime) pattern separate from DA-D (daytime) if nighttime authorized', required: isDA_ap && !isLocal_ap, note: '§73.150(b): separate pattern authorizations for DA-D and DA-N; skywave NIF analysis for DA-N' }
       ];
       function isLocal_ap(){ return LOCAL_CHANNEL_KHZ.has(frequency_khz); }
@@ -6484,7 +6484,7 @@ async function scoreCandidate(pt, ctx, warnings){
         : 'NOT_NEEDED';
 
       const daRecommendedNote = daRecommended === 'STRONGLY_RECOMMENDED'
-        ? `NDA field at COL (${field_at_col_nda_mvm ?? '?'} mV/m) is below the §73.24(j) 5 mV/m floor. A DA pattern toward ${col_bearing_deg}° can add 3–5 dB gain and may achieve compliance without increasing TPO.`
+        ? `NDA field at COL (${field_at_col_nda_mvm ?? '?'} mV/m) is below the §73.24(i) 5 mV/m floor. A DA pattern toward ${col_bearing_deg}° can add 3–5 dB gain and may achieve compliance without increasing TPO.`
         : daRecommended === 'EVALUATE'
         ? `Clear channel (${frequency_khz} kHz): DA-N pattern may be required to protect dominant Class A nighttime skywave contour at night.`
         : daRecommended === 'CONSIDER'
@@ -6509,7 +6509,7 @@ async function scoreCandidate(pt, ctx, warnings){
         element_spacing_options: isDA_ap ? spacingOptions : null,
         hrp_compliance_checklist: hrpChecklist,
         n_checklist_required: hrpChecklist.filter(i => i.required).length,
-        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.154 (proof of performance); §73.24(j) (COL field); §73.207/§73.215 (protection)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.154 (proof of performance); §73.24(i) (COL field); §73.207/§73.215 (protection)',
         note: 'Pattern optimization guidance is screening-grade. Actual DA element positions, current ratios, and phasing must be determined by a licensed broadcast engineer using full §73.182 analysis and field measurements per §73.154.'
       };
     })(),
@@ -6946,7 +6946,7 @@ async function scoreCandidate(pt, ctx, warnings){
           if (!enabled_g) return 'Goal not enabled — weight = 0';
           if (sub_score == null) return 'Sub-score not evaluated — metric unavailable';
           if (m.goal === 'maximize_col_coverage' && coverage_pct != null && coverage_pct < 0.80)
-            return `COL coverage ${(coverage_pct * 100).toFixed(0)}% < §73.24(j) 80% floor — NON-COMPLIANT`;
+            return `COL coverage ${(coverage_pct * 100).toFixed(0)}% < §73.24(i) 80% floor — NON-COMPLIANT`;
           if (m.goal === 'minimize_blanket_population' && blanket_population_pct != null && blanket_population_pct > 1)
             return `Blanket population ${blanket_population_pct.toFixed(2)}% > §73.24(g) 1% ceiling — NON-COMPLIANT`;
           if (m.goal === 'avoid_wildfire_risk' && sub_score != null && sub_score <= 25)
@@ -7010,15 +7010,15 @@ async function scoreCandidate(pt, ctx, warnings){
       const item = (id, label, rule, status, note, required_action = null) =>
         ({ id, label, rule, status, note, required_action });
 
-      // 1. COL coverage — §73.24(j) 80% floor
+      // 1. COL coverage — §73.24(i) 80% floor
       const i1 = (() => {
-        if (coverage_pct == null) return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(j)', 'NOT_EVALUATED',
+        if (coverage_pct == null) return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(i)', 'NOT_EVALUATED',
           'COL coverage not evaluated — no polygon or daytime reach data available.',
           'Commission §73.183 coverage study with GIS polygon of principal community');
-        if (coverage_pct >= COL_COVERAGE_HARD_FLOOR) return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(j)', 'PASS',
+        if (coverage_pct >= COL_COVERAGE_HARD_FLOOR) return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(i)', 'PASS',
           `${(coverage_pct * 100).toFixed(0)}% of principal community receives ≥5 mV/m (floor: 80%).`);
-        return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(j)', 'FAIL',
-          `Coverage ${(coverage_pct * 100).toFixed(0)}% is below the 80% §73.24(j) floor — site is NON-COMPLIANT at current TPO.`,
+        return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(i)', 'FAIL',
+          `Coverage ${(coverage_pct * 100).toFixed(0)}% is below the 80% §73.24(i) floor — site is NON-COMPLIANT at current TPO.`,
           `Increase TPO or select a site closer to principal community. Minimum compliant TPO is estimated at ${minimum_tpo_for_col_coverage_kw ?? 'unknown'} kW.`);
       })();
 
@@ -7420,7 +7420,7 @@ async function scoreCandidate(pt, ctx, warnings){
     // Per-candidate community of license (CoL) geographic profile.
     // Characterizes the principal community relative to this candidate site:
     // distance from candidate to CoL centroid, geographic tier (near/mid/far),
-    // §73.24(j) five mV/m coverage assessment, and FCC engineering implications.
+    // §73.24(i) five mV/m coverage assessment, and FCC engineering implications.
     community_of_license_profile: (() => {
       // Distance from candidate to COL centroid (or fallback: distance to current site)
       const col_dist_km = col_centroid
@@ -7441,12 +7441,12 @@ async function scoreCandidate(pt, ctx, warnings){
         : 'REMOTE';
 
       const geoTierNote = {
-        PROXIMATE: 'Candidate is within 3 km of CoL centroid. §73.24(j) 5 mV/m coverage highly achievable even at minimum TPO. Monitor blanket population (§73.24g) at close range.',
-        NEAR:      'Candidate within 10 km of CoL. §73.24(j) compliance straightforward at typical class TPO. Blanket population monitoring advisable.',
-        MID:       'Candidate 10–30 km from CoL. §73.24(j) compliance depends on TPO and ground conductivity. Groundwave reach calculation critical.',
-        FAR:       'Candidate 30–60 km from CoL. Higher TPO and/or better-conductivity site required for reliable §73.24(j) compliance. Consider DA pattern to direct energy toward CoL.',
-        REMOTE:    'Candidate > 60 km from CoL. §73.24(j) compliance likely requires near-maximum class TPO. Relocation to this candidate may require class upgrade or variance.',
-        UNKNOWN:   'CoL centroid not provided — geographic tier cannot be assessed. Supply a CoL polygon for accurate §73.24(j) analysis.'
+        PROXIMATE: 'Candidate is within 3 km of CoL centroid. §73.24(i) 5 mV/m coverage highly achievable even at minimum TPO. Monitor blanket population (§73.24g) at close range.',
+        NEAR:      'Candidate within 10 km of CoL. §73.24(i) compliance straightforward at typical class TPO. Blanket population monitoring advisable.',
+        MID:       'Candidate 10–30 km from CoL. §73.24(i) compliance depends on TPO and ground conductivity. Groundwave reach calculation critical.',
+        FAR:       'Candidate 30–60 km from CoL. Higher TPO and/or better-conductivity site required for reliable §73.24(i) compliance. Consider DA pattern to direct energy toward CoL.',
+        REMOTE:    'Candidate > 60 km from CoL. §73.24(i) compliance likely requires near-maximum class TPO. Relocation to this candidate may require class upgrade or variance.',
+        UNKNOWN:   'CoL centroid not provided — geographic tier cannot be assessed. Supply a CoL polygon for accurate §73.24(i) analysis.'
       }[geoTier_cp] ?? '';
 
       // Coverage adequacy assessment
@@ -7475,9 +7475,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const data_quality = community_of_license_polygon
         ? 'POLYGON' : col_centroid ? 'CENTROID_ONLY' : 'NO_COL_DATA';
       const data_quality_note = {
-        POLYGON:        'CoL GeoJSON polygon supplied — intersection analysis available. §73.24(j) compliance can be assessed with high spatial resolution.',
+        POLYGON:        'CoL GeoJSON polygon supplied — intersection analysis available. §73.24(i) compliance can be assessed with high spatial resolution.',
         CENTROID_ONLY:  'CoL centroid point supplied but no polygon. Coverage assessed as disc-proxy (§73.24j compliance treated as binary at centroid distance). Polygon recommended for accurate analysis.',
-        NO_COL_DATA:    'No CoL data supplied — distance proxy uses candidate-to-current-site distance. Commission GeoJSON polygon of principal community for §73.24(j) analysis.'
+        NO_COL_DATA:    'No CoL data supplied — distance proxy uses candidate-to-current-site distance. Commission GeoJSON polygon of principal community for §73.24(i) analysis.'
       }[data_quality];
 
       // Engineering recommendations
@@ -7486,13 +7486,13 @@ async function scoreCandidate(pt, ctx, warnings){
         engineering_recommendations.push('Consider DA pattern to maximize signal toward CoL and reduce wasted power in non-service directions (§73.150 application).');
       }
       if (!colCompliant && tpo_for_col_coverage_kw != null) {
-        engineering_recommendations.push(`Increase TPO to ≥${tpo_for_col_coverage_kw} kW to achieve §73.24(j) 5 mV/m 80% CoL coverage floor at this site.`);
+        engineering_recommendations.push(`Increase TPO to ≥${tpo_for_col_coverage_kw} kW to achieve §73.24(i) 5 mV/m 80% CoL coverage floor at this site.`);
       }
       if (data_quality !== 'POLYGON') {
-        engineering_recommendations.push('Supply a GeoJSON polygon of the principal community for accurate §73.24(j) compliance analysis.');
+        engineering_recommendations.push('Supply a GeoJSON polygon of the principal community for accurate §73.24(i) compliance analysis.');
       }
       if (fieldAtColMvm != null && fieldAtColMvm < 5.0) {
-        engineering_recommendations.push(`Field at CoL centroid = ${fieldAtColMvm} mV/m < 5 mV/m §73.24(j) threshold. Site fails principal-community coverage at current TPO.`);
+        engineering_recommendations.push(`Field at CoL centroid = ${fieldAtColMvm} mV/m < 5 mV/m §73.24(i) threshold. Site fails principal-community coverage at current TPO.`);
       }
 
       return {
@@ -7513,7 +7513,7 @@ async function scoreCandidate(pt, ctx, warnings){
         col_compliant:               colCompliant,
         minimum_tpo_for_col_kw:      tpo_for_col_coverage_kw,
         engineering_recommendations: engineering_recommendations.length > 0 ? engineering_recommendations : ['No immediate engineering actions required at screening grade.'],
-        reference: '47 CFR §73.24(j) (5 mV/m principal community coverage); §73.24(g) (blanket population limit); §73.150 (directional antenna for coverage shaping)',
+        reference: '47 CFR §73.24(i) (5 mV/m principal community coverage); §73.24(g) (blanket population limit); §73.150 (directional antenna for coverage shaping)',
         note: 'Community of license profile is a screening-grade geographic assessment. Coverage_pct uses a 10-km disc proxy when no CoL polygon is supplied. Bearing calculations use the WGS-84 spherical earth model.'
       };
     })(),
@@ -24944,7 +24944,7 @@ async function scoreCandidate(pt, ctx, warnings){
           // GeoJSON circle approximation: a regular polygon with N sides
           geojson_type: 'circle',
           n_sides: 64,       // sufficient for smooth circle at typical zoom levels
-          regulatory_note: def.id === 'col_min'  ? '§73.24(j): 5 mV/m required at community of license'
+          regulatory_note: def.id === 'col_min'  ? '§73.24(i): 5 mV/m required at community of license'
             : def.id === 'standard'  ? 'Standard service contour; used in coverage reporting'
             : def.id === 'primary'   ? '§73.182 protected groundwave contour for NIF analysis'
             : '§73.24(g) blanket interference zone — may require mitigation measures'
@@ -24983,7 +24983,7 @@ async function scoreCandidate(pt, ctx, warnings){
         primary_area_km2:     primaryAreaKm2,
         blanket_area_km2:     blanketAreaKm2,
         render_spec:          renderSpec,
-        reference: '47 CFR §73.24(j) (COL 5 mV/m); §73.24(g) (blanket 1000 mV/m); §73.182 (0.5 mV/m protected); FCC M3 groundwave propagation curves',
+        reference: '47 CFR §73.24(i) (COL 5 mV/m); §73.24(g) (blanket 1000 mV/m); §73.182 (0.5 mV/m protected); FCC M3 groundwave propagation curves',
         note: 'Contour radii are FCC groundwave screening estimates assuming flat terrain and uniform soil conductivity. Actual contour shapes vary with terrain and σ variation. Use §73.183 contour computation software for filing-grade coverage maps.'
       };
     })(),
@@ -25820,7 +25820,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Compute contour radii for each service level
       const contourDefs_pd = [
-        { id: 'col_min',  mvm: 5.0,  label: 'COL (5 mV/m)',    rule: '§73.24(j)' },
+        { id: 'col_min',  mvm: 5.0,  label: 'COL (5 mV/m)',    rule: '§73.24(i)' },
         { id: 'standard', mvm: 2.0,  label: 'Standard (2 mV/m)', rule: 'FCC standard service' },
         { id: 'primary',  mvm: 0.5,  label: 'Primary (0.5 mV/m)', rule: '§73.182 protection' }
       ];
@@ -25861,7 +25861,7 @@ async function scoreCandidate(pt, ctx, warnings){
         source: 'NAB State of Audio 2023; Nielsen Audio Monthly; Edison Research Share of Ear 2023'
       };
 
-      // COL rule context: §73.24(j) requires principal community to be within 5 mV/m daytime contour
+      // COL rule context: §73.24(i) requires principal community to be within 5 mV/m daytime contour
       const col_radius_pd = contours_pd.find(c => c.id === 'col_min')?.radius_km ?? null;
       const col_area_pd   = contours_pd.find(c => c.id === 'col_min')?.area_km2 ?? null;
       const col_pop_pd    = contours_pd.find(c => c.id === 'col_min')?.population_estimate ?? null;
@@ -25885,7 +25885,7 @@ async function scoreCandidate(pt, ctx, warnings){
         primary_population_estimate: primary_pop_pd,
         audience_demographics:       audienceDemographics,
         pop_data_source: 'US Census ACS 5-year estimates (not yet integrated); disc-area approximation with conductivity-based density proxy',
-        reference: '47 CFR §73.24(j); §73.182; FCC Form 301-AM Schedule D; US Census Bureau ACS 5-year; NAB State of Audio 2023',
+        reference: '47 CFR §73.24(i); §73.182; FCC Form 301-AM Schedule D; US Census Bureau ACS 5-year; NAB State of Audio 2023',
         note: `Population overlay at ${frequency_khz} kHz, ${tpo_kw} kW, σ=${sigma_msm} mS/m. COL radius: ${col_radius_pd ?? 'N/A'} km. Primary radius: ${primary_radius_pd ?? 'N/A'} km. Replace density proxy with Census API for filing-grade estimates.`
       };
     })(),
@@ -27739,7 +27739,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   1. §73.182 Engineering Interference Study
       //   2. NEPA §1.1307 Environmental Checklist
       //   3. Tower/Site Description (coordinates, height, ground system)
-      //   4. Community Coverage Analysis (§73.24(j) 5 mV/m contour)
+      //   4. Community Coverage Analysis (§73.24(i) 5 mV/m contour)
       //
       // Additional exhibits triggered by station characteristics:
       //   • TPO ≥ 1 kW:  OET-65 RF radiation hazard analysis required
@@ -27775,7 +27775,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'E1', name: '§73.182 Engineering Interference Study',         required: true },
         { id: 'E2', name: 'NEPA §1.1307 Environmental Checklist',           required: true },
         { id: 'E3', name: 'Tower/Site Description + Ground System Data',    required: true },
-        { id: 'E4', name: '§73.24(j) Community Coverage Analysis',          required: true },
+        { id: 'E4', name: '§73.24(i) Community Coverage Analysis',          required: true },
         { id: 'E5', name: 'OET-65 RF Radiation Hazard Analysis',            required: rf_hazard_required },
         { id: 'E6', name: 'Horizontal Radiation Pattern Table (§73.150(a) — 72 radials at 5°)', required: isDA },
         { id: 'E7', name: 'Antenna Array Technical Data / Phasor Desc.',    required: isDA },
@@ -27814,7 +27814,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_filing_cost_low_usd:    prep_cost_low  + fcc_filing_fee_usd,
         total_filing_cost_high_usd:   prep_cost_high + fcc_filing_fee_usd,
         form:                         'FCC Form 301-AM',
-        reference:                    '47 CFR §73.182; §73.150 (AM DA — 72-radial HRP); §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
+        reference:                    '47 CFR §73.182; §73.150 (AM DA — 72-radial HRP); §73.24(i); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
         note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Design height (${isHighClass_cpe ? '5/8λ' : '3/8λ'}): ${design_height_cpe}m — ${asr_required ? 'ASR required (§17.7)' : 'ASR not required'}. Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
       };
     })(),
@@ -28206,7 +28206,7 @@ async function scoreCandidate(pt, ctx, warnings){
     am_licensed_contour_migration_guide: (() => {
       // Licensed contour migration analysis for AM relocation candidates.
       //
-      // When relocating an AM station, the §73.24(j) community coverage
+      // When relocating an AM station, the §73.24(i) community coverage
       // contour (the 5 mV/m groundwave daytime contour) and the nighttime
       // 0.5 mV/m secondary contour both shift.  The key question for each
       // candidate site is: does the contour still enclose the city of license
@@ -28225,7 +28225,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   4. Higher sigma_msm (more conductive soil) → larger groundwave contour;
       //      this is the soil conductivity advantage score.
       //
-      // Key §73.24(j) rule: The principal community must receive a minimum
+      // Key §73.24(i) rule: The principal community must receive a minimum
       // signal of 5 mV/m for all stations.  If the relocation moves the tower
       // far from the city of license, the 5 mV/m contour must still reach it.
       //
@@ -28234,7 +28234,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // For DA stations, the estimate is directional-average only.
 
       const SIGMA_REFERENCE = 5;  // mS/m — FCC median soil conductivity for comparison
-      const TARGET_FIELD_MVM = 5; // mV/m — §73.24(j) community contour threshold
+      const TARGET_FIELD_MVM = 5; // mV/m — §73.24(i) community contour threshold
       const SECONDARY_FIELD  = 0.5; // mV/m — nighttime secondary contour
 
       // Estimate contour radius at candidate soil conductivity
@@ -28304,7 +28304,7 @@ async function scoreCandidate(pt, ctx, warnings){
         city_of_license_at_risk:      city_at_risk,
         city_to_candidate_distance_km: city_distance_km,
         col_reference_used:           colRef ? 'col_centroid' : (current_site ? 'current_site_proxy' : 'none'),
-        reference:                    '47 CFR §73.24(j); §73.184; FCC AM groundwave method (OET-72)',
+        reference:                    '47 CFR §73.24(i); §73.184; FCC AM groundwave method (OET-72)',
         note:                         `Estimated 5 mV/m daytime contour at ${r_day_km} km (σ=${sigmaEff} mS/m vs. ref ${r_ref_day_km} km at σ=5). Coverage ${soil_coverage_advantage} by ${Math.abs(contour_delta_pct)}%. Area ~${coverage_area_km2} km². COL status: ${city_at_risk}${city_distance_km != null ? ` (dist ${city_distance_km} km)` : ''}. SCREENING GRADE ONLY.`
       };
     })(),
@@ -30646,7 +30646,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // CONTOURS REQUIRED IN FCC FORM 301-AM EXHIBIT
       // ─────────────────────────────────────────────
-      //   • 5 mV/m contour (principal community coverage, §73.24(j))
+      //   • 5 mV/m contour (principal community coverage, §73.24(i))
       //   • 0.5 mV/m contour (service contour, §73.186)
       //   • 0.1 mV/m contour (nighttime — required for Class A, B, D)
       //   • 0.025 mV/m contour (Class D nighttime, §73.186(d))
@@ -30683,7 +30683,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const needsNighttime01  = isClassA || isClassB || isClassD;
 
       const CONTOURS_REQUIRED = [
-        { contour: '5 mV/m',     purpose: 'Principal community coverage',       rule: '§73.24(j)', required: true },
+        { contour: '5 mV/m',     purpose: 'Principal community coverage',       rule: '§73.24(i)', required: true },
         { contour: '0.5 mV/m',   purpose: 'Daytime service contour',            rule: '§73.186',   required: true },
         { contour: '0.1 mV/m',   purpose: 'Nighttime protection contour',       rule: '§73.186',   required: needsNighttime01 },
         { contour: '0.025 mV/m', purpose: 'Class D secondary nighttime',        rule: '§73.186(d)',required: needsNighttime025 },
@@ -30740,7 +30740,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_high_usd
         },
         formal_proof_required: is_da2,
-        reference: '47 CFR §73.182; §73.183; §73.184; §73.186; §73.24(j)',
+        reference: '47 CFR §73.182; §73.183; §73.184; §73.186; §73.24(i)',
         note: `${frequency_khz} kHz (${fcc_class}): ${CONTOURS_REQUIRED.length} contours required. Map scale ${map_scale}. ${is_da ? `DA: ${n_radials} radials required. ` : 'NDA: omnidirectional contours. '}Cost estimate $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
@@ -30882,13 +30882,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // Guide #120 — Community Coverage Waiver & Short-Spacing
       //
       // Every AM station must provide a principal community (COL) signal.
-      // A relocation that reduces COL coverage below the §73.24(j) standard
+      // A relocation that reduces COL coverage below the §73.24(i) standard
       // requires either: (1) engineering showing adequate coverage is still met,
       // or (2) a waiver under §1.3 / §1.925.
       //
       // KEY RULES
       // ─────────
-      // 47 CFR §73.24(j) — Principal community coverage.
+      // 47 CFR §73.24(i) — Principal community coverage.
       //   A broadcast station must provide a predicted coverage signal of at
       //   least 5 mV/m to the entire principal community (city of license).
       //   "Entire" means the city limits, not the metropolitan area.
@@ -30896,7 +30896,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   show 5 mV/m in the direction of the COL from the transmitter site.
       //
       // 47 CFR §73.215 — Directional antenna short-spacing.
-      //   When a DA station cannot meet the §73.24(j) standard omnidirectionally,
+      //   When a DA station cannot meet the §73.24(i) standard omnidirectionally,
       //   a directional antenna may be required.  §73.215 sets the conditions
       //   under which a station operating with a DA pattern still qualifies
       //   for protection from interference.
@@ -30916,7 +30916,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // COVERAGE ASSESSMENT
       // ───────────────────
-      //   §73.24(j) requires 5 mV/m to the COL city limits.
+      //   §73.24(i) requires 5 mV/m to the COL city limits.
       //   For the purpose of this guide, coverage_pct (already computed for
       //   this candidate) is used to estimate whether the requirement is met.
       //   We use a simplified check: if 5 mV/m radius ≥ distance to the COL
@@ -30935,7 +30935,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   ±20 kHz: 50–100 km
       //
       // WAIVER COSTS
-      //   Engineering exhibits for §73.24(j) waiver: $3,000–$8,000
+      //   Engineering exhibits for §73.24(i) waiver: $3,000–$8,000
       //   Legal preparation: $3,000–$10,000
       //   Total (waiver scenario): $6,000–$18,000
 
@@ -30996,7 +30996,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_high_usd: waiver_total_high,
         },
         waiver_standard: '47 CFR §1.3 / §1.925 — public interest, no undue interference',
-        reference: '47 CFR §73.24(j); §73.37; §73.215; §1.3; §1.925',
+        reference: '47 CFR §73.24(i); §73.37; §73.215; §1.3; §1.925',
         note: `${frequency_khz} kHz (${fcc_class}): COL coverage status = ${coverage_status}. 5 mV/m reach ≈ ${r5_km ?? 'N/A'} km. ${waiver_likely_needed ? 'Waiver may be needed — est. $' + waiver_total_low.toLocaleString() + '–$' + waiver_total_high.toLocaleString() + '.' : 'Coverage likely adequate.'} Co-channel min spacing: ${co_channel_min_km} km.`
       };
     })(),
@@ -31537,7 +31537,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { step: 2, task: 'Measure base impedance (bridge measurement)', rule: '§73.1560' },
         { step: 3, task: 'Verify operating power within ±10% of authorized', rule: '§73.1560' },
         { step: 4, task: 'Install and calibrate base current meter', rule: '§73.1665' },
-        { step: 5, task: '5 mV/m spot measurement toward community of license', rule: '§73.24(j)' },
+        { step: 5, task: '5 mV/m spot measurement toward community of license', rule: '§73.24(i)' },
         { step: 6, task: 'File License to Cover (FCC Form 302-AM)', rule: '§73.3598' },
       ];
 
@@ -32812,7 +32812,7 @@ function finalizeLabels(c, scoreCutoff){
     } else if (colFail && !blankFail){
       // Only COL coverage fails — classify by most specific recovery path.
       if (c.minimum_tpo_for_col_coverage_kw != null){
-        // Engine found a feasible TPO (≤50 kW) that reaches the §73.24(j) 5 mV/m floor —
+        // Engine found a feasible TPO (≤50 kW) that reaches the §73.24(i) 5 mV/m floor —
         // direct power increase is the most actionable fix.
         c.status_category = 'RECOVERABLE_WITH_POWER_INCREASE';
       } else if (c.field_at_col_centroid_mvm != null && c.field_at_col_centroid_mvm < 0.5){
@@ -33141,7 +33141,7 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
       protection_class_advisory:
         `Class ${fcc_class} on local channel (${frequency_khz} kHz, §73.27). ` +
         `Maximum 250 W ERP. Skywave (§73.182) nighttime interference is minimal at this power level. ` +
-        `Focus engineering effort on §73.24(j) principal-community 5 mV/m daytime coverage.`
+        `Focus engineering effort on §73.24(i) principal-community 5 mV/m daytime coverage.`
     };
   }
   if (channel_class === 'clear_channel'){
@@ -33293,7 +33293,7 @@ function buildRecommendedActions({
     actions.push({
       priority: 'URGENT',
       action: 'File an STA or Minor Modification for the current site immediately.',
-      rationale: `The current site baseline scores ${baseline.score?.toFixed(1) ?? '?'} and is flagged NON_COMPLIANT on the screening rubric (§73.24(j) coverage or §73.24(g) blanket pop). Do not wait for relocation — address the existing non-compliance first.`
+      rationale: `The current site baseline scores ${baseline.score?.toFixed(1) ?? '?'} and is flagged NON_COMPLIANT on the screening rubric (§73.24(i) coverage or §73.24(g) blanket pop). Do not wait for relocation — address the existing non-compliance first.`
     });
   }
 
@@ -33353,8 +33353,8 @@ function buildRecommendedActions({
     const topPwrIncr = pwrIncrCandidates[0];
     actions.push({
       priority: 'HIGH',
-      action: `Increase TPO to resolve §73.24(j) COL coverage on ${pwrIncrCandidates.length} candidate(s)${topPwrIncr ? ` (Rank ${topPwrIncr.rank}: increase to ≥${topPwrIncr.minimum_tpo_for_col_coverage_kw} kW)` : ''}.`,
-      rationale: `The engine found a feasible power level (≤50 kW) at which the §73.24(j) 5 mV/m groundwave contour reaches the community-of-license centroid. This is the most direct fix — no DA pattern study required. Verify the increased TPO is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket-population problems before filing.`
+      action: `Increase TPO to resolve §73.24(i) COL coverage on ${pwrIncrCandidates.length} candidate(s)${topPwrIncr ? ` (Rank ${topPwrIncr.rank}: increase to ≥${topPwrIncr.minimum_tpo_for_col_coverage_kw} kW)` : ''}.`,
+      rationale: `The engine found a feasible power level (≤50 kW) at which the §73.24(i) 5 mV/m groundwave contour reaches the community-of-license centroid. This is the most direct fix — no DA pattern study required. Verify the increased TPO is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket-population problems before filing.`
     });
   } else {
     // Fallback: any candidate with a computed COL power fix not already in RECOVERABLE_WITH_POWER_INCREASE.
@@ -33366,8 +33366,8 @@ function buildRecommendedActions({
       const topCol = colPwrCandidates[0];
       actions.push({
         priority: 'MEDIUM',
-        action: `Evaluate TPO increase for §73.24(j) COL coverage on ${colPwrCandidates.length} candidate(s)${topCol ? ` (Rank ${topCol.rank}: increase to ≥${topCol.minimum_tpo_for_col_coverage_kw} kW)` : ''}.`,
-        rationale: `One or more top-5 candidates fail the §73.24(j) 5 mV/m principal-community floor at the proposed power. The engine has pre-computed the minimum TPO at which the 5 mV/m groundwave contour reaches the community-of-license centroid distance. Verify the increased power is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket population problems.`
+        action: `Evaluate TPO increase for §73.24(i) COL coverage on ${colPwrCandidates.length} candidate(s)${topCol ? ` (Rank ${topCol.rank}: increase to ≥${topCol.minimum_tpo_for_col_coverage_kw} kW)` : ''}.`,
+        rationale: `One or more top-5 candidates fail the §73.24(i) 5 mV/m principal-community floor at the proposed power. The engine has pre-computed the minimum TPO at which the 5 mV/m groundwave contour reaches the community-of-license centroid distance. Verify the increased power is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket population problems.`
       });
     }
   }
@@ -33387,7 +33387,7 @@ function buildRecommendedActions({
     actions.push({
       priority: 'MEDIUM',
       action: 'Supply the community-of-license GeoJSON polygon for filing-grade COL coverage scoring.',
-      rationale: `Current run uses a 10 km disc proxy for §73.24(j) coverage. Providing the actual COL boundary as a GeoJSON Polygon enables Monte-Carlo polygon overlap scoring and significantly increases confidence in the coverage sub-score.`
+      rationale: `Current run uses a 10 km disc proxy for §73.24(i) coverage. Providing the actual COL boundary as a GeoJSON Polygon enables Monte-Carlo polygon overlap scoring and significantly increases confidence in the coverage sub-score.`
     });
   }
 
@@ -33484,7 +33484,7 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
     id: 'COL_COVERAGE',
     description: 'Document ≥ 80% community-of-license coverage by the 5 mV/m daytime contour',
     status: 'REQUIRED',
-    rule: '47 CFR §73.24(j)',
+    rule: '47 CFR §73.24(i)',
     note: community_of_license_polygon
       ? 'COL polygon provided — coverage computation is polygon-based (filing-grade)'
       : 'No COL polygon provided — coverage proxy used; polygon-based analysis required for filing'
@@ -33494,7 +33494,7 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
     id: 'COL_CENTROID_FIELD',
     description: 'Verify predicted field strength at COL centroid meets 5 mV/m floor',
     status: 'REQUIRED',
-    rule: '47 CFR §73.24(j)',
+    rule: '47 CFR §73.24(i)',
     note: col_centroid
       ? `COL centroid provided (${col_centroid.lat.toFixed(4)}, ${col_centroid.lon.toFixed(4)})`
       : 'Use geographic center of COL boundary if centroid not separately specified'
@@ -33632,10 +33632,10 @@ function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct
       const colNote = minimum_tpo_for_col_coverage_kw != null
         ? ` (increase TPO to ≥${minimum_tpo_for_col_coverage_kw} kW to fix)`
         : ' (even at 50 kW, COL coverage cannot be achieved from this location)';
-      failDesc.push(`§73.24(j): field at COL centroid ${field_at_col_centroid_mvm.toFixed(2)} mV/m is below the 5 mV/m floor${colNote}`);
+      failDesc.push(`§73.24(i): field at COL centroid ${field_at_col_centroid_mvm.toFixed(2)} mV/m is below the 5 mV/m floor${colNote}`);
     } else if (colFail && principal_community_5mvm_km != null)
-      failDesc.push(`§73.24(j): 5 mV/m radius ${principal_community_5mvm_km.toFixed(1)} km does not cover the COL`);
-    else if (colFail) failDesc.push(`§73.24(j): COL coverage below 80% floor`);
+      failDesc.push(`§73.24(i): 5 mV/m radius ${principal_community_5mvm_km.toFixed(1)} km does not cover the COL`);
+    else if (colFail) failDesc.push(`§73.24(i): COL coverage below 80% floor`);
     if (blanketFail){
       const blankNote = minimum_tpo_for_compliance_kw != null
         ? ` (reduce to ≤${minimum_tpo_for_compliance_kw} kW to fix)`
@@ -33667,9 +33667,9 @@ function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct
   }
   if (field_at_col_centroid_mvm != null && distance_from_current_km >= 0.5){
     if (field_at_col_centroid_mvm >= 5){
-      bits.push(`COL field ${field_at_col_centroid_mvm.toFixed(1)} mV/m (≥§73.24(j) floor)`);
+      bits.push(`COL field ${field_at_col_centroid_mvm.toFixed(1)} mV/m (≥§73.24(i) floor)`);
     } else if (field_at_col_centroid_mvm >= 0.5){
-      bits.push(`COL field ${field_at_col_centroid_mvm.toFixed(2)} mV/m (below 5 mV/m §73.24(j) — coverage risk)`);
+      bits.push(`COL field ${field_at_col_centroid_mvm.toFixed(2)} mV/m (below 5 mV/m §73.24(i) — coverage risk)`);
     } else {
       bits.push(`COL field ${field_at_col_centroid_mvm.toFixed(3)} mV/m (far below secondary service threshold)`);
     }
@@ -33710,9 +33710,9 @@ function buildTopSummary(top, baseline, nEvaluated){
   // COL field at rank 1 if available.
   if (r1.field_at_col_centroid_mvm != null){
     const fStr = r1.field_at_col_centroid_mvm >= 5
-      ? `COL field ${r1.field_at_col_centroid_mvm.toFixed(1)} mV/m (≥§73.24(j) 5 mV/m floor)`
+      ? `COL field ${r1.field_at_col_centroid_mvm.toFixed(1)} mV/m (≥§73.24(i) 5 mV/m floor)`
       : r1.field_at_col_centroid_mvm >= 0.5
-        ? `COL field ${r1.field_at_col_centroid_mvm.toFixed(2)} mV/m (below 5 mV/m §73.24(j) floor${r1.minimum_tpo_for_col_coverage_kw != null ? `; increase TPO to ≥${r1.minimum_tpo_for_col_coverage_kw} kW to fix` : ''})`
+        ? `COL field ${r1.field_at_col_centroid_mvm.toFixed(2)} mV/m (below 5 mV/m §73.24(i) floor${r1.minimum_tpo_for_col_coverage_kw != null ? `; increase TPO to ≥${r1.minimum_tpo_for_col_coverage_kw} kW to fix` : ''})`
         : `COL field ${r1.field_at_col_centroid_mvm.toFixed(3)} mV/m (far below secondary service${r1.minimum_tpo_for_col_coverage_kw != null ? `; ≥${r1.minimum_tpo_for_col_coverage_kw} kW needed` : ''})`;
     parts.push(fStr);
   }
@@ -33821,7 +33821,7 @@ function discCoverageFraction({ circle_center, circle_radius_km, disc_center, di
 // [lon, lat] order per the GeoJSON spec.  Uses the polygon's bounding
 // box × 2048 samples — deterministic via a seeded RNG so results are
 // stable across calls.  2048 gives ≈ ±2% Monte-Carlo error at screening
-// quality, which is acceptable for §73.24(j) pre-screening.
+// quality, which is acceptable for §73.24(i) pre-screening.
 function polygonCoverageFraction({ polygon, circle_center, circle_radius_km, n_samples = 2048 }){
   try {
     const ring = polygon.coordinates && polygon.coordinates[0];
@@ -33945,7 +33945,7 @@ export function buildFilingComplexityScore({ chanClass, fcc_class, frequency_khz
   const nonCompliantCount = returned.filter(c => c.status_category === 'NON_COMPLIANT').length;
   if (nonCompliantCount > 0) {
     score += 5;
-    factors.push({ factor: 'NON_COMPLIANT_TOP_CANDIDATES', points: 5, note: `${nonCompliantCount} top candidate(s) fail §73.24(j) COL floor — power upgrade or DA required before any of these can be filed.` });
+    factors.push({ factor: 'NON_COMPLIANT_TOP_CANDIDATES', points: 5, note: `${nonCompliantCount} top candidate(s) fail §73.24(i) COL floor — power upgrade or DA required before any of these can be filed.` });
   }
   const total = Math.min(100, Math.round(score));
   const complexity_tier = total >= 75 ? 'VERY_HIGH'
