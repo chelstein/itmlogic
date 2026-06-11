@@ -29000,9 +29000,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   6. Any base current departure ≥ 5% (DA) or > 10% (NDA) from licensed value
       const PHASOR_TRIGGERS = [
         { id: 'TRANSMITTER_CHANGE', label: 'Transmitter replacement / power change',       cfr: '§73.1350', frequency: 'AS NEEDED' },
-        { id: 'ANTENNA_MOD',        label: 'Antenna system modification (coax, ATU, tower)', cfr: '§73.1215', frequency: 'AS NEEDED' },
+        { id: 'ANTENNA_MOD',        label: 'Antenna system modification (coax, ATU, tower)', cfr: '§73.154', frequency: 'AS NEEDED' },
         { id: 'GROUND_MOD',         label: 'Ground system modification',                    cfr: '§73.190',  frequency: 'AS NEEDED' },
-        { id: 'STORM_EVENT',        label: 'After storm, lightning, or physical damage',    cfr: '§73.1215', frequency: 'AS NEEDED' },
+        { id: 'STORM_EVENT',        label: 'After storm, lightning, or physical damage',    cfr: '§73.1350', frequency: 'AS NEEDED' },
         { id: 'QUARTERLY_MONITOR',  label: 'Antenna monitor system verification',           cfr: '§73.159',  frequency: 'QUARTERLY' },
         { id: 'BASE_CURRENT_EXCEEDANCE', label: `Base current departure ≥ ${isDA_dtv ? 5 : 10}% from licensed value`, cfr: isDA_dtv ? '§73.154' : '§73.1350', frequency: 'IMMEDIATE' }
       ];
@@ -32617,7 +32617,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Below-standard ground systems require §73.151 proof of performance
       const proof_required = min_radials < std_n_radials;
 
-      // Inspection recommendations: §73.1580 — annual visual; §73.1215 ground system records
+      // Inspection recommendations: §73.1580 — annual visual; §73.151 / station records — ground system
       const inspection_interval_months = 12;
 
       const checklist = [
@@ -32626,7 +32626,7 @@ async function scoreCandidate(pt, ctx, warnings){
         'Bond all radials to tower base at a single copper bus ring (star ground)',
         'Use AWG #10 copper wire minimum; larger AWG for radials >250 m',
         'Install cadweld or exothermic connections at all junctions (no mechanical clamps)',
-        'Maintain ground system record per §73.1215: radial count, length, burial depth, date',
+        'Maintain ground system record (station files; §73.151 basis): radial count, length, burial depth, installation date',
         `Conduct annual visual inspection of ground field per §73.1580 (interval: ${inspection_interval_months} months)`,
       ];
       if (proof_required) {
@@ -32658,7 +32658,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_system_low_usd,
           total_system_high_usd,
         },
-        reference: '47 CFR §73.189(b)(4), §73.151, §73.1215, §73.1580; FCC Engineering Circular AM Ground System; ITU-R P.832',
+        reference: '47 CFR §73.189(b)(4); §73.151; §73.1580; FCC Engineering Circular AM Ground System; ITU-R P.832',
         note: `${std_n_radials} radials × ${std_radial_len_m} m (0.35λ at ${freq_khz} kHz). ${copper_kg} kg copper. Est. $${total_system_low_usd.toLocaleString()}–$${total_system_high_usd.toLocaleString()} (${n_towers} tower${n_towers > 1 ? 's' : ''}).`
       };
     })(),
