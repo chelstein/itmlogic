@@ -16559,7 +16559,9 @@ test('#94 KAZM: am_cp_validity_and_tolling_guide present with correct term', asy
   // §73.3536: license to cover is bounded by CP expiration (36 months); the previous
   // 24-month figure was based on a nonexistent §73.3598(f).
   assert.strictEqual(cp.ltc_deadline_months, 36, 'LtC deadline must be 36 months (CP expiration per §73.3598(a))');
-  assert.strictEqual(cp.extension_days, 180, '§73.3598(e) extension must be 180 days');
+  // §73.3598(e) forfeits an unbuilt CP automatically at expiration — there is no
+  // routine extension for full-service stations; only §73.3598(b) tolling applies.
+  assert.strictEqual(cp.extension_days, 0, 'no routine CP extension exists (§73.3598(e) auto-forfeiture)');
 });
 
 test('#94 DA station: complexity_risk is HIGH', async () => {

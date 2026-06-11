@@ -7903,9 +7903,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //        a. International coordination required (US/MX, US/CA treaty)
       //        b. Litigation enjoining construction
       //     4. Other documented force-majeure events (COVID tolling precedent)
-      //   §73.3598(e): FCC may grant one 180-day extension if "good cause" shown.
-      //     Good cause examples: environmental challenges still pending, financing
-      //     not yet secured, tower manufacturer lead times, permitting delays.
+      //   §73.3598(e): a CP not built and not covered by a license application is
+      //     AUTOMATICALLY FORFEITED at expiration, with no further Commission action.
+      //     There is NO routine good-cause extension for full-service stations —
+      //     only the §73.3598(b) tolling events pause the clock.
       //   License to Cover — FCC Form 302-AM (§73.3536) must be filed before CP
       //     expiration; §73.1620(c) requires the license application within
       //     10 days of commencing program tests.
@@ -7914,8 +7915,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // or major foundation work underway (FCC Media Bureau interpretation).
       //
       // Danger window: if CP expires without construction complete and no
-      // timely extension request, the authorization is VOID; a new Form 301-AM
-      // CP application is required (re-competes in an AM window if applicable).
+      // license application on file, the authorization forfeits automatically
+      // (§73.3598(e)); a new Form 301-AM CP application is required
+      // (re-competes in an AM window if applicable).
       //
       // For AM: there is no "long-form" vs. "short-form" distinction — all
       // full-service AM CPs require Form 301-AM; minor modifications use
@@ -7926,9 +7928,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const cp_term_months   = cp_term_years * 12;
       const cp_term_days     = cp_term_years * 365;
 
-      // Extension: one-time 180-day extension on showing of good cause
-      const extension_days   = 180;
-      const extension_months = Math.round(extension_days / 30);
+      // Extensions: NONE for full-service stations — §73.3598(e) forfeits an unbuilt
+      // CP automatically at expiration. Only §73.3598(b) tolling pauses the clock.
+      // (extension_days kept as an output field for API compatibility; always 0.)
+      const extension_days   = 0;
+      const extension_months = 0;
 
       // Tolling scenarios — which apply to this station type
       const isDA_cp = /^DA/i.test(pattern_mode);
@@ -7963,9 +7967,10 @@ async function scoreCandidate(pt, ctx, warnings){
         }
       ];
 
-      // Good-cause extension reasons
+      // Common delay causes — useful when documenting a §73.3598(b) tolling
+      // notification; note these do NOT extend the CP by themselves.
       const good_cause_examples = [
-        'Environmental review still pending at time of extension request',
+        'Environmental review still pending at time of expiration',
         'Tower manufacturer or steel lead times exceed original schedule',
         'Local zoning permits not yet issued despite good-faith effort',
         'Financing secured but closing delayed beyond original schedule',
@@ -7984,8 +7989,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { event: 'Substantial construction started (contracts signed, major work begun)', month_low: 6, month_high: 18, note: 'Must begin before expiration; establishes good-faith record' },
         { event: 'Construction complete; antenna on-air for testing', month_low: 12, month_high: 30, note: 'Proof of performance field measurements begin' },
         { event: 'Form 302-AM (License to Cover) must be filed', month: ltc_deadline_months, note: `§73.3536: file before CP expiration (§73.1620(c): within 10 days of starting program tests); contains proof-of-performance results` },
-        { event: 'CP expiration (if 180-day extension granted)', month: cp_term_months + extension_months, note: `Extended CP expires ${cp_term_months + extension_months} months from grant` },
-        { event: 'CP expiration (standard term, no extension)', month: cp_term_months, note: `${cp_term_years}-year standard term per §73.3598(a)` }
+        { event: 'CP expiration — automatic forfeiture if unbuilt (§73.3598(e))', month: cp_term_months, note: `${cp_term_years}-year standard term per §73.3598(a); no routine extensions — only §73.3598(b) tolling events pause the clock` }
       ];
 
       // Timeline risk assessment
@@ -29069,10 +29073,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const isClear_ltc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
 
       // ---- CP term and LTC deadline ----
-      // §73.3598(a): AM CP term is 3 years from grant; extensions under §73.3598(b)
-      // require showing of good cause; FCC rarely grants > 6-month extensions.
+      // §73.3598(a): AM CP term is 3 years from grant; no routine extensions —
+      // only §73.3598(b) tolling events pause the clock; an unbuilt CP forfeits
+      // automatically at expiration (§73.3598(e)).
       const cp_term_years  = 3;
-      const ltc_days_after = 10;    // §73.3536: LTC must be filed within 10 days of construction completion
+      const ltc_days_after = 10;    // §73.1620(c): license application within 10 days of commencing program tests
       const ltc_grace_days = 180;   // FCC informal policy: up to 180-day STA may bridge if LTC delayed
 
       // ---- Form 302-AM requirements (License-to-Cover) ----
