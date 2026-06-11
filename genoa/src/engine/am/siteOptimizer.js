@@ -3397,12 +3397,13 @@ async function scoreCandidate(pt, ctx, warnings){
     // All ranges are 2024 USD SCREENING ESTIMATES — not for budgeting.
     tower_cost_estimate: (() => {
       const lambdaM    = 300000 / frequency_khz;
-      const qwM        = lambdaM / 4;
-      const asrNeeded  = qwM > 60.96;
+      const isHighClass_tce = /^[AB]$/i.test(fcc_class);
+      const planH_m    = isHighClass_tce ? lambdaM * 0.625 : lambdaM * 0.375;
+      const asrNeeded  = planH_m > 60.96;
 
       // Tower steel — guyed monopole rule of thumb (lower for shorter towers)
-      const towerLow  = Math.round(qwM * 50  / 1000) * 1000;
-      const towerHigh = Math.round(qwM * 150 / 1000) * 1000;
+      const towerLow  = Math.round(planH_m * 50  / 1000) * 1000;
+      const towerHigh = Math.round(planH_m * 150 / 1000) * 1000;
 
       // Ground system copper — standard 120 radials; σ penalty for poor soil
       const gndBase = sigma_msm < 2 ? 120000 : sigma_msm < 4 ? 100000 : 80000;
@@ -3431,14 +3432,14 @@ async function scoreCandidate(pt, ctx, warnings){
       const fmtK = (n) => `$${Math.round(n / 1000)}k`;
 
       return {
-        tower_height_m:        round2(qwM),
+        tower_height_m:        round2(planH_m),
         asr_lighting_required: asrNeeded,
         cost_tier,
         total_low_usd:         totalLow,
         total_high_usd:        totalHigh,
         range_label:           `${fmtK(totalLow)}–${fmtK(totalHigh)} (2024 USD, screening only)`,
         breakdown: {
-          tower_steel:  { low: towerLow,  high: towerHigh,  note: `Guyed λ/4 monopole at ${Math.round(qwM)} m` },
+          tower_steel:  { low: towerLow,  high: towerHigh,  note: `Guyed ${isHighClass_tce ? '5/8λ' : '3/8λ'} monopole at ${Math.round(planH_m)} m` },
           ground_system:{ low: gndLow,    high: gndHigh,    note: `120-radial copper; σ=${sigma_msm} mS/m soil factor` },
           faa_lighting: { low: faaLow,    high: faaHigh,    note: asrNeeded ? 'ASR threshold exceeded (47 CFR §17.7)' : 'Below ASR threshold — no lighting required' },
           civil_work:   { low: civilLow,  high: civilHigh,  note: 'Grading, access road, fence, foundation' }
@@ -3804,8 +3805,9 @@ async function scoreCandidate(pt, ctx, warnings){
     // estimates; actual costs depend on consultant selection and filing complexity.
     permit_and_engineering_cost_estimate: (() => {
       const lambdaM_pe = 300000 / frequency_khz;
-      const qwM_pe     = lambdaM_pe / 4;
-      const asrRequired = qwM_pe > 60.96;
+      const isHighClass_pe = /^[AB]$/i.test(fcc_class);
+      const planH_pe   = lambdaM_pe * (isHighClass_pe ? 0.625 : 0.375);
+      const asrRequired = planH_pe > 60.96;
       const daRecommended = coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR
         || blanket_population_pct != null && blanket_population_pct >= 0.8
         || !!treaty_zone
@@ -3837,7 +3839,7 @@ async function scoreCandidate(pt, ctx, warnings){
           id: 'FCC_FORM_854_ASR',
           label: 'FCC Form 854 ASR registration',
           low_usd: 175, high_usd: 175,
-          note: `λ/4 ≈ ${Math.round(qwM_pe)} m > §17.7 60.96 m — tower registration required.`
+          note: `Design height ${Math.round(planH_pe)} m > §17.7 60.96 m — tower registration required.`
         });
       }
 
@@ -3942,8 +3944,9 @@ async function scoreCandidate(pt, ctx, warnings){
     per_candidate_engineering_checklist: (() => {
       const items = [];
       const asrThresh = 60.96; // 200 ft in metres — 47 CFR §17.7
-      const lambdaM   = 300000 / frequency_khz;
-      const qwM       = lambdaM / 4;
+      const lambdaM         = 300000 / frequency_khz;
+      const isHighClass_chk = /^[AB]$/i.test(fcc_class);
+      const planH_chk       = lambdaM * (isHighClass_chk ? 0.625 : 0.375);
       // 1. Soil resistivity — always required if conductivity is screening-grade or poor.
       if (ground_sigma_filing_grade !== 'filing'){
         items.push({
@@ -3954,12 +3957,12 @@ async function scoreCandidate(pt, ctx, warnings){
         });
       }
       // 2. ASR — every AM quarter-wave antenna triggers §17.7 at most frequencies.
-      if (qwM > asrThresh){
+      if (planH_chk > asrThresh){
         items.push({
           id: 'ASR_REGISTRATION',
           priority: 'REQUIRED',
           label: 'ASR registration (47 CFR §17.7)',
-          note: `λ/4 ≈ ${Math.round(qwM)} m at ${frequency_khz} kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854 before construction; may require FAA aeronautical study and lighting compliance.`
+          note: `Design height ${Math.round(planH_chk)} m at ${frequency_khz} kHz (Class ${fcc_class}) exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854 before construction; may require FAA aeronautical study and lighting compliance.`
         });
       }
       // 3. RF exposure — mandatory for all licensed AM stations.
@@ -4044,12 +4047,13 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Step 3 — ASR/FAA coordination (if height triggers §17.7)
       const lambdaM_cp = 300000 / frequency_khz;
-      const qwM_cp = lambdaM_cp / 4;
-      if (qwM_cp > 60.96){
+      const isHighClass_cp = /^[AB]$/i.test(fcc_class);
+      const planH_cp = lambdaM_cp * (isHighClass_cp ? 0.625 : 0.375);
+      if (planH_cp > 60.96){
         steps.push({
           step: 3,
           phase: 'ASR_FAA_COORDINATION',
-          action: `File FAA Form 7460-1 aeronautical study and FCC Form 854 ASR registration — λ/4 = ${Math.round(qwM_cp)} m at ${frequency_khz} kHz exceeds 60.96 m §17.7 threshold`,
+          action: `File FAA Form 7460-1 aeronautical study and FCC Form 854 ASR registration — design height ${Math.round(planH_cp)} m (Class ${fcc_class}) at ${frequency_khz} kHz exceeds 60.96 m §17.7 threshold`,
           timeline_weeks: '8–16',
           blocking: true
         });
@@ -15883,8 +15887,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower height from frequency and class (for demolition cost scaling)
       const lambda_demo_m = 300000 / frequency_khz;
       const tower_demo_m  = ['A','B'].includes(fcc_class)
-        ? round2(lambda_demo_m * 0.5)
-        : round2(lambda_demo_m / 4);
+        ? round2(lambda_demo_m * 0.625)
+        : round2(lambda_demo_m * 0.375);
       const tower_demo_ft = Math.round(tower_demo_m * 3.281);
 
       // Tower demolition cost: scales with height and configuration
@@ -16200,8 +16204,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Derive tower height from frequency and class
       const lambda_fnd_m = 300000 / frequency_khz;
       const tower_fnd_m  = ['A','B'].includes(fcc_class)
-        ? round2(lambda_fnd_m * 0.5)
-        : round2(lambda_fnd_m / 4);
+        ? round2(lambda_fnd_m * 0.625)
+        : round2(lambda_fnd_m * 0.375);
       const tower_fnd_ft = Math.round(tower_fnd_m * 3.281);
 
       // Base pier (drilled): diameter and depth scale with tower height

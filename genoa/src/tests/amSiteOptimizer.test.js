@@ -3552,13 +3552,15 @@ test('tower_cost_estimate.cost_tier is a valid enum', async () => {
   }
 });
 
-test('tower_cost_estimate.tower_height_m matches lambda/4 for frequency', async () => {
+test('tower_cost_estimate.tower_height_m matches class-aware planning height', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
   assert.equal(out.available, true);
-  const expectedQw = Math.round((300000 / KAZM.frequency_khz / 4) * 100) / 100;
+  // Class D: 3/8λ; Class A/B: 5/8λ
+  const lambda = 300000 / KAZM.frequency_khz;
+  const expected3_8 = Math.round(lambda * 0.375 * 100) / 100;
   for (const c of out.candidates) {
-    assert.ok(Math.abs(c.tower_cost_estimate.tower_height_m - expectedQw) < 0.1,
-      `tower_height_m ${c.tower_cost_estimate.tower_height_m} should be near λ/4 = ${expectedQw} m`);
+    assert.ok(Math.abs(c.tower_cost_estimate.tower_height_m - expected3_8) < 0.5,
+      `tower_height_m ${c.tower_cost_estimate.tower_height_m} should be near 3/8λ = ${expected3_8} m for Class D`);
   }
 });
 
@@ -12025,23 +12027,23 @@ test('am_tower_decommissioning_and_site_remediation_guide present on KAZM candid
 test('am_tower_decommissioning_and_site_remediation_guide KAZM tower demolition', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_decommissioning_and_site_remediation_guide;
-  assert.strictEqual(g.tower_demo_ft,           315,   'KAZM 780 kHz Class D tower should be 315 ft');
-  assert.strictEqual(g.tower_steel_tons_est,    22,    '315 ft tower ≈ 22 tons of steel');
-  assert.strictEqual(g.tower_demo_cost_low_usd, 15750, '315 ft × $50/ft = $15,750 demolition low');
+  assert.strictEqual(g.tower_demo_ft,           473,   'KAZM 780 kHz Class D 3/8λ tower should be 473 ft');
+  assert.strictEqual(g.tower_steel_tons_est,    33,    '473 ft tower ≈ 33 tons of steel');
+  assert.strictEqual(g.tower_demo_cost_low_usd, 23650, '473 ft × $50/ft = $23,650 demolition low');
 });
 
 test('am_tower_decommissioning_and_site_remediation_guide KAZM salvage and total', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_decommissioning_and_site_remediation_guide;
-  assert.strictEqual(g.salvage_high_usd,       5280,  '22 tons × 2000 lb × $0.12/lb = $5,280 salvage high');
-  assert.strictEqual(g.total_demo_cost_low_usd, 24750, 'Total decommissioning low should be $24,750');
+  assert.strictEqual(g.salvage_high_usd,       7920,  '33 tons × 2000 lb × $0.12/lb = $7,920 salvage high');
+  assert.strictEqual(g.total_demo_cost_low_usd, 32650, 'Total decommissioning low should be $32,650');
   assert.ok(g.total_demo_cost_high_usd > g.total_demo_cost_low_usd, 'High cost must exceed low');
 });
 
 test('am_tower_decommissioning_and_site_remediation_guide KAZM net cost after salvage', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_decommissioning_and_site_remediation_guide;
-  assert.strictEqual(g.net_demo_cost_low_usd, 19470, 'Net demo cost low (24750 - 5280) should be $19,470');
+  assert.strictEqual(g.net_demo_cost_low_usd, 24730, 'Net demo cost low (32650 - 7920) should be $24,730');
   assert.ok(g.net_demo_cost_high_usd >= 0, 'Net cost should be non-negative (no salvage windfall)');
   assert.ok(g.net_demo_cost_high_usd > g.net_demo_cost_low_usd, 'Net high must exceed net low');
 });
@@ -12054,9 +12056,9 @@ test('am_tower_decommissioning_and_site_remediation_guide comparison table colum
     assert.ok('demo_salvage_value_usd'  in row, 'demo_salvage_value_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.demo_tower_cost_low_usd, 15750, 'rank-1 demo_tower_cost_low_usd should be $15,750');
-  assert.strictEqual(r0.demo_total_low_usd,      24750, 'rank-1 demo_total_low_usd should be $24,750');
-  assert.strictEqual(r0.demo_salvage_value_usd,  5280,  'rank-1 demo_salvage_value_usd should be $5,280');
+  assert.strictEqual(r0.demo_tower_cost_low_usd, 23650, 'rank-1 demo_tower_cost_low_usd should be $23,650 (473 ft)');
+  assert.strictEqual(r0.demo_total_low_usd,      32650, 'rank-1 demo_total_low_usd should be $32,650 (473 ft)');
+  assert.strictEqual(r0.demo_salvage_value_usd,  7920,  'rank-1 demo_salvage_value_usd should be $7,920 (33 tons at 473 ft)');
 });
 
 test('am_ground_system_resistance_and_maintenance_guide present on KAZM candidate', async () => {
@@ -12253,26 +12255,26 @@ test('am_concrete_foundation_and_anchor_design_guide present on KAZM candidate',
 test('am_concrete_foundation_and_anchor_design_guide KAZM tower and pier sizing', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_concrete_foundation_and_anchor_design_guide;
-  assert.strictEqual(g.tower_fnd_ft, 315, 'KAZM 780 kHz Class D λ/4 tower should be 315 ft');
-  assert.strictEqual(g.base_pier_diameter_ft, 4, '315 ft tower base pier should be 4 ft diameter');
-  assert.strictEqual(g.base_pier_depth_ft,   15, '315 ft tower base pier should be 15 ft deep');
-  assert.strictEqual(g.base_pier_cy,        6.98, 'Base pier concrete should be 6.98 CY');
+  assert.strictEqual(g.tower_fnd_ft, 473, 'KAZM 780 kHz Class D 3/8λ tower should be 473 ft');
+  assert.strictEqual(g.base_pier_diameter_ft, 5, '473 ft tower base pier should be 5 ft diameter (>400 ft)');
+  assert.strictEqual(g.base_pier_depth_ft,   20, '473 ft tower base pier should be 20 ft deep (>400 ft)');
+  assert.strictEqual(g.base_pier_cy,        14.54, 'Base pier concrete should be 14.54 CY');
 });
 
 test('am_concrete_foundation_and_anchor_design_guide KAZM guy anchor sizing', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_concrete_foundation_and_anchor_design_guide;
   assert.strictEqual(g.n_anchors,        3,     'Guyed tower should have 3 guy anchors');
-  assert.strictEqual(g.anchor_cy_each,   3.56,  'Each anchor should be 3.56 CY');
-  assert.strictEqual(g.total_anchor_cy,  10.68, 'Total anchor concrete should be 10.68 CY');
-  assert.strictEqual(g.total_concrete_cy, 17.66, 'Total concrete (pier + anchors) should be 17.66 CY');
+  assert.strictEqual(g.anchor_cy_each,   7.41,  'Each anchor should be 7.41 CY (473 ft >400 ft)');
+  assert.strictEqual(g.total_anchor_cy,  22.23, 'Total anchor concrete should be 22.23 CY');
+  assert.strictEqual(g.total_concrete_cy, 36.77, 'Total concrete (pier + anchors) should be 36.77 CY');
 });
 
 test('am_concrete_foundation_and_anchor_design_guide KAZM foundation costs', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_concrete_foundation_and_anchor_design_guide;
-  assert.strictEqual(g.total_foundation_low_usd,  59480,  'Foundation low cost should be $59,480');
-  assert.strictEqual(g.total_foundation_high_usd, 120460, 'Foundation high cost should be $120,460');
+  assert.strictEqual(g.total_foundation_low_usd,  116810, 'Foundation low cost should be $116,810 (473 ft)');
+  assert.strictEqual(g.total_foundation_high_usd, 235120, 'Foundation high cost should be $235,120 (473 ft)');
   assert.ok(g.total_foundation_high_usd > g.total_foundation_low_usd, 'High cost must exceed low');
 });
 
@@ -12284,8 +12286,8 @@ test('am_concrete_foundation_and_anchor_design_guide comparison table columns pr
     assert.ok('fnd_n_anchors'    in row, 'fnd_n_anchors missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.fnd_concrete_cy,   17.66, 'rank-1 fnd_concrete_cy should be 17.66');
-  assert.strictEqual(r0.fnd_total_low_usd, 59480, 'rank-1 fnd_total_low_usd should be $59,480');
+  assert.strictEqual(r0.fnd_concrete_cy,   36.77,  'rank-1 fnd_concrete_cy should be 36.77 (473 ft)');
+  assert.strictEqual(r0.fnd_total_low_usd, 116810, 'rank-1 fnd_total_low_usd should be $116,810 (473 ft)');
   assert.strictEqual(r0.fnd_n_anchors,     3,     'rank-1 fnd_n_anchors should be 3');
 });
 
