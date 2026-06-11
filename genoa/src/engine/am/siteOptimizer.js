@@ -3393,8 +3393,9 @@ async function scoreCandidate(pt, ctx, warnings){
 
       return { go_no_go, confidence, one_line, evaluated_at_tpo_kw: tpo_kw };
     })(),
-    // Tower cost estimate — screening-grade construction cost model for a new λ/4
-    // self-supporting or guyed monopole.  Based on industry rule-of-thumb ranges:
+    // Tower cost estimate — screening-grade construction cost model for a new
+    // self-supporting or guyed monopole at class standard height (5/8λ A/B, 3/8λ C/D).
+    // Based on industry rule-of-thumb ranges:
     //   AM monopole: $50–150/m of tower height for guyed stick
     //   Ground system: 120 standard radials ≈ $80–120k; poor σ adds 30-60% for
     //     extended copper system.
@@ -17586,7 +17587,7 @@ async function scoreCandidate(pt, ctx, warnings){
         legal_fees_high_usd,
         total_zoning_cost_low_usd,
         total_zoning_cost_high_usd,
-        note: `Tower est. ${tower_height_ft}ft (λ/4 @ ${frequency_khz} kHz). Zoning: ${zoning_class} (${dist_from_col_km}km from COL); CUP probability ${Math.round(cup_probability * 100)}%${height_variance_required ? `; height variance required (limit: ${zoning_height_limit_ft}ft)` : ''}. Setback: ${setback_required_ft}ft from residential. SHPO review: ${shpo_review_required ? `required per FCC/ACHP NPA (${shpo_review_weeks_low}–${shpo_review_weeks_high} weeks)` : 'not triggered (<200ft)'}. Opposition risk: ${opposition_risk}. Zoning total: $${total_zoning_cost_low_usd.toLocaleString()}–$${total_zoning_cost_high_usd.toLocaleString()}.`,
+        note: `Tower est. ${tower_height_ft}ft (Class ${fcc_class} ${['A', 'B'].includes(fcc_class) ? '5/8λ' : '3/8λ'} @ ${frequency_khz} kHz). Zoning: ${zoning_class} (${dist_from_col_km}km from COL); CUP probability ${Math.round(cup_probability * 100)}%${height_variance_required ? `; height variance required (limit: ${zoning_height_limit_ft}ft)` : ''}. Setback: ${setback_required_ft}ft from residential. SHPO review: ${shpo_review_required ? `required per FCC/ACHP NPA (${shpo_review_weeks_low}–${shpo_review_weeks_high} weeks)` : 'not triggered (<200ft)'}. Opposition risk: ${opposition_risk}. Zoning total: $${total_zoning_cost_low_usd.toLocaleString()}–$${total_zoning_cost_high_usd.toLocaleString()}.`,
         reference: '47 CFR §73.49 (antenna enclosure / site requirement); §73.1125 (main studio proximity); FCC v. Beach Communications (1993); Telecommunications Act 1996 §704 (tower siting)',
       };
     })(),
@@ -18079,7 +18080,7 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_maintenance_cost_high_usd,
         total_initial_cost_low_usd,
         total_initial_cost_high_usd,
-        note: `Tower height (λ/4 estimate): ${std_tower_height_ft}ft (${std_tower_height_m}m) at ${frequency_khz} kHz${faa_notification_required ? ` — FAA Form 7460-1 required (14 CFR §77.9); FCC ASR registration required (§17.7); lighting: ${lighting_type.replace(/_/g, ' ')} on ${n_tower_elements} structure${n_tower_elements > 1 ? 's' : ''} per §17.21; annual maintenance obligation per §17.47` : ' — below 200 ft FAA notification threshold; no ASR registration required'}.`,
+        note: `Tower height (Class ${fcc_class} ${['A', 'B'].includes(fcc_class) ? '5/8λ' : '3/8λ'} design): ${std_tower_height_ft}ft (${std_tower_height_m}m) at ${frequency_khz} kHz${faa_notification_required ? ` — FAA Form 7460-1 required (14 CFR §77.9); FCC ASR registration required (§17.7); lighting: ${lighting_type.replace(/_/g, ' ')} on ${n_tower_elements} structure${n_tower_elements > 1 ? 's' : ''} per §17.21; annual maintenance obligation per §17.47` : ' — below 200 ft FAA notification threshold; no ASR registration required'}.`,
         reference: '47 CFR §17.7 (ASR registration threshold); §17.21 (lighting/marking requirements); §17.47 (annual lighting inspection); 14 CFR §77.9 (FAA Form 7460-1 threshold); FCC Form 854 (ASR)',
       };
     })(),
@@ -18974,11 +18975,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // Guy wire tension: typically 10–15% of Rated Breaking Strength (RBS).
       // Foundation: CIP concrete pier; depth = max(frost line, geotechnical).
       //
-      // Tower weight estimates (guyed, lattice, λ/4 AM tower):
-      //   Class A (50 kW, ~200m): 80,000–150,000 lb steel
-      //   Class B (10 kW, ~150m): 40,000–80,000 lb
-      //   Class D clr (5 kW, ~96m/315ft): 15,000–35,000 lb
-      //   Class D loc (1 kW, ~60m/197ft): 8,000–15,000 lb
+      // Tower weight estimates (guyed lattice at class standard height — 5/8λ A/B, 3/8λ C/D):
+      //   Class A (50 kW, 5/8λ ~190–230m): 80,000–150,000 lb steel
+      //   Class B (10 kW, 5/8λ): 40,000–80,000 lb
+      //   Class D clr (5 kW, 3/8λ ~144m/473ft @780 kHz): 15,000–35,000 lb
+      //   Class D loc (1 kW, 3/8λ ~78m/255ft @1450 kHz): 8,000–15,000 lb
       //
       // Guy anchor spacing: typically 80–100% of tower height for moment resistance.
       // Insulator requirements: all guys and base must have base insulator
@@ -20054,7 +20055,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Base impedance at λ/4 resonance (screening-grade estimates).
       // Rr from classical monopole theory: 36.6 Ω at 90° (λ/4).
       const Rr_ohm    = 36.6;
-      // Ground loss: 120-radial λ/4 system on moderate soil (4 mS/m) → Rg ≈ 2–4 Ω.
+      // Ground loss: 120 radials at 0.35λ (§73.186 / NBS TN-24) on moderate soil (4 mS/m) → Rg ≈ 2–4 Ω.
       const Rg_low_ohm  = 2.0;
       const Rg_high_ohm = 5.0;
       // Small conductor resistance (tower steel, base insulator contacts): ~0.3–0.5 Ω.
@@ -20192,9 +20193,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const site_acq_low  = 8500;
       const site_acq_high = 31000;
 
-      // 4. Tower Construction (λ/4 guyed monopole at candidate freq/site).
+      // 4. Tower Construction (guyed monopole at class standard height: 5/8λ A/B, 3/8λ C/D).
       // Cost scales roughly with height and terrain accessibility.
-      // λ/4 at 780 kHz = 96m (315ft). Below 200ft → lower; above 300ft → higher.
+      // Class D 3/8λ at 780 kHz = 144m (473ft). Below 200ft → lower; above 300ft → higher.
       const tower_height_factor = Math.min(2.0, Math.max(0.4, tower_ft / 250));
       const tower_base_low  = 85000;
       const tower_base_high = 200000;
@@ -25492,8 +25493,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.1213 (FCC: antenna structure maintenance)
       // ASR (Antenna Structure Registration) required for towers ≥ 61m AGL
 
-      // Tower height estimation: AM towers are typically λ/4 to λ/2
-      // Standard AM tower: 5/8λ for max gain
+      // Tower height estimation: class standard planning height —
+      // 5/8λ for Class A/B (max gain), 3/8λ for Class C/D
       const lambda_tl   = round2(300000 / frequency_khz); // m
       const qwave_tl    = round2(lambda_tl / 4);           // m
       const towerHeightEst_m  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_tl);  // 5/8λ Class A/B, 3/8λ Class C/D design height
