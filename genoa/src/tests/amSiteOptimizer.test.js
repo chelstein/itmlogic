@@ -8018,10 +8018,12 @@ test('transmitter_facility_design_guide has correct power calculations', async (
   assert.ok(f.hvac_required_tons > 0, 'HVAC must be required');
 });
 
-test('transmitter_facility_design_guide §73.49 fencing required when TPO > 250W', async () => {
+// §73.49 requires a locked enclosure for any AM tower with RF potential at the base —
+// no power threshold; series-fed monopoles (as modeled here) always require it.
+test('transmitter_facility_design_guide §73.49 fencing always required for series-fed AM tower', async () => {
   const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
   const f = out.candidates[0].transmitter_facility_design_guide;
-  assert.strictEqual(f.fencing.required, true, '5 kW station must require §73.49 fencing');
+  assert.strictEqual(f.fencing.required, true, 'series-fed AM tower must require §73.49 fencing');
   assert.ok(f.fencing.minimum_height_ft >= 8, 'fence must be at least 8 ft');
   assert.ok(typeof f.fencing.warning_signs === 'string', 'warning signs spec must be present');
 });
@@ -14328,10 +14330,12 @@ it('am_broadcast_facility_security_guide is present on every candidate', async (
   }
 });
 
-it('am_broadcast_facility_security_guide fence_height_ft is 8 (§73.49 minimum)', async () => {
+// §73.49 requires an effective locked enclosure but specifies no height;
+// 8 ft is the industry standard the guide uses for costing.
+it('am_broadcast_facility_security_guide fence_height_ft is 8 (industry standard)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_broadcast_facility_security_guide;
-  assert.strictEqual(g.fence_height_ft, 8, 'fence_height_ft must be 8 per §73.49');
+  assert.strictEqual(g.fence_height_ft, 8, 'fence_height_ft must be 8 (industry standard; §73.49 sets no height)');
 });
 
 it('am_broadcast_facility_security_guide fence_perimeter_ft is positive and reflects tower size', async () => {

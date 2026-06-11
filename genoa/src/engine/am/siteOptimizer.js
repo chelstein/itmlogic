@@ -9187,9 +9187,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM transmitter building and HVAC / thermal management guide.
       //
       // Regulatory framework:
-      //   47 CFR §73.49: AM antenna towers must be enclosed with locked fence if
-      //     accessible to the public.  By extension the transmitter building must
-      //     comply with local building codes and be secure.
+      //   47 CFR §73.49: AM towers with RF potential at the base must be enclosed
+      //     with effective locked fences or other enclosures.  By extension the
+      //     transmitter building must comply with local building codes and be secure.
       //   §73.1350(c): Transmitter must be capable of reducing power or shutting
       //     down from the operating position; building must provide safe access.
       //   NFPA 70 (NEC): All electrical work must comply with the National Electrical
@@ -12760,10 +12760,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower base RF safety and detuning — §73.49 protective fencing + OET Bulletin 65 base zone.
       // AM tower base is a live RF element: voltage = sqrt(P_w × R_base_Ω).
       // For Class D NDA at 5 kW, R_base ≈ 50–200 Ω (short tower, low conductivity → high R_base).
-      // 47 CFR §73.49: ALL AM towers must be enclosed by a locked fence ≥ 2.4 m (8 ft) high OR
-      //   have an approved anti-climb device AND RF hazard warning signs at each gate.
-      //   Non-directional self-supporting towers < 60 m sometimes qualify for fence waiver
-      //   with approved anti-climb alone; confirm with FCC Mass Media Bureau before omitting fence.
+      // 47 CFR §73.49: AM towers with RF potential at the base (series-fed, folded unipole,
+      //   insulated base) must be enclosed with effective locked fences or other enclosures;
+      //   individual tower fences are not required if towers sit within a protective property fence.
+      //   The rule specifies NO fence height — 8 ft (2.44 m) chain-link with anti-climb top is
+      //   the industry/insurance standard used here.
       // Detuning (§73.150(a)(5) and §73.1030): towers used for DA arrays must be detuned when
       //   the primary array is not operating. Detuning shack (ATU bypass, shorting switch) required.
       // Base current monitoring (§73.61): authorized base current must be within 2% continuously;
@@ -12784,8 +12785,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_base = frequency_khz / 1000;
       const d_base_gp_m   = round2(3.5 * Math.sqrt(tpo_kw) * Math.sqrt(1.0 / freq_mhz_base)); // freq correction
       const d_base_occ_m  = round2(d_base_gp_m / 2.23); // 10x vs 2x MPE ratio = sqrt(5)
-      // §73.49 fence specification
-      const fence_height_m = 2.44; // 8 ft minimum
+      // Fence specification — §73.49 requires an effective locked enclosure (no height
+      // specified in the rule); 8 ft is the industry standard used for costing.
+      const fence_height_m = 2.44; // 8 ft industry standard
       const fence_perimeter_m = round2(4 * (d_base_gp_m + 6)); // 6 m clearance on each side
       const fence_perimeter_ft = round2(fence_perimeter_m * 3.281);
       // Cost estimates (2024 USD, chain-link with barbed wire, gate, warning signs)
@@ -12832,7 +12834,7 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_maint_high_usd,
         fence_required_by_regulation: true,
         reference: '47 CFR §73.49 (AM tower fencing and protection); §73.61 (base current monitoring requirements); §73.150(a)(5) (DA detuning); §73.1030 (AM antenna operation); FCC OET Bulletin 65 §4 (RF exposure near AM towers); NFPA 70 (electrical safety for transmitter facilities); EIA/TIA 222-H (structural considerations)',
-        note: `${frequency_khz} kHz, ${tpo_kw} kW: tower base voltage ${v_base_low_vrms}–${v_base_high_vrms} V RMS (R_base ${r_base_est_ohm_low}–${r_base_est_ohm_high} Ω). §73.49 fence required: ≥${fence_height_m} m high, ~${fence_perimeter_ft} ft perimeter. General-public RF exclusion ≈ ${d_base_gp_m} m. Total RF safety capex: $${total_rf_safety_low_usd.toLocaleString()}–$${total_rf_safety_high_usd.toLocaleString()}.${is_da_base ? ' Detuning shack required for DA array (§73.150).' : ''}`
+        note: `${frequency_khz} kHz, ${tpo_kw} kW: tower base voltage ${v_base_low_vrms}–${v_base_high_vrms} V RMS (R_base ${r_base_est_ohm_low}–${r_base_est_ohm_high} Ω). §73.49 locked enclosure required (height not specified by rule; ${fence_height_m} m industry standard), ~${fence_perimeter_ft} ft perimeter. General-public RF exclusion ≈ ${d_base_gp_m} m. Total RF safety capex: $${total_rf_safety_low_usd.toLocaleString()}–$${total_rf_safety_high_usd.toLocaleString()}.${is_da_base ? ' Detuning shack required for DA array (§73.150).' : ''}`
       };
     })(),
 
@@ -13128,8 +13130,9 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_broadcast_facility_security_guide: (() => {
-      // 47 CFR §73.49: AM towers with ground systems must be enclosed by fences of adequate height
-      // to prevent accidental contact with the antenna or its base. Minimum fence height: 8 ft.
+      // 47 CFR §73.49: AM towers with RF potential at the base must be enclosed with
+      // effective locked fences or other enclosures (the rule specifies no height;
+      // 8 ft is the industry/insurance standard used for costing here).
       // Fence perimeter: based on site area required for guy anchor radius at tower height.
       const freq_mhz_sec = frequency_khz / 1000;
       const lambda_m_sec = 299.792458 / freq_mhz_sec;
@@ -13141,7 +13144,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const guy_radius_ft_high = round2(tower_height_ft_sec * 0.80);
       // Fence perimeter: square enclosure around max guy radius + 20 ft buffer
       const fence_perimeter_ft = round2(4 * (guy_radius_ft_high + 20) * 2); // rough square
-      const fence_height_ft = 8; // §73.49 minimum
+      const fence_height_ft = 8; // industry standard (§73.49 requires enclosure but sets no height)
       // Chain-link fence with anti-climb topping: $15–$35 per linear foot installed
       const fence_cost_per_lf_low  = 15;
       const fence_cost_per_lf_high = 35;
@@ -13171,7 +13174,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_security_capex_low_usd,
         total_security_capex_high_usd,
         reference: '47 CFR §73.49 (AM tower fence/marking required); 47 CFR §17.4 (ASR painting/lighting); NFPA 70 (NEC) Article 810 (broadcast antenna installation safety); ASIS International Physical Security Standard (PSP)',
-        note: `§73.49 requires ≥ ${fence_height_ft} ft fence around AM tower and ground system. Est. perimeter: ${fence_perimeter_ft} ft (based on ${guy_radius_ft_high} ft guy radius + buffer). Fence: $${fence_cost_low_usd.toLocaleString()}–$${fence_cost_high_usd.toLocaleString()}. Total security capex: $${total_security_capex_low_usd.toLocaleString()}–$${total_security_capex_high_usd.toLocaleString()} + $${monitoring_annual_low_usd.toLocaleString()}–$${monitoring_annual_high_usd.toLocaleString()}/yr monitoring.`
+        note: `§73.49 requires an effective locked enclosure around the AM tower (no height specified; ${fence_height_ft} ft industry standard). Est. perimeter: ${fence_perimeter_ft} ft (based on ${guy_radius_ft_high} ft guy radius + buffer). Fence: $${fence_cost_low_usd.toLocaleString()}–$${fence_cost_high_usd.toLocaleString()}. Total security capex: $${total_security_capex_low_usd.toLocaleString()}–$${total_security_capex_high_usd.toLocaleString()} + $${monitoring_annual_low_usd.toLocaleString()}–$${monitoring_annual_high_usd.toLocaleString()}/yr monitoring.`
       };
     })(),
 
@@ -24818,23 +24821,22 @@ async function scoreCandidate(pt, ctx, warnings){
       const hvacTons             = round2(heatDissipated_btu / 12000);  // 12,000 BTU/ton
 
       // §73.49 fencing requirements.
-      // All AM transmitting systems in excess of 250 W must be enclosed in a locked fence.
-      // The fence must be locked at all times and must bear warning signs.
-      const fencingRequired = tpo_kw > 0.25;
-      const fenceSpecs = fencingRequired ? {
-        required: true,
+      // AM towers with RF potential at the base (series-fed, folded unipole, insulated
+      // base — i.e., the monopoles modeled here) must be enclosed with effective locked
+      // fences or other enclosures; individual tower fences are not required if the
+      // towers sit within a protective property fence. The rule has no power threshold
+      // and specifies no fence height — 8 ft is the industry standard used for costing.
+      const fencingRequired = true;
+      const fenceSpecs = {
+        required: fencingRequired,
         rule: '47 CFR §73.49',
         minimum_height_ft: 8,
         material: 'Chain-link or equivalent — must prevent unauthorized access',
-        warning_signs: 'High voltage warning signs at each entrance and at intervals not to exceed 100 feet',
+        warning_signs: 'RF/high voltage warning signs at each entrance and at intervals not to exceed 100 feet',
         lock_required: 'Deadbolt or padlock; key held by licensed operator',
         access_gate_count: Math.max(1, Math.ceil(tpo_kw / 25)),  // more gates for higher power
         estimated_perimeter_ft: round2(Math.sqrt(300 * tpo_kw / 5) * 4),  // rough scaling
-        note: '§73.49: locked enclosure required for all AM transmitting systems > 250 W. Ground system radials must be within the fenced area or covered by a grounding mat accessible only to authorized personnel.'
-      } : {
-        required: false,
-        rule: '47 CFR §73.49',
-        note: 'Fencing not required for stations at or below 250 W.'
+        note: '§73.49: effective locked enclosure required for AM towers with RF potential at the base (height/material not specified by rule; 8 ft chain-link is industry standard). Tower fence may be omitted only if the tower is within a protective property fence.'
       };
 
       // Standby generator requirements.
