@@ -24292,7 +24292,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { exhibit: 'Exhibit E (Pattern Plots)', description: 'Theoretical HRP and NDA pattern plots (0°–360°, linear field scale)', required: true },
         { exhibit: 'Exhibit F (HRP Table)',     description: 'Horizontal radiation pattern table at 5° increments (72 radials, 0°–355°) per §73.150(a), EF at 1 km, normalized to maximum radial = 1.0', required: true },
         { exhibit: 'Exhibit G (Phasing Data)',  description: 'Base current ratios (I_n/I_1), phase angles, and antenna monitor reference parameters', required: true },
-        { exhibit: 'Exhibit H (Suppression)',   description: 'Suppression ratios toward each co-channel protected station within the §73.207 D/U analysis area', required: true },
+        { exhibit: 'Exhibit H (Suppression)',   description: 'Suppression ratios toward each co-channel protected station per §73.182 NIF D/U analysis (§73.207 is the FM D/U rule; AM uses §73.182)', required: true },
         { exhibit: 'Exhibit I (Mutual Z)',      description: 'Self- and mutual-impedance matrix for all element pairs at operating frequency', required: recConfig_da.n_elements > 2 },
         { exhibit: 'Form 302-AM (License)',     description: 'License to cover: proof-of-performance measurements per §73.154 filed after construction', required: true }
       ];
@@ -26766,7 +26766,8 @@ async function scoreCandidate(pt, ctx, warnings){
     frequency_spectrum_coordination: (() => {
       // Frequency/spectrum coordination for AM relocation
       // Covers co-channel, adjacent-channel, 2nd/3rd adjacent, IBOC sideband protection
-      // Key rule: §73.182 co-channel; §73.184 adjacent-channel; §73.209 2nd adj; §73.213 3rd adj
+      // Key rule: §73.182 (co-channel NIF); §73.37 (adjacent/2nd/3rd adj minimum distances for AM)
+      // (§73.184 = AM groundwave curves; §73.209 = FM 2nd adj; §73.213 = FM 3rd adj — not AM channel rules)
 
       const isClear_fsc  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const isLocal_fsc  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
@@ -26784,27 +26785,27 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         {
           id: 'FIRST_ADJ',        label: 'First adjacent (±10 kHz)',
-          cfr: '47 CFR §73.184',
+          cfr: '47 CFR §73.37 (AM ±10 kHz minimum distances)',
           du_daytime_db:  6,      du_nighttime_db: -6,
           min_spacing_km: 322,
           class_applies:  'ALL',
-          notes: 'D/U ≥ 6 dB during daytime. First adjacent interference is common at low power.'
+          notes: 'D/U ≥ 6 dB during daytime per AM engineering practice. First adjacent interference is common at low power. (§73.184 = AM groundwave curves, not adjacent-channel rule.)'
         },
         {
           id: 'SECOND_ADJ',       label: 'Second adjacent (±20 kHz)',
-          cfr: '47 CFR §73.209',
+          cfr: '47 CFR §73.37 (AM ±20 kHz minimum distances)',
           du_daytime_db:  0,      du_nighttime_db: -12,
           min_spacing_km: 161,
           class_applies:  'ALL',
-          notes: 'D/U ≥ 0 dB day. Second adjacent interference typically only an issue at very high power.'
+          notes: 'D/U ≥ 0 dB day. Second adjacent interference typically only an issue at very high power. (§73.209 is the FM 2nd adj rule — not applicable to AM.)'
         },
         {
           id: 'THIRD_ADJ',        label: 'Third adjacent (±30 kHz)',
-          cfr: '47 CFR §73.213',
+          cfr: '47 CFR §73.37 (AM engineering practice; no dedicated AM 3rd-adj CFR section)',
           du_daytime_db:  -6,     du_nighttime_db: -18,
           min_spacing_km: 80,
           class_applies:  'ALL',
-          notes: 'D/U ≥ -6 dB day. Rarely a problem except with very close high-power stations.'
+          notes: 'D/U ≥ -6 dB day. Rarely a problem except with very close high-power stations. (§73.213 is the FM 3rd adj rule — not applicable to AM.)'
         },
         {
           id: 'IBOC_SIDEBAND',    label: 'IBOC/HD Radio sideband (±15 kHz)',
@@ -26839,9 +26840,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // Frequency coordination study items
       const coordinationItems = [
         { item: 'Co-channel station database search',         cfr: '§73.182', required: true,  tool: 'FCC LMS API or REC Networks AMQUERY' },
-        { item: 'First adjacent station search (±10 kHz)',    cfr: '§73.184', required: true,  tool: 'FCC LMS API' },
-        { item: 'Second adjacent station search (±20 kHz)',   cfr: '§73.209', required: true,  tool: 'FCC LMS API' },
-        { item: 'Third adjacent station search (±30 kHz)',    cfr: '§73.213', required: true,  tool: 'FCC LMS API' },
+        { item: 'First adjacent station search (±10 kHz)',    cfr: '§73.37 (AM ±10 kHz distances)', required: true,  tool: 'FCC LMS API' },
+        { item: 'Second adjacent station search (±20 kHz)',   cfr: '§73.37 (AM ±20 kHz distances)', required: true,  tool: 'FCC LMS API' },
+        { item: 'Third adjacent station search (±30 kHz)',    cfr: '§73.37; §73.182', required: true,  tool: 'FCC LMS API' },
         { item: 'IBOC interference study',                    cfr: '§73.404', required: false, tool: 'iBiquity/xperi modeling software' },
         { item: 'NIF study (clear channel)',                  cfr: '§73.182', required: nifRequired, tool: 'FCC groundwave/skywave propagation software' },
         { item: 'Treaty protection analysis (Canada/Mexico)', cfr: '§73.1205', required: true,  tool: 'FCC treaty database; AMQUERY' }
@@ -26871,7 +26872,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_coordination_items:        coordinationItems.length,
         n_required_items:            coordinationItems.filter(i => i.required).length,
         coordination_timeline:        coordinationTimeline,
-        reference: '47 CFR §73.182; §73.184; §73.209; §73.213; §73.404; §73.1205; FCC AM Allocation Engineering Data; REC Networks AMQUERY',
+        reference: '47 CFR §73.182 (NIF analysis); §73.37 (AM minimum distance separations); §73.184 (AM groundwave curves); §73.404 (IBOC/HD Radio); §73.1205 (treaty protection); FCC AM Allocation Engineering Data; REC Networks AMQUERY',
         note: `${chanClass_fsc} channel at ${frequency_khz} kHz. Co-channel zone: ${coordinationZone_km} km. NIF study: ${nifRequired ? 'required' : 'not required'}.`
       };
     })(),
