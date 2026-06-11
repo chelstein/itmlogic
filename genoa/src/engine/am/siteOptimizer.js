@@ -15911,7 +15911,7 @@ async function scoreCandidate(pt, ctx, warnings){
         recommended_reference,
         annual_calibration_low_usd,
         annual_calibration_high_usd,
-        reference: '47 CFR §73.1545(a) (carrier frequency tolerance: ±20 Hz for AM); §73.1545(b) (modulation monitor required within 24 hours of operation); IEEE Std 1139-2008 (frequency stability terminology); ITU-R SM.1539 (frequency measurement and monitoring)',
+        reference: '47 CFR §73.1545(a) (carrier frequency tolerance: ±20 Hz for AM); §73.1540 (carrier frequency measurements); IEEE Std 1139-2008 (frequency stability terminology); ITU-R SM.1539 (frequency measurement and monitoring)',
         note: `Carrier frequency accuracy: ${frequency_khz} kHz AM, §73.1545 limit ±${required_accuracy_hz} Hz (±${required_accuracy_ppm} ppm). GPSDO ≈${gpsdo_error_hz} Hz error ($${gpsdo_cost_low_usd.toLocaleString()}–$${gpsdo_cost_high_usd.toLocaleString()}), Rubidium ≈${rubidium_error_hz} Hz ($${rubidium_cost_low_usd.toLocaleString()}–$${rubidium_cost_high_usd.toLocaleString()}), OCXO ≈${ocxo_error_hz} Hz ($${ocxo_cost_low_usd}–$${ocxo_cost_high_usd}). Recommended: ${recommended_reference}. Annual calibration: $${annual_calibration_low_usd}–$${annual_calibration_high_usd}.`
       };
     })(),
@@ -28825,12 +28825,12 @@ async function scoreCandidate(pt, ctx, warnings){
     am_carrier_frequency_reference_guide: (() => {
       // Carrier frequency accuracy and standard frequency reference guide.
       //
-      // §73.1540: AM stations must maintain carrier frequency within ±20 Hz of the
+      // §73.1545(a): AM stations must maintain carrier frequency within ±20 Hz of the
       // licensed (center) frequency at all times.  The frequency tolerance is the most
       // stringent technical requirement for AM — violations carry a forfeiture of up to
       // $10,000 per day (§1.80(b)(7)).
       //
-      // §73.1545: Unattended operation is permitted if the transmitter's automatic
+      // §73.1400: Unattended operation is permitted if the transmitter's automatic
       // frequency control (AFC) keeps the carrier within tolerance.  Any drift must be
       // logged.
       //
@@ -28843,7 +28843,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //             ITU-R TF.460-6; NAB Engineering Handbook Ch. 4
 
       const freq_hz = frequency_khz * 1000;
-      const tolerance_hz  = 20;          // §73.1540: ±20 Hz absolute
+      const tolerance_hz  = 20;          // §73.1545(a): ±20 Hz absolute
       const tolerance_ppm = round2((tolerance_hz / freq_hz) * 1e6);
       const tolerance_ppb = round2(tolerance_ppm * 1000);
 

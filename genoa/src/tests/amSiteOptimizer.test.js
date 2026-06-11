@@ -16795,7 +16795,7 @@ test('#99 KAZM: am_carrier_frequency_reference_guide present, tolerance ±20 Hz'
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const cfr = out.candidates[0].am_carrier_frequency_reference_guide;
   assert.ok(cfr, 'am_carrier_frequency_reference_guide must be present');
-  assert.strictEqual(cfr.fcc_tolerance_hz, 20, 'FCC tolerance must be ±20 Hz (§73.1540)');
+  assert.strictEqual(cfr.fcc_tolerance_hz, 20, 'FCC tolerance must be ±20 Hz (§73.1545(a))');
   assert.ok(typeof cfr.fcc_tolerance_ppm === 'number', 'fcc_tolerance_ppm must be numeric');
   assert.ok(cfr.fcc_tolerance_ppm > 0, 'fcc_tolerance_ppm must be positive');
   assert.strictEqual(cfr.recommended_reference, 'GPS_DISCIPLINED', 'GPS_DISCIPLINED must be recommended');
