@@ -3186,7 +3186,7 @@ async function scoreCandidate(pt, ctx, warnings){
     'ASR / FAA / zoning review',
     'Tower-owner lease and structural review'
   ];
-  if (/^DA/i.test(pattern_mode)) required_next_studies.push('§73.150 directional antenna pattern design and §73.154 proof of performance');
+  if (/^DA/i.test(pattern_mode)) required_next_studies.push('§73.150 directional antenna pattern design and §73.151 proof of performance');
   if (CLEAR_CHANNEL_KHZ.has(frequency_khz) && fcc_class !== 'A') required_next_studies.push('§73.182 dominant-station NIF analysis (clear channel — secondary operation)');
 
   return {
@@ -4798,7 +4798,7 @@ async function scoreCandidate(pt, ctx, warnings){
         additional_engineering_weeks_max: add_wks_max,
         note: `Commission a ${study_type.replace(/_/g, ' ')} study before filing. DA engineering adds ${add_wks_min}–${add_wks_max} weeks; budget for multiple antenna modeling iterations.`,
         rule: '47 CFR §73.150 / §73.152',
-        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.25 (clear channel protection); §73.182 (skywave interference); §73.154(a) (DA proof of performance)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.25 (clear channel protection); §73.182 (skywave interference); §73.151 (DA proof of performance)',
       };
     })(),
     // Signal environment advisory — characterizes the directional interference
@@ -5367,7 +5367,7 @@ async function scoreCandidate(pt, ctx, warnings){
           rule:        '47 CFR §73.150 / §73.152 / §73.154',
           responsible: 'Licensed broadcast engineer (antenna)',
           note:        daRecom
-            ? '§73.150(a) / Form 301-AM: horizontal pattern table in 5° increments (72 tabulated values, 0°–355°). DA pattern must be modeled with moment-method (NEC) software; proof-of-performance field-intensity measurements required after construction per §73.154.'
+            ? '§73.150(a) / Form 301-AM: horizontal pattern table in 5° increments (72 tabulated values, 0°–355°). DA pattern must be modeled with moment-method (NEC) software; proof-of-performance required after construction per §73.151 (moment-method accepted per §73.151(c)).'
             : 'NDA operation proposed. DA pattern exhibit not required unless NIF failure or objection requires pattern protection.'
         },
         {
@@ -5388,7 +5388,7 @@ async function scoreCandidate(pt, ctx, warnings){
           status:      'REQUIRED',
           rule:        '47 CFR §73.3536',
           responsible: 'Communications counsel',
-          note:        'File after construction and proof of performance per §73.154. License completes the site change authorization.'
+          note:        'File after construction and proof of performance per §73.151. License completes the site change authorization.'
         }
       ];
 
@@ -5567,12 +5567,12 @@ async function scoreCandidate(pt, ctx, warnings){
       };
     })(),
     technical_proof_guide: (() => {
-      // Post-construction proof of performance guide per 47 CFR §73.154.
+      // Post-construction proof of performance guide (§73.151 DA full/moment-method; §73.154 DA partial; §73.186 NDA field measurements).
       // Identifies the specific field-intensity measurements and calculations
       // required before Form 302-AM license application can be filed.
       //
-      // NDA (non-directional antenna) proof: §73.154 — 8 radial measurements
-      // DA proof: §73.154 — field-intensity measurements on all DA pattern radials
+      // NDA proof: §73.186 — measurements on six or more radials (8 at 45° is common practice)
+      // DA proof: §73.151 — full measurement or moment-method proof; §73.154 partial proofs
       //   + monitor point measurements + base current readings.
       const isDA_pg  = CLEAR_CHANNEL_KHZ.has(frequency_khz) && fcc_class !== 'A';
       const isClearD_pg = isDA_pg && fcc_class === 'D';
@@ -5584,7 +5584,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const f_mhz_pg = frequency_khz / 1000;
       const mpe_gp_pg = f_mhz_pg < 1.34 ? 100 : round2(180 / (f_mhz_pg * f_mhz_pg));
 
-      // NDA proof radials (§73.154 Table 1): 8 radials at 45° intervals.
+      // NDA proof radials: 8 at 45° intervals (engineering practice; §73.186 minimum is 6).
       // For DA: all radials in the authorized pattern + monitor points.
       const ndaRadials = [0, 45, 90, 135, 180, 225, 270, 315].map(az => ({
         azimuth_deg: az,
@@ -5596,7 +5596,7 @@ async function scoreCandidate(pt, ctx, warnings){
         {
           id: 'BASE_CURRENT',
           label: 'Antenna base current reading',
-          rule: '47 CFR §73.154(a)',
+          rule: '47 CFR §73.51 (direct method power)',
           instrument: 'Thermocouple ammeter at antenna base',
           notes: 'Read base current at licensed TPO. Record as reference for monitor-point calibration.'
         },
@@ -5613,7 +5613,7 @@ async function scoreCandidate(pt, ctx, warnings){
           rule: '47 CFR §73.154',
           instrument: 'Calibrated FCC field-intensity meter (Narda, ETS-Lindgren, or equivalent) with λ/4 whip',
           notes: isDA_pg
-            ? `DA pattern: measure all azimuthal radials specified in authorized DA pattern, plus 8 orthogonal radials for verification. Monitor points must be measured at authorized reference field. §73.154(a) requires submission of measured pattern vs. theoretical to obtain license to cover (Form 302-AM).`
+            ? `DA pattern: measure all azimuthal radials specified in authorized DA pattern, plus 8 orthogonal radials for verification. Monitor points must be measured at authorized reference field. §73.151 governs the proof submitted with the license to cover (Form 302-AM); moment-method proofs per §73.151(c) are accepted.`
             : `Drive 8 radials at 0°/45°/90°/135°/180°/225°/270°/315° from antenna. Record FI every ${round2(lambdaM_pg / 8)} m (λ/8) from base out to minimum 2 km. Compute inverse-distance normalized field at 1 km for each radial.`
         },
         {
@@ -5664,7 +5664,7 @@ async function scoreCandidate(pt, ctx, warnings){
         measurements: proofMeasurements,
         nda_radial_plan: isDA_pg ? null : ndaRadials,
         filing_trigger: 'FCC Form 302-AM (license to cover, §73.3536) must be filed before CP expiration (3-year term per §73.3598(a)). Proof measurements must be complete before 302-AM is submitted.',
-        reference: '47 CFR §73.154 (proof of performance); §73.190 (antenna efficiency); §73.150(a) (DA pattern table, 5° increments); FCC Form 302-AM (license to cover); OET Bulletin 65 (RF exposure).',
+        reference: '47 CFR §73.151 (DA proof of performance); §73.154 (DA partial proof); §73.186 (NDA field measurements); §73.190 (antenna efficiency); §73.150 (DA pattern, 5° increments); FCC Form 302-AM (license to cover); OET Bulletin 65 (RF exposure).',
         note: 'This is a screening-grade proof guide. Actual proof methodology must be coordinated with the licensed broadcast engineer of record and FCC counsel before construction.'
       };
     })(),
@@ -6358,7 +6358,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'GROUND_SYSTEM',      label: `Ground system (${nRadials} radials × ${radialLen_m} m)`, low_usd: groundLow, high_usd: groundHigh, note: '§73.189(b)(4) buried copper radial system (design); includes trenching and §73.190 conductivity survey' },
         { id: 'TRANSMITTER',        label: `Transmitter (${tpo_kw} kW)`,  low_usd: txLow,      high_usd: txHigh,      note: 'Primary + backup transmitters; includes installation and initial alignment' },
         { id: 'TRANSMISSION_LINE',  label: 'Transmission line + ATU',     low_usd: txLineLow,  high_usd: txLineHigh,  note: 'Heliax / rigid line from transmitter building to tower base + antenna tuning unit' },
-        { id: 'ENGINEERING',        label: 'Broadcast + structural engineering', low_usd: engLow, high_usd: engHigh,  note: isDA_ff ? 'DA array engineering + §73.150 pattern design + §73.182 NIF analysis' : '§73.182 NIF study, §73.154 proof design, structural PE' },
+        { id: 'ENGINEERING',        label: 'Broadcast + structural engineering', low_usd: engLow, high_usd: engHigh,  note: isDA_ff ? 'DA array engineering + §73.150 pattern design + §73.182 NIF analysis' : '§73.182 NIF study, §73.151 proof design, structural PE' },
         { id: 'FCC_FILING',         label: 'FCC Form 301-AM filing + fees', low_usd: fccLow,   high_usd: fccHigh,    note: 'FCC application fees + FCC counsel / legal costs; does not include CP grant timeline costs' },
         { id: 'ENVIRONMENTAL',      label: 'NEPA/NHPA environmental',     low_usd: envLow,     high_usd: envHigh,     note: 'NEPA desktop, §106 SHPO consultation, EA preparation if required; excludes mitigation costs' },
         { id: 'SITE_PREP',          label: 'Site preparation',            low_usd: siteLow,    high_usd: siteHigh,    note: 'Grading, access road, fence, electrical service connection, transmitter building' },
@@ -6814,7 +6814,7 @@ async function scoreCandidate(pt, ctx, warnings){
           weeks_low:    p5Low,
           weeks_high:   p5High,
           key_tasks:    [
-            `${isDA_lt ? 'DA proof (72-radial FI traversals per §73.154)' : 'NDA proof (8-radial inverse-distance traversals)'}`,
+            `${isDA_lt ? 'DA proof (72-radial FI traversals per §73.151)' : 'NDA proof (8-radial inverse-distance traversals)'}`,
             'Base current measurements and antenna efficiency verification (§73.190)',
             'RF exposure (MPE) measurement per OET Bulletin 65',
             'File FCC Form 302-AM (license to cover) with proof measurements',
@@ -11994,7 +11994,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const phase_tolerance_deg  = 3;    // §73.68(a) — ±3°
       const ratio_tolerance_pct  = 5;    // §73.62(a) — ±5% of licensed sample current ratio
-      const proof_radials        = 72;   // §73.154(a)
+      const proof_radials        = 72;   // full-proof practice matching §73.150 5° pattern azimuths (rule basis §73.151)
       const proof_increment_deg  = 9;    // 360/72 = 5° intervals; §73.154 says 0 through 355° at 5°... adjusted per rule
       const emergency_nda_days   = 30;   // §73.62(c) — up to 30 days before STA must be filed (minor variation, monitor points in limits)
 
@@ -27267,7 +27267,7 @@ async function scoreCandidate(pt, ctx, warnings){
         {
           id: 'FULL_PROOF',
           label: 'Full Field Intensity Proof (§73.154(a))',
-          cfr: '47 CFR §73.154(a)',
+          cfr: '47 CFR §73.151(a)',
           radials: 72,
           degree_interval: 5,
           required_for: ['New DA construction', 'Major modification (>2% current change)', 'Pattern change'],
@@ -27275,12 +27275,12 @@ async function scoreCandidate(pt, ctx, warnings){
           tolerance_db: 2.0,
           estimated_days: 5,
           cost_est_usd: 18000,
-          description: '72 radial traversals at 5° intervals. Measured pattern must agree with authorized pattern within ±2 dB on all radials.'
+          description: '72 radial traversals at 5° intervals (matching the §73.150 standard-pattern azimuths). ±2 dB agreement target is engineering practice; rule basis for full proofs is §73.151.'
         },
         {
           id: 'SPOT_CHECK',
-          label: 'Spot Check Proof (§73.154(c))',
-          cfr: '47 CFR §73.154(c)',
+          label: 'Partial Proof (§73.154)',
+          cfr: '47 CFR §73.154',
           radials: 24,
           degree_interval: 15,
           required_for: ['Minor modification (≤2% current ratio or phase change)', 'Tower painting/lighting work'],
@@ -27288,12 +27288,12 @@ async function scoreCandidate(pt, ctx, warnings){
           tolerance_db: 2.0,
           estimated_days: 2,
           cost_est_usd: 6500,
-          description: '24 radial spot checks at 15° intervals. Acceptable for minor modifications with pre-approved antenna parameters.'
+          description: 'Measurements on each radial with a monitoring point, ≥8 field strength points per radial within 3–15 km (§73.154(a)). 24 radials at 15° shown as conservative practice.'
         },
         {
           id: 'PARTIAL_PROOF',
-          label: 'Partial Proof / Theoretical (§73.154(b))',
-          cfr: '47 CFR §73.154(b)',
+          label: 'Moment-Method Proof (§73.151(c))',
+          cfr: '47 CFR §73.151(c)',
           radials: 0,
           degree_interval: null,
           required_for: ['New CP where full proof not yet possible', 'Interim operation period'],
@@ -27301,23 +27301,23 @@ async function scoreCandidate(pt, ctx, warnings){
           tolerance_db: null,
           estimated_days: 1,
           cost_est_usd: 2500,
-          description: 'Theoretical proof using computer modeling. Must be replaced by measured proof before license grant (within 12 months).'
+          description: 'Computational proof per §73.151(c): moment-method (NEC) modeling of the array with measured base impedances and sampling system verification — accepted in lieu of full measurement proofs.'
         }
       ];
 
       const ND_CHECK = {
         required: true,
-        cfr: '47 CFR §73.154(e)',
-        description: 'Non-directional measurement at standard monitoring point to verify antenna efficiency reference',
+        cfr: '47 CFR §73.154',
+        description: 'Comparison of directional vs non-directional field strength on measured radials (one §73.154 partial-proof method)',
         standard_monitoring_point_m: round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz * 0.02),
         base_current_tolerance_pct: 5
       };
 
       const ANTENNA_PARAMETERS = [
-        { param: 'Field ratio (RMS voltage ratio)', tolerance: '±2% of licensed value', cfr: '§73.62' },
-        { param: 'Phase (relative to reference tower)', tolerance: '±3° of licensed value', cfr: '§73.62' },
-        { param: 'Base impedance (resistance)', tolerance: '±3% of licensed value', cfr: '§73.62' },
-        { param: 'Base impedance (reactance)', tolerance: '±3% of licensed value', cfr: '§73.62' }
+        { param: 'Sample current ratio', tolerance: '±5% of licensed value', cfr: '§73.62(a)' },
+        { param: 'Phase (relative to reference tower)', tolerance: '±3° of licensed value', cfr: '§73.62(a)' },
+        { param: 'Base impedance (resistance)', tolerance: '±3% (engineering practice)', cfr: '§73.54 (measurement)' },
+        { param: 'Base impedance (reactance)', tolerance: '±3% (engineering practice)', cfr: '§73.54 (measurement)' }
       ];
 
       const applicableProof = PROOF_METHODS[0];
@@ -27335,8 +27335,8 @@ async function scoreCandidate(pt, ctx, warnings){
         estimated_proof_days: applicableProof.estimated_days,
         proof_tolerance_db: 2.0,
         filing_requirement: 'Proof must be filed with FCC as Exhibit to Form 302-AM (License to Cover) within 12 months of CP grant',
-        reference: '47 CFR §73.154; 47 CFR §73.62; FCC Media Bureau DA Proof Guidelines (2016); NAB Engineering Handbook §6.3',
-        note: `DA pattern — §73.154 proof required. Full proof: ${PROOF_METHODS[0].radials} radials at ${PROOF_METHODS[0].degree_interval}° intervals; est. ${PROOF_METHODS[0].estimated_days} days / $${PROOF_METHODS[0].cost_est_usd.toLocaleString()}.`
+        reference: '47 CFR §73.151 (full/moment-method proofs); §73.154 (partial proofs); §73.62 (DA tolerances); NAB Engineering Handbook §6.3',
+        note: `DA pattern — proof of performance required (§73.151 full/moment-method; §73.154 partial). Full proof: ${PROOF_METHODS[0].radials} radials at ${PROOF_METHODS[0].degree_interval}° intervals; est. ${PROOF_METHODS[0].estimated_days} days / $${PROOF_METHODS[0].cost_est_usd.toLocaleString()}.`
       };
     })(),
 

@@ -8717,7 +8717,7 @@ test('directional_antenna_proof_guide applicable for DA-N pattern', async () => 
   assert.strictEqual(d.applicable, true, 'DA-N pattern must set applicable=true');
   assert.ok(Array.isArray(d.proof_methods), 'proof_methods must be an array');
   assert.ok(d.n_proof_methods === d.proof_methods.length, 'n_proof_methods must match array length');
-  assert.ok(d.proof_tolerance_db === 2.0, '§73.154 tolerance must be ±2 dB');
+  assert.ok(d.proof_tolerance_db === 2.0, 'proof agreement target must be ±2 dB (engineering practice)');
 });
 
 test('directional_antenna_proof_guide full proof has 72 radials at 5° intervals', async () => {
@@ -8726,7 +8726,7 @@ test('directional_antenna_proof_guide full proof has 72 radials at 5° intervals
   assert.strictEqual(d.applicable, true, 'DA-D must be applicable');
   const fullProof = d.proof_methods.find(p => p.id === 'FULL_PROOF');
   assert.ok(fullProof != null, 'FULL_PROOF method must be present');
-  assert.strictEqual(fullProof.radials, 72, '§73.154(a) full proof requires 72 radials');
+  assert.strictEqual(fullProof.radials, 72, 'full proof uses 72 radials matching §73.150 5° pattern azimuths (§73.151)');
   assert.strictEqual(fullProof.degree_interval, 5, 'full proof requires 5° radial intervals');
   assert.ok(fullProof.cost_est_usd > 0, 'full proof cost must be positive');
 });
@@ -8736,7 +8736,7 @@ test('directional_antenna_proof_guide ND check requires base current monitoring'
   const d = out.candidates[0].directional_antenna_proof_guide;
   assert.strictEqual(d.applicable, true, 'must be applicable');
   assert.ok(d.nd_check != null, 'nd_check must be present');
-  assert.strictEqual(d.nd_check.required, true, 'ND check is required per §73.154(e)');
+  assert.strictEqual(d.nd_check.required, true, 'DA/ND comparison check required (§73.154 partial-proof method)');
   assert.ok(d.nd_check.base_current_tolerance_pct > 0, 'base_current_tolerance_pct must be positive');
 });
 
@@ -10314,7 +10314,7 @@ test('fcc_proof_of_performance_measurement_guide present on KAZM candidate', asy
   assert.ok(g, 'POP guide must be present');
   assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
   assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
-  assert.strictEqual(g.n_measurement_points_per_radial, 8, '§73.154 requires 8 points per radial');
+  assert.strictEqual(g.n_measurement_points_per_radial, 8, '§73.154(a) requires ≥8 field strength points per radial');
 });
 
 test('fcc_proof_of_performance_measurement_guide KAZM NDA gets SHORT_PROOF', async () => {
