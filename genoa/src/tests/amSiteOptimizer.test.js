@@ -6126,7 +6126,7 @@ test('ground_radial_installation_cost_guide presence and structure', async () =>
   assert.strictEqual(g.fcc_class, 'D', 'fcc_class mismatch');
   assert.strictEqual(g.n_radials, 120, 'FCC minimum is 120 radials (§73.190)');
   assert.strictEqual(g.fcc_minimum_radials, 120, 'fcc_minimum_radials must be 120');
-  assert.strictEqual(g.radial_cfr, '47 CFR §73.186', 'CFR reference must be §73.186 (AM ground system standard — 120 × 0.35λ)');
+  assert.strictEqual(g.radial_cfr, '47 CFR §73.189(b)(4)', 'CFR reference must be §73.189(b)(4) (AM ground system — 120 × 0.35λ excellent standard)');
 });
 
 test('ground_radial_installation_cost_guide KAZM 780kHz wavelength physics', async () => {
@@ -6135,10 +6135,10 @@ test('ground_radial_installation_cost_guide KAZM 780kHz wavelength physics', asy
   // λ = 300000/780 = 384.615m; λ/4 = round(96.15) = 96m; λ/2 = round(192.3) = 192m
   assert.strictEqual(g.lambda_quarter_m, 96, 'λ/4 for 780kHz must be 96m');
   assert.strictEqual(g.lambda_half_m, 192, 'λ/2 for 780kHz must be 192m');
-  // Radial length: 0.35λ per §73.186 / NBS TN-24 = Math.round(384.615 × 0.35) = 135m
-  assert.strictEqual(g.radial_length_m, 135, 'radial_length_m must equal 0.35λ (135m per §73.186)');
+  // Radial length: 0.35λ per §73.189(b)(4) / NBS TN-24 = Math.round(384.615 × 0.35) = 135m
+  assert.strictEqual(g.radial_length_m, 135, 'radial_length_m must equal 0.35λ (135m per §73.189(b)(4))');
   // Total wire: 120 × 135 = 16200m
-  assert.strictEqual(g.total_wire_length_m, 16200, 'total wire length must be 120 × 135 = 16200m (0.35λ per §73.186)');
+  assert.strictEqual(g.total_wire_length_m, 16200, 'total wire length must be 120 × 135 = 16200m (0.35λ per §73.189(b)(4))');
 });
 
 test('ground_radial_installation_cost_guide NDA single-tower cost structure', async () => {
@@ -6169,7 +6169,7 @@ test('ground_radial_installation_cost_guide comparison table columns present', a
     assert.ok('gric_total_wire_m' in row, `rank ${row.rank} missing gric_total_wire_m`);
     assert.ok('gric_cost_typ_usd' in row, `rank ${row.rank} missing gric_cost_typ_usd`);
     assert.ok('gric_upgrade_cost_usd' in row, `rank ${row.rank} missing gric_upgrade_cost_usd`);
-    assert.strictEqual(row.gric_total_wire_m, 16200, `rank ${row.rank} total wire must be 16200m (120 × 135m = 0.35λ per §73.186)`);
+    assert.strictEqual(row.gric_total_wire_m, 16200, `rank ${row.rank} total wire must be 16200m (120 × 135m = 0.35λ per §73.189(b)(4))`);
     assert.ok(row.gric_cost_typ_usd > 0, `rank ${row.rank} typical cost must be positive`);
   }
 });
@@ -6868,9 +6868,9 @@ test('ground_lease_negotiation_guide recommended lease term is at least 20 years
 test('ground_lease_negotiation_guide ground radial radius matches frequency physics', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].ground_lease_negotiation_guide;
-  // At 780 kHz, 0.35λ = round2(300000/780 × 0.35) = round2(134.62) = 135m per §73.186 / NBS TN-24
+  // At 780 kHz, 0.35λ = round2(300000/780 × 0.35) = round2(134.62) = 135m per §73.189(b)(4) / NBS TN-24
   const expected_radial_m = Math.round(300000 / 780 * 0.35);
-  assert.strictEqual(g.ground_radial_radius_m, expected_radial_m, `radial radius must be 0.35λ ≈ ${expected_radial_m}m at 780 kHz per §73.186`);
+  assert.strictEqual(g.ground_radial_radius_m, expected_radial_m, `radial radius must be 0.35λ ≈ ${expected_radial_m}m at 780 kHz per §73.189(b)(4)`);
   assert.ok(g.min_site_area_acres > 0, 'min_site_area_acres must be positive');
 });
 
@@ -8249,7 +8249,7 @@ test('radial_system_engineering_guide wavelength and radial length', async () =>
   const lambda = 300000 / KAZM.frequency_khz;
   assert.ok(Math.abs(r.wavelength_m - lambda) < 1, 'wavelength must match 300000/freq_khz');
   assert.ok(r.optimum_radial_length_m > 0, 'optimum radial length must be positive');
-  assert.ok(r.optimum_radial_length_m < r.wavelength_m, 'radial length (0.35λ per §73.186) must be less than full wavelength');
+  assert.ok(r.optimum_radial_length_m < r.wavelength_m, 'radial length (0.35λ per §73.189(b)(4)) must be less than full wavelength');
   assert.ok(r.optimum_radial_length_ft > r.optimum_radial_length_m, 'ft must be greater than m');
 });
 
@@ -9676,8 +9676,8 @@ test('station_total_project_cost_pro_forma_guide tower height matches 780 kHz λ
   assert.strictEqual(g.tower_height_m, 144, 'tower_height_m must be 144 (3/8λ at 780 kHz)');
   assert.strictEqual(g.tower_height_ft, 473, 'tower_height_ft must be 473');
   assert.strictEqual(g.n_radials, 120, 'n_radials must be 120');
-  // Radial length: 0.35λ per §73.186 = Math.round(300000/780 × 0.35) = 135m
-  assert.strictEqual(g.radial_length_m, 135, 'radial_length_m must be 135 (0.35λ per §73.186)');
+  // Radial length: 0.35λ per §73.189(b)(4) = Math.round(300000/780 × 0.35) = 135m
+  assert.strictEqual(g.radial_length_m, 135, 'radial_length_m must be 135 (0.35λ per §73.189(b)(4))');
 });
 
 test('station_total_project_cost_pro_forma_guide contingency and subtotals consistent', async () => {
@@ -10410,8 +10410,8 @@ test('am_grounding_system_and_rf_safety_guide KAZM Class D ground system paramet
   assert.strictEqual(g.n_radials, 90, 'KAZM Class D clear-channel should use 90 radials');
   assert.strictEqual(g.n_tower_elements, 1, 'NDA station should have 1 tower element');
   assert.strictEqual(g.wire_gauge_awg, 10, '5 kW station should use #10 AWG wire');
-  // 780 kHz: 0.35λ = round2(384.62 × 0.35) = 134.62m per §73.186 / NBS TN-24
-  assert.ok(g.radial_length_m > 130 && g.radial_length_m < 140, `radial_length_m ${g.radial_length_m} should be ~134.62m (0.35λ per §73.186)`);
+  // 780 kHz: 0.35λ = round2(384.62 × 0.35) = 134.62m per §73.189(b)(4) / NBS TN-24
+  assert.ok(g.radial_length_m > 130 && g.radial_length_m < 140, `radial_length_m ${g.radial_length_m} should be ~134.62m (0.35λ per §73.189(b)(4))`);
   assert.ok(g.total_radial_length_m > 8000, `total_radial_length_m ${g.total_radial_length_m} should be >8000m`);
 });
 
@@ -12539,7 +12539,7 @@ test('KAZM ground system radial geometry', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_installation_and_maintenance_guide;
   assert.strictEqual(g.frequency_khz, 780, 'frequency_khz should be 780');
-  assert.strictEqual(g.radial_length_ft, 441.34, 'radial_length_ft should be 441.34 (0.35λ per §73.186)');
+  assert.strictEqual(g.radial_length_ft, 441.34, 'radial_length_ft should be 441.34 (0.35λ per §73.189(b)(4))');
   assert.strictEqual(g.recommended_radials, 120, 'NDA station should use 120 radials');
   assert.strictEqual(g.is_da, false, 'NDA pattern_mode should set is_da=false');
 });
@@ -12555,8 +12555,8 @@ test('KAZM ground system wire and labor costs', async () => {
 test('KAZM ground system total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_installation_and_maintenance_guide;
-  assert.strictEqual(g.total_low_usd,  43868.64,  'total_low_usd should be 43868.64 (0.35λ per §73.186)');
-  assert.strictEqual(g.total_high_usd, 202720.32, 'total_high_usd should be 202720.32 (0.35λ per §73.186)');
+  assert.strictEqual(g.total_low_usd,  43868.64,  'total_low_usd should be 43868.64 (0.35λ per §73.189(b)(4))');
+  assert.strictEqual(g.total_high_usd, 202720.32, 'total_high_usd should be 202720.32 (0.35λ per §73.189(b)(4))');
 });
 
 test('am_ground_system_installation_and_maintenance_guide comparison table columns present', async () => {
@@ -12567,8 +12567,8 @@ test('am_ground_system_installation_and_maintenance_guide comparison table colum
     assert.ok('gnd_recommended_radials' in row, 'gnd_recommended_radials missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.gnd_radial_length_ft,    441.34,   'rank-1 gnd_radial_length_ft should be 441.34 (0.35λ per §73.186)');
-  assert.strictEqual(r0.gnd_total_low_usd,        43868.64, 'rank-1 gnd_total_low_usd should be 43868.64 (0.35λ per §73.186)');
+  assert.strictEqual(r0.gnd_radial_length_ft,    441.34,   'rank-1 gnd_radial_length_ft should be 441.34 (0.35λ per §73.189(b)(4))');
+  assert.strictEqual(r0.gnd_total_low_usd,        43868.64, 'rank-1 gnd_total_low_usd should be 43868.64 (0.35λ per §73.189(b)(4))');
   assert.strictEqual(r0.gnd_recommended_radials,  120,      'rank-1 gnd_recommended_radials should be 120');
 });
 
@@ -13515,7 +13515,7 @@ test('KAZM NDA site requires 2 acres minimum', async () => {
   const g = out.candidates[0].am_real_estate_and_land_acquisition_guide;
   assert.strictEqual(g.isDA,      false, 'KAZM NDA so isDA should be false');
   assert.strictEqual(g.min_acres, 2,     'NDA requires 2 acres minimum');
-  assert.strictEqual(g.radial_ft, 441.34, 'KAZM radial_ft should be 441.34 (0.35λ per §73.186)');
+  assert.strictEqual(g.radial_ft, 441.34, 'KAZM radial_ft should be 441.34 (0.35λ per §73.189(b)(4))');
 });
 
 test('KAZM land purchase total cost', async () => {
@@ -13777,21 +13777,21 @@ test('KAZM 780 kHz radial design specifications', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_radial_design_guide;
   assert.strictEqual(g.wavelength_m,      384.35, 'KAZM wavelength_m should be 384.35');
-  assert.strictEqual(g.radial_length_ft,  441.34, 'KAZM radial_length_ft should be 441.34 (0.35λ per §73.186)');
+  assert.strictEqual(g.radial_length_ft,  441.34, 'KAZM radial_length_ft should be 441.34 (0.35λ per §73.189(b)(4))');
   assert.strictEqual(g.num_radials_ideal, 120,    'num_radials_ideal should be 120');
 });
 
 test('KAZM total radial wire length', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_radial_design_guide;
-  assert.strictEqual(g.total_radial_length_mi, 10.03, 'KAZM total_radial_length_mi should be 10.03 (120 × 0.35λ per §73.186)');
+  assert.strictEqual(g.total_radial_length_mi, 10.03, 'KAZM total_radial_length_mi should be 10.03 (120 × 0.35λ per §73.189(b)(4))');
 });
 
 test('KAZM ground system radial total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_radial_design_guide;
-  assert.strictEqual(g.total_low_usd,  12592.16, 'KAZM total_low_usd should be 12592.16 (0.35λ per §73.186)');
-  assert.strictEqual(g.total_high_usd, 32480.4,  'KAZM total_high_usd should be 32480.4 (0.35λ per §73.186)');
+  assert.strictEqual(g.total_low_usd,  12592.16, 'KAZM total_low_usd should be 12592.16 (0.35λ per §73.189(b)(4))');
+  assert.strictEqual(g.total_high_usd, 32480.4,  'KAZM total_high_usd should be 32480.4 (0.35λ per §73.189(b)(4))');
 });
 
 test('am_ground_system_radial_design_guide comparison table columns present', async () => {
@@ -13803,7 +13803,7 @@ test('am_ground_system_radial_design_guide comparison table columns present', as
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.grd_num_radials_ideal, 120,      'rank-1 grd_num_radials_ideal should be 120');
-  assert.strictEqual(r0.grd_radial_length_ft,  441.34,   'rank-1 grd_radial_length_ft should be 441.34 (0.35λ per §73.186)');
+  assert.strictEqual(r0.grd_radial_length_ft,  441.34,   'rank-1 grd_radial_length_ft should be 441.34 (0.35λ per §73.189(b)(4))');
   assert.strictEqual(r0.grd_total_low_usd,     12592.16, 'rank-1 grd_total_low_usd should be 12592.16 (120 × 0.35λ system)');
 });
 
@@ -14671,8 +14671,8 @@ it('am_broadcast_tower_grounding_and_cathodic_protection_guide is present on eac
 it('am_broadcast_tower_grounding_and_cathodic_protection_guide radial_length_m matches 0.35λ for 780 kHz', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_broadcast_tower_grounding_and_cathodic_protection_guide;
-  // 0.35λ at 780 kHz = 300000/780 × 0.35 ≈ 134.62 m per §73.186 / NBS TN-24
-  assert.ok(Math.abs(g.radial_length_m - 134.62) < 0.1, `radial_length_m ${g.radial_length_m} should be ~134.62m (0.35λ per §73.186)`);
+  // 0.35λ at 780 kHz = 300000/780 × 0.35 ≈ 134.62 m per §73.189(b)(4) / NBS TN-24
+  assert.ok(Math.abs(g.radial_length_m - 134.62) < 0.1, `radial_length_m ${g.radial_length_m} should be ~134.62m (0.35λ per §73.189(b)(4))`);
 });
 
 it('am_broadcast_tower_grounding_and_cathodic_protection_guide total_copper_wire_m = 120 × radial_length_m', async () => {
@@ -15098,9 +15098,9 @@ it('am_transmitter_site_lease_and_property_rights_guide is present on each candi
 it('am_transmitter_site_lease_and_property_rights_guide site_area_required_acres based on 0.35λ radial circle', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmitter_site_lease_and_property_rights_guide;
-  // 780 kHz: radial = 134.62 m (0.35λ per §73.186) → circle area + 20% > 5 acres
+  // 780 kHz: radial = 134.62 m (0.35λ per §73.189(b)(4)) → circle area + 20% > 5 acres
   assert.ok(g.site_area_required_acres > 5, 'site must be > 5 acres for 780 kHz ground system');
-  assert.ok(Math.abs(g.radial_length_m - 134.62) < 0.1, 'radial_length_m should be 0.35λ ≈ 134.62m per §73.186');
+  assert.ok(Math.abs(g.radial_length_m - 134.62) < 0.1, 'radial_length_m should be 0.35λ ≈ 134.62m per §73.189(b)(4)');
 });
 
 it('am_transmitter_site_lease_and_property_rights_guide lease_annual_low_usd > 0', async () => {
@@ -15855,10 +15855,10 @@ test('KAZM 780 kHz: quarter_wave_ft ≈ 315 ft physics reference and min_site_ra
   const g = out.candidates[0].am_ground_radial_system_design_guide;
   assert.ok(g.quarter_wave_ft > 300 && g.quarter_wave_ft < 330,
     `quarter_wave_ft (λ/4 physics ref) should be ~315 ft for 780 kHz, got ${g.quarter_wave_ft}`);
-  // 0.35λ at 780 kHz = 134.62m ≈ 441 ft per §73.186 / NBS TN-24 (standard radial length)
+  // 0.35λ at 780 kHz = 134.62m ≈ 441 ft per §73.189(b)(4) / NBS TN-24 (standard radial length)
   assert.ok(g.standard_radial_ft > 430 && g.standard_radial_ft < 460,
     `standard_radial_ft should be ~441 ft (0.35λ) for 780 kHz, got ${g.standard_radial_ft}`);
-  assert.strictEqual(g.min_site_radius_ft, g.standard_radial_ft, 'min_site_radius_ft must equal standard_radial_ft (0.35λ per §73.186)');
+  assert.strictEqual(g.min_site_radius_ft, g.standard_radial_ft, 'min_site_radius_ft must equal standard_radial_ft (0.35λ per §73.189(b)(4))');
   assert.strictEqual(g.n_radials_full, 120, 'n_radials_full must be 120');
   assert.strictEqual(g.n_radials_economy, 60, 'n_radials_economy must be 60');
 });
@@ -17227,10 +17227,10 @@ test('#107 KAZM: ground radial guide present with correct shape', async () => {
 test('#107 radial length equals 0.35λ for station frequency', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const grs = out.candidates[0].am_ground_radial_system_cost_and_specification_guide;
-  // radial_length_m = round2(300000/freq × 0.35) per §73.186 / NBS TN-24; allow ±0.5m for rounding
+  // radial_length_m = round2(300000/freq × 0.35) per §73.189(b)(4) / NBS TN-24; allow ±0.5m for rounding
   const expected = (300000 / KAZM.frequency_khz) * 0.35;
   assert.ok(Math.abs(grs.radial_length_m - expected) <= 0.5,
-    `radial_length_m ${grs.radial_length_m}m must be within 0.5m of ${expected.toFixed(2)}m (0.35λ per §73.186)`);
+    `radial_length_m ${grs.radial_length_m}m must be within 0.5m of ${expected.toFixed(2)}m (0.35λ per §73.189(b)(4))`);
 });
 
 test('#107 optimum config has more radials and better efficiency than economy', async () => {
