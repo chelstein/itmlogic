@@ -7117,7 +7117,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // 12. Construction completion and license-to-cover deadline
       const i12 = item('construction_deadline', 'CP construction completion and Form 302-AM deadline', '47 CFR §73.3598', 'WARN',
-        'FCC Construction Permits expire 3 years from grant per §73.3598(a); routine extensions are not available — the period tolls only for the specific events in §73.3598(b). License to Cover (Form 302-AM, §73.3536) must be filed within 10 days of commencing program tests (§73.1620(c)).',
+        'FCC Construction Permits expire 3 years from grant per §73.3598(a); routine extensions are not available — the period tolls only for the specific events in §73.3598(b). License to Cover (Form 302-AM, §73.3536) must be filed within 10 days of commencing program tests for NDA stations (§73.1620(a)(1)); DA stations must file the license application with DA proof BEFORE program tests (§73.1620(a)(2)).',
         'Develop construction schedule immediately upon CP grant. If a §73.3598(b) tolling event (litigation, international coordination, act of God) occurs, notify the FCC promptly — an unbuilt CP forfeits automatically at expiration (§73.3598(e)).');
 
       const items_rc = [i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12];
@@ -7908,7 +7908,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //     There is NO routine good-cause extension for full-service stations —
       //     only the §73.3598(b) tolling events pause the clock.
       //   License to Cover — FCC Form 302-AM (§73.3536) must be filed before CP
-      //     expiration; §73.1620(c) requires the license application within
+      //     expiration; §73.1620(a)(1) requires the license application within
       //     10 days of commencing program tests.
       //
       // Construction "substantially started" = major construction contracts signed
@@ -7979,7 +7979,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Form 302-AM "License to Cover" filing deadline
       // Must be filed before CP expiration (§73.3536); for a standard 3-year CP
-      // that is 36 months from grant. §73.1620(c) additionally requires the
+      // that is 36 months from grant. §73.1620(a)(1) additionally requires the
       // license application within 10 days of commencing program tests.
       const ltc_deadline_months = 36;  // bounded by 3-year CP expiration
 
@@ -7988,7 +7988,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { event: 'CP granted by FCC', month: 0, note: '3-year clock starts on grant date' },
         { event: 'Substantial construction started (contracts signed, major work begun)', month_low: 6, month_high: 18, note: 'Must begin before expiration; establishes good-faith record' },
         { event: 'Construction complete; antenna on-air for testing', month_low: 12, month_high: 30, note: 'Proof of performance field measurements begin' },
-        { event: 'Form 302-AM (License to Cover) must be filed', month: ltc_deadline_months, note: `§73.3536: file before CP expiration (§73.1620(c): within 10 days of starting program tests); contains proof-of-performance results` },
+        { event: 'Form 302-AM (License to Cover) must be filed', month: ltc_deadline_months, note: `§73.3536: file before CP expiration (§73.1620(a)(1): within 10 days of starting program tests for NDA; DA must file before tests); contains proof-of-performance results` },
         { event: 'CP expiration — automatic forfeiture if unbuilt (§73.3598(e))', month: cp_term_months, note: `${cp_term_years}-year standard term per §73.3598(a); no routine extensions — only §73.3598(b) tolling events pause the clock` }
       ];
 
@@ -8016,7 +8016,7 @@ async function scoreCandidate(pt, ctx, warnings){
         milestones,
         complexity_risk,
         risk_rationale,
-        reference: '47 CFR §73.3598 (CP term, tolling); §73.3598(a) (3-year term); §73.3598(b) (tolling); §73.3536 (license to cover); §73.1620(c) (program tests); FCC Form 302-AM instructions',
+        reference: '47 CFR §73.3598 (CP term, tolling); §73.3598(a) (3-year term); §73.3598(b) (tolling); §73.3536 (license to cover); §73.1620(a) (program tests); FCC Form 302-AM instructions',
         note: `Class ${fcc_class} CP: ${cp_term_years}-year standard term. LtC (Form 302-AM) due by month ${ltc_deadline_months}. Timeline risk: ${complexity_risk}. ${risk_rationale}`
       };
     })(),
@@ -21527,7 +21527,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const silent_days_auto_allowed  = 10;     // §73.1740: no authorization needed up to 10 days
       const silent_months_sta_trigger  = 1;      // STA recommended if silence will exceed 30 days
-      const silent_months_forfeiture   = 12;     // §73.1740(a)(1): forfeiture after 12 months silent
+      const silent_months_forfeiture   = 12;     // §73.1740(c) / 47 U.S.C. §312(g): license expires after 12 consecutive months silent
 
       // Estimate construction silence duration based on DA/NDA and class
       // DA stations take longer because array phasing and proof are complex
@@ -29077,7 +29077,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // only §73.3598(b) tolling events pause the clock; an unbuilt CP forfeits
       // automatically at expiration (§73.3598(e)).
       const cp_term_years  = 3;
-      const ltc_days_after = 10;    // §73.1620(c): license application within 10 days of commencing program tests
+      const ltc_days_after = 10;    // §73.1620(a)(1): license application within 10 days of commencing program tests (NDA)
       const ltc_grace_days = 180;   // FCC informal policy: up to 180-day STA may bridge if LTC delayed
 
       // ---- Form 302-AM requirements (License-to-Cover) ----

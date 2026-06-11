@@ -6296,7 +6296,7 @@ test('fcc_silent_station_authorization_guide presence and structure', async () =
   assert.strictEqual(g.frequency_khz, 780, 'frequency_khz mismatch');
   assert.strictEqual(g.fcc_class, 'D', 'fcc_class mismatch');
   assert.strictEqual(g.silent_days_auto_allowed, 10, 'auto-allowed silent days must be 10 (§73.1740)');
-  assert.strictEqual(g.silent_months_forfeiture, 12, 'forfeiture trigger must be 12 months (§73.1740(a)(1))');
+  assert.strictEqual(g.silent_months_forfeiture, 12, 'license expires after 12 consecutive silent months (§73.1740(c) / 47 U.S.C. §312(g))');
   assert.strictEqual(g.sta_cfr, '47 CFR §73.1635', 'STA CFR must reference §73.1635');
 });
 
