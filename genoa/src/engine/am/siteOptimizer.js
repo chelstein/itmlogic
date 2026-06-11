@@ -21326,14 +21326,16 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Class B/C: protected to 2 mV/m daytime contour
       //   Class D: may not cause interference to Class A/B/C co-channel stations
       //
-      // §73.207 Minimum distance separation requirements (adjacent/second-adj channel):
+      // §73.37 Minimum distance separation requirements for AM (short-spacing table):
       //   Provides lookup table of minimum km separation by class pair
       //   First-adjacent (±10 kHz): ~50% of co-channel separation
       //   Second-adjacent (±20 kHz): ~25% of co-channel separation
+      //   (§73.207 is the FM distance separation rule — not applicable to AM)
       //
-      // §73.209 Protection of dominant stations from short-spaced applications:
-      //   Short-spaced stations may coexist if: new station does not increase interference to
-      //   protected contours of dominant stations; requires detailed interference analysis
+      // §73.182 Protection of dominant AM stations from short-spaced applicants:
+      //   Short-spaced AM stations may coexist only if the new station does not increase interference
+      //   to protected contours of dominant stations; requires NIF analysis per §73.182.
+      //   (§73.209 is the FM short-spacing protection rule — not applicable to AM)
       //
       // D/U protection ratios for AM (engineering practice; ITU-R BS.560):
       //   Co-channel (0 kHz offset):    D/U ≥ 20 dB at protected contour (10:1 field ratio)
@@ -21409,7 +21411,7 @@ async function scoreCandidate(pt, ctx, warnings){
         coordination_steps:          COORD_STEPS,
         interference_analysis_required: true,
         form_exhibit_required:       true,
-        reference: '47 CFR §73.182 (dominant station protection); §73.207 (minimum separation); §73.209 (short-spacing); §73.24(b) (clear channels); §73.525 (engineering agreements); ITU-R BS.560',
+        reference: '47 CFR §73.182 (dominant station protection / NIF analysis); §73.37 (AM minimum distance separations); §73.24(b) (clear channels); §73.525 (engineering agreements); ITU-R BS.560',
         note: `${frequency_khz} kHz ${channel_type} channel, Class ${fcc_class}${is_secondary_on_clear ? ' (SECONDARY on clear channel — must protect Class A dominant)' : ''}. D/U ratios: co-channel ≥20 dB, 1st-adj ≥6 dB, 2nd-adj ≥0 dB. ${COORD_STEPS.length} coordination steps required. ${skywave_protection_required ? 'Night-time skywave protection required (Class A dominant).' : is_secondary_on_clear ? 'Night-time skywave: secondary status; must not increase Class A interference.' : 'Night-time: not a clear channel dominant.'}`
       };
     })(),
@@ -22128,7 +22130,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'INTERFERENCE',     label: 'Interference analysis', cfr: '§73.182', required: true, note: 'Must show no new objectionable interference to all co-channel and adjacent-channel stations' },
         { id: 'DA_PATTERN',       label: 'DA horizontal radiation pattern table', cfr: '§73.150(a)', required: isDA_lm, note: 'Normalized relative field values at 5° increments (72 radials, 0°–355°) per §73.150(a) / Form 301-AM; day and night patterns separately' },
         { id: 'ANTENNA_EFF',      label: 'Antenna efficiency and ground system data', cfr: '§73.190; §73.24', required: true, note: 'Ground system parameters; predicted efficiency factor used in power/contour calculations' },
-        { id: 'TOWER_HEIGHT',     label: 'Tower height (AGL/AMSL) and structural data', cfr: '§73.1560; §17.7', required: true, note: 'Height of antenna structure above ground level and above mean sea level' },
+        { id: 'TOWER_HEIGHT',     label: 'Tower height (AGL/AMSL) and structural data', cfr: '§17.7 (ASR trigger: 60.96 m AGL); §73.685 (licensed height)', required: true, note: 'Height of antenna structure above ground level (for ASR) and above mean sea level (for RCAMSL)' },
         { id: 'FAA_CLEARANCE',    label: 'FAA Form 7460-1 or FAA determination', cfr: '§17.7; §17.23', required: true, note: 'Required for any structure > 61m AGL; FAA determination must be attached to LMS filing' },
         { id: 'ENVIRONMENTAL',    label: 'EA or categorical exclusion finding', cfr: '§1.1301–§1.1319', required: true, note: 'Most AM tower relocations qualify for categorical exclusion; full EA required if in floodplain, wetland, etc.' },
         { id: 'ASR_NUMBER',       label: 'FCC ASR registration number', cfr: '§17.7', required: true, note: 'Tower > 60.96m AGL must be registered in FCC Antenna Structure Registration system before CP grant' },
@@ -23123,8 +23125,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
     asr_registration_update_guide: (() => {
       // §17.7: FCC Antenna Structure Registration (ASR) — mandatory for towers that meet height/location thresholds
-      // §17.7(a): Any tower that exceeds 60.96 m (200 ft) AMSL OR is within a 3-mile radius of an airport
-      //   must be registered with the FCC's ASR database before construction.
+      // §17.7(a): Any tower that exceeds 60.96 m (200 ft) AGL (above ground level) OR is within a 3-nautical-mile
+      //   radius of an airport (or 1 nmi of a heliport) must be registered in the FCC's ASR database.
       // §17.7(b): Towers in certain sensitive areas (near airports) have lower registration thresholds.
       // §17.4: Structures meeting §17.7 height/proximity thresholds must be registered in the ASR
       //   database before construction. FCC Form 301-AM requires the ASR number on Exhibit A.
@@ -23141,7 +23143,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const three_eights_m_asr = round2(wavelength_m_asr * h_frac_asr);  // class-dependent design height (3/8λ for C/D)
       const quarter_wave_m_asr = round2(wavelength_m_asr * 0.25);
 
-      // ASR registration threshold: 60.96 m (200 ft) AMSL
+      // ASR registration threshold: 60.96 m (200 ft) AGL (above ground level — §17.7(a))
       const ASR_HEIGHT_THRESHOLD_M = 60.96;
       const asr_required_by_height = three_eights_m_asr > ASR_HEIGHT_THRESHOLD_M;
       // Airport proximity: would need actual airport database lookup; flag as "evaluate"
@@ -23888,7 +23890,7 @@ async function scoreCandidate(pt, ctx, warnings){
         candidate_primary_reach_km: primaryReach_km,
         sideband_rolloff: SIDEBAND_ROLLOFF,
         assessment_notes: ASSESSMENT_NOTES,
-        reference: '47 CFR §73.182(b) Table 1; §73.207; FCC AM Query (query.fcc.gov); ITU AM Bandwidth Spec',
+        reference: '47 CFR §73.182(b) Table 1; §73.37 (AM minimum distance separations); FCC AM Query (query.fcc.gov); ITU AM Bandwidth Spec',
         note: `${frequency_khz} kHz Class ${fcc_class}. Adj-10 D/U: ${DU_10KHZ_DB} dB. Adj-20 D/U: ${DU_20KHZ_DB} dB. ${ADJACENT_CHANNELS.length} adjacent channels to check.`
       };
     })(),
@@ -24172,7 +24174,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
     // DA array physical design guide.
     // Covers multi-element array configurations, element spacing, amplitude/phase ratios,
-    // mutual coupling correction, suppression ratio mechanics (§73.207/§73.215),
+    // mutual coupling correction, suppression ratio mechanics (§73.182 NIF; §73.207/§73.215 are FM rules),
     // Form 301-AM engineering exhibits (§73.150(a) 72-radial HRP), and base current monitoring (§73.61).
     // Distinct from antenna_pattern_optimization_guide (COL bearing / whether DA is needed).
     da_array_design_guide: (() => {
@@ -24276,9 +24278,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const minElements_da  = isClear_da ? 3 : 2;
       const recConfig_da    = arrayConfigs.find(c => c.n_elements === minElements_da) ?? arrayConfigs[0];
 
-      // §73.207 co-channel D/U protection implies a suppression ratio requirement.
+      // §73.182 co-channel D/U protection implies a suppression ratio requirement for AM DA stations.
       // The ratio 1/26 ≈ −28.3 dB is the minimum separation between the interfering
       // station's EF at the victim's protected contour and the victim's own field.
+      // (§73.207 is the FM minimum-distance rule; §73.182 governs AM co-channel D/U.)
       // Actual required suppression from NIF analysis (§73.182) will vary by case.
       const SUPP_REQ_DB_da = 28.3;
 
@@ -24327,12 +24330,12 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         array_configurations: arrayConfigs,
         suppression_requirement_db: SUPP_REQ_DB_da,
-        suppression_note: `§73.207/§73.215: suppression ratio of ≥${SUPP_REQ_DB_da} dB toward interfered-with co-channel protected contours. Actual required suppression from §73.182 NIF analysis may be higher.`,
+        suppression_note: `§73.182 NIF analysis governs AM DA suppression: ≥${SUPP_REQ_DB_da} dB toward interfered-with co-channel protected contours. Actual required suppression from §73.182 NIF analysis may be higher. (§73.207/§73.215 are FM rules, not applicable to AM.)`,
         n_hrp_radials: 72,
         hrp_increment_deg: 5,
         form_301am_exhibits: formExhibits,
         base_current_monitoring: baseCurrentMonitoring_da,
-        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N); §73.207 (co-channel D/U protection); §73.61 (base current monitoring); §73.182 (NIF analysis); §73.154 (proof of performance)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N); §73.182 (AM NIF analysis / co-channel D/U protection); §73.61 (base current monitoring); §73.154 (proof of performance)',
         note: 'DA array element positions, amplitude ratios, and phase angles are engineering estimates for screening purposes. Actual design requires a licensed broadcast engineer, full mutual impedance matrix computation, and §73.182 NIF analysis. Proof-of-performance field measurements per §73.154 required before FCC issues license to cover (Form 302-AM).'
       };
     })(),
@@ -25101,7 +25104,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // D/U ratio framework for co-channel AM interference assessment
       // FCC uses D/U = desired-to-undesired field strength ratio
       // §73.182(j): for AM, protection is skywave to skywave (1% of nights, 50% of locations)
-      // §73.207: minimum D/U for co-channel is determined by class pair spacing tables
+      // §73.37: AM minimum distance separation table (co-channel and adjacent-channel class pairs)
+      // (§73.207 is the FM minimum distance table — not applicable to AM)
       // Daytime groundwave D/U reference: 20 dB minimum for protected service (§73.182)
 
       const DU_DAYTIME_MIN_DB_cc   = 26;  // dB — daytime co-channel D/U (§73.182(r): 20:1)
@@ -25180,7 +25184,7 @@ async function scoreCandidate(pt, ctx, warnings){
         propagation_factors:  propagationFactors,
         mitigation_strategies: mitigationStrategies.filter(m => m.applicable),
         n_applicable_mitigations: mitigationStrategies.filter(m => m.applicable).length,
-        reference: '47 CFR §73.182; §73.207; §73.37; §73.404(c); FCC OET Bulletin 69',
+        reference: '47 CFR §73.182; §73.37 (AM minimum distance separations); §73.404(c); FCC OET Bulletin 69',
         note: `D/U budget framework for co-channel interference assessment at ${frequency_khz} kHz. Required co-channel spacing: ${requiredCcSpacingKm} km for Class ${fcc_class}. NIF study: ${nifRequired ? nifStudyType : 'NOT REQUIRED'}.`
       };
     })(),
@@ -25212,7 +25216,7 @@ async function scoreCandidate(pt, ctx, warnings){
           milestones: [
             { id: 'spacing_study',    task: '§73.37 spacing analysis (all channels)', days: 10, rule: '§73.37', note: 'Must clear co-channel, first-adjacent, and second-adjacent for all class pairs.' },
             { id: 'nif_study',        task: `§73.182 NIF study (${isClear_cpt ? 'clear channel' : 'regional'})`, days: isClear_cpt ? 30 : 15, rule: '§73.182', note: 'Skywave NIF must cover all domestic and international stations within protection distance.' },
-            { id: 'da_pattern',       task: isDA_cpt ? 'Directional antenna pattern design + §73.150(a) HRP (72 radials)' : 'Non-directional antenna design', days: isDA_cpt ? 21 : 7, rule: '§73.150', note: isDA_cpt ? '72-radial HRP at 5° increments per §73.150(a); suppression ≥ 28.3 dB per §73.207.' : 'Non-DA antenna design simpler but confirm vertical radiation pattern.' },
+            { id: 'da_pattern',       task: isDA_cpt ? 'Directional antenna pattern design + §73.150(a) HRP (72 radials)' : 'Non-directional antenna design', days: isDA_cpt ? 21 : 7, rule: '§73.150', note: isDA_cpt ? '72-radial HRP at 5° increments per §73.150(a); suppression ≥ 28.3 dB per §73.182 NIF analysis. (§73.207 is the FM D/U rule; not applicable to AM.)' : 'Non-DA antenna design simpler but confirm vertical radiation pattern.' },
             { id: 'coverage_map',     task: '§73.183 coverage map (groundwave contour)', days: 7, rule: '§73.183', note: 'Required Schedule D exhibit for Form 301-AM.' },
             { id: 'env_assessment',   task: 'Environmental assessment (§1.1301–§1.1319)', days: 14, rule: '§1.1301', note: 'Required for towers > 450 ft AGL or in environmentally sensitive areas.' },
             { id: 'asr_filing',       task: 'ASR registration (FCC Form 854)', days: 7, rule: '§17.7', note: 'Required for structures ≥ 61m AGL. Must be registered before CP issuance.' }
@@ -33562,7 +33566,7 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
       description: 'File theoretical horizontal radiation pattern table per §73.150(a) / Form 301-AM',
       status: 'REQUIRED',
       rule: '47 CFR §73.150(a)',
-      note: 'Theoretical HRP: 72 radials at 5° increments (0°–355°) per §73.150(a). Measured proof per §73.154: all DA-authorized azimuths + verification radials. Suppression ratios must satisfy §73.207/§73.215 D/U protection.'
+      note: 'Theoretical HRP: 72 radials at 5° increments (0°–355°) per §73.150(a). Measured proof per §73.154: all DA-authorized azimuths + verification radials. Suppression ratios must satisfy §73.182 NIF D/U protection requirements. (§73.207/§73.215 are FM rules — not applicable to AM.)'
     });
   }
 
