@@ -11969,7 +11969,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   • Table of relative field values at 5° increments (72 radials) filed with Form 301-AM
       //   • Pattern must be designed by a licensed Professional Engineer
       //
-      // §73.68(c) waiver: available for emergency operations; station may operate non-directional
+      // §73.62(c): after a minor parameter variation, the licensee has 24 hours to measure
+      // all monitoring points; if they remain within limits, operation may continue up to
+      // 30 days before an STA must be filed. Substantial variance: terminate within
+      // 3 minutes unless power is reduced (§73.62(b)). Station may operate non-directional
       //   at authorized NDA power (not to exceed licensed DA power) for up to 10 days without FCC
       //   approval; beyond 10 days requires STA.
       //
@@ -11993,7 +11996,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const ratio_tolerance_pct  = 5;    // §73.62(a) — ±5% of licensed sample current ratio
       const proof_radials        = 72;   // §73.154(a)
       const proof_increment_deg  = 9;    // 360/72 = 5° intervals; §73.154 says 0 through 355° at 5°... adjusted per rule
-      const emergency_nda_days   = 10;   // §73.68(c) — up to 10 days without STA
+      const emergency_nda_days   = 30;   // §73.62(c) — up to 30 days before STA must be filed (minor variation, monitor points in limits)
 
       let monitor_low_usd     = 0, monitor_high_usd     = 0;
       let calibration_low_usd = 0, calibration_high_usd = 0;
@@ -12033,7 +12036,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_da_high_usd,
         reference: '47 CFR §73.55 (DA logging); §73.62(a) (current ratio ±5% / phase ±3°); §73.68 (sampling systems); §73.154(a) (DA proof of performance); §73.150(a) (horizontal pattern — 72 radials at 5°)',
         note: isDA
-          ? `DA station (${pattern_mode}): phase tolerance ±${phase_tolerance_deg}°, ratio tolerance ±${ratio_tolerance_pct}% per §73.62(a). ${proof_radials}-radial proof required per §73.154(a). Emergency NDA allowed ≤${emergency_nda_days} days without STA (§73.68(c)). Total first-year DA compliance: $${total_da_low_usd.toLocaleString()}–$${total_da_high_usd.toLocaleString()}.`
+          ? `DA station (${pattern_mode}): phase tolerance ±${phase_tolerance_deg}°, ratio tolerance ±${ratio_tolerance_pct}% per §73.62(a). ${proof_radials}-radial proof required per §73.154(a). Out-of-tolerance operation: ≤${emergency_nda_days} days before STA required (§73.62(c); substantial variance must terminate in 3 min per §73.62(b)). Total first-year DA compliance: $${total_da_low_usd.toLocaleString()}–$${total_da_high_usd.toLocaleString()}.`
           : `NDA station (${pattern_mode}): no DA phase/ratio monitoring required. DA-specific compliance cost = $0.`
       };
     })(),
