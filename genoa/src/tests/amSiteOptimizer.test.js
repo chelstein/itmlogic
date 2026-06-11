@@ -15362,11 +15362,11 @@ it('am_remote_control_and_unattended_operation_guide is present and non-null for
   }
 });
 
-it('KAZM operator response time and RC accuracy per §73.1300 and §73.1400', async () => {
+it('KAZM corrective-action window and instrument accuracy per §73.1350(c) and §73.1215', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_remote_control_and_unattended_operation_guide;
-  assert.strictEqual(g.operator_response_time_hrs, 2, '§73.1300 requires operator response within 2 hours');
-  assert.strictEqual(g.rc_accuracy_pct, 2.0, '§73.1400(b) remote control readings must be within ±2%');
+  assert.strictEqual(g.operator_response_time_hrs, 3, '§73.1350(c): correct or terminate within 3 hours');
+  assert.strictEqual(g.rc_accuracy_pct, 2.0, '§73.1215: indicating instruments accurate to 2% of full scale');
   assert.strictEqual(g.rc_must_control_power, true, 'remote control must include power on/off');
   assert.strictEqual(g.rc_must_monitor_antenna, true, 'remote control must include antenna current monitoring');
 });

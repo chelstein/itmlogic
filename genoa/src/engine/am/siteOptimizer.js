@@ -10735,7 +10735,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Regulatory framework:
       //   47 CFR §73.1300: Unattended operation of broadcast stations.
       //   §73.1400: Remote control operation — general requirements.
-      //   §73.1410: Remote control system specifications.
+      //   §73.1350: Transmission system operation — corrective action / termination duties.
       //   §73.1350: Transmitter control and monitoring (antenna monitor, modulation monitor, power meter).
       //
       // §73.1300 — Unattended operation:
@@ -10801,14 +10801,14 @@ async function scoreCandidate(pt, ctx, warnings){
       const cellular_coverage_likely = true;    // Sedona/AZ area has good coverage
 
       // Response time standard per §73.1300:
-      const operator_response_time_hrs = 2;
+      const operator_response_time_hrs = 3;  // §73.1350(c): correct or terminate within 3 hours (3 minutes where interference is caused)
 
       // Remote control capabilities required per §73.1400:
       const rc_must_control_power     = true;   // on/off + power reduction
       const rc_must_monitor_antenna   = true;   // base current or TPO ±2%
       const rc_must_monitor_modulation = true;  // modulation monitor data
       const rc_da_antenna_monitor     = isDA_rc;  // DA stations: additional antenna monitor
-      const rc_accuracy_pct           = 2.0;    // §73.1400(b): readings within ±2%
+      const rc_accuracy_pct           = 2.0;    // §73.1215: indicating instruments accurate to 2% of full scale
 
       // Logging requirement per §73.1820(a):
       const log_min_frequency         = 'daily';   // at minimum once per day
@@ -10859,8 +10859,8 @@ async function scoreCandidate(pt, ctx, warnings){
         install_high_usd,
         total_rc_low_usd,
         total_rc_high_usd,
-        reference: '47 CFR §73.1300 (unattended operation — 2-hour operator response); §73.1400 (remote control requirements); §73.1410 (remote control system specs); §73.1350 (transmitter control and monitoring); §73.1820(a) (daily log requirement); §73.69 (antenna monitors); §73.61 (DA field strength measurements)',
-        note: `Remote control ${remote_required ? 'RECOMMENDED' : 'OPTIONAL'} for site ${round2(dist_km)} km from current location. Required capabilities: transmitter on/off, TPO/antenna current monitoring (±${rc_accuracy_pct}%), modulation monitoring.${isDA_rc ? ` DA station (${pattern_mode}): antenna monitor data channel required per §73.69.` : ''} Operator must respond within ${operator_response_time_hrs} hours per §73.1300. Preferred connection: ${preferred_connection}. POTS line-based legacy remote control: high risk in rural AZ. Log minimum: ${log_min_frequency}.`
+        reference: '47 CFR §73.1300 (unattended operation); §73.1400 (transmission system monitoring); §73.1350 (transmission system operation — corrective action within 3 hours, 3 minutes where interference); §73.1215 (instrument accuracy 2%); §73.1820(a) (daily log requirement); §73.69 (antenna monitors); §73.61 (DA field strength measurements)',
+        note: `Remote control ${remote_required ? 'RECOMMENDED' : 'OPTIONAL'} for site ${round2(dist_km)} km from current location. Required capabilities: transmitter on/off, TPO/antenna current monitoring (±${rc_accuracy_pct}%), modulation monitoring.${isDA_rc ? ` DA station (${pattern_mode}): antenna monitor data channel required per §73.69.` : ''} Out-of-tolerance operation must be corrected or terminated within ${operator_response_time_hrs} hours per §73.1350(c) (3 minutes where interference is caused). Preferred connection: ${preferred_connection}. POTS line-based legacy remote control: high risk in rural AZ. Log minimum: ${log_min_frequency}.`
       };
     })(),
 
@@ -15665,7 +15665,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const monitor_cost_low_usd  = is_class_a ? 6000  : 3000;
       const monitor_cost_high_usd = is_class_a ? 15000 : 8000;
 
-      // §73.1400 / §73.1410: remote control and automatic transmission system (ATS)
+      // §73.1400: transmission system monitoring (attended/unattended, ATS)
       const remote_control_low_usd  = 2000;
       const remote_control_high_usd = 6000;
 
@@ -15708,7 +15708,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_monitoring_high_usd,
         log_interval_min,
         readings_per_day,
-        reference: '47 CFR §73.1215 (modulation monitor); §73.1820 (station logs); §73.1400 (remote control); §73.1410 (automatic transmission systems)',
+        reference: '47 CFR §73.1215 (indicating instruments); §73.1820 (station logs); §73.1400 (transmission system monitoring, incl. ATS)',
         note: `Class ${fcc_class} ${tpo_kw} kW station: ${monitor_type} modulation monitor $${monitor_cost_low_usd.toLocaleString()}–$${monitor_cost_high_usd.toLocaleString()}; remote control $${remote_control_low_usd.toLocaleString()}–$${remote_control_high_usd.toLocaleString()}; total monitoring system $${total_monitoring_low_usd.toLocaleString()}–$${total_monitoring_high_usd.toLocaleString()}; log every ${log_interval_min} min (${readings_per_day} readings/day)`
       };
     })(),
