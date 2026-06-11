@@ -9771,8 +9771,8 @@ test('fcc_form_301_exhibit_checklist_guide KAZM NDA has 0 DA-specific exhibits',
 test('fcc_form_301_exhibit_checklist_guide KAZM 780 kHz ASR required (tower > 61m)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].fcc_form_301_exhibit_checklist_guide;
-  assert.strictEqual(g.asr_required, true, 'ASR required for 96m tower (> 61m threshold)');
-  assert.strictEqual(g.tower_height_ft, 315, 'tower must be 315 ft (λ/4 at 780 kHz)');
+  assert.strictEqual(g.asr_required, true, 'ASR required for 144m tower (> 61m threshold)');
+  assert.strictEqual(g.tower_height_ft, 473, 'tower must be 473 ft (3/8λ at 780 kHz Class D)');
 });
 
 test('fcc_form_301_exhibit_checklist_guide deficiency triggers populated', async () => {
@@ -12676,10 +12676,10 @@ test('am_tower_lighting_and_aviation_compliance_guide present on KAZM candidate'
 test('KAZM tower height and FAA notice requirement', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
-  assert.strictEqual(g.tower_height_m,    96.09,  'KAZM 780 kHz Class D tower should be 96.09 m (λ/4)');
-  assert.strictEqual(g.tower_height_ft,   315.26, 'KAZM tower should be 315.26 ft');
-  assert.strictEqual(g.needs_faa_notice,  true,   '315 ft tower requires FAA notice');
-  assert.strictEqual(g.needs_asr,         true,   '315 ft tower requires ASR registration');
+  assert.strictEqual(g.tower_height_m,    144.13, 'KAZM 780 kHz Class D tower should be 144.13 m (3/8λ)');
+  assert.strictEqual(g.tower_height_ft,   472.87, 'KAZM tower should be 472.87 ft');
+  assert.strictEqual(g.needs_faa_notice,  true,   '472 ft tower requires FAA notice');
+  assert.strictEqual(g.needs_asr,         true,   '472 ft tower requires ASR registration');
 });
 
 test('KAZM tower lighting type and costs', async () => {
@@ -12705,7 +12705,7 @@ test('am_tower_lighting_and_aviation_compliance_guide comparison table columns p
     assert.ok('lit_lighting_type'         in row, 'lit_lighting_type missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.lit_tower_height_ft,       315.26,                       'rank-1 lit_tower_height_ft should be 315.26');
+  assert.strictEqual(r0.lit_tower_height_ft,       472.87,                       'rank-1 lit_tower_height_ft should be 472.87');
   assert.strictEqual(r0.lit_total_install_low_usd,  6125,                         'rank-1 lit_total_install_low_usd should be $6,125');
   assert.strictEqual(r0.lit_lighting_type,          'medium_intensity_white_or_red', 'rank-1 lit_lighting_type mismatch');
 });
@@ -12984,8 +12984,9 @@ test('am_financial_feasibility_and_roi_guide present on KAZM candidate', async (
 test('KAZM financial capital cost components', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
-  assert.strictEqual(g.tower_cap_low,   60000,  '315 ft tower low should be $60,000');
-  assert.strictEqual(g.tower_cap_high,  180000, '315 ft tower high should be $180,000');
+  // 3/8λ at 780 kHz = 472.87 ft → falls in 400–600 ft bracket
+  assert.strictEqual(g.tower_cap_low,   150000, '472 ft tower (3/8λ) low should be $150,000');
+  assert.strictEqual(g.tower_cap_high,  400000, '472 ft tower (3/8λ) high should be $400,000');
   assert.strictEqual(g.tx_low,          20000,  '5 kW transmitter low should be $20,000');
   assert.strictEqual(g.gnd_low,         20000,  'ground system low should be $20,000');
 });
@@ -12993,8 +12994,10 @@ test('KAZM financial capital cost components', async () => {
 test('KAZM total capital cost range', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
-  assert.strictEqual(g.total_capital_low,  150000, 'total_capital_low should be $150,000');
-  assert.strictEqual(g.total_capital_high, 510000, 'total_capital_high should be $510,000');
+  // tower=150000 + gnd=20000 + tx=20000 + soft=30000 + site=20000 = 240000
+  // tower=400000 + gnd=80000 + tx=70000 + soft=100000 + site=80000 = 730000
+  assert.strictEqual(g.total_capital_low,  240000, 'total_capital_low should be $240,000');
+  assert.strictEqual(g.total_capital_high, 730000, 'total_capital_high should be $730,000');
 });
 
 test('KAZM simple payback years', async () => {
@@ -15575,19 +15578,19 @@ test('am_site_environmental_impact_and_permitting_guide is present on every cand
   }
 });
 
-test('KAZM tower_height_ft is ~315.25 ft for 780 kHz (λ/4)', async () => {
+test('KAZM tower_height_ft is ~472.87 ft for 780 kHz Class D (3/8λ)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_site_environmental_impact_and_permitting_guide;
-  assert.ok(Math.abs(g.tower_height_ft - 315.25) < 0.5, `tower_height_ft expected ~315.25, got ${g.tower_height_ft}`);
-  assert.strictEqual(g.height_exceeds_450ft, false, '315 ft tower must not exceed 450 ft §1.1307(b) trigger');
+  assert.ok(Math.abs(g.tower_height_ft - 472.87) < 0.5, `tower_height_ft expected ~472.87, got ${g.tower_height_ft}`);
+  assert.strictEqual(g.height_exceeds_450ft, true, '472 ft tower exceeds 450 ft §1.1307(b) trigger');
 });
 
-test('KAZM NEPA trigger is UNLIKELY for standard rural NDA site', async () => {
+test('KAZM NEPA trigger is POSSIBLE due to §1.1307(b) (tower exceeds 450 ft)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_site_environmental_impact_and_permitting_guide;
-  assert.strictEqual(g.nepa_trigger, 'UNLIKELY', 'standard rural site should show UNLIKELY NEPA trigger');
-  assert.strictEqual(g.ea_cost_low, 0, 'no EA cost when trigger is UNLIKELY');
-  assert.strictEqual(g.ea_cost_high, 0, 'no EA cost when trigger is UNLIKELY');
+  assert.strictEqual(g.nepa_trigger, 'POSSIBLE', '3/8λ Class D tower at 472ft exceeds 450ft §1.1307(b) EA trigger');
+  assert.strictEqual(g.ea_cost_low, 8000, 'EA cost must be $8,000 when §1.1307(b) triggered');
+  assert.strictEqual(g.ea_cost_high, 40000, 'EA cost must be $40,000 when §1.1307(b) triggered');
 });
 
 test('KAZM cup_required is true and cost range is reasonable', async () => {

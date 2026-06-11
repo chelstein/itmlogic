@@ -10384,10 +10384,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //     EA if any (a) trigger → $8,000–$40,000 typical.
 
       // --- tower height for triggering ---
-      // λ/4 at frequency_khz:
+      // Class-aware design height: 5/8λ for Class A/B, 3/8λ for Class C/D
       const lambda_m         = 299792.458 / frequency_khz;
-      const quarter_wave_m   = lambda_m / 4;
-      const tower_height_ft  = round2(quarter_wave_m * 3.28084);
+      const quarter_wave_m   = lambda_m / 4;   // λ/4 — physics reference
+      const isHighClass_env2 = /^[AB]$/i.test(fcc_class);
+      const design_h_env_m   = lambda_m * (isHighClass_env2 ? 0.625 : 0.375);
+      const tower_height_ft  = round2(design_h_env_m * 3.28084);
       const height_exceeds_450ft = tower_height_ft > 450;
 
       // --- §1.1307(b) hard trigger ---
@@ -10414,7 +10416,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Without address-level NRHP data we apply a conservative heuristic:
       //   - Class D clear channel stations are often rural → NPA likely applicable.
       //   - Towers within city centers → individual §106 more likely.
-      const tower_height_m        = round2(quarter_wave_m);
+      const tower_height_m        = round2(design_h_env_m);
       const section_106_likely    = tower_height_ft > 200 && inTreatyZone;
       const section_106_required  = section_106_likely;
       const section_106_note      = section_106_required
@@ -19805,9 +19807,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_clear_ch = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const is_local_ch  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
       const lambda_m_ch  = 300000 / frequency_khz;
-      const lambda_q_m_ch = lambda_m_ch / 4;
-      const tower_ft_ch   = Math.round(lambda_q_m_ch * 3.28084);
-      const asr_required_ch = lambda_q_m_ch > 61;   // §17.7: >200 ft AGL
+      const lambda_q_m_ch = lambda_m_ch / 4;   // λ/4 — physics reference only
+      const isHighClass_ch = /^[AB]$/i.test(fcc_class);
+      const design_h_m_ch  = lambda_m_ch * (isHighClass_ch ? 0.625 : 0.375); // 5/8λ A/B, 3/8λ C/D
+      const tower_ft_ch   = Math.round(design_h_m_ch * 3.28084);
+      const asr_required_ch = design_h_m_ch > 61;   // §17.7: >200 ft AGL
 
       const exhibits_A = [
         { id: 'A1', section: 'A', title: 'FCC Form 301-AM main application (fully completed)', required: true, cfr: '§73.3533; §73.3536', notes: 'All sections completed; signed by applicant; Section I: ownership, Section III: technical specs' },
@@ -19840,7 +19844,7 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       const exhibits_E_asr = [
-        { id: 'E1', section: 'E', title: 'ASR registration number', required: asr_required_ch, cfr: '47 CFR §17.4; §17.7', notes: `Towers ≥ 61 m AGL (200 ft) require FAA ASR; proposed tower = λ/4 ≈ ${Math.round(lambda_q_m_ch)} m (${tower_ft_ch} ft) → ${asr_required_ch ? 'REQUIRED' : 'not required'}` },
+        { id: 'E1', section: 'E', title: 'ASR registration number', required: asr_required_ch, cfr: '47 CFR §17.4; §17.7', notes: `Towers ≥ 61 m AGL (200 ft) require FAA ASR; proposed design height = ${isHighClass_ch ? '5/8λ' : '3/8λ'} ≈ ${Math.round(design_h_m_ch)} m (${tower_ft_ch} ft) → ${asr_required_ch ? 'REQUIRED' : 'not required'}` },
         { id: 'E2', section: 'E', title: 'FAA aeronautical study (Form 7460-1)', required: asr_required_ch, cfr: '14 CFR §77; §17.23', notes: `FAA no-hazard determination or equivalent required for towers ≥ 61 m; painting/lighting per AC 70/7460-1M` },
         { id: 'E3', section: 'E', title: 'Tower owner authorization / co-location agreement', required: false, cfr: '§73.1020', notes: 'If antenna is on a shared tower (co-location): lease or authorization letter from tower owner required as exhibit' },
       ];
