@@ -18169,8 +18169,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const mpe_uncontrolled_mw_cm2 = f_mhz < 1.34 ? 100 : round2(180 / (f_mhz * f_mhz));
       const mpe_controlled_mw_cm2   = f_mhz < 3.0  ? 900 : round2(900 / (f_mhz * f_mhz));
 
-      // MPE evaluation required at ≥5 kW TPO per §1.1307 categorical exclusion
-      const mpe_evaluation_required = tpo_kw >= 5;
+      // §1.1307(b) Table 1: AM broadcast MPE evaluation required for ERP > 1 kW.
+      // Conservative formal-exhibit trigger used in this section: ≥ 5 kW.
+      // Stations 1–5 kW must also evaluate; retain OET-65 calculation on file.
+      const mpe_evaluation_required = tpo_kw > 1;
 
       // Uncontrolled exclusion zone at base of tower (OET-65 Supplement B, AM
       // ground-wave near-field; induction-zone dominance reduces far-field estimate)
@@ -25598,14 +25600,15 @@ async function scoreCandidate(pt, ctx, warnings){
       // OET Bulletin 65: provides MPE limits and evaluation methods for broadcast stations
       // MPE limits (general population / uncontrolled) at AM frequencies:
       //   §1.1310 Table 1: For 0.3–3 MHz (MF/LF): E = 614 V/m, H = 163 A/m, Power density = 100 mW/cm²
-      // Evaluation threshold for AM: ERP ≥ 5 kW daytime requires routine evaluation per OET Bulletin 65 §4.1
+      // Evaluation threshold for AM: §1.1307(b) Table 1 requires routine evaluation for ERP > 1 kW.
+      // OET Bulletin 65 §4.1. This section uses 5 kW as the formal exhibit trigger (conservative).
 
       const MPE_POWER_DENSITY_MW_CM2 = 100.0;  // mW/cm² for 0.3–3 MHz general population
       const MPE_E_FIELD_VM = 614;               // V/m general population
       const MPE_H_FIELD_AM = 163;               // A/m general population
 
-      // FCC ERP threshold for AM evaluation: OET Bul 65 Table 1 footnote
-      // AM (535–1705 kHz): routine evaluation required if ERP ≥ 5 kW
+      // §1.1307(b) Table 1 actual AM categorical exclusion threshold: 1 kW ERP.
+      // Conservative formal-exhibit trigger used here: 5 kW.
       const EVAL_THRESHOLD_KW_mpe = 5;
       const evaluationRequired_mpe = tpo_kw >= EVAL_THRESHOLD_KW_mpe;
 
@@ -25633,7 +25636,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'excl_zone',  exhibit: 'Exclusion zone diagram (in site plan)',  rule: 'OET Bul 65 §3.3', note: 'Identify controlled/uncontrolled exposure zones on scaled site plan.' },
         { id: 'fencing',    exhibit: 'Fencing plan (§73.49)',                  rule: '§73.49', note: 'Fence must enclose exclusion zone; prevent unauthorized access.' }
       ] : [
-        { id: 'cat_exclusion', exhibit: 'Categorical exclusion statement', rule: '§1.1307(b)', note: `TPO ${tpo_kw} kW < ${EVAL_THRESHOLD_KW_mpe} kW threshold. Routine evaluation not required.` }
+        { id: 'cat_exclusion', exhibit: 'Categorical exclusion statement', rule: '§1.1307(b)', note: `TPO ${tpo_kw} kW below 5 kW formal-exhibit trigger. ${tpo_kw > 1 ? 'NOTE: ERP > 1 kW — §1.1307(b) actual threshold requires evaluation; retain OET-65 on file.' : 'Categorically excluded per §1.1307(b) (≤ 1 kW).'}` }
       ];
 
       // Monitoring requirements
