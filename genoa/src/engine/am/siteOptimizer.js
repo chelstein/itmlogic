@@ -12961,7 +12961,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_antenna_tower_lighting_and_marking_guide: (() => {
-      // 47 CFR §17.21–§17.25: FCC tower marking/lighting requirements cross-reference FAA AC 70/7460-1M.
+      // 47 CFR §17.21–§17.23: FCC tower marking/lighting requirements cross-reference FAA AC 70/7460-1M.
       // Tower height determines lighting category per 14 CFR Part 77 / FAA AC 70/7460-1M:
       //   < 200 ft AGL: no lighting required (unless within airport approach zone)
       //   200–499 ft:   Medium-intensity white strobes (day); red steady/flashing (night)
@@ -13004,7 +13004,7 @@ async function scoreCandidate(pt, ctx, warnings){
         painting_cost_high_usd,
         annual_lighting_maintenance_low_usd,
         annual_lighting_maintenance_high_usd,
-        reference: '47 CFR §17.21–§17.25 (antenna structure marking/lighting); FAA AC 70/7460-1M (obstruction marking and lighting); 14 CFR Part 77 (safe efficient use of navigable airspace); FAA L-810/L-856/L-864/L-865 lamp standards; 47 CFR §17.6 (notification to FAA)',
+        reference: '47 CFR §17.21–§17.23 (antenna structure marking/lighting); FAA AC 70/7460-1M (obstruction marking and lighting); 14 CFR Part 77 (safe efficient use of navigable airspace); FAA L-810/L-856/L-864/L-865 lamp standards; 47 CFR §17.6 (notification to FAA)',
         note: `${tower_height_ft_ltg} ft tower: ${lighting_required ? `lighting REQUIRED — ${lighting_category}` : 'no lighting required (< 200 ft)'}. Paint: ${paint_bands} alternating bands (aviation orange/white). LED system: $${led_system_cost_low_usd.toLocaleString()}–$${led_system_cost_high_usd.toLocaleString()}. Painting: $${painting_cost_low_usd.toLocaleString()}–$${painting_cost_high_usd.toLocaleString()}.`
       };
     })(),
@@ -13878,7 +13878,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_tower_painting_and_marking_guide: (() => {
-      // 47 CFR §17.21–§17.25 and FAA AC 70/7460-1M specify tower painting and marking.
+      // 47 CFR §17.21–§17.23 and FAA AC 70/7460-1M specify tower painting and marking.
       // Towers > 200 ft AGL: required to display aviation orange/white paint bands
       // and obstruction lighting per FAA standards.
       // Shorter towers near airports may also need marking.
@@ -13923,7 +13923,7 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_repaint_high_usd: annual_repaint_high,
         lighting_inspection_low_usd, lighting_inspection_high_usd,
         total_initial_low_usd, total_initial_high_usd,
-        reference: '47 CFR §17.21 (marking required); §17.23 (painting specifications — aviation orange/white alternating bands); §17.25 (obstruction lighting); §17.47 (periodic inspection); §17.56 (painting maintenance); FAA AC 70/7460-1M (obstruction marking and lighting); FAA Form 7460-2 (notice of construction completion)',
+        reference: '47 CFR §17.21 (marking required); §17.23 (painting specifications — aviation orange/white alternating bands); §17.23 (obstruction marking/lighting specifications); §17.47 (periodic inspection); §17.56 (painting maintenance); FAA AC 70/7460-1M (obstruction marking and lighting); FAA Form 7460-2 (notice of construction completion)',
         note: `${tower_h_ft.toFixed(0)} ft tower: ${requires_painting ? `${num_bands} orange/white bands (${band_height_ft.toFixed(0)} ft/band). Initial paint: $${paint_low_usd.toLocaleString()}–$${paint_high_usd.toLocaleString()}; repaint every ${repaint_cycle_years} yr.` : 'No FAA paint required (≤200 ft).'}`
       };
     })(),
@@ -26324,7 +26324,7 @@ async function scoreCandidate(pt, ctx, warnings){
     zoning_land_use_compatibility_guide: (() => {
       // AM broadcast tower site zoning compatibility analysis
       // Key authorities: local zoning codes, FCC preemption (47 USC §332), ARPA, SEQR
-      // Tower height determines zoning review burden; §11.4 NEPA environmental filing
+      // Tower height determines zoning review burden; §1.1307 NEPA environmental filing
 
       const lambda_zl    = round2(300000 / frequency_khz);
       const towerH_m_zl  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_zl); // 5/8λ Class A/B, 3/8λ Class C/D
@@ -26385,14 +26385,14 @@ async function scoreCandidate(pt, ctx, warnings){
           conditional_use_required: true,
           variance_likely: false,
           timeline_months: 18,
-          notes: 'Excellent ground conductivity (ideal for AM). But requires Section 404 CWA permit, §404 wetland delineation, FEMA floodplain compliance, and §11.4(b)(1) FCC NEPA review.'
+          notes: 'Excellent ground conductivity (ideal for AM). But requires Section 404 CWA permit, §404 wetland delineation, FEMA floodplain compliance, and §1.1307 FCC NEPA review.'
         }
       ];
 
-      // Environmental review triggers per §11.4 / NEPA
+      // Environmental review triggers per §1.1307 / NEPA
       const NEPA_TRIGGERS = [
         { trigger: 'Wilderness Area / National Park',     applies: false, form: 'FCC Form 620 Environmental Review', risk: 'PROHIBITIVE' },
-        { trigger: 'Floodplain (100-year)',               applies: false, form: 'FEMA Elevation Certificate + §11.4', risk: 'HIGH' },
+        { trigger: 'Floodplain (100-year)',               applies: false, form: 'FEMA Elevation Certificate + §1.1307', risk: 'HIGH' },
         { trigger: 'Wetland (CWA §404)',                  applies: false, form: 'Army Corps NWP or Individual Permit', risk: 'HIGH' },
         { trigger: 'Endangered Species (ESA)',            applies: false, form: 'USFWS Section 7 Consultation', risk: 'MODERATE' },
         { trigger: 'Historic Properties (NHPA §106)',     applies: false, form: 'SHPO Consultation', risk: 'MODERATE' },
@@ -26449,7 +26449,7 @@ async function scoreCandidate(pt, ctx, warnings){
         site_preference_order,
         access_requirements,
         n_access_requirements:  access_requirements.length,
-        reference: '47 CFR §11.4 (NEPA); 47 USC §332(c)(7); CWA §404; ESA §7; NHPA §106; NFPA 101; FCC Env. Review',
+        reference: '47 CFR §1.1307 (NEPA); 47 USC §332(c)(7); CWA §404; ESA §7; NHPA §106; NFPA 101; FCC Env. Review',
         note: `Tower height est. ${towerH_m_zl} m (${towerH_ft_zl} ft) for Class ${fcc_class} at ${frequency_khz} kHz. Agricultural/industrial zoning preferred. Height variance likely in commercial zones.`
       };
     })(),
@@ -26581,7 +26581,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'SITE_SURVEY',    phase: 'PRE_FILING', form: 'None (internal)',           required: true,  description: 'Ground conductivity survey (Wenner 4-pin method); soil analysis for radial design' },
         { id: 'FAA_OE',         phase: 'PRE_FILING', form: 'FAA Form 7460-1',           required: needsASR_rc, description: `FAA aeronautical study (OE/AAA). Required when tower exceeds 61m. ${needsASR_rc ? 'REQUIRED for this site.' : 'NOT triggered (tower likely < 61m).'}` },
         { id: 'ASR',            phase: 'PRE_FILING', form: 'FCC ASR (CORES)',           required: needsASR_rc, description: `Antenna Structure Registration. Required when tower ≥ 60.96m AGL. ${needsASR_rc ? 'REQUIRED.' : 'Check final tower height.'}` },
-        { id: 'ENV_REVIEW',     phase: 'PRE_FILING', form: 'FCC Environmental Review',  required: false, description: 'FCC §11.4 NEPA environmental checklist. Required if site triggers wilderness, wetland, flood, ESA, NHPA §106, or RF concerns.' },
+        { id: 'ENV_REVIEW',     phase: 'PRE_FILING', form: 'FCC Environmental Review',  required: false, description: 'FCC §1.1307 NEPA environmental checklist. Required if site triggers wilderness, wetland, flood, ESA, NHPA §106, or RF concerns.' },
         { id: 'SHPO',           phase: 'PRE_FILING', form: 'NHPA §106 Consultation',    required: false, description: 'State Historic Preservation Officer consultation for towers in or near historic districts.' },
         { id: 'SPACING_STUDY',  phase: 'PRE_FILING', form: 'Engineering study',         required: true,  description: 'Co-channel and adjacent-channel spacing verification per §73.182. Confirms new site meets D/U minimums.' },
         { id: 'NIF_STUDY',      phase: 'PRE_FILING', form: 'Engineering study',         required: isClear_rc, description: `Nighttime interference/protection study. Required for clear channel stations. ${isClear_rc ? 'REQUIRED.' : 'Not required (not clear channel).'}` }
@@ -26636,7 +26636,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_required_filings:     requiredFilings.length,
         filings_by_phase:       filingsByPhase,
         total_required_fees_usd: totalFees,
-        reference: '47 CFR §73.150; §73.154; §73.182; §73.1212; §11.4; §17.7; FCC Form 301-AM instructions; FCC Media Bureau AM processing guide 2024',
+        reference: '47 CFR §73.150; §73.154; §73.182; §73.1212; §1.1307; §17.7; FCC Form 301-AM instructions; FCC Media Bureau AM processing guide 2024',
         note: `${requiredFilings.length} required filings for Class ${fcc_class} ${isDA_rc ? 'DA' : 'NDA'} at ${frequency_khz} kHz. Total FCC fees: $${totalFees.toLocaleString()}. DA proof required: ${isDA_rc}. ASR/FAA: ${needsASR_rc}.`
       };
     })(),
@@ -26989,12 +26989,12 @@ async function scoreCandidate(pt, ctx, warnings){
 
     environmental_impact_assessment: (() => {
       // Environmental impact assessment for AM broadcast tower site relocation
-      // FCC §11.4: NEPA checklist required for all construction permit applications
-      // Eight categorical exclusions in §11.4(a) cover most standard AM sites
+      // FCC §1.1306/§1.1307: NEPA checklist required for all construction permit applications
+      // Categorical exclusions in §1.1306 cover most standard AM sites
 
       const towerH_eia    = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D design height
 
-      // NEPA categorical exclusion analysis (§11.4(a))
+      // NEPA categorical exclusion analysis (§1.1306)
       // These conditions REMOVE the site from categorical exclusion (require full EA)
       const NEPA_EXCLUSIONS = [
         { id: 'WILDERNESS',    label: 'Wilderness / Wildlife refuge',         triggers_ea: false, description: 'If site is in or adjacent to designated wilderness area or wildlife refuge.' },
@@ -27003,17 +27003,17 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'ESA',           label: 'Endangered Species Act §7',            triggers_ea: false, description: 'Proposed action may affect listed species or critical habitat (USFWS/NMFS).' },
         { id: 'NHPA',          label: 'NHPA §106 historic property',          triggers_ea: false, description: 'Tower within APE of National Register-listed or eligible property.' },
         { id: 'TRIBAL',        label: 'Tribal lands or sacred sites',         triggers_ea: false, description: 'Site on or adjacent to tribal trust lands or documented sacred sites.' },
-        { id: 'RF_EXPOSURE',   label: 'RF exposure — MPE non-compliance',     triggers_ea: false, description: 'Failure to comply with §1.1310 MPE limits is an environmental concern per §11.4.' },
+        { id: 'RF_EXPOSURE',   label: 'RF exposure — MPE non-compliance',     triggers_ea: false, description: 'Failure to comply with §1.1310 MPE limits is an environmental concern per §1.1307(b).' },
         { id: 'HIGH_POWER',    label: 'High-intensity illuminated tower (>1.2MW ERP)', triggers_ea: false, description: 'Tower illumination visible from residential areas may require EA.' }
       ];
 
       // Categorical exclusion status
       const catExclusion = {
         applies:       true, // assume applies unless site-specific factors trigger EA
-        cfr:           '47 CFR §11.4(a)',
+        cfr:           '47 CFR §1.1306',
         conditions:    'Categorical exclusion applies when none of the 8 exclusionary conditions are present',
         form:          'FCC Form 301-AM Environmental Exhibit — check all 8 boxes',
-        note:          'If ANY exclusion condition is triggered, applicant must file Environmental Assessment (EA) per §11.4(b)'
+        note:          'If ANY exclusion condition is triggered, applicant must file Environmental Assessment (EA) per §1.1307'
       };
 
       // Section 106 (NHPA) process
@@ -27057,7 +27057,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const estimatedEADays = 90; // if EA required; categorical exclusion = 0
 
       const environmental_checklist = [
-        { item: '§11.4 NEPA categorical exclusion check', required: true,  form: 'Form 301-AM Exhibit', duration_days: 2 },
+        { item: '§1.1306 NEPA categorical exclusion check', required: true,  form: 'Form 301-AM Exhibit', duration_days: 2 },
         { item: 'NHPA §106 / SHPO consultation', required: true,  form: 'SHPO letter + APE map', duration_days: nhpa_106.total_process_days },
         { item: 'ESA §7 screening (IPaC)', required: true,  form: 'IPaC report', duration_days: 7 },
         { item: 'CWA §404 wetland screening', required: false, form: 'USACE jurisdiction letter', duration_days: 30 },
@@ -27079,7 +27079,7 @@ async function scoreCandidate(pt, ctx, warnings){
         environmental_checklist,
         n_checklist_items:        environmental_checklist.length,
         n_required_items:         environmental_checklist.filter(i => i.required).length,
-        reference: '47 CFR §11.4; NHPA §106 (36 CFR Part 800); ESA §7 (50 CFR Part 402); CWA §404; NEPA (42 USC §4321); Executive Order 11988 (Floodplains); FCC Environmental Review Guidelines',
+        reference: '47 CFR §1.1306; §1.1307; NHPA §106 (36 CFR Part 800); ESA §7 (50 CFR Part 402); CWA §404; NEPA (42 USC §4321); Executive Order 11988 (Floodplains); FCC Environmental Review Guidelines',
         note: `NEPA categorical exclusion assumed (no site-specific triggers identified). NHPA §106 and ESA §7 screening always required (~${nhpa_106.total_process_days} days). Tower height est. ${towerH_eia}m.`
       };
     })(),
@@ -32746,7 +32746,7 @@ async function scoreCandidate(pt, ctx, warnings){
         'Maintain lighting inspection log; check every 24 hours or install automatic monitoring',
       ];
       if (isDA) checklist.push(`Repeat lighting compliance for all ${n_towers} DA array towers (§17.58)`);
-      if (tower_height_ft >= 500) checklist.push('Coordinate high-intensity daytime lighting schedule with FAA (§17.25)');
+      if (tower_height_ft >= 500) checklist.push('Coordinate high-intensity daytime lighting schedule with FAA (§17.23)');
 
       return {
         tower_height_ft:            tower_height_ft,
