@@ -15706,13 +15706,14 @@ async function scoreCandidate(pt, ctx, warnings){
       let land_class, purchase_per_acre_low_usd, purchase_per_acre_high_usd,
           annual_lease_per_acre_low_usd, annual_lease_per_acre_high_usd;
 
-      if (dist_km < 10) {
+      // Use land_use_class (distance + conductivity proxy) for consistent classification.
+      if (land_use_class === 'SUBURBAN') {
         land_class = 'suburban';
         purchase_per_acre_low_usd  = 15000;
         purchase_per_acre_high_usd = 40000;
         annual_lease_per_acre_low_usd  = 500;
         annual_lease_per_acre_high_usd = 1500;
-      } else if (dist_km < 30) {
+      } else if (land_use_class === 'SUBURBAN_RURAL') {
         land_class = 'rural_edge';
         purchase_per_acre_low_usd  = 5000;
         purchase_per_acre_high_usd = 15000;
@@ -16277,17 +16278,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const f_mhz_nf = round2(frequency_khz / 1000);
       const fa_atmospheric_db = Math.round(53 - 28 * Math.log10(f_mhz_nf));
 
-      // Man-made noise figure by inferred land use (ITU-R P.372 Table 1)
-      // Use distance from current site as a proxy for rural vs urban character.
-      // >9.5 km from current site (which is typically in/near town): likely rural
-      // >4.5 km: suburban/agricultural edge
-      // <=4.5 km: urban edge / mixed-use
-      // Thresholds are set slightly below grid spacing (10 km / 5 km) to account
-      // for haversine distances that fall just under the nominal grid step.
-      const dist_nf_km = pt.distance_from_current_km ?? 0;
-      const land_use_noise_class = dist_nf_km > 9.5 ? 'rural'
-        : dist_nf_km > 4.5 ? 'suburban'
-        : 'urban_edge';
+      // Man-made noise figure by inferred land use (ITU-R P.372 Table 1).
+      // Use land_use_class (distance + conductivity proxy) for consistent classification
+      // across all noise-related guides in this candidate's output.
+      const land_use_noise_class = (land_use_class === 'SUBURBAN') ? 'urban_edge'
+        : (land_use_class === 'SUBURBAN_RURAL') ? 'suburban' : 'rural';
       const fa_man_made_db = land_use_noise_class === 'rural' ? 20
         : land_use_noise_class === 'suburban' ? 32
         : 40;
@@ -16323,7 +16318,7 @@ async function scoreCandidate(pt, ctx, warnings){
         interference_risk,
         noise_reduction_vs_urban_db,
         reference: 'ITU-R P.372-15 §§5-7 (atmospheric and man-made radio noise); ITU-R P.372-15 Table 1 (noise figure categories: rural Fa=20 dB, suburban Fa=32 dB, urban Fa=46 dB); 47 CFR §73.44 (AM technical standards)',
-        note: `RF noise environment at ${round2(pt.lat)}°N / ${round2(pt.lon)}°W (${round2(dist_nf_km)} km from current site): classified ${land_use_noise_class}. Atmospheric Fa=${fa_atmospheric_db} dB, man-made Fa=${fa_man_made_db} dB (ITU-R P.372). Effective noise floor ≈${noise_floor_db_uvm} dBμV/m (${bw_khz_nf} kHz BW). Interference risk: ${interference_risk}. Noise score: ${noise_score}/100 (higher = quieter site).`
+        note: `RF noise environment at ${round2(pt.lat)}°N / ${round2(pt.lon)}°W (land use: ${land_use_class}): classified ${land_use_noise_class}. Atmospheric Fa=${fa_atmospheric_db} dB, man-made Fa=${fa_man_made_db} dB (ITU-R P.372). Effective noise floor ≈${noise_floor_db_uvm} dBμV/m (${bw_khz_nf} kHz BW). Interference risk: ${interference_risk}. Noise score: ${noise_score}/100 (higher = quieter site).`
       };
     })(),
 
