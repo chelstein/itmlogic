@@ -483,6 +483,9 @@ export async function runSiteOptimizer(body = {}){
   const quarter_wave_m = round2(lambda_m / 4);
   const half_wave_m    = round2(lambda_m / 2);
   const ASR_THRESHOLD_M = 60.96;
+  const isHighClass_top = /^[AB]$/i.test(fcc_class);
+  const design_h_m_top  = round2(lambda_m * (isHighClass_top ? 0.625 : 0.375));
+  const asr_required_design = design_h_m_top > ASR_THRESHOLD_M;
   const tower_reference = {
     wavelength_m:            lambda_m,
     quarter_wave_m,
@@ -490,7 +493,8 @@ export async function runSiteOptimizer(body = {}){
     typical_range_m:         `${quarter_wave_m}–${half_wave_m}`,
     asr_threshold_m:         ASR_THRESHOLD_M,
     asr_registration_required_at_quarter_wave: quarter_wave_m > ASR_THRESHOLD_M,
-    note: `AM vertical antennas typically run λ/4–λ/2. At ${frequency_khz} kHz all heights in the typical range ${quarter_wave_m > ASR_THRESHOLD_M ? 'EXCEED' : 'may be below'} the §17.7 ASR 200-ft threshold.`
+    asr_registration_required_at_design_height: asr_required_design,
+    note: `AM Class ${fcc_class} planning height ${isHighClass_top ? '5/8λ' : '3/8λ'} = ${design_h_m_top} m at ${frequency_khz} kHz. Design height ${asr_required_design ? 'EXCEEDS' : 'is below'} the §17.7 ASR 200-ft (60.96 m) threshold.`
   };
 
   // ---- 9. Top-candidates summary ----
@@ -534,7 +538,7 @@ export async function runSiteOptimizer(body = {}){
   const form_301_checklist = buildForm301Checklist({
     fcc_class, tpo_kw, pattern_mode, frequency_khz,
     channel_class: chanClass, skywave_risk_level,
-    asr_registration_required: quarter_wave_m > ASR_THRESHOLD_M,
+    asr_registration_required: asr_required_design,
     community_of_license_polygon: !!community_of_license_polygon,
     col_centroid: col_centroid || null,
     // Pass aggregated candidate context so checklist can surface station-level items
@@ -1934,10 +1938,10 @@ export async function runSiteOptimizer(body = {}){
       ? `${poorSigmaCandidates} returned candidate(s) have POOR conductivity (σ < 2 mS/m); extended ground systems and §73.190 surveys will be required before site commitment.`
       : null;
 
-    // ASR statement
-    const asrRequired = quarter_wave_m > 60.96;
+    // ASR statement — use design height (3/8λ Class C/D, 5/8λ Class A/B) not λ/4
+    const asrRequired = asr_required_design;
     const asrStatement = asrRequired
-      ? `At ${frequency_khz} kHz, all standard antenna heights (λ/4 = ${quarter_wave_m} m) exceed the §17.7 200-ft (60.96 m) ASR threshold — every candidate requires FCC Form 854 registration and FAA aeronautical study before construction.`
+      ? `At ${frequency_khz} kHz, the standard Class ${fcc_class} ${isHighClass_top ? '5/8λ' : '3/8λ'} design height (${design_h_m_top} m) exceeds the §17.7 200-ft (60.96 m) ASR threshold — every candidate requires FCC Form 854 registration and FAA aeronautical study before construction.`
       : null;
 
     // Treaty statement
@@ -2124,8 +2128,10 @@ export async function runSiteOptimizer(body = {}){
   const tower_construction_timeline = (() => {
     const isClear    = chanClass === 'clear_channel';
     const isRegional = chanClass === 'regional';
-    const qwM_tct   = (300000 / frequency_khz) / 4;
-    const asrReqd   = qwM_tct > ASR_THRESHOLD_M;
+    const qwM_tct      = (300000 / frequency_khz) / 4;  // λ/4 reference
+    const isHighCls_tct = /^[AB]$/i.test(fcc_class);
+    const designH_tct   = (300000 / frequency_khz) * (isHighCls_tct ? 0.625 : 0.375);
+    const asrReqd      = designH_tct > ASR_THRESHOLD_M;
     const hasTreaty  = returned.some(c => !!c.treaty_zone);
     const needsDA    = returned.some(c => c.directional_antenna_study_guide?.recommended === true);
     const needsFullDA = returned.some(c => c.directional_antenna_study_guide?.study_type === 'FULL_DA_STUDY_DAY_NIGHT');
@@ -2144,7 +2150,7 @@ export async function runSiteOptimizer(body = {}){
     // Phase 4: Tower procurement + site prep (ground clearing, foundation, radial field install)
     const p4_weeks = asrReqd ? [12, 20] : [8, 14];
     // Phase 5: Tower erection (guyed vs. self-support affects schedule)
-    const p5_weeks = qwM_tct > 100 ? [6, 12] : [4, 8];
+    const p5_weeks = designH_tct > 100 ? [6, 12] : [4, 8];
     // Phase 6: Antenna system installation + ATU/phasor (DA adds time)
     const p6_min = needsDA ? 6 : 3;
     const p6_max = needsDA ? 12 : 6;
@@ -2162,7 +2168,7 @@ export async function runSiteOptimizer(body = {}){
       { id: 'SITE_PARCEL', label: 'Site selection, parcel & zoning', weeks_min: p1_weeks[0], weeks_max: p1_weeks[1], notes: 'Concurrent with Phase 2. Includes option-to-purchase/lease negotiation, zoning review, environmental Phase I.' },
       { id: 'ENGINEERING_STUDIES', label: 'Pre-filing engineering studies', weeks_min: p2_weeks[0], weeks_max: p2_weeks[1], notes: `Soil survey, ${isClear ? 'NIF skywave study, ' : ''}${needsDA ? 'DA pattern engineering, ' : ''}MPE evaluation. Concurrent with Phase 1.` },
       { id: 'FCC_APPLICATION', label: 'FCC Form 301-AM filing & CP processing', weeks_min: p3_weeks[0], weeks_max: p3_weeks[1], notes: `${hasTreaty ? 'Includes FCC IB treaty coordination (12–52 wk). ' : ''}FCC processing target 6–12 months after complete application.` },
-      { id: 'SITE_PREP_PROCUREMENT', label: 'Tower procurement & site preparation', weeks_min: p4_weeks[0], weeks_max: p4_weeks[1], notes: `Concurrent with late Phase 3. Includes radial field installation (${Math.round(qwM_tct)} m × 120 radials), grounding, access road.` },
+      { id: 'SITE_PREP_PROCUREMENT', label: 'Tower procurement & site preparation', weeks_min: p4_weeks[0], weeks_max: p4_weeks[1], notes: `Concurrent with late Phase 3. Includes radial field installation (${Math.round((300000 / frequency_khz) * 0.35)} m × 120 radials per §73.186/NBS TN-24), grounding, access road.` },
       { id: 'TOWER_ERECTION', label: 'Tower erection', weeks_min: p5_weeks[0], weeks_max: p5_weeks[1], notes: `Weather-dependent. ${asrReqd ? 'FAA lighting system installation required.' : ''}` },
       { id: 'ANTENNA_INSTALL', label: 'Antenna system & ATU/phasor installation', weeks_min: p6_weeks[0], weeks_max: p6_weeks[1], notes: needsDA ? 'DA array phasing and ATU adjustment add time — 2–4 engineer site visits expected.' : 'Single-tower NDA: standard ATU matching, base current measurement.' },
       { id: 'PROOF_LICENSE', label: 'Proof of performance & license', weeks_min: p7_weeks[0], weeks_max: p7_weeks[1], notes: 'FCC Form 302-AM filed after proof. License typically issued within 4–6 weeks of complete proof.' }
@@ -2391,7 +2397,7 @@ export async function runSiteOptimizer(body = {}){
     minimum_spacing_reference: buildMinimumSpacingReference({ fcc_class, channel_class: chanClass }),
     regulatory_timeline_estimate: buildRegulatoryTimeline({
       fcc_class, channel_class: chanClass, skywave_risk_level,
-      asr_required: quarter_wave_m > ASR_THRESHOLD_M,
+      asr_required: asr_required_design,
       has_treaty_candidates: returned.some(c => !!c.treaty_zone),
       any_poor_sigma: returned.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
       n_promising: candidate_count_by_status.PROMISING ?? 0
@@ -5674,7 +5680,7 @@ async function scoreCandidate(pt, ctx, warnings){
           action:    'Verify county/municipal zoning classification permits telecommunications tower and broadcast facility',
           what_to_check: 'Contact county planning department; request written determination that AM tower and transmitter building are permitted uses. Some AZ/NV counties treat AM towers as conditional use.',
           timeline_weeks: [2, 6],
-          notes:     'AM tower heights at 780 kHz (λ/4 ≈ 96 m) may exceed local height limits — confirm variance or conditional use permit process.'
+          notes:     `AM tower heights at ${frequency_khz} kHz (${isHighClass_sa ? '5/8λ' : '3/8λ'} ≈ ${Math.round(towerH_sa)} m) may exceed local height limits — confirm variance or conditional use permit process.`
         },
         {
           id:        'TITLE_SEARCH',
@@ -6985,6 +6991,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const lambda_rc = 300000 / frequency_khz;
       const qwave_rc  = lambda_rc / 4;
       const hwave_rc  = lambda_rc / 2;
+      const isHighClass_rc  = /^[AB]$/i.test(fcc_class);
+      const designH_rc      = lambda_rc * (isHighClass_rc ? 0.625 : 0.375);
       const isDA_rc   = /^DA/i.test(pattern_mode);
       const isClear_rc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const isLocal_rc = LOCAL_CHANNEL_KHZ.has(frequency_khz);
@@ -7019,22 +7027,15 @@ async function scoreCandidate(pt, ctx, warnings){
       })();
 
       // 3. ASR tower registration — §17.7 (200 ft / 60.96 m threshold)
-      // If λ/4 > 60.96 m → ASR is certain (WARN).
-      // If λ/4 ≤ 60.96 m but λ/2 > 60.96 m → depends on final tower height (NOT_EVALUATED).
-      // If even λ/2 ≤ 60.96 m → standard heights clear the threshold (PASS).
-      const asrRequired_rc   = qwave_rc > ASR_M;
-      const asrPossible_rc   = !asrRequired_rc && hwave_rc > ASR_M;
-      const asrNotRequired_rc = !asrRequired_rc && !asrPossible_rc;
+      // Use the class-aware design height (3/8λ for Class C/D, 5/8λ for Class A/B).
+      // At all standard AM frequencies, design height > 60.96 m → ASR always required.
+      const asrRequired_rc = designH_rc > ASR_M;
       const i3 = asrRequired_rc
         ? item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'WARN',
-          `λ/4 = ${round2(qwave_rc)} m at ${frequency_khz} kHz exceeds the 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 and FAA Form 7460-1 (aeronautical study) required before construction.`,
+          `Class ${fcc_class} ${isHighClass_rc ? '5/8λ' : '3/8λ'} design height = ${round2(designH_rc)} m at ${frequency_khz} kHz exceeds the 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 and FAA Form 7460-1 (aeronautical study) required before construction.`,
           'File FAA Form 7460-1 and obtain FAA determination before filing Form 854 with FCC. Marking/lighting per FAA determination (§17.21–§17.50).')
-        : asrNotRequired_rc
-        ? item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'PASS',
-          `λ/4 = ${round2(qwave_rc)} m, λ/2 = ${round2(hwave_rc)} m at ${frequency_khz} kHz — both standard heights are below the 60.96 m (200 ft) §17.7 ASR threshold. ASR registration not required at standard heights.`)
-        : item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'NOT_EVALUATED',
-          `λ/4 = ${round2(qwave_rc)} m (below threshold) but λ/2 = ${round2(hwave_rc)} m exceeds 60.96 m at ${frequency_khz} kHz. ASR applicability depends on final tower height.`,
-          'Confirm final antenna height. If tower exceeds 200 ft (60.96 m) ASR is mandatory regardless of frequency.');
+        : item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'PASS',
+          `Class ${fcc_class} design height ${round2(designH_rc)} m at ${frequency_khz} kHz — below the 60.96 m (200 ft) §17.7 ASR threshold. ASR registration not required at standard height.`);
 
       // 4. RF exposure (MPE) — §1.1310 / OET Bulletin 65
       // AM stations > 5 kW ERP must conduct MPE evaluation (general pop uncontrolled limits).
@@ -33878,10 +33879,11 @@ export function buildFilingComplexityScore({ chanClass, fcc_class, frequency_khz
     score += 25;
     factors.push({ factor: 'TREATY_ZONE_CANDIDATES', points: 25, note: 'One or more top candidates are within a US/MX or US/CA treaty zone — FCC IB international coordination required, adding 12–52 weeks.' });
   }
-  const qwM_fcs = (300000 / frequency_khz) / 4;
-  if (qwM_fcs > ASR_THRESH) {
+  const isHighCls_fcs = /^[AB]$/i.test(fcc_class);
+  const designH_fcs   = (300000 / frequency_khz) * (isHighCls_fcs ? 0.625 : 0.375);
+  if (designH_fcs > ASR_THRESH) {
     score += 10;
-    factors.push({ factor: 'ASR_REQUIRED', points: 10, note: `λ/4 ≈ ${Math.round(qwM_fcs)} m > §17.7 ${ASR_THRESH} m threshold — FAA 7460-1 aeronautical study + FCC Form 854 required for any standard tower.` });
+    factors.push({ factor: 'ASR_REQUIRED', points: 10, note: `Class ${fcc_class} ${isHighCls_fcs ? '5/8λ' : '3/8λ'} design height ≈ ${Math.round(designH_fcs)} m > §17.7 ${ASR_THRESH} m threshold — FAA 7460-1 aeronautical study + FCC Form 854 required.` });
   }
   const anyFullDA = returned.some(c => c.directional_antenna_study_guide?.study_type === 'FULL_DA_STUDY_DAY_NIGHT');
   const anyDaRec  = returned.some(c => c.directional_antenna_study_guide?.recommended === true);
