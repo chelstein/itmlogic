@@ -32041,24 +32041,23 @@ async function scoreCandidate(pt, ctx, warnings){
       const cvg_pct   = coverage_pct ?? 0;
       const dist_km   = pt.distance_from_current_km ?? 0;
 
-      // Population density proxy (persons/km²) from latitude band
+      // Population density proxy (persons/km²) derived from land_use_class
+      // (land_use_class is the canonical urbanization proxy for this candidate)
       // (Rough US census band proxy; actual would use GIS population raster)
-      const POP_DENSITY_URBAN      = 400;   // dense metro
       const POP_DENSITY_SUBURBAN   = 80;    // suburban ring
       const POP_DENSITY_RURAL      = 10;    // agricultural/rural
       const POP_DENSITY_REMOTE     = 2;     // sparsely populated
 
-      const isCoastalCorridor = (lat > 36 && lat < 42) && (pt.lon ?? -95) > -90;
-      const isSunbelt         = lat > 25 && lat < 35;
       const pop_density_proxy =
-        isCoastalCorridor ? POP_DENSITY_URBAN :
-        isSunbelt         ? POP_DENSITY_SUBURBAN :
-        dist_km < 30      ? POP_DENSITY_SUBURBAN : POP_DENSITY_RURAL;
+        land_use_class === 'SUBURBAN'       ? 150   // near-urban edge
+        : land_use_class === 'SUBURBAN_RURAL' ? POP_DENSITY_SUBURBAN
+        : land_use_class === 'RURAL'          ? POP_DENSITY_RURAL
+        : POP_DENSITY_REMOTE;
 
       const area_classification =
-        pop_density_proxy >= POP_DENSITY_URBAN    ? 'URBAN'    :
-        pop_density_proxy >= POP_DENSITY_SUBURBAN ? 'SUBURBAN' :
-        pop_density_proxy >= POP_DENSITY_RURAL    ? 'RURAL'    : 'REMOTE';
+        land_use_class === 'SUBURBAN'       ? 'SUBURBAN' :
+        land_use_class === 'SUBURBAN_RURAL' ? 'SUBURBAN' :
+        land_use_class === 'RURAL'          ? 'RURAL'    : 'REMOTE';
 
       // Coverage contour area estimate: use the 0.5 mV/m groundwave reach already computed
       // for the candidate.  Falls back to a conservative 25 km if not yet available.
