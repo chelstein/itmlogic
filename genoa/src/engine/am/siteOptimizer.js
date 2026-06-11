@@ -5922,8 +5922,8 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     // Co-location compatibility scoring for this candidate site.
-    // Scores the site against 5 common infrastructure host types per FCC §73.1675,
-    // structural engineering practice, and AM broadcast co-site RF considerations.
+    // Scores the site against 5 common infrastructure host types per AM broadcast
+    // co-site RF engineering practice and structural considerations.
     // No actual infrastructure database lookup — this is a site-parameter-driven assessment.
     colocation_compatibility_score: (() => {
       const isClear_cc  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
@@ -5951,7 +5951,7 @@ async function scoreCandidate(pt, ctx, warnings){
         // Diplexing required when frequencies are within ±20 kHz (same-band)
         // Risk scales with power ratio and frequency offset
         const deltaNeeded = 20; // kHz minimum offset for diplexer feasibility
-        risks.push('Diplexing filter required (§73.1675) — adds $15–60k to project; potential intermodulation products');
+        risks.push('Diplexing filter required — adds $15–60k to project; potential intermodulation products');
         if (isHighPow) { score -= 10; risks.push('High TPO (≥25 kW) limits diplexer options — custom filter likely required'); }
         if (isClear_cc) { score -= 8; risks.push('Clear channel: nighttime skywave from host station may complicate §73.182 NIF analysis'); }
         return { score: Math.max(0, Math.min(100, score)), benefits, risks };
@@ -6045,7 +6045,7 @@ async function scoreCandidate(pt, ctx, warnings){
         best_host_score: best.score,
         best_host_tier: best.compatibility_tier,
         diplexing_always_required: true,
-        reference: '47 CFR §73.1675 (AM directional antenna systems); §73.182; §73.190; FCC Form 854 (ASR); OET Bulletin 65',
+        reference: '47 CFR §73.182; §73.190; FCC Form 854 (ASR); OET Bulletin 65',
         note: 'Compatibility scores are site-parameter-driven screening estimates. No actual infrastructure inventory lookup performed. Engage a licensed broadcast engineer for structural, RF, and lease compatibility verification before co-location commitment.'
       };
     })(),
@@ -6992,7 +6992,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
     // Per-candidate FCC pre-filing regulatory compliance checklist.
     // 12 items drawn from §73.24, §73.182, §73.150, §1.1306, §1.1310,
-    // §17.7, §73.190, and §73.315.  Each item is evaluated at screening
+    // §17.7, and §73.190.  Each item is evaluated at screening
     // grade from available candidate data and assigned a status of
     // PASS, WARN, FAIL, or NOT_EVALUATED.
     regulatory_compliance_checklist: (() => {
@@ -7672,7 +7672,7 @@ async function scoreCandidate(pt, ctx, warnings){
         min_radial_length_km: 25,
         field_contours_required: ['5.0 mV/m', '2.0 mV/m', '1.0 mV/m', '0.5 mV/m', '0.25 mV/m'],
         elements_measured_per_tower: 'Phase (deg) and ratio (dB) for each element during proof',
-        note: 'DA proof: 72 radials at 5° intervals per §73.154(a). Full field intensity measurements at each point. Must include element phases and ratios in proof report. §73.155 allows limited adjustments within ±2° phase and ±0.5 dB ratio tolerances during proof.'
+        note: 'DA proof: 72 radials at 5° intervals per §73.154(a). Full field intensity measurements at each point. Must include element phases and ratios in proof report. Operating tolerances: current ratios ±5%, phases ±3° per §73.62(a).'
       };
       const traversal_spec = isDA_pp ? da_traversal_spec : nda_traversal_spec;
 
@@ -7744,7 +7744,7 @@ async function scoreCandidate(pt, ctx, warnings){
         proof_timeline_weeks_low:   proof_weeks_low,
         proof_timeline_weeks_high:  proof_weeks_high,
         filing_form:                'FCC Form 302-AM (license to cover)',
-        reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.51 (direct method power); §73.189(b)(4) (ground system); §73.190 (conductivity/certification); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
+        reference: '47 CFR §73.154 (proof of performance); §73.62(a) (DA current ratio ±5%, phase ±3°); §73.51 (direct method power); §73.189(b)(4) (ground system); §73.190 (conductivity/certification); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
       };
     })(),
@@ -8433,12 +8433,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // into a Gantt-style schedule with parallel-path critical path analysis.
       //
       // Regulatory milestones:
-      //   Phase 1 — Site selection + due diligence (§73.3549(a) site control)
+      //   Phase 1 — Site selection + due diligence (site control per Form 301-AM instructions)
       //   Phase 2 — Engineering (NIF study, DA design if applicable)
       //   Phase 3 — Environmental (NEPA/NHPA, TCNS tribal, Phase I ESA)
       //   Phase 4 — FAA coordination (Form 7460-1 if ASR required)
       //   Phase 5 — FCC application filing (Form 301-AM CP)
-      //   Phase 6 — FCC processing (§73.3548 petitions to deny, grant)
+      //   Phase 6 — FCC processing (§73.3584 petitions to deny, grant)
       //   Phase 7 — Construction (tower, ground system, building)
       //   Phase 8 — Proof of performance + license to cover (Form 302-AM)
       //
@@ -8467,7 +8467,7 @@ async function scoreCandidate(pt, ctx, warnings){
           weeks_low:   isUrban_mt ? 12 : 8,
           weeks_high:  isUrban_mt ? 26 : 18,
           parallel:    true,
-          milestone:   '§73.3549(a) site control letter'
+          milestone:   'Site control letter (Form 301-AM instructions require reasonable assurance of site availability)'
         },
         {
           phase:       2,
@@ -8510,11 +8510,11 @@ async function scoreCandidate(pt, ctx, warnings){
         {
           phase:       6,
           name:        'FCC processing + grant',
-          description: `FCC Broadcast Branch review; 30-day petition-to-deny window (§73.3548); potential hearing if contested. ${isClear_mt ? 'Clear channel applications receive heightened IB scrutiny.' : ''}`,
+          description: `FCC Broadcast Branch review; 30-day petition-to-deny window (§73.3584); potential hearing if contested. ${isClear_mt ? 'Clear channel applications receive heightened IB scrutiny.' : ''}`,
           weeks_low:   isClear_mt ? 52 : 26,
           weeks_high:  isClear_mt ? 156 : 78,
           parallel:    false,
-          milestone:   'CP granted (§73.3561); 3-year construction window begins'
+          milestone:   'CP granted; 3-year construction window begins (§73.3598)'
         },
         {
           phase:       7,
@@ -8570,7 +8570,7 @@ async function scoreCandidate(pt, ctx, warnings){
         is_clear_channel:          isClear_mt,
         ea_likely:                 eaLikely_mt,
         asr_required:              asrReq_mt,
-        reference: '47 CFR §73.3549(a) (site control); §73.3548 (petitions to deny); §73.3561 (CP grant, 3-year window); §73.3598 (CP extension); §73.154 (proof of performance); §1.1306 (NEPA); §17.7 (ASR); FCC Form 301-AM and 302-AM instructions',
+        reference: '47 CFR §73.3533 (CP application); §73.3584 (petitions to deny); §73.3598 (CP period of construction — 3 years); §73.154 (proof of performance); §1.1306 (NEPA); §17.7 (ASR); FCC Form 301-AM and 302-AM instructions',
         note: `Total relocation timeline: ${Math.round(total_months_low)}–${Math.round(total_months_high)} months (${total_weeks_low}–${total_weeks_high} weeks). Critical parallel path: Phase ${criticalParallelPhase.phase} (${criticalParallelPhase.name}). ${isClear_mt ? 'Clear channel — expect 36–48+ months.' : ''}`
       };
     })(),
@@ -8826,10 +8826,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Regulatory framework:
       //   47 CFR §73.1350(a): The licensee is responsible for maintaining a site
       //     with sufficient access to operate and maintain the antenna system.
-      //   §73.1690(c): Relocation of transmitter or antenna requires prior Commission
+      //   §73.1690(b): Relocation of transmitter or antenna requires prior Commission
       //     authorization (CP) — the FCC filing process starts with site control.
-      //   §73.3549(a): Applications for major facilities modification must include
-      //     a statement that the applicant has "reasonable assurance of site
+      //   Form 301-AM instructions: Applications for major facilities modification must
+      //     include evidence that the applicant has "reasonable assurance of site
       //     availability" — binding option or lease letter required with Form 301-AM.
       //   47 CFR Part 1, Subpart B / NEPA §1.1307: Environmental assessment
       //     triggers include historic properties (NHPA §106), wetlands, floodplains,
@@ -8902,7 +8902,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { item: 'Phase I ESA (ASTM E1527-21)',                     weeks_low: 3, weeks_high: 6,  notes: 'Required by FCC §1.1307(a) NEPA checklist for new tower sites' },
         { item: 'FAA Form 7460-1 (pre-coordination)',              weeks_low: 4, weeks_high: 12, notes: h_m_lu > 60.96 ? `Required — ${h_ft_lu} ft tower > 200 ft §17.7 ASR threshold` : `May not be required — ${h_ft_lu} ft tower ≤ 200 ft; verify airspace` },
         { item: 'NHPA §106 historic property review',              weeks_low: 3, weeks_high: 16, notes: nhpa_risk === 'HIGH' ? 'Urban site — SHPO consultation likely required; allow 16 weeks worst case' : 'Standard desktop review usually sufficient' },
-        { item: 'Lease/option agreement (site control letter)',     weeks_low: 4, weeks_high: 12, notes: 'FCC requires "reasonable assurance of site availability" with Form 301-AM (§73.3549(a))' },
+        { item: 'Lease/option agreement (site control letter)',     weeks_low: 4, weeks_high: 12, notes: 'FCC requires "reasonable assurance of site availability" with Form 301-AM (see Form 301-AM Schedule A instructions)' },
         { item: 'Zoning permit / conditional use hearing',          weeks_low: zoning_weeks_low, weeks_high: zoning_weeks_high, notes: zone_risk_desc },
         { item: 'Title/survey and access road easement',           weeks_low: 2, weeks_high: 6,  notes: 'Required before construction permit can be exercised' }
       ];
@@ -8927,7 +8927,7 @@ async function scoreCandidate(pt, ctx, warnings){
         site_control_weeks_low,
         site_control_weeks_high,
         due_diligence_items,
-        reference: '47 CFR §73.1350(a); §73.1690(c); §73.3549(a); 47 CFR Part 1 §1.1306–§1.1307 (NEPA); NHPA §106 (16 USC §470f); ASTM E1527-21 (Phase I ESA); FAA Form 7460-1 (FAA obstruction study)',
+        reference: '47 CFR §73.1350(a); §73.1690(b) (prior auth required for transmitter relocation); §73.3533 (CP application); 47 CFR Part 1 §1.1306–§1.1307 (NEPA); NHPA §106 (16 USC §470f); ASTM E1527-21 (Phase I ESA); FAA Form 7460-1 (FAA obstruction study)',
         note: `SCREENING-GRADE land-use and site-access assessment. Zone risk: ${zone_risk_tier}. Estimated lease: $${lease_low_mo.toLocaleString()}–$${lease_high_mo.toLocaleString()}/mo ($${(lease_10yr_low/1000).toFixed(0)}K–$${(lease_10yr_high/1000).toFixed(0)}K over 10 years). Site control before CP filing: ${site_control_weeks_low}–${site_control_weeks_high} weeks.`
       };
     })(),
@@ -9074,7 +9074,7 @@ async function scoreCandidate(pt, ctx, warnings){
         grand_total_low_usd:          total_low_pf,
         grand_total_high_usd:         total_high_pf,
         grand_total_midpoint_usd:     midpoint_pf,
-        reference: '47 CFR §73.3500; §73.3533; §73.3561; §17.7; §1.1307; §1.1310; OET Bulletin 65 Ed. 97-01; FCC FY2024 fee schedule (§1.1102); ARBE cost model (2023); ENR CCI Q4 2024',
+        reference: '47 CFR §73.3500; §73.3533; §73.3598; §17.7; §1.1307; §1.1310; OET Bulletin 65 Ed. 97-01; FCC FY2024 fee schedule (§1.1102); ARBE cost model (2023); ENR CCI Q4 2024',
         note: `SCREENING-GRADE pro forma. Total project cost estimate: $${(total_low_pf/1000).toFixed(0)}K–$${(total_high_pf/1000).toFixed(0)}K (midpoint ~$${(midpoint_pf/1000).toFixed(0)}K) including 15–25% contingency. Class ${fcc_class} ${frequency_khz} kHz, ${tpo_kw} kW ${is_da_pf ? 'DA' : 'NDA'}, ${h_ft_pf} ft tower. Engage a licensed broadcast engineer and FCC counsel before committing capital.`
       };
     })(),
@@ -9087,10 +9087,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //     FCC Form 301-AM (modification CP), License to Cover via Form 302-AM.
       //   §73.3533: Major modification: change in community of license, class, or
       //     significant change in facilities requires a major amendment petition.
-      //   §73.3548: Petitions to deny — third parties have 30 days after public
+      //   §73.3584: Petitions to deny — third parties have 30 days after public
       //     notice to file.  Contested applications take 12–24+ months.
-      //   §73.3561: FCC grant of CP — licensee has 3 years to complete construction.
-      //   §73.3598: Construction permit expiration; extensions possible for cause.
+      //   §73.3598: Period of construction — licensee has 3 years from CP issuance
+      //     to complete construction and file for license. Extensions possible for cause.
       //   47 CFR §1.1102 / FCC FY 2024 Fee Schedule (DA 23-864):
       //     AM station application fees (FY2024):
       //       Form 301-AM (major modification CP): $1,015
@@ -9139,7 +9139,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const nepa_days_high = 90;   // if EA required, pre-filing
       const fcc_processing_low  = 180;   // 6 months (uncontested, no petition)
       const fcc_processing_high = 540;   // 18 months (minor opposition / staff backlog)
-      const construction_days   = 1095;  // 3 years from CP grant per §73.3561
+      const construction_days   = 1095;  // 3 years from CP grant per §73.3598
       const proof_days_low      = 60;    // proof-of-performance field work
       const proof_days_high     = 120;
       const license_grant_days_low  = 30;
@@ -9180,13 +9180,13 @@ async function scoreCandidate(pt, ctx, warnings){
           'NEPA/§106 pre-filing review (if triggered)',
           'FCC Form 301-AM — Major Modification CP',
           '30-day public notice / petition window (§73.3580)',
-          'FCC grant of CP (§73.3561)',
+          'FCC grant of CP (§73.3598 — 3-year construction period begins)',
           'Construction (≤ 3 years)',
           'Proof-of-performance measurements (§73.154)',
           'FCC Form 302-AM — License to Cover CP',
           'FCC grant of license'
         ],
-        reference: '47 CFR §73.3500 (applications); §73.3533 (major mod); §73.3548 (petitions to deny); §73.3561 (CP grant); §73.3580 (public notice); §73.3598 (CP expiration); FCC FY2024 Fee Schedule DA 23-864 ($1,015 per Form 301-AM / 302-AM)',
+        reference: '47 CFR §73.3500 (applications); §73.3533 (major mod); §73.3584 (petitions to deny); §73.3580 (public notice); §73.3598 (CP period of construction — 3 years); FCC FY2024 Fee Schedule DA 23-864 ($1,015 per Form 301-AM / 302-AM)',
         note: `${isDA ? 'DA' : 'NDA'} ${fcc_class} station. FCC fees: $${total_fcc_fees.toLocaleString()}. Soft costs (atty + eng): $${total_soft_low.toLocaleString()}–$${total_soft_high.toLocaleString()}. Timeline: ${total_timeline_low}–${total_timeline_high} days (excl. construction).`
       };
     })(),
@@ -10215,8 +10215,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM site access and utility infrastructure guide.
       //
       // Regulatory basis:
-      //   47 CFR §73.1535: Remote control and auxiliary operation require unobstructed
-      //     site access for unattended operation inspections.
+      //   47 CFR §73.1400: Transmission system monitoring and remote control requires
+      //     unobstructed site access for unattended operation inspections.
       //   47 CFR §73.1870: Emergency operation provisions.  Class A/B stations in critical
       //     areas effectively need standby power to maintain operations.  Best practice
       //     for all classes.  FCC inspectors verify standby power capability.
@@ -10344,7 +10344,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_infra_high_usd,
         annual_recurring_low_usd,
         annual_recurring_high_usd,
-        reference: '47 CFR §73.1535 (remote control); §73.1870 (emergency operation); §73.1560(b) (power reduction STA); NFPA 110 (2021) §7.2 (generator sizing, 25% headroom, Level 1 ≤10 s transfer); EIA-840 utility extension cost estimates; USDA RUS (rural utility service) construction standards',
+        reference: '47 CFR §73.1400 (remote control / transmission system monitoring); §73.1870 (emergency operation); §73.1560(b) (power reduction STA); NFPA 110 (2021) §7.2 (generator sizing, 25% headroom, Level 1 ≤10 s transfer); EIA-840 utility extension cost estimates; USDA RUS (rural utility service) construction standards',
         note: `${generator_kw} kW standby generator (NFPA 110 Level 1) required for ${tpo_kw} kW station: TX ${ac_input_kw} kW + HVAC ${hvac_load_kw} kW + base ${site_base_kw} kW = ${total_load_kw} kW × 1.25 headroom = ${generator_load_kw} kW. Road: ${road_access_type.replace(/_/g, ' ')}. Total one-time infrastructure: $${total_infra_low_usd.toLocaleString()}–$${total_infra_high_usd.toLocaleString()}.`
       };
     })(),
@@ -15686,7 +15686,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const total_monitoring_high_usd = round2(
         monitor_cost_high_usd + remote_control_high_usd + internet_monitoring_high_usd + logging_system_high_usd);
 
-      const log_interval_min = 30; // §73.1820: every 30 minutes
+      const log_interval_min = 180; // §73.1820(a)(2): DA stations — antenna monitor readings at intervals ≤ 3 hours
       const readings_per_day = Math.round(24 * 60 / log_interval_min);
 
       return {
@@ -17798,7 +17798,7 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_maint_low_usd,
         annual_maint_high_usd,
         note: `${nominal_tx_kw} kW ${power_class_tx} power class AM transmitter (TPO: ${tpo_kw} kW); backup at ${backup_tx_kw} kW recommended${isDA_tx ? '; DA phasing cabinet required' : ''}. ${n_base_current_meters} base current meter${n_base_current_meters > 1 ? 's' : ''} (§73.61); remote control required (§73.1400). Total equipment: $${total_equipment_low_usd.toLocaleString()}–$${total_equipment_high_usd.toLocaleString()} excl. ATU/ground system; annual maintenance: $${annual_maint_low_usd.toLocaleString()}–$${annual_maint_high_usd.toLocaleString()}.`,
-        reference: '47 CFR §73.1560 (operating power tolerances ±10%); §73.1675 (auxiliary transmitters); §73.1215 (equipment maintenance); §73.1400 (transmission system requirements)',
+        reference: '47 CFR §73.1560(a) (operating power 90–105% of authorized); §73.1675 (auxiliary transmitters); §73.1215 (equipment maintenance); §73.1400 (transmission system requirements)',
       };
     })(),
 
@@ -19895,7 +19895,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'G1', section: 'G', title: 'DA horizontal radiation pattern (theoretical)', required: true, cfr: '§73.150(a)', notes: 'Tabulated field ratios at 72 azimuths (5° increments, 0°–355°) per §73.150(a) / Form 301-AM for each operating mode (DA-D, DA-N); signed by engineer' },
         { id: 'G2', section: 'G', title: 'Antenna system design parameters', required: true, cfr: '§73.152; §73.154(a)', notes: 'Phase/ratio values for each element; mutual impedance matrix; driving point impedances; ATU design schematic' },
         { id: 'G3', section: 'G', title: 'Moment method analysis (NEC or MININEC)', required: true, cfr: '§73.150(b); §73.154(a)', notes: 'Full-wave electromagnetic model of the DA array; submitted as Exhibit D to Form 301-AM; used for theoretical pattern' },
-        { id: 'G4', section: 'G', title: 'DA proof monitoring specification', required: true, cfr: '§73.61; §73.154(a)', notes: 'Specifies monitoring points, reference parameters, tolerance values (±2° phase, ±0.5 dB ratio per §73.155)' },
+        { id: 'G4', section: 'G', title: 'DA proof monitoring specification', required: true, cfr: '§73.61; §73.154(a)', notes: 'Specifies monitoring points, reference parameters, tolerance values (current ratios ±5%, phase ±3° per §73.62(a))' },
       ] : [];
 
       const all_exhibits = [...exhibits_A, ...exhibits_B, ...exhibits_C, ...exhibits_D_nepa, ...exhibits_E_asr, ...exhibits_F, ...exhibits_G_da];
@@ -20995,10 +20995,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Step 6: For DA: adjust phasor for correct current ratio and phase at full power
       //   Step 7: Conduct proof-of-performance measurements (separate from ATU commissioning)
       //
-      // FCC §73.155: Transmitter output and antenna operating tolerances:
-      //   - Base current must stay within ±5% of licensed value (§73.155(a))
+      // FCC §73.62(a): DA antenna operating tolerances:
+      //   - Base current must stay within ±5% of licensed value (§73.62(a))
       //   - Carrier frequency within ±20 Hz (§73.1215)
-      //   - For DA: current ratios within ±5%, phases within ±3° (§73.155(d))
+      //   - For DA: current ratios within ±5%, phases within ±3° (§73.62(a))
 
       const isDA_atu   = /^DA/i.test(pattern_mode);
       const n_towers   = isDA_atu ? 2 : 1;
@@ -21034,16 +21034,16 @@ async function scoreCandidate(pt, ctx, warnings){
       );
 
       // FCC tolerances
-      const current_tolerance_pct   = 5;     // §73.155(a): ±5% of licensed base current
-      const phase_tolerance_deg     = isDA_atu ? 3 : null;     // §73.155(d): ±3° for DA
-      const ratio_tolerance_pct     = isDA_atu ? 5 : null;     // §73.155(d): ±5% for DA
+      const current_tolerance_pct   = 5;     // §73.62(a): ±5% of licensed base current
+      const phase_tolerance_deg     = isDA_atu ? 3 : null;     // §73.62(a): ±3° for DA
+      const ratio_tolerance_pct     = isDA_atu ? 5 : null;     // §73.62(a): ±5% for DA
 
       const COMMISSIONING_STEPS = [
         { step: 1, action: 'Pre-installation base impedance measurement', detail: `Measure tower base impedance (R + jX) with calibrated antenna analyzer at ${frequency_khz} kHz; record measured Ra and Xa; compare to theoretical (${base_resistance_ohm_typical}Ω + j0 at λ/4)`, equipment: 'Antenna analyzer (e.g., RigExpert AA-2000 or AIM 4170)' },
         { step: 2, action: 'ATU design and fabrication', detail: 'Design L/T/π network to transform measured base impedance to 50Ω; specify component L and C values; use RF-rated components with adequate current/voltage rating', equipment: 'ATU fabrication (commercial or custom)' },
         { step: 3, action: 'Low-power coarse tune (10W test transmitter)', detail: `Inject 10W at ${frequency_khz} kHz; adjust ATU for minimum reflected power; verify SWR < 1.5:1 before increasing power`, equipment: 'Lab transmitter or signal generator + RF amplifier' },
         { step: 4, action: 'Full-power fine tune and SWR verification', detail: `Increase to licensed power (${tpo_kw ?? 5} kW TPO); fine-tune for minimum SWR; target SWR < 1.1:1; record final L and C settings`, equipment: 'Directional wattmeter (e.g., Bird 43 or equivalent)' },
-        { step: 5, action: isDA_atu ? 'DA phasor adjustment for current ratios and phases' : 'Base current calibration and documentation', detail: isDA_atu ? `Adjust phasor for correct tower current ratios (±5% tolerance) and phases (±3° tolerance) per §73.155(d); verify with calibrated base current meters on all ${n_towers} towers` : `Calibrate base current meter to read licensed current value; verify within ±5% tolerance per §73.155(a); document settings for FCC records`, equipment: isDA_atu ? 'Calibrated base current meters on all towers; phasor control panel' : 'Base current meter (e.g., Deltec or Potomac Instruments)' }
+        { step: 5, action: isDA_atu ? 'DA phasor adjustment for current ratios and phases' : 'Base current calibration and documentation', detail: isDA_atu ? `Adjust phasor for correct tower current ratios (±5% tolerance) and phases (±3° tolerance) per §73.62(a); verify with calibrated base current meters on all ${n_towers} towers` : `Calibrate base current meter to read licensed current value; verify within ±5% tolerance per §73.62(a); document settings for FCC records`, equipment: isDA_atu ? 'Calibrated base current meters on all towers; phasor control panel' : 'Base current meter (e.g., Deltec or Potomac Instruments)' }
       ];
 
       return {
@@ -21068,11 +21068,11 @@ async function scoreCandidate(pt, ctx, warnings){
         current_tolerance_pct,
         phase_tolerance_deg,
         ratio_tolerance_pct,
-        current_tolerance_cfr:        '47 CFR §73.155(a)',
-        da_tolerance_cfr:             isDA_atu ? '47 CFR §73.155(d)' : null,
+        current_tolerance_cfr:        '47 CFR §73.62(a)',
+        da_tolerance_cfr:             isDA_atu ? '47 CFR §73.62(a)' : null,
         frequency_tolerance_hz:       20,
         frequency_tolerance_cfr:      '47 CFR §73.1215',
-        reference: '47 CFR §73.155 (operating tolerances); §73.61 (base current monitoring); §73.1215 (frequency tolerance); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
+        reference: '47 CFR §73.62(a) (DA operating tolerances: current ratio ±5%, phase ±3°); §73.61 (base current monitoring); §73.1215 (frequency tolerance); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
         note: `${isDA_atu ? 'DA' : 'NDA'} ${frequency_khz} kHz, λ/4=${lambda_quarter_m}m. Base resistance ~${base_resistance_ohm_typical}Ω; base current ~${base_current_rms}A rms at ${tpo_kw ?? 5} kW. ATU cost: $${total_atu_cost_low.toLocaleString()}–$${total_atu_cost_high.toLocaleString()} (typ. $${total_atu_cost_typ.toLocaleString()}). Commissioning: ${commissioning_days_low}–${commissioning_days_high} days. Antenna efficiency: ~${antenna_efficiency_pct}% with 120-radial system.`
       };
     })(),
@@ -29211,7 +29211,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // for rapid comparison across candidates.  Each dimension is scored 0–4:
       //   0 = Negligible  1 = Low  2 = Moderate  3 = High  4 = Critical
       //
-      // References: §73.24 (site eligibility), §73.150 (DA), §73.315/§73.37
+      // References: §73.24 (site eligibility), §73.150 (DA), §73.37
       // (spacing), Part 17 / §17.7 (ASR), NEPA (40 CFR 1500), FCC NEPA rules
       // (47 CFR §1.1307), local zoning baseline from population density proxy.
 
@@ -29627,14 +29627,17 @@ async function scoreCandidate(pt, ctx, warnings){
       const apc_cost_usd = apc_required ? { low: 1200, high: 2800 } : null;
 
       // Log entry triggers (§73.1820)
+      // §73.1820(a): entries for EAS tests, tower light malfunctions, other license requirements.
+      // §73.1820(a)(2): DA stations without FCC-approved antenna system must log common point
+      //   current, efficiency factor, and antenna monitor readings at intervals ≤ 3 hours.
       const LOG_ENTRY_TRIGGERS = [
-        { trigger: 'Sign-on / sign-off', cfr: '§73.1820(a)(1)' },
-        { trigger: 'Pattern change (DA-N or DA-2 day/night switch)', cfr: '§73.1820(a)(2)', da_only: true },
-        { trigger: 'EAS required weekly and monthly test', cfr: '§73.1820(a)(3)' },
-        { trigger: 'Equipment failures or abnormal operation', cfr: '§73.1820(a)(4)' },
-        { trigger: 'Power reduction or emergency operation', cfr: '§73.1820(a)(5)' },
-        { trigger: 'STA commencement / termination', cfr: '§73.1820(a)(6)' },
-        { trigger: 'Silent period start / end', cfr: '§73.1820(a)(7)' }
+        { trigger: 'Sign-on / sign-off', cfr: '§73.1820' },
+        { trigger: 'Pattern change (DA-N or DA-2 day/night switch)', cfr: '§73.1820', da_only: true },
+        { trigger: 'EAS required weekly and monthly test', cfr: '§73.1820(a)' },
+        { trigger: 'Equipment failures or abnormal operation', cfr: '§73.1820' },
+        { trigger: 'Power reduction or emergency operation', cfr: '§73.1820' },
+        { trigger: 'STA commencement / termination', cfr: '§73.1820' },
+        { trigger: 'Silent period start / end', cfr: '§73.1820' }
       ];
       const applicable_triggers = LOG_ENTRY_TRIGGERS.filter(t => !t.da_only || isDA);
 
@@ -29852,7 +29855,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Taken with a calibrated field strength meter
       //   - Corrected for inverse-distance variation (E × d vs distance curve)
       //
-      // 47 CFR §73.315 — AM field strength measurement methodology.
+      // 47 CFR §73.184 / FCC AM field strength measurement practice.
       //   - Measurements must be taken on open, level terrain ≥ 30 m from structures
       //   - Rod antenna height: 1 meter above ground
       //   - Multiple readings (≥ 3) averaged per point
@@ -29879,7 +29882,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Station must be at 100% modulation with reference tone during measurement
       //
       // References:
-      //   47 CFR §73.151; §73.154; §73.315
+      //   47 CFR §73.151; §73.154; §73.184
       //   ITU-R P.368-10; FCC M3 conductivity maps; NRSC AM Field Measurement Protocol
 
       const isDA     = /^DA/i.test(pattern_mode);
@@ -29915,12 +29918,12 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Measurement conditions checklist
       const MEASUREMENT_CONDITIONS = [
-        { condition: 'Open terrain — ≥ 30 m from buildings, trees, utility lines', required: true, cfr: '§73.315' },
-        { condition: 'Dry ground — no rain within 24 hours', required: true, cfr: '§73.315' },
-        { condition: 'Antenna height 1 m above ground; oriented vertically', required: true, cfr: '§73.315' },
+        { condition: 'Open terrain — ≥ 30 m from buildings, trees, utility lines', required: true, cfr: '§73.184 / FCC AM measurement practice' },
+        { condition: 'Dry ground — no rain within 24 hours', required: true, cfr: '§73.184 / FCC AM measurement practice' },
+        { condition: 'Antenna height 1 m above ground; oriented vertically', required: true, cfr: '§73.184 / FCC AM measurement practice' },
         { condition: 'GPS coordinates logged at each point (sub-meter preferred)', required: true, cfr: '§73.151' },
         { condition: 'Station at 100% modulation (400 Hz or 1 kHz reference tone)', required: true, cfr: 'NRSC protocol' },
-        { condition: 'At least 3 readings averaged per point', required: true, cfr: '§73.315' },
+        { condition: 'At least 3 readings averaged per point', required: true, cfr: '§73.184 / FCC AM measurement practice' },
         { condition: 'Calibration certificate for field strength meter < 12 months', required: true, cfr: '§73.151' },
         { condition: 'Ambient noise floor logged at each point', required: false, cfr: 'NRSC recommended' }
       ];
@@ -29958,7 +29961,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fcc_filing_fee_usd,
         total_cost_low_usd,
         total_cost_high_usd,
-        reference: '47 CFR §73.151; §73.154; §73.315; ITU-R P.368-10; NRSC AM Field Measurement Protocol',
+        reference: '47 CFR §73.151; §73.154; §73.184; ITU-R P.368-10; NRSC AM Field Measurement Protocol',
         note: isDA
           ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: formal proof required within ${filing_deadline_days} days of initial operation — ${n_radials_required} radials at ${radial_step_deg}° steps, ${MIN_POINTS_PER_RADIAL} points/radial (${total_field_measurements} measurements). File via FCC Form 302-AM.`
           : `NDA station at ${frequency_khz} kHz: formal proof not required (§73.152) unless FCC orders. Recommend ${nda_spot_check_radials} spot-check radials internally to verify COL coverage and document compliance.`
