@@ -25533,7 +25533,7 @@ async function scoreCandidate(pt, ctx, warnings){
         frequency_khz,
         tower_height_estimate_m:   towerHeightEst_m,
         tower_height_estimate_ft:  towerHeightEst_ft,
-        tower_height_basis:        ['A', 'B'].includes(fcc_class) ? '5/8λ (Class A/B optimum)' : 'λ/4 (Class C/D standard)',
+        tower_height_basis:        ['A', 'B'].includes(fcc_class) ? '5/8λ (Class A/B optimum)' : '3/8λ (Class C/D design height)',
         asr_required:              asrRequired_tl,
         asr_threshold_m:           ASR_THRESHOLD_M,
         faa_lighting_tier:         tier.label,
@@ -25544,7 +25544,7 @@ async function scoreCandidate(pt, ctx, warnings){
         maintenance_obligations:   maintenanceObs,
         n_maintenance_items:       maintenanceObs.length,
         reference: '47 CFR §17.7; §17.21; §17.23; §17.47; §17.56; §73.1213; FAA AC 70/7460-1M',
-        note: `Estimated tower height: ${towerHeightEst_m} m (${towerHeightEst_ft} ft) at ${['A', 'B'].includes(fcc_class) ? '5/8λ' : 'λ/4'}. ASR ${asrRequired_tl ? 'REQUIRED' : 'not required (< 61m)'}. FAA tier: ${tier.label}.`
+        note: `Estimated tower height: ${towerHeightEst_m} m (${towerHeightEst_ft} ft) at ${['A', 'B'].includes(fcc_class) ? '5/8λ' : '3/8λ'}. ASR ${asrRequired_tl ? 'REQUIRED' : 'not required (< 61m)'}. FAA tier: ${tier.label}.`
       };
     })(),
 
@@ -27313,7 +27313,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Structural analysis for AM broadcast towers per TIA-222-H (2018) and ANSI/TIA-222
       // §73.49 requires substantial structure; §17.7 ASR requires PE-stamped structural analysis
       // Key: wind zone, ice loading, antenna weight, and foundation capacity all drive tower selection
-      const towerH_tsa = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
+      const towerH_tsa = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D
       const asr_required_tsa = towerH_tsa > 60.96;
 
       // TIA-222-H wind speed exposure categories (ASCE 7-16 basis)
@@ -27718,19 +27718,21 @@ async function scoreCandidate(pt, ctx, warnings){
       //   • Tower ≥ 60.96m (200 ft): FAA Form 7460-1 / ASR registration (§17.7)
       //   • Class A/B:   Nighttime NIF analysis (§73.182 skywave tables)
       //
-      // Tower height estimate: a first-order estimate uses the quarter-wave
-      // height (λ/4) which is the optimum electrical height for a series-excited
-      // AM monopole.  λ/4 (m) = 75,000 / frequency_khz.
+      // Tower height estimate: class-aware design height per §73.150.
+      // 5/8λ for Class A/B (FCC optimum); 3/8λ for Class C/D (standard planning height).
       //
       // Form 301-AM filing fee: $1,705 (as of 2024 FCC fee schedule, 47 CFR
       // §1.1104).  Post-grant license fee (Form 302-AM): $190.
 
       const isDA = /^DA/i.test(pattern_mode);
 
-      // Quarter-wave height estimate
+      // Quarter-wave height: kept as reference field (physics baseline)
       const quarter_wave_height_m = round2(75000 / frequency_khz);
+      // Design height drives ASR — 3/8λ Class C/D, 5/8λ Class A/B
+      const isHighClass_cpe   = /^[AB]$/i.test(fcc_class);
+      const design_height_cpe = round2((isHighClass_cpe ? 0.625 : 0.375) * 300000 / frequency_khz);
       // ASR registration threshold: 200 feet = 60.96 m (47 CFR §17.7)
-      const asr_required          = quarter_wave_height_m > 60.96;
+      const asr_required          = design_height_cpe > 60.96;
 
       const rf_hazard_required    = tpo_kw >= 1.0;
       const ea_required           = tpo_kw > 5.0;
@@ -27782,7 +27784,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_filing_cost_high_usd:   prep_cost_high + fcc_filing_fee_usd,
         form:                         'FCC Form 301-AM',
         reference:                    '47 CFR §73.182; §73.150 (AM DA — 72-radial HRP); §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
-        note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Quarter-wave tower: ${quarter_wave_height_m}m (${asr_required ? 'ASR required' : 'ASR likely not required'}). Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
+        note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Design height (${isHighClass_cpe ? '5/8λ' : '3/8λ'}): ${design_height_cpe}m — ${asr_required ? 'ASR required (§17.7)' : 'ASR not required'}. Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
       };
     })(),
 
@@ -27795,7 +27797,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // tower type, soil, and permitting complexity.
       //
       // Cost components:
-      //   1. Tower: 5/8λ for Class A/B, λ/4 for C/D (standard AM monopole heights); DA adds tower(s)
+      //   1. Tower: 5/8λ for Class A/B, 3/8λ for C/D (standard AM planning heights); DA adds tower(s)
       //   2. Ground radial system: 90-radial standard (0.35λ radials per §73.186)
       //   3. Transmitter building: prefab shelter including HVAC/generator
       //   4. Transmitter equipment: main + spare by power class
@@ -30440,7 +30442,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_da_certifications: DA_CERTIFICATIONS.length,
         key_databases: ['CORES/FRN', 'LMS', 'ASR', 'ETRS/EAS', 'OPIF'],
         reference: '47 CFR §1.8001; §17.4; §17.7; §73.2080; §73.3526; §73.3539; §73.3571; §73.3598; §73.3615; §11.61',
-        note: `${frequency_khz} kHz (${fcc_class}): ASR ${asr_required ? 'REQUIRED (λ/4 ≈ ' + qw_m + ' m > 61 m)' : 'not required (λ/4 ≈ ' + qw_m + ' m ≤ 61 m)'}. Annual compliance cost ≈ $${total_annual_low_usd.toLocaleString()}. ${n_annual_obligations} annual obligations. ${is_da ? 'DA pattern parameters must be current in LMS.' : 'NDA — no pattern maintenance required.'}`
+        note: `${frequency_khz} kHz (${fcc_class}): ASR ${asr_required ? 'REQUIRED (design height ' + qw_m + ' m > 61 m §17.7)' : 'not required (design height ' + qw_m + ' m ≤ 61 m)'}. Annual compliance cost ≈ $${total_annual_low_usd.toLocaleString()}. ${n_annual_obligations} annual obligations. ${is_da ? 'DA pattern parameters must be current in LMS.' : 'NDA — no pattern maintenance required.'}`
       };
     })(),
 
