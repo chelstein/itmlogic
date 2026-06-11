@@ -19804,7 +19804,7 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       const exhibits_G_da = isDA_ch ? [
-        { id: 'G1', section: 'G', title: 'DA horizontal radiation pattern (theoretical)', required: true, cfr: '§73.150; §73.151', notes: 'Tabulated field ratios at 36 azimuths (10° increments) for each operating mode (DA-D, DA-N); signed by engineer' },
+        { id: 'G1', section: 'G', title: 'DA horizontal radiation pattern (theoretical)', required: true, cfr: '§73.150(a)', notes: 'Tabulated field ratios at 72 azimuths (5° increments, 0°–355°) per §73.150(a) / Form 301-AM for each operating mode (DA-D, DA-N); signed by engineer' },
         { id: 'G2', section: 'G', title: 'Antenna system design parameters', required: true, cfr: '§73.152; §73.154(a)', notes: 'Phase/ratio values for each element; mutual impedance matrix; driving point impedances; ATU design schematic' },
         { id: 'G3', section: 'G', title: 'Moment method analysis (NEC or MININEC)', required: true, cfr: '§73.150(b); §73.154(a)', notes: 'Full-wave electromagnetic model of the DA array; submitted as Exhibit D to Form 301; used for theoretical pattern' },
         { id: 'G4', section: 'G', title: 'DA proof monitoring specification', required: true, cfr: '§73.61; §73.154(a)', notes: 'Specifies monitoring points, reference parameters, tolerance values (±2° phase, ±0.5 dB ratio per §73.155)' },
