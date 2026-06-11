@@ -8845,7 +8845,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // ── Environmental triggers (§1.1307) ──
       const is_da_lu = /^DA/i.test(pattern_mode);
       const lambda_lu = round2(300000 / frequency_khz);
-      const h_frac_lu = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_frac_lu = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D design height
       const h_m_lu    = round2(h_frac_lu * lambda_lu);
       const h_ft_lu   = Math.round(h_m_lu * 3.28084);
 
@@ -17951,14 +17951,14 @@ async function scoreCandidate(pt, ctx, warnings){
     am_antenna_tower_lighting_and_faa_guide: (() => {
       // Models FAA tower lighting requirements (14 CFR Part 77, FCC §17.21) and
       // FCC Antenna Structure Registration (ASR) obligations under §17.7 for the
-      // candidate tower.  Tower height is estimated from the standard λ/4 monopole
-      // height at the station frequency.
+      // candidate tower.  Tower height is estimated from the design height:
+      // 3/8λ for Class C/D, 5/8λ for Class A/B.
 
       const isDA_ltg = /^DA/i.test(pattern_mode);
 
-      // Wavelength and standard quarter-wave tower height estimate
+      // Wavelength and design tower height (3/8λ Class C/D, 5/8λ Class A/B)
       const lambda_m            = round2(300000 / frequency_khz);
-      const std_tower_height_m  = round2(lambda_m * 0.25);
+      const std_tower_height_m  = round2(lambda_m * (['A', 'B'].includes(fcc_class) ? 0.625 : 0.375));
       const std_tower_height_ft = round2(std_tower_height_m * 3.28084);
 
       // FAA notification and FCC ASR threshold: 200 ft (60.96m) AGL per 14 CFR
