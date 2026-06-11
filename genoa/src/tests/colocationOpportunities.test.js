@@ -2686,7 +2686,22 @@ test('am_construction_project_schedule_and_management_guide present across coloc
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_construction_project_schedule_and_management_guide missing`);
     assert.ok(g.total_months_low > 0, `rank ${c.rank}: total_months_low must be positive`);
     assert.ok(g.total_months_high >= g.total_months_low, `rank ${c.rank}: high must be >= low`);
-    assert.strictEqual(g.is_clear, true, `rank ${c.rank}: KAZM 780 kHz is_clear should be true`);
+    // baseBody uses 790 kHz — not a §73.25 clear channel (clear channels are fixed per §73.25)
+    assert.strictEqual(g.is_clear, false, `rank ${c.rank}: 790 kHz is not a clear channel`);
+  }
+});
+
+test('am_construction_project_schedule_and_management_guide: clear-channel station gets longer FCC processing', async () => {
+  // 780 kHz IS a §73.25 clear channel; 790 kHz is not
+  const clearOut = await runColocationOpportunities(baseBody({ frequency_khz: 780, candidate_limit: 1 }));
+  const nonClearOut = await runColocationOpportunities(baseBody({ frequency_khz: 790, candidate_limit: 1 }));
+  if (clearOut.candidates.length > 0 && nonClearOut.candidates.length > 0) {
+    const gClear = clearOut.candidates[0].am_construction_project_schedule_and_management_guide;
+    const gNonClear = nonClearOut.candidates[0].am_construction_project_schedule_and_management_guide;
+    assert.strictEqual(gClear.is_clear, true,    '780 kHz must report is_clear=true');
+    assert.strictEqual(gNonClear.is_clear, false, '790 kHz must report is_clear=false');
+    assert.ok(gClear.fcc_processing_months_low > gNonClear.fcc_processing_months_low,
+      'clear channel requires longer FCC processing');
   }
 });
 

@@ -5028,16 +5028,26 @@ async function scoreCandidate(pt, ctx, warnings){
       });
 
       // Gate 7: §73.316 DA pattern (if recommended)
-      const daRec = false; // placeholder — actual recommendation comes from directional_antenna_study_guide
-      const daStatus = daRec ? WARN : NA;
-      // We can check if coverage_pct < 80 and coverage_pct >= 40 as a proxy for DA need
-      const daProxy = colPct != null && colPct < 80 && colPct >= 40;
+      // Sources in priority order:
+      //   1. pattern_mode already DA → operator declared, definitely required
+      //   2. COL coverage gap 40–79% → directional pattern may recover coverage
+      //   3. Full coverage or no COL data → not indicated at this screening level
+      const isAlreadyDA   = /^DA/i.test(pattern_mode);
+      const daProxy       = colPct != null && colPct < 0.80 && colPct >= 0.40;
+      const daStatus      = (isAlreadyDA || daProxy) ? WARN : NA;
+      const daValue       = isAlreadyDA ? 'DA mode declared — §73.150 DA design and §73.182 NIF required'
+                          : daProxy     ? 'COL coverage gap — DA pattern may recover coverage'
+                          :               'Not indicated at this screening level';
       gates.push({
         id: 'DA_PATTERN', label: '§73.316 directional antenna pattern',
-        status: daProxy ? WARN : NA,
-        value: daProxy ? 'DA study likely needed' : 'Not indicated at this coverage level',
+        status: daStatus,
+        value: daValue,
         rule: '47 CFR §73.150 / §73.316',
-        note: daProxy ? 'COL coverage gap may be recoverable with DA pattern — see directional_antenna_study_guide.' : null
+        note: isAlreadyDA
+          ? 'Operator-declared DA mode: §73.150 array design, §73.68 antenna monitor, and §73.182 nighttime NIF study are all required before Form 301-AM filing.'
+          : daProxy
+          ? 'COL coverage gap may be recoverable with DA pattern — see directional_antenna_study_guide for directional array cost and engineering scope.'
+          : null
       });
 
       const failCount = gates.filter(g => g.status === FAIL).length;
@@ -28121,9 +28131,22 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA = /^DA/i.test(pattern_mode);
       const contour_is_circular_estimate = !isDA;
 
-      // Principal community check flag (screening: if city_distance_km is
-      // available and > r_day_km, the contour may not reach the city of license)
-      const city_at_risk = false; // placeholder — full check requires COL coordinates
+      // Principal community check: if col_centroid is provided, compute
+      // the great-circle distance from the candidate to the COL center.
+      // When that distance exceeds the estimated 5 mV/m contour radius,
+      // the contour likely falls short of the COL — flag as AT_RISK.
+      // If no COL reference is available, report NOT_EVALUATED.
+      const colRef = col_centroid ?? null;
+      let city_at_risk = 'NOT_EVALUATED';
+      let city_distance_km = null;
+      if (colRef && Number.isFinite(colRef.lat) && Number.isFinite(colRef.lon)){
+        city_distance_km = round2(greatCircleKm(pt.lat, pt.lon, colRef.lat, colRef.lon));
+        city_at_risk = city_distance_km > r_day_km ? 'AT_RISK' : 'COVERED';
+      } else if (current_site && Number.isFinite(current_site.lat)){
+        // Fall back to current site as COL proxy (imprecise but directionally useful)
+        city_distance_km = round2(greatCircleKm(pt.lat, pt.lon, current_site.lat, current_site.lon));
+        city_at_risk = city_distance_km > r_day_km ? 'AT_RISK_PROXY' : 'LIKELY_COVERED';
+      }
 
       return {
         fcc_class, frequency_khz, tpo_kw,
@@ -28140,8 +28163,10 @@ async function scoreCandidate(pt, ctx, warnings){
         is_da:                        isDA,
         da_contour_directional_note:  isDA ? 'DA pattern: contour estimate is NDA-equivalent (circular). Actual DA contour requires per-azimuth pattern analysis.' : null,
         city_of_license_at_risk:      city_at_risk,
+        city_to_candidate_distance_km: city_distance_km,
+        col_reference_used:           colRef ? 'col_centroid' : (current_site ? 'current_site_proxy' : 'none'),
         reference:                    '47 CFR §73.24(j); §73.184; FCC AM groundwave method (OET-72)',
-        note:                         `Estimated 5 mV/m daytime contour at ${r_day_km} km (σ=${sigmaEff} mS/m vs. ref ${r_ref_day_km} km at σ=5). Coverage ${soil_coverage_advantage} by ${Math.abs(contour_delta_pct)}%. Area ~${coverage_area_km2} km². SCREENING GRADE ONLY.`
+        note:                         `Estimated 5 mV/m daytime contour at ${r_day_km} km (σ=${sigmaEff} mS/m vs. ref ${r_ref_day_km} km at σ=5). Coverage ${soil_coverage_advantage} by ${Math.abs(contour_delta_pct)}%. Area ~${coverage_area_km2} km². COL status: ${city_at_risk}${city_distance_km != null ? ` (dist ${city_distance_km} km)` : ''}. SCREENING GRADE ONLY.`
       };
     })(),
 
@@ -29311,9 +29336,18 @@ async function scoreCandidate(pt, ctx, warnings){
         return round2(r?.distance_km ?? 0);
       })();
 
-      // Coverage improvement estimate vs current site
-      // (We don't have current site sigma here, so estimate directionally)
-      const reach_pct_change = 0; // placeholder — would need current site reach
+      // Coverage improvement estimate vs current site.
+      // Look up M3 conductivity for the current site (zone fallback, synchronous)
+      // to estimate the current site's 0.5 mV/m reach for the comparison.
+      const reach_pct_change = (() => {
+        try {
+          const _csM3 = lookupM3ZoneFallback(current_site.lat, current_site.lon);
+          const csSigma = _csM3?.available ? _csM3.sigma_mS_m : 4;
+          const csR = fccAmDistanceKm({ frequency_khz, target_mvm: 0.5, conductivity_msm: csSigma, erp_kw: tpo_kw });
+          const csReach = round2(csR?.distance_km ?? 0);
+          return csReach > 0 ? round2(((primary_reach_km - csReach) / csReach) * 100) : null;
+        } catch { return null; }
+      })();
 
       // Market overlap analysis: 3 concentric zones
       const COVERAGE_ZONES = [
@@ -29372,9 +29406,10 @@ async function scoreCandidate(pt, ctx, warnings){
         n_coverage_zones: COVERAGE_ZONES.length,
         primary_service_radius_km: primary_reach_km,
         primary_service_area_km2: COVERAGE_ZONES[0].area_km2,
+        reach_pct_change_vs_current_site: reach_pct_change,
         translator_opportunity: TRANSLATOR_OPPORTUNITY,
         reference: '47 CFR §73.24; §73.182; §73.187; §73.318; §74.1200; FCC AMTA 2020; FCC Form 349',
-        note: `Class ${fcc_class} at ${frequency_khz} kHz. Primary 0.5 mV/m reach: ${primary_reach_km} km (${COVERAGE_ZONES[0].area_km2} km²). COL min: ${myThreshold.day_mvm} mV/m day. FM translator (250W) authorized under AMTA.`
+        note: `Class ${fcc_class} at ${frequency_khz} kHz. Primary 0.5 mV/m reach: ${primary_reach_km} km (${COVERAGE_ZONES[0].area_km2} km²). COL min: ${myThreshold.day_mvm} mV/m day.${reach_pct_change != null ? ` Reach change vs current site: ${reach_pct_change > 0 ? '+' : ''}${reach_pct_change}%.` : ''} FM translator (250W) authorized under AMTA.`
       };
     })(),
 
