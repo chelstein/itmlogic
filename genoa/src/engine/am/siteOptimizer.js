@@ -4762,7 +4762,7 @@ async function scoreCandidate(pt, ctx, warnings){
       if (blankHigh)      key_constraints.push(`Null 1000 mV/m contour away from populated areas (§73.24(g) ≤1% blanket limit).`);
       if (treaty_zone)    key_constraints.push(`Reduce power toward ${treaty_zone} border for binational coordination.`);
       if (secondaryClear) key_constraints.push(`DA-N pattern must protect Class A dominant's 0.5 mV/m and 25 µV/m contours.`);
-      key_constraints.push(`§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).`);
+      key_constraints.push(`§73.150(a) / Form 301-AM: horizontal pattern filed in 5° increments (72 tabulated values, 0°–355°).`);
       key_constraints.push(`Typical AM DA array: 2–4 tower elements; ground system must be extended to all towers.`);
 
       const add_wks_min = study_type === 'FULL_DA_STUDY_DAY_NIGHT' ? 16 : 8;
@@ -4774,7 +4774,7 @@ async function scoreCandidate(pt, ctx, warnings){
         study_type,
         triggers,
         key_constraints,
-        pattern_radials_required: 72,  // §73.316: 5° increments
+        pattern_radials_required: 72,  // §73.150(a) / Form 301-AM: 5° increments (0°–355°)
         additional_engineering_weeks_min: add_wks_min,
         additional_engineering_weeks_max: add_wks_max,
         note: `Commission a ${study_type.replace(/_/g, ' ')} study before filing. DA engineering adds ${add_wks_min}–${add_wks_max} weeks; budget for multiple antenna modeling iterations.`,
@@ -6425,9 +6425,9 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // §73.316 horizontal radiation pattern compliance checklist
       const hrpChecklist = [
-        { id: 'HRP_TABLE', item: 'Horizontal radiation pattern table at 10° increments (0°–350°)', required: isDA_ap, note: '§73.316(b)(1): full 36-radial measured pattern required for all DA stations' },
-        { id: 'HRP_CONTOUR', item: 'Effective field (mV/m at 1 km) for each radial tabulated', required: isDA_ap, note: '§73.316(b)(2): EF at 1 km computed from measured base currents and pattern' },
-        { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: isDA_ap, note: '§73.316: D/U at interfered-with protected contour must meet §73.207 limits' },
+        { id: 'HRP_TABLE', item: 'Horizontal radiation pattern table at 5° increments (0°–355°, 72 values)', required: isDA_ap, note: '§73.150(a) / Form 301-AM Exhibit: full 72-radial theoretical pattern at 5° increments required for AM DA authorization' },
+        { id: 'HRP_CONTOUR', item: 'Effective field (mV/m at 1 km) for each radial tabulated', required: isDA_ap, note: '§73.150(a): EF at 1 km computed from base current ratios and pattern; referenced to maximum value = 1.0' },
+        { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: isDA_ap, note: '§73.207 / §73.182: D/U at interfered-with protected contour must meet minimum spacing table limits; not a §73.316 requirement (which applies to FM)' },
         { id: 'DA_LICENSE_STATUS', item: 'DA pattern must be approved via FCC Form 302-AM (license to cover)', required: isDA_ap, note: '§73.3533: proof-of-performance measurements required before DA operation authorized' },
         { id: 'MONITOR_POINT', item: 'FCC-specified monitor points during DA operation', required: isDA_ap && isClear_ap, note: '§73.61/§73.62: clear-channel DA stations require FCC-specified monitoring' },
         { id: 'COL_MIN_FIELD', item: `COL minimum field: ${colReqdMvm} mV/m at ${dist_to_col_km} km toward ${col_bearing_deg}°`, required: true, note: `§73.24(j): 5 mV/m groundwave field must reach community of license from candidate site. NDA estimate: ${field_at_col_nda_mvm != null ? `${field_at_col_nda_mvm} mV/m` : 'N/A'}.` },
