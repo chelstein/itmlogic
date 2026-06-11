@@ -2842,15 +2842,17 @@ test('mpe_rf_exposure_summary.recommended_fence_distance_m >= near_field_boundar
   }
 });
 
-test('mpe_rf_exposure_summary fence distance increases with higher TPO', async () => {
+test('mpe_rf_exposure_summary far-field exclusion distance increases with higher TPO', async () => {
+  // At AM frequencies the near-field boundary (λ/2π ≈ 61m at 780kHz) dominates fence_distance
+  // for typical AM power levels.  The far_field_exclusion_m is what scales with TPO.
   const low  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, candidate_limit: 1 });
   const high = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, candidate_limit: 1 });
   assert.equal(low.available, true);
   assert.equal(high.available, true);
-  const fenceLow  = low.candidates[0].mpe_rf_exposure_summary.recommended_fence_distance_m;
-  const fenceHigh = high.candidates[0].mpe_rf_exposure_summary.recommended_fence_distance_m;
-  assert.ok(fenceHigh > fenceLow,
-    `higher TPO should produce larger fence distance: ${fenceHigh} not > ${fenceLow}`);
+  const excLow  = low.candidates[0].mpe_rf_exposure_summary.far_field_exclusion_m;
+  const excHigh = high.candidates[0].mpe_rf_exposure_summary.far_field_exclusion_m;
+  assert.ok(excHigh > excLow,
+    `higher TPO should produce larger far-field exclusion: ${excHigh} not > ${excLow}`);
 });
 
 // ---------- engineering_summary ----------
@@ -9771,8 +9773,8 @@ test('fcc_form_301_exhibit_checklist_guide KAZM NDA has 0 DA-specific exhibits',
 test('fcc_form_301_exhibit_checklist_guide KAZM 780 kHz ASR required (tower > 61m)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].fcc_form_301_exhibit_checklist_guide;
-  assert.strictEqual(g.asr_required, true, 'ASR required for 96m tower (> 61m threshold)');
-  assert.strictEqual(g.tower_height_ft, 315, 'tower must be 315 ft (λ/4 at 780 kHz)');
+  assert.strictEqual(g.asr_required, true, 'ASR required for 144m tower (> 61m threshold)');
+  assert.strictEqual(g.tower_height_ft, 473, 'tower must be 473 ft (3/8λ at 780 kHz Class D)');
 });
 
 test('fcc_form_301_exhibit_checklist_guide deficiency triggers populated', async () => {
@@ -12676,10 +12678,10 @@ test('am_tower_lighting_and_aviation_compliance_guide present on KAZM candidate'
 test('KAZM tower height and FAA notice requirement', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
-  assert.strictEqual(g.tower_height_m,    96.09,  'KAZM 780 kHz Class D tower should be 96.09 m (λ/4)');
-  assert.strictEqual(g.tower_height_ft,   315.26, 'KAZM tower should be 315.26 ft');
-  assert.strictEqual(g.needs_faa_notice,  true,   '315 ft tower requires FAA notice');
-  assert.strictEqual(g.needs_asr,         true,   '315 ft tower requires ASR registration');
+  assert.strictEqual(g.tower_height_m,    144.13, 'KAZM 780 kHz Class D tower should be 144.13 m (3/8λ)');
+  assert.strictEqual(g.tower_height_ft,   472.87, 'KAZM tower should be 472.87 ft');
+  assert.strictEqual(g.needs_faa_notice,  true,   '472 ft tower requires FAA notice');
+  assert.strictEqual(g.needs_asr,         true,   '472 ft tower requires ASR registration');
 });
 
 test('KAZM tower lighting type and costs', async () => {
@@ -12705,7 +12707,7 @@ test('am_tower_lighting_and_aviation_compliance_guide comparison table columns p
     assert.ok('lit_lighting_type'         in row, 'lit_lighting_type missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.lit_tower_height_ft,       315.26,                       'rank-1 lit_tower_height_ft should be 315.26');
+  assert.strictEqual(r0.lit_tower_height_ft,       472.87,                       'rank-1 lit_tower_height_ft should be 472.87');
   assert.strictEqual(r0.lit_total_install_low_usd,  6125,                         'rank-1 lit_total_install_low_usd should be $6,125');
   assert.strictEqual(r0.lit_lighting_type,          'medium_intensity_white_or_red', 'rank-1 lit_lighting_type mismatch');
 });
@@ -12984,8 +12986,9 @@ test('am_financial_feasibility_and_roi_guide present on KAZM candidate', async (
 test('KAZM financial capital cost components', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
-  assert.strictEqual(g.tower_cap_low,   60000,  '315 ft tower low should be $60,000');
-  assert.strictEqual(g.tower_cap_high,  180000, '315 ft tower high should be $180,000');
+  // 3/8λ at 780 kHz = 472.87 ft → falls in 400–600 ft bracket
+  assert.strictEqual(g.tower_cap_low,   150000, '472 ft tower (3/8λ) low should be $150,000');
+  assert.strictEqual(g.tower_cap_high,  400000, '472 ft tower (3/8λ) high should be $400,000');
   assert.strictEqual(g.tx_low,          20000,  '5 kW transmitter low should be $20,000');
   assert.strictEqual(g.gnd_low,         20000,  'ground system low should be $20,000');
 });
@@ -12993,15 +12996,17 @@ test('KAZM financial capital cost components', async () => {
 test('KAZM total capital cost range', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
-  assert.strictEqual(g.total_capital_low,  150000, 'total_capital_low should be $150,000');
-  assert.strictEqual(g.total_capital_high, 510000, 'total_capital_high should be $510,000');
+  // tower=150000 + gnd=20000 + tx=20000 + soft=30000 + site=20000 = 240000
+  // tower=400000 + gnd=80000 + tx=70000 + soft=100000 + site=80000 = 730000
+  assert.strictEqual(g.total_capital_low,  240000, 'total_capital_low should be $240,000');
+  assert.strictEqual(g.total_capital_high, 730000, 'total_capital_high should be $730,000');
 });
 
 test('KAZM simple payback years', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
-  assert.strictEqual(g.simple_payback_years_low,  0.3, 'payback_years_low should be 0.3');
-  assert.strictEqual(g.simple_payback_years_high, 5.1, 'payback_years_high should be 5.1');
+  assert.strictEqual(g.simple_payback_years_low,  0.48, 'payback_years_low should be 0.48 (240000/500000)');
+  assert.strictEqual(g.simple_payback_years_high, 7.3,  'payback_years_high should be 7.3 (730000/100000)');
   assert.strictEqual(g.annual_revenue_low,  100000, 'annual_revenue_low should be $100,000');
   assert.strictEqual(g.annual_revenue_high, 500000, 'annual_revenue_high should be $500,000');
 });
@@ -15575,19 +15580,19 @@ test('am_site_environmental_impact_and_permitting_guide is present on every cand
   }
 });
 
-test('KAZM tower_height_ft is ~315.25 ft for 780 kHz (λ/4)', async () => {
+test('KAZM tower_height_ft is ~472.87 ft for 780 kHz Class D (3/8λ)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_site_environmental_impact_and_permitting_guide;
-  assert.ok(Math.abs(g.tower_height_ft - 315.25) < 0.5, `tower_height_ft expected ~315.25, got ${g.tower_height_ft}`);
-  assert.strictEqual(g.height_exceeds_450ft, false, '315 ft tower must not exceed 450 ft §1.1307(b) trigger');
+  assert.ok(Math.abs(g.tower_height_ft - 472.87) < 0.5, `tower_height_ft expected ~472.87, got ${g.tower_height_ft}`);
+  assert.strictEqual(g.height_exceeds_450ft, true, '472 ft tower exceeds 450 ft §1.1307(b) trigger');
 });
 
-test('KAZM NEPA trigger is UNLIKELY for standard rural NDA site', async () => {
+test('KAZM NEPA trigger is POSSIBLE due to §1.1307(b) (tower exceeds 450 ft)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_site_environmental_impact_and_permitting_guide;
-  assert.strictEqual(g.nepa_trigger, 'UNLIKELY', 'standard rural site should show UNLIKELY NEPA trigger');
-  assert.strictEqual(g.ea_cost_low, 0, 'no EA cost when trigger is UNLIKELY');
-  assert.strictEqual(g.ea_cost_high, 0, 'no EA cost when trigger is UNLIKELY');
+  assert.strictEqual(g.nepa_trigger, 'POSSIBLE', '3/8λ Class D tower at 472ft exceeds 450ft §1.1307(b) EA trigger');
+  assert.strictEqual(g.ea_cost_low, 8000, 'EA cost must be $8,000 when §1.1307(b) triggered');
+  assert.strictEqual(g.ea_cost_high, 40000, 'EA cost must be $40,000 when §1.1307(b) triggered');
 });
 
 test('KAZM cup_required is true and cost range is reasonable', async () => {
@@ -17668,14 +17673,20 @@ test('#116 DA station has more da_certifications than NDA', async () => {
   assert.ok(gDA2.n_da_certifications > 0, 'DA-2 must have at least one DA certification');
 });
 
-test('#116 annual cost includes ASR inspection only when ASR required', async () => {
+test('#116 annual cost includes ASR inspection for all AM Class D stations (3/8λ exceeds 61m)', async () => {
+  // At 3/8λ design height, all Class D AM frequencies have towers > 61m (200ft):
+  //   1600 kHz: 3/8λ = 70.3m > 61m → ASR required
+  //   540 kHz:  3/8λ = 208m  > 61m → ASR required
   const highFreq = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
   const lowFreq  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
   const annHigh = highFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
   const annLow  = lowFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
-  assert.strictEqual(annHigh.asr_annual_inspection_usd, 0, '1600 kHz: no ASR inspection cost');
-  assert.ok(annLow.asr_annual_inspection_usd > 0, '540 kHz: must have ASR inspection cost');
-  assert.ok(annLow.total_annual_low_usd > annHigh.total_annual_low_usd, 'low-freq annual cost > high-freq');
+  assert.ok(annHigh.asr_annual_inspection_usd > 0, '1600 kHz 3/8λ=70m > 61m: ASR inspection cost required');
+  assert.ok(annLow.asr_annual_inspection_usd  > 0, '540 kHz 3/8λ=208m > 61m: ASR inspection cost required');
+  // DA station (pattern adds DA parameter monitoring cost) vs NDA
+  const da2Out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const annDA2 = da2Out.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
+  assert.ok(annDA2.total_annual_low_usd > annHigh.total_annual_low_usd, 'DA station annual cost > NDA due to pattern monitoring');
 });
 
 test('#116 candidate_comparison_table has rdb_* columns', async () => {
