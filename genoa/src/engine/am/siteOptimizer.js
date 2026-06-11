@@ -13833,7 +13833,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd_tp = /^[CD]$/i.test(fcc_class);
-      const tower_h_m      = round2(is_class_cd_tp ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_h_m      = round2(is_class_cd_tp ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_h_ft     = round2(tower_h_m * 3.28084);
       // Painting requirements per §17.23:
       // Towers ≤200 ft: no paint required (unless near airport)
@@ -13931,7 +13931,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd_dc = /^[CD]$/i.test(fcc_class);
       const isDA_dc        = /^DA/i.test(pattern_mode);
-      const tower_h_m      = round2(is_class_cd_dc ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_h_m      = round2(is_class_cd_dc ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_h_ft     = round2(tower_h_m * 3.28084);
       // Tower demolition cost varies by height:
       // <200 ft: $15,000–$50,000; 200–400 ft: $40,000–$150,000; >400 ft: $100,000–$400,000
@@ -14044,7 +14044,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd_t  = /^[CD]$/i.test(fcc_class);
       const isDA_t         = /^DA/i.test(pattern_mode);
-      const tower_h_m      = round2(is_class_cd_t ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_h_m      = round2(is_class_cd_t ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_h_ft     = round2(tower_h_m * 3.28084);
       const distance_km    = pt.distance_from_current_km ?? 0;
       const distance_mi    = round2(distance_km * 0.621371);
