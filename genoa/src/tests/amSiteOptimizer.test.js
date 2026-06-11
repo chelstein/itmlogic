@@ -9970,7 +9970,7 @@ test('fcc_license_history_and_compliance_record_guide present on KAZM candidate'
   assert.ok(g, 'license history guide must be present');
   assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
   assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
-  assert.strictEqual(g.cp_years_to_expiry, 3, 'CP expiry must be 3 years per §73.3534');
+  assert.strictEqual(g.cp_years_to_expiry, 3, 'CP expiry must be 3 years per §73.3598(a)');
 });
 
 test('fcc_license_history_and_compliance_record_guide KAZM NDA Class D processing priority', async () => {
@@ -16556,7 +16556,9 @@ test('#94 KAZM: am_cp_validity_and_tolling_guide present with correct term', asy
   const cp = out.candidates[0].am_cp_validity_and_tolling_guide;
   assert.ok(cp != null, 'am_cp_validity_and_tolling_guide must be present');
   assert.strictEqual(cp.cp_term_years, 3, '§73.3598(a) CP term must be 3 years');
-  assert.strictEqual(cp.ltc_deadline_months, 24, 'LtC deadline must be 24 months');
+  // §73.3536: license to cover is bounded by CP expiration (36 months); the previous
+  // 24-month figure was based on a nonexistent §73.3598(f).
+  assert.strictEqual(cp.ltc_deadline_months, 36, 'LtC deadline must be 36 months (CP expiration per §73.3598(a))');
   assert.strictEqual(cp.extension_days, 180, '§73.3598(e) extension must be 180 days');
 });
 

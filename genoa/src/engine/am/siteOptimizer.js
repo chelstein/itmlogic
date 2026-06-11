@@ -5661,7 +5661,7 @@ async function scoreCandidate(pt, ctx, warnings){
         estimated_field_days: estimated_days,
         measurements: proofMeasurements,
         nda_radial_plan: isDA_pg ? null : ndaRadials,
-        filing_trigger: 'FCC Form 302-AM (license to cover) must be filed within 3 years of CP grant date (§73.3534). Proof measurements must be complete before 302-AM is submitted.',
+        filing_trigger: 'FCC Form 302-AM (license to cover, §73.3536) must be filed before CP expiration (3-year term per §73.3598(a)). Proof measurements must be complete before 302-AM is submitted.',
         reference: '47 CFR §73.154 (proof of performance); §73.190 (antenna efficiency); §73.150(a) (DA pattern table, 5° increments); FCC Form 302-AM (license to cover); OET Bulletin 65 (RF exposure).',
         note: 'This is a screening-grade proof guide. Actual proof methodology must be coordinated with the licensed broadcast engineer of record and FCC counsel before construction.'
       };
@@ -6856,7 +6856,7 @@ async function scoreCandidate(pt, ctx, warnings){
         risk_note,
         treaty_zone_present:       hasTreaty_lt,
         asr_required:              asrReq_lt,
-        reference: '47 CFR §73.3520 (application fee); §73.3533 (construction completion); §73.3534 (license to cover deadline); 47 CFR §1.47 (public notice); FCC Media Bureau AM processing data',
+        reference: '47 CFR §73.3520 (application fee); §73.3533 (CP application); §73.3536 (license to cover); §73.3598 (construction period); 47 CFR §1.47 (public notice); FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. Contested applications, environmental appeals, or treaty complications can add years. All phase estimates are calendar weeks.'
       };
     })(),
@@ -7116,9 +7116,9 @@ async function scoreCandidate(pt, ctx, warnings){
         'Prepare complete engineering filing package with licensed broadcast consultant. LMS rejects incomplete Form 301-AM submissions; completeness review before filing saves significant processing delays.');
 
       // 12. Construction completion and license-to-cover deadline
-      const i12 = item('construction_deadline', 'CP construction completion and Form 302-AM deadline', '47 CFR §73.3534', 'WARN',
-        'FCC Construction Permits specify a completion deadline (typically 3 years from CP grant per §73.3534). Extensions can be requested but require showing of good cause. License to Cover (Form 302-AM) must be filed within 10 days of construction completion.',
-        'Develop construction schedule immediately upon CP grant. Request extension per §73.3534(b) if needed before deadline expiration — retroactive extensions are not available.');
+      const i12 = item('construction_deadline', 'CP construction completion and Form 302-AM deadline', '47 CFR §73.3598', 'WARN',
+        'FCC Construction Permits expire 3 years from grant per §73.3598(a); routine extensions are not available — the period tolls only for the specific events in §73.3598(b). License to Cover (Form 302-AM, §73.3536) must be filed within 10 days of commencing program tests (§73.1620(c)).',
+        'Develop construction schedule immediately upon CP grant. If a §73.3598(b) tolling event (litigation, international coordination, act of God) occurs, notify the FCC promptly — an unbuilt CP forfeits automatically at expiration (§73.3598(e)).');
 
       const items_rc = [i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12];
       const counts = { PASS: 0, WARN: 0, FAIL: 0, NOT_EVALUATED: 0 };
@@ -7140,7 +7140,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fail_count: counts.FAIL,
         not_evaluated_count: counts.NOT_EVALUATED,
         items: items_rc,
-        reference: '47 CFR §73.24(g)(j); §73.182; §73.150 (AM DA); §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3534; OET Bulletin 65',
+        reference: '47 CFR §73.24(g)(j); §73.182; §73.150 (AM DA); §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3598; OET Bulletin 65',
         note: 'regulatory_compliance_checklist is a screening-grade pre-filing assessment only. All WARN and NOT_EVALUATED items require professional engineering study, legal review, or additional data collection before Form 301-AM can be filed. Consult a licensed broadcast consultant and FCC communications attorney before filing.'
       };
     })(),
@@ -7906,8 +7906,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   §73.3598(e): FCC may grant one 180-day extension if "good cause" shown.
       //     Good cause examples: environmental challenges still pending, financing
       //     not yet secured, tower manufacturer lead times, permitting delays.
-      //   §73.3598(f): License to Cover — FCC Form 302-AM must be filed within
-      //     2 years of CP grant or before expiration, whichever is sooner.
+      //   License to Cover — FCC Form 302-AM (§73.3536) must be filed before CP
+      //     expiration; §73.1620(c) requires the license application within
+      //     10 days of commencing program tests.
       //
       // Construction "substantially started" = major construction contracts signed
       // or major foundation work underway (FCC Media Bureau interpretation).
@@ -7972,16 +7973,17 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       // Form 302-AM "License to Cover" filing deadline
-      // Must be filed within 2 years of CP grant OR before CP expiration, whichever sooner.
-      // For a standard 3-year CP, the 2-year deadline is the binding constraint.
-      const ltc_deadline_months = 24;  // 2 years from CP grant = 24 months
+      // Must be filed before CP expiration (§73.3536); for a standard 3-year CP
+      // that is 36 months from grant. §73.1620(c) additionally requires the
+      // license application within 10 days of commencing program tests.
+      const ltc_deadline_months = 36;  // bounded by 3-year CP expiration
 
       // Key milestones in CP lifecycle
       const milestones = [
         { event: 'CP granted by FCC', month: 0, note: '3-year clock starts on grant date' },
         { event: 'Substantial construction started (contracts signed, major work begun)', month_low: 6, month_high: 18, note: 'Must begin before expiration; establishes good-faith record' },
         { event: 'Construction complete; antenna on-air for testing', month_low: 12, month_high: 30, note: 'Proof of performance field measurements begin' },
-        { event: 'Form 302-AM (License to Cover) must be filed', month: ltc_deadline_months, note: `§73.3598(f): 2-year deadline or before expiration; contains proof-of-performance results` },
+        { event: 'Form 302-AM (License to Cover) must be filed', month: ltc_deadline_months, note: `§73.3536: file before CP expiration (§73.1620(c): within 10 days of starting program tests); contains proof-of-performance results` },
         { event: 'CP expiration (if 180-day extension granted)', month: cp_term_months + extension_months, note: `Extended CP expires ${cp_term_months + extension_months} months from grant` },
         { event: 'CP expiration (standard term, no extension)', month: cp_term_months, note: `${cp_term_years}-year standard term per §73.3598(a)` }
       ];
@@ -8010,7 +8012,7 @@ async function scoreCandidate(pt, ctx, warnings){
         milestones,
         complexity_risk,
         risk_rationale,
-        reference: '47 CFR §73.3598 (CP term, tolling, extension); §73.3598(a) (3-year term); §73.3598(b) (tolling); §73.3598(e) (180-day extension); §73.3598(f) (license to cover); FCC Form 302-AM instructions',
+        reference: '47 CFR §73.3598 (CP term, tolling); §73.3598(a) (3-year term); §73.3598(b) (tolling); §73.3536 (license to cover); §73.1620(c) (program tests); FCC Form 302-AM instructions',
         note: `Class ${fcc_class} CP: ${cp_term_years}-year standard term. LtC (Form 302-AM) due by month ${ltc_deadline_months}. Timeline risk: ${complexity_risk}. ${risk_rationale}`
       };
     })(),
@@ -17885,7 +17887,7 @@ async function scoreCandidate(pt, ctx, warnings){
         engineering_cost_high_usd,
         fcc_filing_fee_usd,
         note: `${filing_type} relocation via ${fcc_form}: CP processing ${cp_processing_months_low}–${cp_processing_months_high} months; post-grant construction ${post_cp_months_low}–${post_cp_months_high} months; total ${total_months_low}–${total_months_high} months decision-to-on-air. CP valid ${cp_validity_years} yrs per §73.67; construction margin ${construction_margin_months_low}–${construction_margin_months_high} months → expiration risk: ${cp_expiration_risk}.`,
-        reference: '47 CFR §73.3533 (application for CP); §73.3534 (filing procedures); §73.3598 (CP expiration — 3 years); §73.3535 (dismissal of applications); FCC Form 301-AM',
+        reference: '47 CFR §73.3533 (application for CP); §73.3564 (acceptance of applications); §73.3598 (CP expiration — 3 years); §73.3535 (dismissal of applications); FCC Form 301-AM',
       };
     })(),
 
@@ -19334,7 +19336,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // Key license record risk categories:
       //   1. Construction Permit (CP) expiration risk: CPs expire 3 years from
-      //      grant date (47 CFR §73.3534); lapse → must re-apply from scratch
+      //      grant date (47 CFR §73.3598); lapse → automatic forfeiture (§73.3598(e)); must re-apply from scratch
       //   2. License renewal history: "red light" rule (47 CFR §1.1910)
       //      blocks new applications during unpaid debts/forfeitures
       //   3. Foreign ownership: > 25% foreign ownership (47 USC §310(b))
@@ -19359,7 +19361,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // CP expiration risk score (0–5): higher for complex DA arrays
       const cp_complexity_score = isDA_lic ? (tpo_kw >= 50 ? 4 : 2) : 1;
-      const cp_years_to_expiry  = 3; // §73.3534 standard CP term
+      const cp_years_to_expiry  = 3; // §73.3598(a) standard CP term
 
       // STA eligibility: available for DA-to-NDA temporary conversions or
       // minor facility changes; not available for major technical changes
@@ -19403,7 +19405,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Key filing deadlines
       const key_deadlines = [
         { item: 'STA application', deadline: 'Before authorized facilities expire (§73.1635)', form: 'FCC Form 302-AM' },
-        { item: 'Construction Permit', deadline: '3 years from CP grant (§73.3534)', form: 'FCC Form 301-AM' },
+        { item: 'Construction Permit', deadline: '3 years from CP grant (§73.3598(a))', form: 'FCC Form 301-AM' },
         { item: 'License to Cover (LTC)', deadline: 'Within 15 days of construction completion (§73.3536)', form: 'FCC Form 302-AM' },
         { item: 'License Renewal', deadline: 'First full-power year after construction (§73.3539)', form: 'FCC Form 303-S' }
       ];
@@ -19426,7 +19428,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_key_deadlines:             key_deadlines.length,
         is_clear_channel:            is_clear_ch_lic,
         is_da:                       isDA_lic,
-        reference: '47 CFR §73.3534; §73.3536; §73.3539; §1.1910; §1.80; §1.2109; 47 USC §310(b); FCC Character Policy Statement (1990); FCC Red Light Rule',
+        reference: '47 CFR §73.3598; §73.3536; §73.3539; §1.1910; §1.80; §1.2109; 47 USC §310(b); FCC Character Policy Statement (1990); FCC Red Light Rule',
         note: `FCC license compliance profile for ${fcc_class}-class station on ${frequency_khz} kHz. ` +
               `Processing: ${processing_priority} (${processing_months_low}–${processing_months_high} months). ` +
               `Comparative risk: ${comparative_risk}. STA eligible: ${sta_eligible}.`
@@ -20731,7 +20733,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_professional_services:      PROFESSIONAL_SERVICES.length,
         n_required_services,
         professional_services:        PROFESSIONAL_SERVICES,
-        reference: 'FCC Form 301-AM instructions; 47 CFR §73.3533; §73.3534; §73.154; §73.190; Communications Law Center (FCC attorney fee surveys); BIA Advisory Services (broadcast engineering fee surveys)',
+        reference: 'FCC Form 301-AM instructions; 47 CFR §73.3533; §73.3598; §73.154; §73.190; Communications Law Center (FCC attorney fee surveys); BIA Advisory Services (broadcast engineering fee surveys)',
         note: `${isDA_bac ? 'DA' : 'NDA'} ${frequency_khz} kHz relocation. Attorney fees: ~$${attorney_total_typ.toLocaleString()} total. Engineering fees: ~$${eng_total_typ.toLocaleString()} total. Combined professional services: $${combined_total_low.toLocaleString()}–$${combined_total_high.toLocaleString()} (typ. $${combined_total_typ.toLocaleString()}). ${n_required_services} required services.`
       };
     })(),
@@ -21930,7 +21932,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Forfeiture for operating an unauthorized transmitter: §503(b); typically $10,000–$25,000
 
       const LEGAL_ALTERNATIVES = [
-        { id: 'RELOCATION',   label: 'Main transmitter relocation (this optimizer)', cfr: '§73.3533; §73.3534', authorized: true, note: 'Move transmitter to better site for coverage improvement — requires FCC CP and construction' },
+        { id: 'RELOCATION',   label: 'Main transmitter relocation (this optimizer)', cfr: '§73.3533; §73.3598', authorized: true, note: 'Move transmitter to better site for coverage improvement — requires FCC CP and construction' },
         { id: 'AM_TRANSLATOR',label: 'AM-to-FM translator', cfr: '§74.1201; MB 13-249', authorized: true, note: 'FCC authorized AM-to-FM translator service; 250W ERP FM fill-in translator within AM contour' },
         { id: 'IBOC_HD',      label: 'AM HD Radio (IBOC digital sidebands)', cfr: '§73.406; FCC IBOC authorization', authorized: true, note: 'Digital audio sidebands on AM carrier; improves quality and perceived coverage; requires separate FCC authorization' },
         { id: 'PART15_CC',    label: 'Part 15 carrier current (in-building only)', cfr: '§15.221', authorized: true, note: 'Unlicensed; power limit 100 mW; effective only inside the building connected to the power line; not practical for area coverage' },
@@ -22058,7 +22060,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - FCC Form 301-AM: Application for AM Broadcast Construction Permit
       //   - Filed electronically via FCC LMS (Licensing and Management System) at lms.fcc.gov
       //   - §73.3533(a): Application for CP required before any site change
-      //   - §73.3534: CP must be filed and granted before construction begins at new site
+      //   - 47 U.S.C. §319(a) / §73.3533: CP must be granted before construction begins at new site
       //
       // Required technical exhibits for Form 301-AM (site relocation):
       //   1. Site coordinates (NAD83): latitude, longitude of proposed antenna reference point
@@ -22082,7 +22084,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //     requiring full public notice; < 3.2 km may qualify as minor modification
       //
       // §73.3539: CP expires if construction not completed within 3 years of grant
-      // §73.3534(b): 6-month extension available upon showing of good cause before expiration
+      // §73.3598(b): no routine extensions — the 3-year period tolls only for specified events (litigation, international coordination, acts of God)
       //
       // Filing fee (FCC Schedule of Application Fees, as of 2024):
       //   - AM CP (major modification): $325 filing fee
@@ -22110,8 +22112,8 @@ async function scoreCandidate(pt, ctx, warnings){
         { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $325 filing fee electronically', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
         { step: 2, action: 'FCC issues public notice (PNOH)', detail: 'FCC Public Notice of Hearing or Application — 30-day window for petitions to deny (major modifications)', timeline: '30-day public comment period', cfr: '§73.3580' },
         { step: 3, action: 'FCC engineering review', detail: 'FCC Media Bureau AM engineers review technical exhibits, interference analysis, and DA proof if applicable', timeline: '3–18 months (NDA faster; DA longer)', cfr: '§73.3533' },
-        { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3534; §73.3526(e)(1)' },
-        { step: 5, action: 'Construct and file Form 302-AM (license to cover)', detail: 'After construction and proof-of-performance, file Form 302-AM with proof exhibits for license to cover', timeline: '3-year CP term; file 302-AM before CP expiration', cfr: '§73.3539; §73.3534(b)' }
+        { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3598; §73.3526(e)(1)' },
+        { step: 5, action: 'Construct and file Form 302-AM (license to cover)', detail: 'After construction and proof-of-performance, file Form 302-AM with proof exhibits for license to cover', timeline: '3-year CP term; file 302-AM before CP expiration', cfr: '§73.3536; §73.3598' }
       ];
 
       return {
@@ -22138,7 +22140,7 @@ async function scoreCandidate(pt, ctx, warnings){
           da_conservative_months: 18
         },
         relocation_note: `File FCC Form 301-AM via LMS. ${n_required_exhibits} required exhibits including interference analysis, contour map, FAA determination, and ASR number. $325 filing fee. ${isDA_lm ? 'DA station requires horizontal radiation pattern table per §73.150(a) (72 radials at 5°). Processing: 9–18 months.' : 'NDA station. Processing: 3–9 months.'} CP valid for 3 years; 6-month extension available.`,
-        reference: '47 CFR §73.3533; §73.3534; §73.3539; §73.3580; §73.150 (AM DA); §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
+        reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3580; §73.150 (AM DA); §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
         note: `Form 301-AM via FCC LMS. ${n_required_exhibits} required exhibits. Filing fee: $325. CP term: 3 years + 6-month extension. Processing: ${isDA_lm ? '9–18' : '3–9'} months. Public notice triggers 30-day petition window for major changes.`
       };
     })(),
@@ -23928,7 +23930,7 @@ async function scoreCandidate(pt, ctx, warnings){
     silent_station_consideration: (() => {
       // §73.1740: FCC rules on silent stations and authorizations
       // §73.1750: Discontinuance of operation (voluntary or involuntary)
-      // §73.3534: Silent STA (Special Temporary Authorization) procedures
+      // §73.1740(a)(4) / §73.1635: silent-station notification and STA procedures
       // §1.65: Disclosure obligation for changed circumstances in pending applications
       //
       // AM relocation projects typically require the station to go silent for
@@ -23959,7 +23961,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // STA (Special Temporary Authority) options
       const STA_OPTIONS = [
-        { id: 'INITIAL_STA', label: 'Initial 30-day STA (§73.3534(b))', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 290, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days' },
+        { id: 'INITIAL_STA', label: 'Initial silent STA (§73.1740(a)(4))', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 290, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days' },
         { id: 'RENEWAL_STA', label: 'STA renewal (each 6-month extension)', form: 'STA renewal request (informal letter acceptable)', fee_usd: 290, duration_weeks: 26, notes: 'FCC will grant up to 12 months total absent extraordinary circumstances' },
         { id: 'REDUCED_POWER', label: 'Reduced power STA (interim operation during construction)', form: 'FCC Form 2100', fee_usd: 290, duration_weeks: null, notes: 'Allows partial operation during construction; must protect co-channel/adjacent allocations' }
       ];
@@ -23978,7 +23980,7 @@ async function scoreCandidate(pt, ctx, warnings){
           max_silent_weeks: MAX_SILENT_WEEKS,
           initial_sta_form: 'FCC Form 2100',
           sta_options: STA_OPTIONS,
-          filing_requirement: 'STA required for silent period > 30 days; file FCC Form 2100 citing §73.3534(b)',
+          filing_requirement: 'STA required for silent period > 30 days; file FCC Form 2100 citing §73.1740(a)(4)',
           cancellation_risk: 'CP or license may be cancelled after 12 months of silence per §73.1740(a)'
         },
         construction_timeline: {
@@ -23991,7 +23993,7 @@ async function scoreCandidate(pt, ctx, warnings){
         exceeds_silent_limit,
         mitigation_strategies: MITIGATIONS,
         n_mitigation_strategies: MITIGATIONS.length,
-        reference: '47 CFR §73.1740; §73.1750; §73.3534; §1.65; FCC Form 2100; FCC Form 319 (legacy); §73.154',
+        reference: '47 CFR §73.1740; §73.1750; §73.1635; §1.65; FCC Form 2100; FCC Form 319 (legacy); §73.154',
         note: `Construction: ${construction_weeks_min}–${construction_weeks_max} wks (typical ${construction_weeks_typical} wks). Max silent: ${MAX_SILENT_WEEKS} wks. License risk: ${license_risk_level}.`
       };
     })(),
