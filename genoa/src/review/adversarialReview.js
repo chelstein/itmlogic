@@ -196,7 +196,7 @@ export function buildAdversarialReview(exhibit) {
           field: 'compliance-pass',
           rule:  '47 CFR §73.215',
           reviewer_question: `${missingCite.length} violation(s) have no rule citation. Which specific rule does each violation invoke?`,
-          why_it_matters:    'Each violation must cite the rule it invokes (§73.207 vs §73.215 vs §73.219). Without a citation the applicant cannot know what remedy is required.',
+          why_it_matters:    'Each violation must cite the rule it invokes (§73.207 vs §73.215 vs §73.213). Without a citation the applicant cannot know what remedy is required.',
           current_evidence:  `${violations.length} violations, ${missingCite.length} missing cite field`,
           gap:               'Some violation records are missing the cite/rule field',
           recommended_fix:   'Add cite field to every violation entry (e.g. "47 CFR §73.215")'

@@ -69,12 +69,12 @@ export const FIELD_TOLERANCES = Object.freeze({
   }),
   asr_height_agl_m: Object.freeze({
     absolute_tolerance:        3,              // §17.4 registration tolerance
-    conflict_code:             'SOURCE_CONFLICT_ASR_HEIGHT',
+    conflict_code:             'SOURCE_CONFLICT_TOWER_HEIGHT',
     blocker_if_primary_missing: false
   }),
   asr_height_amsl_m: Object.freeze({
     absolute_tolerance:        3,
-    conflict_code:             'SOURCE_CONFLICT_ASR_HEIGHT',
+    conflict_code:             'SOURCE_CONFLICT_TOWER_HEIGHT',
     blocker_if_primary_missing: false
   }),
   tower_coordinates: Object.freeze({

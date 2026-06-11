@@ -7,7 +7,8 @@
 //
 // REGULATORY BASIS
 //   47 CFR §73.215 — FM full-service contour protection.
-//   47 CFR §73.62  — directional antenna pattern authorization.
+//   47 CFR §73.316 — FM directional antennas (pattern authorization).
+//   (§73.62 is the AM DA-tolerances rule — not applicable to this FM module.)
 //
 // DETERMINISM GUARANTEE
 //   All recommended phase values come directly from the NEC coarse grid

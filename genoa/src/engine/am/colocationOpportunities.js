@@ -46,7 +46,7 @@ const KNOWN_SOURCES      = Object.freeze(['MANUAL']);
 // Co-location-specific thresholds.
 const DIPLEX_RADIUS_KM            = 10;   // same-band AM host < 10 km → diplexing required
 const SAME_BAND_INTERFERENCE_KHZ  = 20;   // freq delta ≤ this → HIGH risk on AM_SITE host
-const COL_COVERAGE_HARD_FLOOR     = 0.80; // mirrors siteOptimizer §73.24(j)
+const COL_COVERAGE_HARD_FLOOR     = 0.80; // mirrors siteOptimizer §73.24(i)
 const BLANKET_POP_HARD_CEIL_PCT   = 1.0;  // mirrors siteOptimizer §73.24(g)
 const PROMISING_TOP_QUANTILE      = 0.75;
 const RECOVERY_SCORE_FLOOR        = 55;   // recoverable categories need a base of usable rf merit
@@ -92,7 +92,7 @@ export async function runColocationOpportunities(body = {}){
   }
 
   // ---- 1c. FCC class power limit advisory (mirrors siteOptimizer §73.21 check) ----
-  const FCC_CLASS_POWER_KW = { A:{min:10,max:50}, B:{min:0.25,max:50}, C:{min:0.001,max:0.25}, D:{min:0.001,max:50} };
+  const FCC_CLASS_POWER_KW = { A:{min:10,max:50}, B:{min:0.25,max:50}, C:{min:0.25,max:1}, D:{min:0.25,max:50} }; // §73.21; D night < 0.25 kW
   const classLimits = FCC_CLASS_POWER_KW[fcc_class];
   if (classLimits){
     if (tpo_kw > classLimits.max){
@@ -295,7 +295,7 @@ export async function runColocationOpportunities(body = {}){
     per_candidate_confidence: confDist,
     notes: [
       ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
-      ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
+      ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring uses geographic region proxy (screening grade); USFS FIA / LANDFIRE raster would provide parcel-level precision'] : []),
       ...(!community_of_license_polygon   ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : []),
       ...(infraSites.length > 0           ? [`${infraSites.length} infrastructure site(s) from ${infrastructure_source} inventory included in pool`] : []),
       ...(confDist.LOW === nPoolTotal ? [`All ${nPoolTotal} candidates scored at LOW confidence (zone-table σ + disc-proxy COL) — provide AM_m3.tif and community_of_license_polygon to raise ranking reliability.`]
@@ -428,7 +428,7 @@ export async function runColocationOpportunities(body = {}){
         { id: 'POPULATION', label: 'Population / people served', confidence: 'SCREENING', score_impact_pts: 8, upgrade_action: 'Integrate Census TIGER block-level population.' },
         { id: 'BLANKET_POPULATION', label: 'Blanket population fraction', confidence: 'SCREENING', score_impact_pts: 6, upgrade_action: 'Integrate Census blocks within 1000 mV/m contour.' },
         { id: 'NIGHTTIME_NIF', label: 'Nighttime skywave (§73.182)', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Integrate FCC OET-72 skywave engine + LMS.' },
-        { id: 'WILDFIRE_RISK', label: 'Wildfire / fuel risk', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Wire USFS FIA / LANDFIRE raster.' }
+        { id: 'WILDFIRE_RISK', label: 'Wildfire / fuel risk', confidence: 'SCREENING', score_impact_pts: goals.avoid_wildfire_risk ? 4 : 0, upgrade_action: 'Wire USFS FIA / LANDFIRE raster for parcel-level fire-hazard severity zone data.' }
       ];
       const filing_grade = dimensions.filter(d => d.confidence === 'FILING_GRADE').length;
       return { overall_confidence: filing_grade >= 2 ? 'MEDIUM_HIGH' : filing_grade >= 1 ? 'MEDIUM' : 'LOW', conductivity_mode: conductivity_mode_loc, col_polygon_supplied: hasColPolygon, dimensions, n_filing_grade: filing_grade, n_screening: dimensions.filter(d => d.confidence === 'SCREENING').length, n_not_evaluated: dimensions.filter(d => d.confidence === 'NOT_EVALUATED').length, note: 'Confidence matrix shows the data quality behind each scoring dimension.' };
@@ -734,7 +734,7 @@ function assignStatusCategory(c, scoreCutoff, { current_site }){
     if (c.minimum_tpo_for_col_coverage_kw != null){
       // Engine found a feasible power level (≤50 kW) — direct TPO increase is the fix.
       category = 'RECOVERABLE_WITH_POWER_INCREASE';
-      reasoning.push(`Engine computed minimum TPO of ${c.minimum_tpo_for_col_coverage_kw} kW to reach §73.24(j) 5 mV/m at COL centroid distance; direct power increase (no DA pattern) is the primary path.`);
+      reasoning.push(`Engine computed minimum TPO of ${c.minimum_tpo_for_col_coverage_kw} kW to reach §73.24(i) 5 mV/m at COL centroid distance; direct power increase (no DA pattern) is the primary path.`);
     } else if (c.distance_from_current_km <= NEARBY_COMMUNITY_RADIUS_KM){
       category = 'RECOVERABLE_WITH_DA';
       reasoning.push('Principal-community 5 mV/m contour shortfall is plausibly recoverable via directional-antenna design (§73.150).');
@@ -797,7 +797,7 @@ function collectHardFails(c){
   // directly (without finalizeLabels), reconstruct from the raw fields.
   const flags = [];
   if (c.col_coverage_pct != null && c.col_coverage_pct < COL_COVERAGE_HARD_FLOOR){
-    flags.push(`COL coverage ${(c.col_coverage_pct * 100).toFixed(0)}% < §73.24(j) floor`);
+    flags.push(`COL coverage ${(c.col_coverage_pct * 100).toFixed(0)}% < §73.24(i) floor`);
   }
   if (c.blanket_population_pct != null && c.blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT){
     flags.push(`Blanket population ${c.blanket_population_pct.toFixed(2)}% > §73.24(g) 1% limit`);
@@ -851,7 +851,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
       const action = c.status_category === 'PROMISING'
         ? `Advance to full §73.182 NIF study and parcel investigation.`
         : c.status_category === 'RECOVERABLE_WITH_POWER_INCREASE'
-        ? `Increase TPO to ≥${c.minimum_tpo_for_col_coverage_kw} kW to achieve §73.24(j) compliance, then advance to NIF study.`
+        ? `Increase TPO to ≥${c.minimum_tpo_for_col_coverage_kw} kW to achieve §73.24(i) compliance, then advance to NIF study.`
         : c.status_category === 'RECOVERABLE_WITH_DA'
         ? `Commission §73.150 directional antenna study to push 5 mV/m contour toward community of license.`
         : c.status_category === 'TREATY_REVIEW'

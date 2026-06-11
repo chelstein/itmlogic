@@ -601,7 +601,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               ) : candidate.field_at_col_centroid_mvm != null ? (() => {
                 const f = candidate.field_at_col_centroid_mvm;
                 const col = f >= 5 ? '#63d471' : f >= 0.5 ? '#ffb347' : '#ff7a7a';
-                const label = f >= 5 ? '≥§73.24(j) 5 mV/m floor ✓'
+                const label = f >= 5 ? '≥§73.24(i) 5 mV/m floor ✓'
                             : f >= 0.5 ? 'below 5 mV/m — COL risk'
                             : 'below 0.5 mV/m — inadequate';
                 return (
@@ -622,7 +622,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </span>
               {candidate.col_coverage_gap_pct > 0 && (
                 <span className="text-[9px] ml-1.5" style={{ color: '#ff7a7a' }}>
-                  (gap: +{(candidate.col_coverage_gap_pct * 100).toFixed(0)}% needed for §73.24(j))
+                  (gap: +{(candidate.col_coverage_gap_pct * 100).toFixed(0)}% needed for §73.24(i))
                 </span>
               )}
             </div>
@@ -657,7 +657,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             {candidate.minimum_tpo_for_col_coverage_kw != null && (
               <div className="col-span-2">
                 <div className="font-mono text-[9px] leading-tight mt-0.5" style={{ color: '#ffb347' }}>
-                  §73.24(j) COL coverage: increase TPO to ≥ {candidate.minimum_tpo_for_col_coverage_kw} kW to reach 5 mV/m at COL centroid
+                  §73.24(i) COL coverage: increase TPO to ≥ {candidate.minimum_tpo_for_col_coverage_kw} kW to reach 5 mV/m at COL centroid
                 </div>
               </div>
             )}
@@ -956,7 +956,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           }[fa.verdict] || fa.verdict;
           return (
             <div>
-              <div className="rack-eyebrow mb-1">Coverage feasibility (§73.24(j))</div>
+              <div className="rack-eyebrow mb-1">Coverage feasibility (§73.24(i))</div>
               <div className="flex items-center gap-2 mb-1.5">
                 <span
                   className="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded-sm"
@@ -1064,7 +1064,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* TPO-to-coverage table */}
         {candidate.tpo_to_coverage_table?.length > 0 && (
           <div>
-            <div className="rack-eyebrow mb-1">TPO for §73.24(j) 5 mV/m at distance</div>
+            <div className="rack-eyebrow mb-1">TPO for §73.24(i) 5 mV/m at distance</div>
             <table className="w-full font-mono text-[10px] border-collapse">
               <thead>
                 <tr className="text-textDim text-left">
@@ -1147,7 +1147,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </tbody>
             </table>
             <div className="font-mono text-[9px] text-textDim/60 mt-1">
-              COL coverage % uses 10 km disc proxy. ← marks current TPO. §73.24(j) floor = 80%, §73.24(g) blanket limit = 1%.
+              COL coverage % uses 10 km disc proxy. ← marks current TPO. §73.24(i) floor = 80%, §73.24(g) blanket limit = 1%.
             </div>
           </div>
         )}
@@ -2492,7 +2492,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 {lcm.is_da && <span style={{ color: '#facc15', gridColumn: '1 / -1' }}>DA station: contour is circular estimate only</span>}
               </div>
               <div style={{ fontSize: 10, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
-                SCREENING GRADE · §73.24(j) · §73.184 FCC groundwave
+                SCREENING GRADE · §73.24(i) · §73.184 FCC groundwave
               </div>
             </div>
           );
@@ -10729,7 +10729,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
               <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
-                Community Coverage Waiver &amp; Short-Spacing (§73.24(j) / §73.37)
+                Community Coverage Waiver &amp; Short-Spacing (§73.24(i) / §73.37)
               </div>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
                 <div>

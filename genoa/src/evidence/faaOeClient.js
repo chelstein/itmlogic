@@ -18,7 +18,7 @@
 //     - Withdrawn / Pending — the proponent withdrew the study, or it
 //       hasn't been adjudicated yet.
 //
-//   Per 47 CFR §17.7 / §17.17, an FCC application that uses a
+//   Per 47 CFR §17.7 / §17.4(b), an FCC application that uses a
 //   structure subject to FAA review MUST cite the ASN and, if a
 //   determination has issued, abide by its conditions.  Genoa's
 //   Engineering Statement Tower Study section quotes the FAA
@@ -459,7 +459,7 @@ function joinUrl(base, suffix){
 }
 
 export const FAA_OE_PROVENANCE = Object.freeze({
-  regulation:    '47 CFR §17.7 — FAA notification (Form 7460-1); §17.17 — application of FAA determination',
+  regulation:    '47 CFR §17.7 — FAA notification (Form 7460-1); §17.4(b) — ASR registration requires the FAA determination',
   related:       ['FAA Order JO 7400.2 (Procedures for Handling Airspace Matters)',
                   'FAA Advisory Circular AC 70/7460-1L (Obstruction Marking and Lighting)'],
   upstream:      'https://oeaaa.faa.gov/oeaaa/external/',

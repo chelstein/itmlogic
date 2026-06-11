@@ -83,7 +83,7 @@ export const FCC_CITES = Object.freeze({
     verified_at: '2026-05-23'
   }),
   AM_CITY_COVERAGE: Object.freeze({
-    rule: '§73.24(j)',
+    rule: '§73.24(i)',
     caption: 'Principal community coverage (AM)',
     subject: 'AM 5 mV/m city-grade principal-community coverage requirement.',
     verified_at: '2026-05-23'
@@ -201,7 +201,7 @@ export const FCC_CITES = Object.freeze({
   ENGINEERING_DATA_FILING: Object.freeze({
     rule: '§73.1610',
     caption: 'Equipment tests',
-    subject: 'FCC authority to demand additional engineering data.',
+    subject: 'Permittee equipment tests during construction; the engineering-readiness data those tests produce. The FCC authority to demand additional engineering data in applications is §73.3514(b).',
     verified_at: '2026-05-23'
   }),
   APPLICATION_FILING_REQUIREMENTS: Object.freeze({

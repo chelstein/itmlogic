@@ -1,12 +1,15 @@
-// 47 CFR §73.24(j) — AM principal community coverage.
+// 47 CFR §73.24(i) — AM principal community coverage.
+// (File name retains the legacy "24j" label from before the citation was
+// corrected; the governing paragraph is §73.24(i) — (j) is the general
+// public-interest standard.)
 //
 // The rule: the 5 mV/m groundwave daytime contour must encompass the
 // entire legal boundary of the principal community (city of license).
-// Where it does not, the application must include a §73.24(j) waiver
+// Where it does not, the application must include a §73.24(i) waiver
 // showing.  Real-world reference: Mullaney KELP 1989 page 1 — "The
 // 5.0 mV daytime contour covers 92 percent of the city limits of El
 // Paso; therefore this proposal shows 'substantial compliance' with
-// Section 73.24(j)."
+// Section 73.24(i)."
 //
 // AUDIT FIXES (2026-05-18 session audit pass):
 //   1. Coverage computation switched from Sutherland-Hodgman convex
@@ -20,7 +23,7 @@
 //      reports overall_pass=null + summary='not_measured', NOT
 //      overall_pass=false.  Previously the absent-polygon finding
 //      could mark the rule as decisively-failed, producing the
-//      contradictory "community-of-license not stated" + "§73.24(j)
+//      contradictory "community-of-license not stated" + "§73.24(i)
 //      coverage FAIL" pair the user flagged.
 //
 // Output: { applicable, regulation, findings, overall_pass, summary,
@@ -29,7 +32,7 @@
 const SUBSTANTIAL_COMPLIANCE_THRESHOLD = 0.80;   // <80% → fail-soft non-compliant
 const FULL_COMPLIANCE_THRESHOLD        = 0.999;  // ≥99.9% → unambiguous pass
 const MC_SAMPLES                       = 10_000; // Monte Carlo trials per check
-const RULE_CITE                        = '47 CFR §73.24(j)';
+const RULE_CITE                        = '47 CFR §73.24(i)';
 
 export function checkAm73_24j({ exhibit } = {}){
   const result = {
@@ -66,10 +69,10 @@ export function checkAm73_24j({ exhibit } = {}){
       citation:  `${RULE_CITE} — 5 mV/m contour must encompass the entire legal community boundary`,
       observed:  `${community || 'community-of-license'} legal boundary not attached`,
       pass:      null,
-      detail:    'Not measured — attach inputs.community_boundary_geojson (RFC 7946 Polygon in WGS-84) to enable the §73.24(j) coverage check.  Sources: US Census TIGER/Line Places shapefile, OSM Nominatim relation, or operator-supplied GIS layer.'
+      detail:    'Not measured — attach inputs.community_boundary_geojson (RFC 7946 Polygon in WGS-84) to enable the §73.24(i) coverage check.  Sources: US Census TIGER/Line Places shapefile, OSM Nominatim relation, or operator-supplied GIS layer.'
     });
     result.overall_pass = null;
-    result.summary = '§73.24(j) check not run — community boundary GeoJSON not attached.';
+    result.summary = '§73.24(i) check not run — community boundary GeoJSON not attached.';
     return result;
   }
   if (!cityPoly5mvm){
@@ -81,7 +84,7 @@ export function checkAm73_24j({ exhibit } = {}){
       detail:    '5 mV/m city-grade contour missing — check that city_5mvm is in AM_DEFAULT_CONTOURS and polygon assembly ran.  This is an engine wiring issue, not an operator input issue.'
     });
     result.overall_pass = null;
-    result.summary = '§73.24(j) check not run — 5 mV/m polygon missing from engine output.';
+    result.summary = '§73.24(i) check not run — 5 mV/m polygon missing from engine output.';
     return result;
   }
 
@@ -96,7 +99,7 @@ export function checkAm73_24j({ exhibit } = {}){
       detail:    'Attach community_boundary_geojson as a single Polygon Feature (RFC 7946) or as a FeatureCollection / MultiPolygon containing at least one Polygon.'
     });
     result.overall_pass = null;
-    result.summary = '§73.24(j) check not run — community boundary could not be parsed.';
+    result.summary = '§73.24(i) check not run — community boundary could not be parsed.';
     return result;
   }
   const cov = computeCoveragePctMonteCarlo({
@@ -112,7 +115,7 @@ export function checkAm73_24j({ exhibit } = {}){
       detail:    'Coverage computation failed — see reason.  Check that both polygons have ≥ 3 vertices and live in the same hemisphere.'
     });
     result.overall_pass = null;
-    result.summary = '§73.24(j) check incomplete — coverage computation failed.';
+    result.summary = '§73.24(i) check incomplete — coverage computation failed.';
     return result;
   }
 
@@ -124,21 +127,21 @@ export function checkAm73_24j({ exhibit } = {}){
   result.findings.push({
     rule:      'coverage_percentage',
     citation:  `${RULE_CITE} — 5 mV/m contour must encompass the entire legal community boundary`,
-    limit:     '100% (or §73.24(j) waiver showing for substantial compliance)',
+    limit:     '100% (or §73.24(i) waiver showing for substantial compliance)',
     observed:  `${pct.toFixed(2)}% of ${community || 'community-of-license'} legal boundary inside 5 mV/m contour (method: ${cov.method})`,
     pass:      fullPass,
     detail:    fullPass
-      ? '5 mV/m contour fully encompasses the principal community — straightforward §73.24(j) compliance.'
+      ? '5 mV/m contour fully encompasses the principal community — straightforward §73.24(i) compliance.'
       : substantial
-        ? `Substantial compliance (${pct.toFixed(1)}% coverage).  Modern practice requires a §73.24(j) waiver showing for any shortfall; cf. Mullaney KELP 1989 which filed a 92% coverage waiver showing the same way.`
+        ? `Substantial compliance (${pct.toFixed(1)}% coverage).  Modern practice requires a §73.24(i) waiver showing for any shortfall; cf. Mullaney KELP 1989 which filed a 92% coverage waiver showing the same way.`
         : `Non-compliant (${pct.toFixed(1)}% coverage).  The 5 mV/m contour does not encompass the principal community and the shortfall is too large for the standard 'substantial compliance' showing — facility redesign (move site, increase TPO, or re-pattern DA) likely required.`
   });
   result.overall_pass = fullPass;
   result.summary = fullPass
-    ? '§73.24(j) principal-community coverage check passes (5 mV/m contour encompasses city-of-license).'
+    ? '§73.24(i) principal-community coverage check passes (5 mV/m contour encompasses city-of-license).'
     : substantial
-      ? `§73.24(j) at ${pct.toFixed(1)}% — substantial compliance; waiver showing required.`
-      : `§73.24(j) at ${pct.toFixed(1)}% — non-compliant; facility redesign required.`;
+      ? `§73.24(i) at ${pct.toFixed(1)}% — substantial compliance; waiver showing required.`
+      : `§73.24(i) at ${pct.toFixed(1)}% — non-compliant; facility redesign required.`;
   return result;
 }
 

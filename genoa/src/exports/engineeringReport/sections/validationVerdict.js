@@ -388,7 +388,7 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
-  // §73.24(j) AM principal-community coverage — 5 mV/m contour must
+  // §73.24(i) AM principal-community coverage — 5 mV/m contour must
   // encompass legal boundary of city of license.  See Mullaney KELP
   // 1989 Section I for the canonical 'substantial compliance' showing.
   const amcj = exhibit.am_city_coverage_compliance;
@@ -399,7 +399,7 @@ export function buildValidationVerdictSection(exhibit){
                     ? ` — ${(amcj.coverage_pct * 100).toFixed(1)}% coverage`
                     : '';
     components.push({
-      name:     '§73.24(j) AM principal-community coverage',
+      name:     '§73.24(i) AM principal-community coverage',
       category: 'compliance',
       status:   amcj.overall_pass === true ? 'PASS'
               : amcj.overall_pass === false ? 'FAIL'

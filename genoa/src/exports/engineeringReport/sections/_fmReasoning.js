@@ -165,11 +165,13 @@ function evalSec215(r){
   const worstLegIsForward = (fwd != null && rev != null) ? fwd <= rev : (fwd != null);
   const beyondRange = worstLegIsForward ? r.du_forward_beyond_range === true
                                         : r.du_reverse_beyond_range === true;
-  const summary = r.pass
+  const summary = r.pass === true
     ? `§73.215 contour protection satisfied (D/U margin ${formatDb(margin_db)} dB)`
-    : beyondRange
-      ? `§73.215 contour protection fails — the interfering contour engulfs the protected contour (D/U required ${r.du_required_db} dB; the protected edge lies within the interferer's free-space near field, so the D/U is beyond the §73.333 curve range)${polyTxt}`
-      : `§73.215 contour protection fails — D/U required ${r.du_required_db} dB but actual is ${formatDb(margin_db != null ? r.du_required_db + margin_db : null)} dB${polyTxt}`;
+    : r.pass === false
+      ? beyondRange
+        ? `§73.215 contour protection fails — the interfering contour engulfs the protected contour (D/U required ${r.du_required_db} dB; the protected edge lies within the interferer's free-space near field, so the D/U is beyond the §73.333 curve range)${polyTxt}`
+        : `§73.215 contour protection fails — D/U required ${r.du_required_db} dB but actual is ${formatDb(margin_db != null ? r.du_required_db + margin_db : null)} dB${polyTxt}`
+      : `§73.215 contour protection status not determined`;
   return { cite: RULE_CITES.section_73_215, pass: r.pass, margin_db, margin_km: null, summary, detail: r };
 }
 

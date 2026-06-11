@@ -68,10 +68,15 @@ export function buildRfExposureSection(exhibit){
         : `ENGINEERING REVIEW REQUIRED — RC AGL ${nf.rcagl_m != null ? nf.rcagl_m.toFixed(1) + ' m' : '(AGL unknown)'} < near-field boundary ${nf.boundary_m != null ? nf.boundary_m.toFixed(1) + ' m' : '(λ/2π)'}; NEC reactive-region study required (OET-65 §3.B)`;
 
   const haveDistances = Number.isFinite(Number(ctl.distance_m)) || Number.isFinite(Number(unc.distance_m));
+  // INCOMPLETE_BOUNDARY_GEOMETRY: compliance distances are computed but no
+  // property-line / lot-boundary distance has been supplied.  The §1.1307(b)
+  // categorical evaluation is incomplete — do NOT imply full RF-exposure compliance.
+  const boundaryMissing = haveDistances && bc.boundary_distance_m == null;
   const passLabel = bc.pass === true  ? 'PASS — boundary clears uncontrolled MPE'
                   : bc.pass === false ? 'FAIL — uncontrolled MPE exceeded at boundary'
                   : needsNec         ? 'ENGINEERING REVIEW REQUIRED — near-field NEC study required (far-field equation not applicable at this RC AGL)'
                   : amScrIsScreen    ? `SCREENING GRADE — near-field exclusion radius ${amScr.binding_distance_m} m; boundary check${amScr.site_boundary_pass === true ? ' PASS' : amScr.site_boundary_pass === false ? ' FAIL' : ' DEFERRED'}`
+                  : boundaryMissing  ? 'INCOMPLETE_BOUNDARY_GEOMETRY — compliance distances computed but property-line / lot-boundary distance not supplied; §1.1307(b) categorical evaluation is incomplete'
                   : haveDistances    ? 'DISTANCES COMPUTED · BOUNDARY CHECK DEFERRED — supply lot/property-line dimensions to complete §1.1307(b) categorical evaluation'
                   : 'NOT EVALUATED';
 

@@ -66,7 +66,7 @@ export function buildExecutiveSummarySection(exhibit){
     checks.push('the §73.184 groundwave service contours (city / primary / secondary / night-intf)');
     checks.push('§73.182(k) / §73.190 nighttime skywave protection (RSS combination per §73.185) of every Class A / B / D station within 1500 km');
     if (exhibit?.am_blanket_compliance?.applicable)      checks.push('§73.24(g) blanketing-interference compliance');
-    if (exhibit?.am_city_coverage_compliance?.applicable) checks.push('§73.24(j) principal-community coverage');
+    if (exhibit?.am_city_coverage_compliance?.applicable) checks.push('§73.24(i) principal-community coverage');
     if (exhibit?.am_da_pattern_compliance?.applicable)   checks.push('§73.150 directional-antenna pattern shape');
     if (exhibit?.international_border?.inside_treaty_zone) checks.push('US/Mexico and / or US/Canada AM treaty obligations');
   } else {
@@ -121,7 +121,7 @@ export function buildExecutiveSummarySection(exhibit){
   const blockerHints = [];
   if (exhibit?.am_blanket_compliance?.overall_pass === false)       blockerHints.push('§73.24(g) blanket-population fail');
   if (exhibit?.am_da_pattern_compliance?.overall_pass === false)    blockerHints.push('§73.150 DA-pattern shape fail');
-  if (exhibit?.am_city_coverage_compliance?.overall_pass === false) blockerHints.push('§73.24(j) community-coverage fail');
+  if (exhibit?.am_city_coverage_compliance?.overall_pass === false) blockerHints.push('§73.24(i) community-coverage fail');
   if (exhibit?.evidence?.am_night_nif?.summary?.n_failing_azimuths > 0){
     const _nifIsScreening = /berry/i.test(
       String(exhibit?.evidence?.am_night_nif?.provenance?.upstream_skywave
@@ -155,7 +155,7 @@ export function buildExecutiveSummarySection(exhibit){
     const pct = Number.isFinite(exhibit.am_city_coverage_compliance.coverage_pct)
       ? (exhibit.am_city_coverage_compliance.coverage_pct * 100).toFixed(1) + '%'
       : '—';
-    recs.push(`§73.24(j) principal-community coverage is ${pct} of the city-of-license boundary — ${isExistingFacility ? 'a substantial-compliance waiver showing or engineering review is required before any modification filing' : 'a substantial-compliance waiver showing or facility redesign is required before filing'}.`);
+    recs.push(`§73.24(i) principal-community coverage is ${pct} of the city-of-license boundary — ${isExistingFacility ? 'a substantial-compliance waiver showing or engineering review is required before any modification filing' : 'a substantial-compliance waiver showing or facility redesign is required before filing'}.`);
   }
   if (exhibit?.international_border?.inside_treaty_zone){
     const ts = exhibit.international_border.treaties?.map((t) => t.treaty).join(' + ');

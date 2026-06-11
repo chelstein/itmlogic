@@ -1729,14 +1729,14 @@ export async function computeExhibit(req){
 
   inputs._study_mode = study_mode_canonical;
 
-  // ---- 6h. Community boundary auto-lookup (AM §73.24(j)) ----
+  // ---- 6h. Community boundary auto-lookup (AM §73.24(i)) ----
   // When the caller does not supply community_boundary_geojson and the
   // exhibit is AM, attempt to fetch the incorporated-place boundary from
   // the Census TIGERweb REST service using the transmitter lat/lon as a
   // proxy for the city-of-license location.  The result is stored in
   // evidence.community_boundary where section_73_24j.js will find it.
   //
-  // Failure is non-blocking: the §73.24(j) check degrades to
+  // Failure is non-blocking: the §73.24(i) check degrades to
   // overall_pass:null with the attach-GeoJSON instruction, exactly as
   // it did before this lookup was added.
   if (String(inputs.service || '').toUpperCase() === 'AM'
@@ -2026,12 +2026,12 @@ export async function computeExhibit(req){
     }
   }
 
-  // ---- 8a-3. AM community boundary auto-fetch for §73.24(j) ----
-  // §73.24(j) needs the legal city boundary polygon to check whether
+  // ---- 8a-3. AM community boundary auto-fetch for §73.24(i) ----
+  // §73.24(i) needs the legal city boundary polygon to check whether
   // the 5 mV/m contour encompasses the community.  When the operator
   // hasn't supplied community_boundary_geojson, attempt to resolve it
   // automatically via Census TIGER / Nominatim.  Result is stored as
-  // evidence.community_boundary; §73.24(j) reads it from there.
+  // evidence.community_boundary; §73.24(i) reads it from there.
   if (service === 'AM' && !inputs.community_boundary_geojson
       && !evidence.community_boundary){
     try {
@@ -2065,7 +2065,7 @@ export async function computeExhibit(req){
           }
         }
       }
-    } catch { /* boundary fetch is fail-soft; §73.24(j) renders NOT_MEASURED */ }
+    } catch { /* boundary fetch is fail-soft; §73.24(i) renders NOT_MEASURED */ }
   }
 
   // ---- 8b. Cross-validate engine output against FCC contour ----

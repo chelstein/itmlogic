@@ -42,8 +42,11 @@ export function buildContourProtectionSection(exhibit){
 
   const rows = studies.map(s => {
     const polygon = s.polygon_overlap || {};
-    const polygon_pass = polygon.subject_interfering_overlaps_nearby_protected === false
-                      && polygon.nearby_interfering_overlaps_subject_protected === false;
+    // Use explicit true-check so undefined (no polygon data) is NOT treated as a fail.
+    const polygon_def_fail = polygon.subject_interfering_overlaps_nearby_protected === true
+                          || polygon.nearby_interfering_overlaps_subject_protected === true;
+    const polygon_pass = !polygon_def_fail
+                      && polygon.subject_interfering_overlaps_nearby_protected !== undefined;
     const key = String(s.nearby_call || s.nearby_facility_id || '');
     const r   = reasoningByCall.get(key);
     return {
@@ -63,7 +66,7 @@ export function buildContourProtectionSection(exhibit){
                           || s.reverse?.du_beyond_curve_range === true,
       reasoning:             r?.binding_constraint
                               ? (r.binding_constraint + (r.alternate_route_available ? ' (alternate route available)' : ''))
-                              : (polygon_pass === false
+                              : (polygon_def_fail
                                   ? 'F(50,10) interfering polygon overlaps the protected contour — §73.215 polygon-overlap test fails'
                                   : '—')
     };

@@ -22,10 +22,11 @@
 //   Effective ERP at azimuth az (power scales as field²):
 //     ERP_eff(az) = ERP_omni · f(az)²
 //
-//   §73.45 MEOV requires the actual monitored field at any
-//   monitoring point to remain within +/- 5% of the licensed value.
+//   §73.62(a) requires DA sample current ratios to stay within ±5%
+//   (phases ±3°) of licensed values; MEOV-augmented patterns are
+//   authorized per §73.152.
 //   §73.150 publishes the format of the pattern data submitted with
-//   the §73.40 application.  The Genoa engine does NOT regenerate
+//   the Form 301-AM construction permit application.  The Genoa engine does NOT regenerate
 //   the pattern from antenna physics — it interpolates the licensed
 //   pattern across azimuths and applies it to the protection
 //   studies.  Genoa's pattern_table input shape is shared with FM
