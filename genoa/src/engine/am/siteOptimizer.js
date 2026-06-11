@@ -25448,7 +25448,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Standard AM tower: 5/8λ for max gain
       const lambda_tl   = round2(300000 / frequency_khz); // m
       const qwave_tl    = round2(lambda_tl / 4);           // m
-      const towerHeightEst_m  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_tl);  // 5/8λ Class A/B, λ/4 Class C/D
+      const towerHeightEst_m  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_tl);  // 5/8λ Class A/B, 3/8λ Class C/D design height
       const towerHeightEst_ft = round2(towerHeightEst_m * 3.28084);
 
       // ASR threshold: ≥ 61m AGL (200 ft) per §17.7
@@ -26898,7 +26898,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC §11.4: NEPA checklist required for all construction permit applications
       // Eight categorical exclusions in §11.4(a) cover most standard AM sites
 
-      const towerH_eia    = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
+      const towerH_eia    = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D design height
 
       // NEPA categorical exclusion analysis (§11.4(a))
       // These conditions REMOVE the site from categorical exclusion (require full EA)
@@ -26993,7 +26993,7 @@ async function scoreCandidate(pt, ctx, warnings){
     site_security_perimeter_guide: (() => {
       // §73.49 requires a substantial fence or other enclosure around the base of each AM antenna.
       // OET Bulletin 65 / §1.1310 MPE zones require RF warning signage at perimeter.
-      const towerH_ssp = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
+      const towerH_ssp = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D design height
       // Minimum fence radius: FCC requires enclosure that prevents casual contact; typically 3–5m radius from base
       const fenceRadius_m = Math.max(5, round2(towerH_ssp * 0.05));
       const perimeterCirc_m = round2(2 * Math.PI * fenceRadius_m);
@@ -27081,7 +27081,7 @@ async function scoreCandidate(pt, ctx, warnings){
     insurance_liability_analysis: (() => {
       // AM broadcast tower insurance: property, liability, E&O, cyber
       // §17.7 ASR non-compliance increases premium and voids aviation-related claims
-      const towerH_ins = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
+      const towerH_ins = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D design height
       const asr_required = towerH_ins > 60.96; // >200 ft requires ASR registration per §17.7
 
       // Replacement cost value: tower structure + equipment + transmitter building
