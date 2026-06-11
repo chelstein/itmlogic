@@ -25252,7 +25252,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const copperMass_kg  = round2(totalRadialLength_m * (recommendedAWG.awg === 8 ? 0.050 : 0.026)); // kg/m approx
       const materialCost_usd = round2(totalRadialLength_m * recommendedAWG.cost_usd_per_m);
 
-      // Burial depth: §73.190 and NEC Article 250 — typically 2–4 inches for AM radials
+      // Burial depth: §73.186 (AM ground system standard) and NEC Article 250 — typically 2–4 inches for AM radials
       const burialDepth_in   = 2; // minimum per common practice; NEC §250.52 says no minimum for radio radials
 
       // Measurement and FCC compliance
@@ -31764,7 +31764,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const quarter_wave_m  = round2(wavelength_m / 4);
       const quarter_wave_ft = round2(quarter_wave_m * 3.28084);
 
-      // Minimum radials for licensed class per §73.190(e) table
+      // Minimum radials for licensed class per §73.186 / NBS TN-24 best practice
       const min_radials =
         fcc_class === 'A' ? 120 :
         fcc_class === 'B' ? 90  :
