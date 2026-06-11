@@ -21966,7 +21966,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const LEGAL_ALTERNATIVES = [
         { id: 'RELOCATION',   label: 'Main transmitter relocation (this optimizer)', cfr: '§73.3533; §73.3598', authorized: true, note: 'Move transmitter to better site for coverage improvement — requires FCC CP and construction' },
         { id: 'AM_TRANSLATOR',label: 'AM-to-FM translator', cfr: '§74.1201; MB 13-249', authorized: true, note: 'FCC authorized AM-to-FM translator service; 250W ERP FM fill-in translator within AM contour' },
-        { id: 'IBOC_HD',      label: 'AM HD Radio (IBOC digital sidebands)', cfr: '§73.406; FCC IBOC authorization', authorized: true, note: 'Digital audio sidebands on AM carrier; improves quality and perceived coverage; requires separate FCC authorization' },
+        { id: 'IBOC_HD',      label: 'AM HD Radio (IBOC digital sidebands)', cfr: 'FCC MB Docket 99-325 (AM IBOC authorization, Oct 2002); §73.404 (IBOC general); see also FCC IBOC authorization', authorized: true, note: 'Digital audio sidebands on AM carrier; improves quality and perceived coverage; requires separate FCC authorization. (§73.406 is in the FM subpart — verify the applicable AM IBOC CFR section before citing.)' },
         { id: 'PART15_CC',    label: 'Part 15 carrier current (in-building only)', cfr: '§15.221', authorized: true, note: 'Unlicensed; power limit 100 mW; effective only inside the building connected to the power line; not practical for area coverage' },
         { id: 'NEW_STATION',  label: 'New AM station at a different frequency', cfr: '§73.3533; §73.21', authorized: true, note: 'Requires full FCC application, auction if competing applications, and separate license; very expensive' }
       ];
@@ -21995,7 +21995,7 @@ async function scoreCandidate(pt, ctx, warnings){
         best_legal_option: 'RELOCATION',
         part15_limit_uv_m: 250, // µV/m at 30m for AM band (§15.209)
         relocation_note: 'AM broadcast boosters are NOT authorized (§73.1660). The legally correct approach to coverage improvement is transmitter relocation (this optimizer), an AM-to-FM translator (§74.1201), or AM HD Radio. Unauthorized AM repeater devices can result in $10,000–$25,000 FCC forfeitures.',
-        reference: '47 CFR §73.1660; §73.406; §74.1201; §15.209; §15.221; §15.5; §301; §503(b); MB 13-249 (AM revitalization)',
+        reference: '47 CFR §73.1660; §73.404 (IBOC general); §74.1201; §15.209; §15.221; §15.5; §301; §503(b); MB Docket 99-325 (AM IBOC authorization); MB 13-249 (AM revitalization)',
         note: `AM boosters: PROHIBITED (§73.1660). ${n_legal_alternatives} legal alternatives available. Best option: transmitter relocation. AM-to-FM translator also authorized. Unauthorized booster forfeiture: $10k–$25k (§503b).`
       };
     })(),
