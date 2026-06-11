@@ -9626,7 +9626,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //     Class D stations on clear channels must commence reduced (nighttime) power at
       //     local sunset and may not resume daytime power until local sunrise.  The
       //     actual UTC transition times vary by date and site latitude/longitude.
-      //   §73.99(b): "Critical Hours" operation — defined as the first two hours after
+      //   §73.187: "Critical Hours" operation — defined as the first two hours after
       //     local sunrise and the last two hours before local sunset — may permit an
       //     intermediate power level for Class D stations when a specific critical-hours
       //     authorization is granted.
@@ -9725,7 +9725,7 @@ async function scoreCandidate(pt, ctx, warnings){
         automation_cost_high:     automation_high,
         power_relay_cost_low:     relay_cost_low,
         power_relay_cost_high:    relay_cost_high,
-        reference: '47 CFR §73.99 (sunset/sunrise power); §73.99(b) (critical hours); §73.1680 (emergency operation); §73.1800 (station ID at transitions); USNO solar tables (for LMS-compliant exact UTC)',
+        reference: '47 CFR §73.99 (PSRA/PSSA); §73.187 (critical hours); §73.1680 (emergency operation); §73.1800 (station ID at transitions); USNO solar tables (for LMS-compliant exact UTC)',
         note: `${isClearCh ? 'Clear channel — Class D must go SILENT at sunset (§73.99).' : `Non-clear — night power ≈ ${night_power_kw} kW (${100 - power_reduction_pct}% of day TPO).`} Summer: ${summer.day_length_h}h day, sunset ${summer.sunset_utc}. Winter: ${winter.day_length_h}h day, sunset ${winter.sunset_utc}.`
       };
     })(),
