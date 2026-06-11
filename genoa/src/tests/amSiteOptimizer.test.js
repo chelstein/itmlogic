@@ -18902,3 +18902,52 @@ test('regulatory_gate_summary DA_PATTERN is N/A for NDA with full COL coverage',
   // For candidates near the current site with good coverage, should be N/A
   assert.ok(['N/A', 'WARN'].includes(daGate.status), 'DA_PATTERN must be N/A or WARN for NDA');
 });
+
+// ── Wildfire sub-score now uses geographic region proxy (no longer null) ─────
+
+test('wildfire sub-score is non-null when avoid_wildfire_risk goal enabled', async () => {
+  const out = await runSiteOptimizer({
+    ...KAZM,
+    optimization_goals: { ...KAZM.optimization_goals, avoid_wildfire_risk: true },
+    candidate_limit: 2
+  });
+  for (const c of out.candidates) {
+    const raw = c.explanation?.score_components_raw;
+    assert.ok(raw, 'score_components_raw must be present');
+    // wildfire score should now be numeric (0, 25, 50, 75, or 100)
+    assert.ok(
+      [0, 25, 50, 75, 100].includes(Number(raw.wildfire)),
+      `wildfire sub-score must be one of [0,25,50,75,100], got: ${raw.wildfire}`
+    );
+  }
+});
+
+test('wildfire sub-score: Western US candidates score 0 or 25 (HIGH or VERY_HIGH risk)', async () => {
+  // KAZM is in Arizona (lon -111, lat 34) — isWesternUS=true, lat not in 35–42 range → HIGH=25
+  const out = await runSiteOptimizer({
+    ...KAZM,
+    optimization_goals: { ...KAZM.optimization_goals, avoid_wildfire_risk: true },
+    candidate_limit: 3
+  });
+  for (const c of out.candidates) {
+    const raw = c.explanation?.score_components_raw;
+    // Arizona candidates are Western US → wildfire score should be 0 or 25
+    assert.ok(raw.wildfire <= 25, `Arizona candidate wildfire score must be ≤25, got ${raw.wildfire}`);
+  }
+});
+
+test('wildfire sub-score: Midwest candidates score 100 (LOW risk)', async () => {
+  // Move current site to Iowa (lon -93.5, lat 41.5) — Midwest → LOW risk
+  const midwestOut = await runSiteOptimizer({
+    ...KAZM,
+    current_site: { lat: 41.5, lon: -93.5 },
+    optimization_goals: { ...KAZM.optimization_goals, avoid_wildfire_risk: true },
+    candidate_limit: 2
+  });
+  for (const c of midwestOut.candidates) {
+    const raw = c.explanation?.score_components_raw;
+    // Iowa candidates should be Midwest (LOW risk = score 100)
+    // Some might be near boundaries, so allow 75 or 100
+    assert.ok(raw.wildfire >= 75, `Iowa candidate wildfire score must be ≥75, got ${raw.wildfire}`);
+  }
+});

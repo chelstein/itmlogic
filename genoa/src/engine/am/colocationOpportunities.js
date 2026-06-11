@@ -295,7 +295,7 @@ export async function runColocationOpportunities(body = {}){
     per_candidate_confidence: confDist,
     notes: [
       ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
-      ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
+      ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring uses geographic region proxy (screening grade); USFS FIA / LANDFIRE raster would provide parcel-level precision'] : []),
       ...(!community_of_license_polygon   ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : []),
       ...(infraSites.length > 0           ? [`${infraSites.length} infrastructure site(s) from ${infrastructure_source} inventory included in pool`] : []),
       ...(confDist.LOW === nPoolTotal ? [`All ${nPoolTotal} candidates scored at LOW confidence (zone-table σ + disc-proxy COL) — provide AM_m3.tif and community_of_license_polygon to raise ranking reliability.`]
@@ -428,7 +428,7 @@ export async function runColocationOpportunities(body = {}){
         { id: 'POPULATION', label: 'Population / people served', confidence: 'SCREENING', score_impact_pts: 8, upgrade_action: 'Integrate Census TIGER block-level population.' },
         { id: 'BLANKET_POPULATION', label: 'Blanket population fraction', confidence: 'SCREENING', score_impact_pts: 6, upgrade_action: 'Integrate Census blocks within 1000 mV/m contour.' },
         { id: 'NIGHTTIME_NIF', label: 'Nighttime skywave (§73.182)', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Integrate FCC OET-72 skywave engine + LMS.' },
-        { id: 'WILDFIRE_RISK', label: 'Wildfire / fuel risk', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Wire USFS FIA / LANDFIRE raster.' }
+        { id: 'WILDFIRE_RISK', label: 'Wildfire / fuel risk', confidence: 'SCREENING', score_impact_pts: goals.avoid_wildfire_risk ? 4 : 0, upgrade_action: 'Wire USFS FIA / LANDFIRE raster for parcel-level fire-hazard severity zone data.' }
       ];
       const filing_grade = dimensions.filter(d => d.confidence === 'FILING_GRADE').length;
       return { overall_confidence: filing_grade >= 2 ? 'MEDIUM_HIGH' : filing_grade >= 1 ? 'MEDIUM' : 'LOW', conductivity_mode: conductivity_mode_loc, col_polygon_supplied: hasColPolygon, dimensions, n_filing_grade: filing_grade, n_screening: dimensions.filter(d => d.confidence === 'SCREENING').length, n_not_evaluated: dimensions.filter(d => d.confidence === 'NOT_EVALUATED').length, note: 'Confidence matrix shows the data quality behind each scoring dimension.' };
