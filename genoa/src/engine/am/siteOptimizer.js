@@ -8915,7 +8915,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ── Tower height (same formula as antenna_height_optimization guide) ──
       const lambda_pf       = round2(300000 / frequency_khz);        // m
-      const h_frac_pf       = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_frac_pf       = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D design height
       const h_m_pf          = round2(h_frac_pf * lambda_pf);
       const h_ft_pf         = Math.round(h_m_pf * 3.28084);
       const is_guyed_pf     = h_ft_pf < 400;
@@ -22480,7 +22480,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Estimate site area requirements based on tower height
       const _lambda_gl    = 300000 / frequency_khz;
-      const tower_height_m = Math.round(_lambda_gl * (['A', 'B'].includes(fcc_class) ? 0.625 : 0.25));
+      const tower_height_m = Math.round(_lambda_gl * (['A', 'B'].includes(fcc_class) ? 0.625 : 0.375));  // 5/8λ A/B, 3/8λ C/D design height
       const guy_radius_m = Math.round(tower_height_m * 0.7); // approximate guy wire radius
       const ground_radial_radius_m = Math.round(_lambda_gl * 0.35); // 0.35λ per §73.186 / NBS TN-24
       const fence_buffer_m = 3; // 3m minimum buffer inside fence
@@ -27432,7 +27432,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Land acquisition guidance for AM transmitter site relocation
       // §1.65 requires notification of changes in circumstances during pending applications
       // FCC Form 301-AM requires legal description of transmitter site; clean title is essential
-      const towerH_pag = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz); // 5/8λ Class A/B, λ/4 Class C/D
+      const towerH_pag = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D design height
 
       // Minimum site area: tower height + guy wire span + buffer
       // For a guyed tower: guy radius ≈ 0.5 × tower height; buffer 15m for fence + access
@@ -28379,9 +28379,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   3. RF Exposure (47 CFR §1.1307(b) / §1.1310) — OET Bulletin 65
       //      AM stations ≥ 1 kW TPO must evaluate general-population/uncontrolled
       //      MPE limits.  AM towers carry RF current on the structure itself;
-      //      the base area is a controlled-environment hazard zone.  The 1.6 mW/cm²
-      //      general population limit at AM frequencies requires the tower fence to
-      //      be ≥ the calculated safe distance.
+      //      the base area is a controlled-environment hazard zone.  The 100 mW/cm²
+      //      general population limit at AM frequencies (OET-65 Table 1, 0.3–3 MHz)
+      //      requires the tower fence to be ≥ the calculated safe distance.
       //
       // References:
       //   47 CFR §1.1301–§1.1319 (NEPA)
@@ -28438,11 +28438,11 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // RF safety: approximate minimum safe distance at fence line
       // AM base current creates near-field RF hazard in tower base area.
-      // General population MPE at AM: 1.6 mW/cm² (uncontrolled).
-      // Simplified: safe_dist_m ≈ sqrt(60 × P_watts / (4π × 1.6)) (EIRP model, very rough)
+      // General population MPE at AM (0.3–3 MHz): 100 mW/cm² per OET Bulletin 65, Table 1.
+      // Simplified: safe_dist_m ≈ sqrt(30 × P_watts / (π × MPE_W_m2)) (rough near-field model)
       // For a full evaluation use OET Bulletin 65 procedure.
       const tpo_watts        = tpo_kw * 1000;
-      const MPE_LIMIT_MW_CM2 = 1.6;  // mW/cm²; OET-65 Table 1 general population AM
+      const MPE_LIMIT_MW_CM2 = 100;  // mW/cm²; OET-65 Table 1 general population, 0.3–3 MHz
       const MPE_LIMIT_W_M2   = MPE_LIMIT_MW_CM2 * 10; // 16 W/m²
       const safe_dist_m      = tpo_watts > 0
         ? round2(Math.sqrt((30 * tpo_watts) / (Math.PI * MPE_LIMIT_W_M2)))
@@ -32573,17 +32573,17 @@ async function scoreCandidate(pt, ctx, warnings){
     am_faa_tower_lighting_and_obstruction_marking_guide: (() => {
       // FAA obstruction marking thresholds per 47 CFR §17.7/§17.21–§17.23 and FAA AC 70/7460-1M
       // Height above ground level (AGL) in feet drives lighting requirements.
-      // For AM towers: typically 150–300 ft AGL depending on power and pattern.
+      // For AM towers: 3/8λ for Class C/D (e.g., ~472 ft at 780 kHz); 5/8λ for Class A/B.
       const freq_khz   = frequency_khz ?? 1000;
       const tpo        = tpo_kw ?? 1;
       const isDA       = /^DA/i.test(pattern_mode ?? '');
 
-      // Estimate typical AM tower height from frequency and power (λ/4 ≈ 73900/freq_khz metres)
-      // §73.186 requires self-supporting or guyed towers; typical AM tower ~0.53λ at 1 MHz ≈ 500 ft
-      // Height proxy: roughly 75000/freq_khz * 0.53 * 3.281 ft, capped at 1200 ft
-      const quarter_wave_ft    = Math.round((75000 / freq_khz) * 3.281);
-      const tower_height_ft    = Math.min(Math.round(quarter_wave_ft * 0.53), 1200);
-      const tower_height_m     = Math.round(tower_height_ft / 3.281);
+      // Tower height by class: 5/8λ for Class A/B (FCC optimum), 3/8λ for Class C/D (standard design).
+      // Used for FAA obstruction-marking analysis only — actual licensed height governs construction.
+      const lambda_faa         = Math.round(300000 / freq_khz);  // full wavelength, m
+      const h_frac_faa_lt      = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
+      const tower_height_m     = Math.round(lambda_faa * h_frac_faa_lt);
+      const tower_height_ft    = Math.round(tower_height_m * 3.28084);
 
       // §17.7(a): ASR registration required for towers >60.96 m (200 ft) AGL, or towers near airports
       const asr_required_height_m  = 60.96;  // 200 ft
