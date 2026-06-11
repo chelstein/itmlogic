@@ -32410,11 +32410,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // Staffing model: higher power / DA sites more likely staffed (chief op on-site)
       const is_likely_staffed = tpo >= 5 || isDA;
 
-      // ADA applicability level
+      // ADA applicability level (land_use_class proxies site urbanization / visit frequency)
       const ada_applicability =
-        is_likely_staffed  ? 'FULL'    :   // staffed site — full ADA Title I/III
-        dist_km < 20       ? 'PARTIAL' :   // near-urban — likely visited regularly
-                             'MINIMAL';    // remote unmanned — basic accessibility
+        is_likely_staffed                                           ? 'FULL'    :   // staffed site — full ADA Title I/III
+        (land_use_class === 'SUBURBAN' || land_use_class === 'SUBURBAN_RURAL') ? 'PARTIAL' :   // near-urban — likely visited regularly
+                                                                      'MINIMAL';    // remote unmanned — basic accessibility
 
       // Required accessibility features
       const accessibility_features = [];
