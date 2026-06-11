@@ -2066,8 +2066,8 @@ test('colocation GRID candidates have transmitter_power_upgrade_pathway_guide', 
   for (const c of out.candidates) {
     const g = c.transmitter_power_upgrade_pathway_guide;
     assert.ok(g != null, `rank ${c.rank} missing transmitter_power_upgrade_pathway_guide`);
-    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (5 kW → 10 kW headroom)`);
-    assert.strictEqual(g.coverage_gain_pct, 41, `rank ${c.rank} coverage_gain_pct must be 41`);
+    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (5 kW → 50 kW Class D ceiling per §73.21(b))`);
+    assert.strictEqual(g.coverage_gain_pct, 216, `rank ${c.rank} coverage_gain_pct must be 216 (√10 at the 50 kW ceiling)`);
   }
 });
 
@@ -3880,8 +3880,8 @@ test('am_remote_control_and_unattended_operation_guide present across colocation
   for (const c of out.candidates) {
     const g = c.am_remote_control_and_unattended_operation_guide;
     assert.ok(g !== undefined && g !== null, `candidate missing am_remote_control_and_unattended_operation_guide`);
-    assert.strictEqual(g.operator_response_time_hrs, 2, '§73.1300 operator response time must be 2 hours');
-    assert.strictEqual(g.rc_accuracy_pct, 2.0, '§73.1400 remote control accuracy must be ±2%');
+    assert.strictEqual(g.operator_response_time_hrs, 3, '§73.1350(c): correct or terminate within 3 hours');
+    assert.strictEqual(g.rc_accuracy_pct, 2.0, '§73.1215: indicating instruments accurate to 2% of full scale');
     assert.ok(g.total_rc_low_usd > 0, 'total_rc_low_usd must be positive');
   }
 });
