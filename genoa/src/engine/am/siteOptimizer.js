@@ -10625,8 +10625,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   47 CFR §73.182: Groundwave service — criteria for determining coverage and interference.
       //   §73.182(k): NIF service — portion of 0.1 mV/m nighttime contour free from
       //     interference from all other stations' skywave signals.
-      //   §73.24(i): Nighttime community of license service: 0.1 mV/m groundwave contour must
-      //     encompass community of license.
+      //   §73.24(i): the daytime 5 mV/m contour must encompass the entire principal
+      //     community; at night, the 5 mV/m or NIF contour (whichever higher) must do so.
       //   §73.37(b): For Class D secondary stations on clear channels: nighttime operation
       //     must not cause objectionable interference to dominant (Class A) station.
       //   §73.182(j): Dominant-station protection: Class D cannot exceed a specified skywave
@@ -11150,8 +11150,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Practical full-fidelity threshold: ≥25 dB SNR (Terman 1955, §73.37 commentary).
       //
       // Field strength at service contour:
-      //   §73.24(h): Daytime community coverage = 0.5 mV/m (53.98 dBµV/m) at service boundary.
-      //   §73.24(i): Nighttime: 0.1 mV/m (40 dBµV/m) for community of license.
+      //   §73.182: 0.5 mV/m (53.98 dBµV/m) daytime service contour; 0.1 mV/m (40 dBµV/m)
+      //     nighttime service reference. (§73.24(i) separately requires the principal
+      //     community inside the 5 mV/m contour.)
       //
       // SNR calculation:
       //   SNR_day = field_strength_dBuVm_day - Ft_dBuVm
