@@ -10609,7 +10609,7 @@ async function scoreCandidate(pt, ctx, warnings){
         cooling_power_kw,
         total_site_load_kw,
         annual_total_electric_usd,
-        reference: '47 CFR §73.1560(a) (TPO tolerance ±2%); EIA 2024 commercial electricity rates; Nautel NX series specs (solid-state AM, 85%+ plate efficiency); Terman (1955) ch. 14 (plate efficiency); §73.21 (Class D power limits 5 kW daytime)',
+        reference: '47 CFR §73.1560(a) (operating power 90–105% of authorized); EIA 2024 commercial electricity rates; Nautel NX series specs (solid-state AM, 85%+ plate efficiency); Terman (1955) ch. 14 (plate efficiency); §73.21 (Class D power limits 5 kW daytime)',
         note: `${tx_type} transmitter at ${tpo_kw} kW: ${overall_efficiency_pct}% overall efficiency → ${ac_input_kw} kW AC input, avg ${avg_power_kw} kW (incl. 10% modulation uplift). Annual electricity at ${operating_hrs_per_day} hrs/day: ~$${annual_electric_usd.toLocaleString()} (at $${electricity_rate_usd_kwh}/kWh AZ rate). Full site load: ${total_site_load_kw} kW (~$${annual_total_electric_usd.toLocaleString()}/yr). Waste heat: ${waste_heat_kw} kW → ${cooling_required_type} cooling. At 50% power (${power_50pct_kw} kW): ~$${annual_50pct_usd.toLocaleString()}/yr.`
       };
     })(),
@@ -11388,7 +11388,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // FCC §73.1570(a): A modulation monitor is required at each AM transmitter location.
       // §73.1570(b): Positive peak modulation must not exceed 125%; negative peak must not exceed 100%.
-      // §73.1560(a): Transmitter output power must remain within ±2% of authorized TPO at all times.
+      // §73.1560(a): Transmitter output power must remain within 90–105% of authorized TPO (asymmetric).
       // §73.51:      For directional antennas, antenna base currents must be maintained within ±5%
       //              of licensed values; monitor and log ratios and phases continuously.
       //
@@ -11408,8 +11408,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Overmodulation: triggers §73.1570(d) reporting obligation if sustained.
       //
       // Power compliance:
-      //   ±2% tolerance on TPO per §73.1560(a) means if licensed at 5.00 kW, acceptable range
-      //   is 4.90–5.10 kW. Power monitors (wattmeters, directional couplers) must be calibrated.
+      //   90–105% range per §73.1560(a) means if licensed at 5.00 kW, acceptable range is
+      //   4.50–5.25 kW (asymmetric floor/ceiling). Power monitors must be calibrated.
       //
       // Cost basis (2024 broadcast market):
       //   - Sampling-type modulation monitor (e.g., Inovonics 531, Belar AMM-1): $2,000–$5,000
@@ -12372,7 +12372,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   not technically mandatory, but practically essential for continuity.  The auxiliary
       //   must be capable of operating the station within the technical parameters of the license.
       //
-      // §73.1560: Operating power must be maintained within ±10% of authorized power (AM stations).
+      // §73.1560: Operating power must be maintained within 90–105% of authorized power (asymmetric).
       //   During a main transmitter failure the station must IMMEDIATELY reduce power or go silent
       //   unless an authorized auxiliary is available.
       //
@@ -13104,7 +13104,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_frequency_monitoring_and_technical_compliance_guide: (() => {
-      // 47 CFR §73.1560: AM stations must maintain carrier frequency within ±20 Hz of authorized frequency.
+      // 47 CFR §73.1545: AM stations must maintain carrier frequency within ±20 Hz of authorized frequency.
       // 47 CFR §73.1570: Modulation limits — AM modulation must not exceed 100% on negative peaks,
       //   or 125% on positive peaks (FCC §73.1570(b)(1)).
       // 47 CFR §73.1580: Transmission system performance — NRSC-2-B (AM Broadcast Technical Standard)
@@ -13145,7 +13145,7 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_fcc_compliance_low_usd,
         annual_fcc_compliance_high_usd,
         fcc_license_fee_usd,
-        reference: '47 CFR §73.1560 (frequency tolerance ±20 Hz); 47 CFR §73.1570 (modulation limits: 100% neg / 125% pos peak); 47 CFR §73.1580 (NRSC-2-B transmission system performance); 47 CFR §73.1870 (chief operator duties); FCC Form 303-S (license renewal)',
+        reference: '47 CFR §73.1545 (carrier frequency tolerance ±20 Hz); 47 CFR §73.1570 (modulation limits: 100% neg / 125% pos peak); 47 CFR §73.1580 (NRSC-2-B transmission system performance); 47 CFR §73.1870 (chief operator duties); FCC Form 303-S (license renewal)',
         note: `${frequency_khz} kHz must stay within ±${freq_tolerance_hz} Hz. Modulation ≤ ${mod_negative_peak_pct}% (neg) / ${mod_positive_peak_pct}% (pos peak). NRSC-2-B: audio BW ≤ ${audio_bandwidth_khz} kHz. Monitoring equipment: $${total_monitoring_equip_low_usd.toLocaleString()}–$${total_monitoring_equip_high_usd.toLocaleString()} capex. Annual compliance: $${annual_fcc_compliance_low_usd.toLocaleString()}–$${annual_fcc_compliance_high_usd.toLocaleString()}/yr.`
       };
     })(),
@@ -20580,14 +20580,14 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     spectrum_monitoring_and_frequency_drift_guide: (() => {
-      // 47 CFR §73.1215 — Carrier frequency tolerance for AM (MF) broadcast stations.
+      // 47 CFR §73.1545 — Carrier frequency tolerance for AM (MF) broadcast stations.
       // Tolerance: ±20 Hz from assigned frequency (absolute), verified at all power levels.
       // Typical modern PLL transmitters: ±0.5–2 Hz drift; older tube rigs: ±5–15 Hz.
       //
       // Monitoring methods:
       //   1. On-site frequency counter (GPS-disciplined reference, ±0.01 Hz accuracy)
       //   2. Remote frequency monitor (SDR or commercial, e.g., Nautel AUI or Inovonics 223)
-      //   3. Third-party independent frequency check (required annually by §73.1215(c))
+      //   3. Third-party independent frequency check (best practice; file in station log)
       //   4. Modulation monitor cross-check (some monitors include carrier freq readout)
       //
       // Drift causes in AM transmitters:
@@ -20601,7 +20601,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const freq_khz         = frequency_khz;                      // 780
       const freq_hz          = freq_khz * 1000;                     // 780,000
-      const tolerance_hz     = 20;                                  // §73.1215 absolute limit
+      const tolerance_hz     = 20;                                  // §73.1545 absolute limit
       const tolerance_ppm    = Math.round((tolerance_hz / freq_hz) * 1e6 * 100) / 100; // ~25.64 ppm
       const lower_limit_hz   = freq_hz - tolerance_hz;              // 779,980
       const upper_limit_hz   = freq_hz + tolerance_hz;              // 780,020
@@ -20618,7 +20618,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { method: 'GPS_COUNTER',    label: 'GPS-disciplined frequency counter',   accuracy_hz: 0.01, cost_usd: 800,  required: true,  notes: 'Primary on-site reference; ±0.01 Hz; GPSDO-locked' },
         { method: 'REMOTE_SDR',     label: 'Software-defined radio (SDR) monitor', accuracy_hz: 1.0,  cost_usd: 350,  required: false, notes: 'RTL-SDR + software; useful for continuous remote monitoring' },
         { method: 'COMMERCIAL_MON', label: 'Commercial frequency monitor',         accuracy_hz: 0.1,  cost_usd: 2500, required: false, notes: 'e.g., Inovonics 223, Belar FMCS-1; integrated with logging' },
-        { method: 'THIRD_PARTY',    label: 'Annual third-party frequency check',   accuracy_hz: 0.05, cost_usd: 500,  required: true,  notes: '§73.1215(c): independent verification annually; file in station log' },
+        { method: 'THIRD_PARTY',    label: 'Annual third-party frequency check',   accuracy_hz: 0.05, cost_usd: 500,  required: true,  notes: '§73.1545: carrier frequency tolerance ±20 Hz; independent verification annually; file in station log' },
       ];
 
       const n_monitoring_methods   = MONITORING_OPTIONS.length;       // 4
@@ -20659,8 +20659,8 @@ async function scoreCandidate(pt, ctx, warnings){
         monitoring_options: MONITORING_OPTIONS,
         correction_steps:   CORRECTION_STEPS,
         n_correction_steps: CORRECTION_STEPS.length,
-        reference: '47 CFR §73.1215 (carrier frequency tolerance); §73.1820 (station logs); §73.1560 (power reduction)',
-        note: `AM frequency tolerance is ±${tolerance_hz} Hz (${tolerance_ppm} ppm at ${freq_khz} kHz) per §73.1215. Modern PLL transmitters operate well within this with <2 Hz typical drift. Annual third-party frequency check required. Monitor after relocation — new site ground conditions may shift ATU tuning slightly.`
+        reference: '47 CFR §73.1545 (carrier frequency tolerance ±20 Hz); §73.1820 (station logs); §73.1560 (power reduction)',
+        note: `AM frequency tolerance is ±${tolerance_hz} Hz (${tolerance_ppm} ppm at ${freq_khz} kHz) per §73.1545. Modern PLL transmitters operate well within this with <2 Hz typical drift. Annual third-party frequency check required. Monitor after relocation — new site ground conditions may shift ATU tuning slightly.`
       };
     })(),
 
@@ -20997,7 +20997,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // FCC §73.62(a): DA antenna operating tolerances:
       //   - Base current must stay within ±5% of licensed value (§73.62(a))
-      //   - Carrier frequency within ±20 Hz (§73.1215)
+      //   - Carrier frequency within ±20 Hz (§73.1545)
       //   - For DA: current ratios within ±5%, phases within ±3° (§73.62(a))
 
       const isDA_atu   = /^DA/i.test(pattern_mode);
@@ -21071,8 +21071,8 @@ async function scoreCandidate(pt, ctx, warnings){
         current_tolerance_cfr:        '47 CFR §73.62(a)',
         da_tolerance_cfr:             isDA_atu ? '47 CFR §73.62(a)' : null,
         frequency_tolerance_hz:       20,
-        frequency_tolerance_cfr:      '47 CFR §73.1215',
-        reference: '47 CFR §73.62(a) (DA operating tolerances: current ratio ±5%, phase ±3°); §73.61 (base current monitoring); §73.1215 (frequency tolerance); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
+        frequency_tolerance_cfr:      '47 CFR §73.1545',
+        reference: '47 CFR §73.62(a) (DA operating tolerances: current ratio ±5%, phase ±3°); §73.61 (base current monitoring); §73.1545 (frequency tolerance ±20 Hz); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
         note: `${isDA_atu ? 'DA' : 'NDA'} ${frequency_khz} kHz, λ/4=${lambda_quarter_m}m. Base resistance ~${base_resistance_ohm_typical}Ω; base current ~${base_current_rms}A rms at ${tpo_kw ?? 5} kW. ATU cost: $${total_atu_cost_low.toLocaleString()}–$${total_atu_cost_high.toLocaleString()} (typ. $${total_atu_cost_typ.toLocaleString()}). Commissioning: ${commissioning_days_low}–${commissioning_days_high} days. Antenna efficiency: ~${antenna_efficiency_pct}% with 120-radial system.`
       };
     })(),
@@ -21421,7 +21421,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // §73.1350(c): Monitoring equipment at transmitter:
       //   - Base current meters for each tower (§73.61)
-      //   - Frequency monitor (§73.1215) — must read within ±20 Hz for AM
+      //   - Frequency monitor (§73.1215 — equipment required) — tolerance ±20 Hz for AM (§73.1545)
       //   - Modulation monitor §73.1570
       //
       // §73.1400: Automatic transmission system (ATS) — allows unattended operation
@@ -21453,7 +21453,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'BASE_CURRENT_METERS', label: `Base current meter${n_towers > 1 ? 's' : ''} (${n_towers} tower${n_towers > 1 ? 's' : ''})`, required: true, examples: 'Deltec, Potomac Instruments, Bird', typical_cost_usd: n_towers * 1200, cfr: '§73.1350(b)(3); §73.61' },
         { id: 'PLATE_TELEMETRY', label: 'Plate voltage/current telemetry', required: true, examples: 'Transmitter built-in metering or external transducer', typical_cost_usd: 500, cfr: '§73.1350(b)(5)' },
         { id: 'MOD_MONITOR', label: 'Modulation monitor', required: true, examples: 'Orban 9200AM, CRL Systems, Inovonics 531', typical_cost_usd: 2500, cfr: '§73.1570; §73.1350(b)(4)' },
-        { id: 'FREQ_MONITOR', label: 'Frequency monitor', required: true, examples: 'Belar FMS-1, ERI Model 100', typical_cost_usd: 2000, cfr: '§73.1215; ±20 Hz tolerance' },
+        { id: 'FREQ_MONITOR', label: 'Frequency monitor', required: true, examples: 'Belar FMS-1, ERI Model 100', typical_cost_usd: 2000, cfr: '§73.1215 (monitor required); §73.1545 (±20 Hz tolerance)' },
         { id: 'CELLULAR_DATA', label: 'Cellular data backup for remote control link', required: false, examples: 'LTE/4G cellular modem; redundant to primary internet', typical_cost_usd: 150, cfr: 'Engineering best practice' },
         { id: 'ATS', label: 'Automatic Transmission System (ATS) for unattended operation', required: false, examples: 'Built into Burk ARC or standalone ATS controller', typical_cost_usd: 2000, cfr: '§73.1400' }
       ];
@@ -21467,7 +21467,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { parameter: 'Modulation (positive)', limit: '100%', action: 'Reduce modulation; alert operator', cfr: '§73.1570' },
         { parameter: 'Modulation (negative)', limit: '125%', action: 'Reduce modulation; alert operator', cfr: '§73.1570' },
         { parameter: 'Loss of modulation', limit: '3 hours continuous', action: 'Alert operator; automatic off-air after timeout', cfr: '§73.1400(b)' },
-        { parameter: 'Carrier frequency', limit: '±20 Hz (AM)', action: 'Alert operator; FCC §73.1215', cfr: '§73.1215' },
+        { parameter: 'Carrier frequency', limit: '±20 Hz (AM)', action: 'Alert operator; FCC §73.1545', cfr: '§73.1545' },
         { parameter: 'Power reduction', limit: 'Any fault condition', action: 'Reduce to 10% TPO or off-air per §73.1350', cfr: '§73.1350(e)' }
       ];
 
@@ -21500,8 +21500,8 @@ async function scoreCandidate(pt, ctx, warnings){
         modulation_limit_positive_pct: 100,
         modulation_limit_negative_pct: 125,
         control_point_license_copy_required: true,
-        reference: '47 CFR §73.1350 (remote control); §73.1400 (ATS); §73.61 (base current monitoring); §73.1215 (frequency tolerance); §73.1570 (modulation monitor)',
-        note: `${isDA_rc ? 'DA' : 'NDA'} ${frequency_khz} kHz: remote control authorized §73.1350. ATS (unattended) authorized §73.1400. ${n_required_components} required RC components, $${required_equipment_cost.toLocaleString()} estimated cost. ${n_towers} tower${n_towers > 1 ? 's' : ''} monitored. Frequency tolerance ±20 Hz (§73.1215).`
+        reference: '47 CFR §73.1350 (remote control); §73.1400 (ATS); §73.61 (base current monitoring); §73.1545 (frequency tolerance ±20 Hz); §73.1570 (modulation monitor)',
+        note: `${isDA_rc ? 'DA' : 'NDA'} ${frequency_khz} kHz: remote control authorized §73.1350. ATS (unattended) authorized §73.1400. ${n_required_components} required RC components, $${required_equipment_cost.toLocaleString()} estimated cost. ${n_towers} tower${n_towers > 1 ? 's' : ''} monitored. Frequency tolerance ±20 Hz (§73.1545).`
       };
     })(),
 
@@ -22336,7 +22336,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_relocation_steps: RELOCATION_STEPS.length,
         estimated_annual_monitoring_cost_usd: annual_monitoring_cost_usd,
         fcc_tolerance_pct: 5, // ±5% sample current ratio per §73.62(a); monitoring-point fields per §73.61
-        carrier_tolerance_hz: 20, // ±20 Hz per §73.1215
+        carrier_tolerance_hz: 20, // ±20 Hz per §73.1545
         relocation_note: `${isDA_mon ? `DA station (${pattern_mode}): ${n_monitoring_points} monitoring points required (${n_points_per_pattern} per pattern × ${n_patterns} patterns). New monitoring points must be established during proof-of-performance and filed with FCC Form 302-AM.` : `NDA station: ${n_monitoring_points} recommended monitoring points. New points should be measured during proof and documented.`} Monitoring point distances: ${min_distance_m}–${max_useful_distance_m}m from tower (at ${frequency_khz} kHz). FCC tolerance: ±${5}% of authorized field value.`,
         reference: '47 CFR §73.1545(a) (frequency tolerance); §73.1570 (modulation); §73.61/§73.62 (DA monitoring); §73.154 (partial proof); Form 302-AM exhibit requirements',
         note: `AM monitoring: ${n_monitoring_points} points required (${n_patterns} patterns × ${n_points_per_pattern}). Distance range: ${min_distance_m}–${max_useful_distance_m}m. Annual cost: ~$${annual_monitoring_cost_usd.toLocaleString()}. ${isDA_mon ? 'DA: remote FSM recommended for continuous pattern monitoring.' : 'NDA: manual quarterly monitoring adequate.'}`
@@ -22356,7 +22356,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // §11.35(a): EAS equipment must remain operational during commercial power outages
       // §73.1680: Backup transmitter obligation (FCC encourages but doesn't mandate backup power for >10 days silence)
-      // §73.1215: Carrier frequency and modulation monitoring must continue — requires continuous power
+      // §73.1545 / §73.1215: Carrier frequency tolerance (±20 Hz, §73.1545) and modulation monitoring (§73.1215) must continue — requires continuous power
       //
       // Utility extension costs (rural AM sites far from utility lines):
       //   - Overhead power line extension: $5,000–$15,000/mile (utility-owned line) or $15,000–$35,000/mile (private)
@@ -22442,7 +22442,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Electrical effects of ice on AM antennas:
       //   - Ice dielectric lowers effective antenna impedance and shifts resonant frequency
       //   - At 780 kHz, a 25mm ice sleeve on the tower base section can shift base impedance by 5–15 Ω
-      //   - Frequency shift may cause carrier to drift outside ±20 Hz tolerance (§73.1215)
+      //   - Frequency shift may cause carrier to drift outside ±20 Hz tolerance (§73.1545)
       //   - ATU (antenna tuning unit) may need retuning during and after icing events
       //   - Directional antenna patterns may be distorted when ice accumulation is non-uniform
       //
@@ -22461,7 +22461,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Heated ATU/base insulator enclosure (protects impedance matching network)
       //   - Active tower excitation deicing (AC current warming, complex, rare)
       //
-      // §73.1215: Carrier frequency must remain within ±20 Hz; icing that shifts ATU resonance
+      // §73.1545: Carrier frequency must remain within ±20 Hz; icing that shifts ATU resonance
       // can cause carrier drift — operator must monitor and retune during icing events
       // §73.49: Fence and tower structure must remain in good repair — ice damage must be repaired
 
@@ -22494,7 +22494,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const annual_cost_typical = applicable_systems.reduce((sum, s) => sum + Math.round((s.cost_usd_per_year.low + s.cost_usd_per_year.high) / 2), 0);
 
       const ELECTRICAL_RISKS = [
-        { risk: 'Carrier frequency drift', cfr: '§73.1215', trigger: `25mm radial ice on tower base can shift ATU impedance, causing carrier drift >±20 Hz`, mitigation: 'Monitor carrier frequency during icing events; retune ATU as needed' },
+        { risk: 'Carrier frequency drift', cfr: '§73.1545', trigger: `25mm radial ice on tower base can shift ATU impedance, causing carrier drift >±20 Hz`, mitigation: 'Monitor carrier frequency during icing events; retune ATU as needed' },
         { risk: 'DA pattern distortion', cfr: '§73.182', trigger: 'Non-uniform ice on DA elements distorts radiation pattern; may cause interference to co-channel stations', mitigation: 'Pattern monitoring during icing; inspect antenna elements post-storm' },
         { risk: 'Base insulator flashover', cfr: '§73.49', trigger: 'Ice bridging across base insulator can cause flashover and transmitter shutdown', mitigation: 'Heated ATU enclosure; insulator inspection after freeze/thaw cycles' }
       ];
@@ -22515,8 +22515,8 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         electrical_risks: ELECTRICAL_RISKS,
         n_electrical_risks: ELECTRICAL_RISKS.length,
-        relocation_note: `Site at ${round2(candidate_lat)}°N is ${ice_zone} (radial ice design thickness: ${ice_mm}mm). ${deicing_recommended ? 'Active deicing systems recommended.' : 'Icing events occur; ATU heated enclosure and remote monitoring recommended at minimum.'} Monitor carrier frequency (§73.1215) during icing events.`,
-        reference: 'TIA-222-H (2017); ASCE 7-22; 47 CFR §73.1215; §73.49; §73.182; ANSI/TIA-322 tower climbing safety',
+        relocation_note: `Site at ${round2(candidate_lat)}°N is ${ice_zone} (radial ice design thickness: ${ice_mm}mm). ${deicing_recommended ? 'Active deicing systems recommended.' : 'Icing events occur; ATU heated enclosure and remote monitoring recommended at minimum.'} Monitor carrier frequency (§73.1545) during icing events.`,
+        reference: 'TIA-222-H (2017); ASCE 7-22; 47 CFR §73.1545 (carrier frequency tolerance ±20 Hz); §73.49; §73.182; ANSI/TIA-322 tower climbing safety',
         note: `Ice zone: ${ice_zone} (${ice_mm}mm design thickness at ${round2(candidate_lat)}°N). ${applicable_systems.length} applicable deicing systems. Estimated annual cost: $${annual_cost_typical.toLocaleString()}. Deicing ${deicing_recommended ? 'RECOMMENDED' : 'not required but monitor'}.`
       };
     })(),
@@ -23007,7 +23007,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     frequency_monitoring_plan_guide: (() => {
-      // §73.1215: AM carrier frequency and modulation monitoring requirements
+      // §73.1545: AM carrier frequency tolerance (±20 Hz); §73.1215: modulation monitoring requirements
       // §73.1350: Transmitter control and monitoring
       // §73.61 / §73.62: AM directional antenna base current monitoring
       // NRSC-2-B: Emission mask standard (AM modulation bandwidth and spurious emissions)
@@ -23018,7 +23018,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Carrier frequency reference may need re-calibration at new site
       //   - Directional antenna (DA) stations must re-establish base current ratios
       //   - New transmitter site may have different local noise environment (impacts monitoring accuracy)
-      // §73.1215(b): Frequency must be kept within ±20 Hz of licensed frequency (AM stations)
+      // §73.1545: Frequency must be kept within ±20 Hz of licensed frequency (AM stations)
       // §73.1350(a): Operator must be able to operate the transmitter (on-site or by remote means)
 
       const isDA_fmpg = /^DA/i.test(pattern_mode);
@@ -23026,7 +23026,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Carrier frequency tolerance
       const CARRIER_FREQ_TOLERANCE = {
         max_deviation_hz: 20,
-        cfr: '§73.1215(b)',
+        cfr: '§73.1545',
         monitoring_method: 'GPS-locked frequency reference or calibrated frequency counter',
         check_frequency: 'Weekly minimum; continuous with automatic monitoring system preferred'
       };
@@ -23103,8 +23103,8 @@ async function scoreCandidate(pt, ctx, warnings){
         remote_monitoring: REMOTE_MONITORING,
         equipment_cost_estimate: EQUIPMENT_COST,
         relocation_note: `Transmitter relocation requires re-calibration of all monitoring equipment at the new site. ${isDA_fmpg ? 'Directional array base current ratios must be re-established during proof-of-performance. ' : ''}Carrier frequency reference must be re-established with GPS-locked standard at new transmitter location.`,
-        reference: '47 CFR §73.44; §73.61; §73.62; §73.1215; §73.1350; §73.1570; §73.1820; NRSC-2-B (AM emission mask standard)',
-        note: `Monitoring requirements: carrier ±20 Hz (§73.1215), modulation 100%/125% (§73.1570)${isDA_fmpg ? ', base current ratios ±5% (§73.62)' : ''}. Remote control permitted (§73.1350(c)).`
+        reference: '47 CFR §73.44; §73.61; §73.62; §73.1215 (modulation monitor); §73.1350; §73.1545 (carrier frequency tolerance ±20 Hz); §73.1570; §73.1820; NRSC-2-B (AM emission mask standard)',
+        note: `Monitoring requirements: carrier ±20 Hz (§73.1545), modulation 100%/125% (§73.1570)${isDA_fmpg ? ', base current ratios ±5% (§73.62)' : ''}. Remote control permitted (§73.1350(c)).`
       };
     })(),
 
@@ -32079,7 +32079,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_modulation_monitor_and_carrier_frequency_compliance_guide: (() => {
-      // §73.1560: AM carrier frequency must remain within ±20 Hz of authorized frequency.
+      // §73.1545: AM carrier frequency must remain within ±20 Hz of authorized frequency.
       // §73.1215: Requires a modulation monitor at each station operating above 10 watts.
       // On relocation, all monitoring must be re-established at new site; new transmitter
       // may require recalibration of modulation monitor per §73.1570.
@@ -32087,7 +32087,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const tpo         = tpo_kw ?? 1;
       const isDA        = /^DA/i.test(pattern_mode ?? '');
 
-      // Carrier frequency tolerance per §73.1560
+      // Carrier frequency tolerance per §73.1545
       const CARRIER_TOL_HZ    = 20;
       const carrier_tol_ppm   = round2((CARRIER_TOL_HZ / (freq_khz * 1000)) * 1e6);
 
@@ -32138,7 +32138,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_low_usd,
           total_high_usd,
         },
-        reference: '47 CFR §73.1215; §73.1560; §73.1570; §73.68',
+        reference: '47 CFR §73.1215 (modulation monitor); §73.1545 (carrier frequency tolerance ±20 Hz); §73.1560 (operating power 90–105%); §73.1570; §73.68',
         note: `Carrier tolerance ±${CARRIER_TOL_HZ} Hz (${carrier_tol_ppm} ppm) at ${freq_khz} kHz. Modulation monitor: ${modulation_monitor_required ? 'REQUIRED (>10 W)' : 'NOT REQUIRED (≤10 W)'}. Peak modulation: +${MOD_MAX_PCT}% / −${MOD_NEG_MAX_PCT}%. ${n_monitor_points_required > 0 ? `DA requires ${n_monitor_points_required} monitor points. ` : ''}Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
