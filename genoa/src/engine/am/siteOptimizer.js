@@ -13450,7 +13450,7 @@ async function scoreCandidate(pt, ctx, warnings){
         evaluation_required,
         evaluation_cost_low_usd,
         evaluation_cost_high_usd,
-        reference: '47 CFR §1.1310 (RF exposure limits); FCC OET Bulletin 65 Ed. 97-01 (RF exposure evaluation methods); 47 CFR §73.816 (AM RF exposure); IEEE C95.1-2019 (RF safety standard)',
+        reference: '47 CFR §1.1307(b) (environmental RF trigger); §1.1310 (MPE limits — general population: 614 mV/m, 100 µW/cm²; occupational: 1842 mV/m, 1000 µW/cm²); FCC OET Bulletin 65 Ed. 97-01 (evaluation methodology); IEEE C95.1-2019 (RF safety standard)',
         note: `ERP ~${erp_kw} kW → general population exclusion zone ~${exclusion_radius_m_general} m (${exclusion_radius_km_general} km); controlled ~${exclusion_radius_m_controlled} m. Formal §1.1310 evaluation ${evaluation_required ? 'REQUIRED (ERP > 5 kW)' : 'not required (ERP ≤ 5 kW) — retain calculation on file'}. MPE limit: ${mpe_general_mv_per_m} mV/m (${mpe_general_uW_per_cm2} µW/cm²) general population.`
       };
     })(),
@@ -23018,7 +23018,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // §17.7(a): Any tower that exceeds 60.96 m (200 ft) AMSL OR is within a 3-mile radius of an airport
       //   must be registered with the FCC's ASR database before construction.
       // §17.7(b): Towers in certain sensitive areas (near airports) have lower registration thresholds.
-      // §73.816(a): AM stations must have a valid ASR number for any tower registered under §17.7.
+      // §17.4: Structures meeting §17.7 height/proximity thresholds must be registered in the ASR
+      //   database before construction. FCC Form 301-AM requires the ASR number on Exhibit A.
       // When relocating, the NEW tower at the candidate site may require ASR registration if:
       //   (a) the tower height exceeds 60.96 m, OR
       //   (b) the site is within 3 nautical miles of a civilian airport or 1 nautical mile of a heliport
@@ -23048,7 +23049,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { step: 2, action: 'Await FAA determination', detail: 'FAA issues "no hazard to air navigation" finding (typically 45 days) or "objection" requiring design change', cfr: '14 CFR §77.17' },
         { step: 3, action: 'File FCC Form 854 (ASR)', detail: 'Submit ASR application to FCC with FAA study reference number; include tower coordinates, height, owner/contact information', cfr: '47 CFR §17.4; §17.7' },
         { step: 4, action: 'Install lighting per FAA order', detail: 'FAA Determination Letter specifies lighting type (white strobes day/medium-intensity red night, etc.) per 14 CFR Part 77', cfr: '47 CFR §17.21; §17.23' },
-        { step: 5, action: 'Update FCC station license', detail: 'Include ASR number on CP application (FCC Form 301-AM); LMS validates ASR number exists for towers meeting threshold', cfr: '47 CFR §73.816(a); §73.3533' },
+        { step: 5, action: 'Update FCC station license', detail: 'Include ASR number on CP application (FCC Form 301-AM Exhibit A); LMS rejects filings without ASR for towers meeting §17.7 threshold', cfr: '47 CFR §17.4; §73.3533' },
         { step: 6, action: 'Report lighting outages', detail: 'Any lighting outage exceeding 30 minutes must be reported to FAA (§17.48) and FCC within 24 hours', cfr: '47 CFR §17.48' }
       ];
 
@@ -23089,7 +23090,7 @@ async function scoreCandidate(pt, ctx, warnings){
         post_registration_obligations: POST_REGISTRATION_OBLIGATIONS,
         n_obligations: POST_REGISTRATION_OBLIGATIONS.length,
         relocation_note: `New tower at this candidate site (est. ${three_eights_m_asr}m) ${asr_required_by_height ? 'REQUIRES FCC ASR registration (exceeds 60.96m threshold). FAA Form 7460-1 must be filed first.' : 'may not require ASR registration by height, but airport proximity check is still required.'}`,
-        reference: '47 CFR §17.4; §17.7; §17.21; §17.23; §17.48; §17.57; §73.816(a); §73.3533; 14 CFR §77; FAA Form 7460-1 (OEAAA portal); FCC Form 854',
+        reference: '47 CFR §17.4 (ASR registration); §17.7 (height/proximity threshold); §17.21 (marking); §17.23 (painting); §17.48 (lighting outage reporting); §17.57 (registration updates); §73.3533 (CP/LTC requirements); 14 CFR §77 (FAA aeronautical study); FAA Form 7460-1 (OEAAA portal); FCC Form 854 (ASR application)',
         note: `ASR required by height: ${asr_required_by_height} (tower ${three_eights_m_asr}m vs ${ASR_HEIGHT_THRESHOLD_M}m threshold). FAA 7460-1 notification: ${faa_notification_likely ? 'LIKELY' : 'EVALUATE'}. ASR filing is free; engineering/lighting: \$6.5k–\$35k.`
       };
     })(),
