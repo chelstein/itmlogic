@@ -3203,7 +3203,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#0c0c14', border: '1px solid #312e81', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#818cf8', marginBottom: 10 }}>
-                §73.316 DA Pattern Design — {da.pattern_mode}
+                §73.150 DA Pattern Design — {da.pattern_mode}
               </div>
               {/* Summary chips */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
@@ -3252,7 +3252,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               {/* Compliance checklist */}
               {da.compliance_checklist && da.compliance_checklist.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>§73.316 Compliance Checklist</div>
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>§73.150 Compliance Checklist</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
                     <tbody>
                       {da.compliance_checklist.map((row, i) => (
@@ -4389,7 +4389,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   </div>
                 </>
               )}
-              <div style={{ marginTop: 6, fontSize: 10, color: '#6366f1' }}>Ref: 47 CFR §73.55, §73.61(b), §73.68, §73.154(a), §73.316(b)</div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#6366f1' }}>Ref: 47 CFR §73.1820, §73.61(b), §73.68, §73.154(a), §73.150</div>
             </div>
           );
         })()}
@@ -5189,7 +5189,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
           return (
             <div key="tpm-guide" style={{ marginBottom: 16, padding: 12, background: '#fff3cd', borderRadius: 8, border: '2px solid #f59e0b' }}>
-              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Tower Painting &amp; FAA Marking (§17.21–§17.25)</div>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Tower Painting &amp; FAA Marking (§17.21–§17.23)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
                 <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
                 <span style={{ fontWeight: 600 }}>FAA painting required:</span>
@@ -5214,7 +5214,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
           return (
             <div key="ipc-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
-              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Interference Protection Contour (§73.207)</div>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Interference Protection Contour (§73.182)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
                 <span>Channel type:</span><span>{g.is_clear_channel ? 'Clear channel' : g.is_local_channel ? 'Local channel' : 'Regional channel'}</span>
                 <span>Station class:</span><span>Class {g.fcc_class ?? '—'} ({g.is_class_cd ? 'secondary / no protection' : 'has interference protection'})</span>
@@ -6920,7 +6920,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#eef2ff', border: '1px solid #818cf8', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
               <div style={{ fontWeight: 700, color: '#312e81', marginBottom: 8, fontSize: 13 }}>
-                Construction Permit &amp; Buildout Timeline (§73.67)
+                Construction Permit &amp; Buildout Timeline (§73.3598)
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#3730a3' }}>
                 <span>Filing type</span>
@@ -6928,7 +6928,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <span>CP processing</span>
                 <span style={{ fontWeight: 600 }}>{g.cp_processing_months_low}–{g.cp_processing_months_high} months</span>
                 <span>CP validity</span>
-                <span style={{ fontWeight: 600 }}>{g.cp_validity_years} years from grant (§73.67)</span>
+                <span style={{ fontWeight: 600 }}>{g.cp_validity_years} years from grant (§73.3598(a))</span>
                 <span>CP expiration risk</span>
                 <span style={{ fontWeight: 700, color: riskColor[g.cp_expiration_risk] ?? '#3730a3' }}>{g.cp_expiration_risk}</span>
                 <span>FCC filing fee</span>
@@ -7971,7 +7971,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0f4ff', borderRadius: 8, border: '1px solid #c7d2fe' }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#3730a3', marginBottom: 8 }}>
-                Spectrum Monitoring &amp; Frequency Drift — §73.1215
+                Spectrum Monitoring &amp; Frequency Drift — §73.1545
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
                 <div><span style={{ color: '#6b7280' }}>Assigned frequency:</span> <strong>{g.freq_hz?.toLocaleString()} Hz ({g.frequency_khz} kHz)</strong></div>
@@ -8362,7 +8362,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
               <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
-                📻 Frequency Coordination — Adjacent Stations (§73.182 / §73.207)
+                📻 Frequency Coordination — Adjacent Stations (§73.182 / §73.37)
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
@@ -8383,7 +8383,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>1st Adjacent D/U</div>
                   <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 15 }}>≥{g.first_adj_du_ratio_db} dB</div>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>§73.207</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>§73.37</div>
                 </div>
               </div>
               {g.du_protection_ratios && (
@@ -8909,7 +8909,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
                   <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Carrier Tolerance</div>
-                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>±{g.carrier_tolerance_hz} Hz (§73.1215)</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>±{g.carrier_tolerance_hz} Hz (§73.1545)</div>
                 </div>
               </div>
               {g.relocation_steps && (
@@ -9342,7 +9342,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
               <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
-                Frequency Monitoring Plan <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.1215</span>
+                Frequency Monitoring Plan <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.1545</span>
               </h4>
               <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
@@ -10479,8 +10479,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               {/* Unattended Operation */}
               <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: 11 }}>
-                <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>UNATTENDED OPERATION — §73.801</div>
-                <div style={{ color: '#4ade80', fontWeight: 700, marginBottom: 4 }}>{uo.authorized ? 'Authorized under §73.801 with remote control' : 'Not authorized'}</div>
+                <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>UNATTENDED OPERATION — §73.1300</div>
+                <div style={{ color: '#4ade80', fontWeight: 700, marginBottom: 4 }}>{uo.authorized ? 'Authorized under §73.1300 with remote control' : 'Not authorized'}</div>
                 {(uo.conditions ?? []).map((c, i) => (
                   <div key={i} style={{ color: '#64748b', fontSize: 10, padding: '1px 0' }}>• {c}</div>
                 ))}
@@ -11287,7 +11287,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
               <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
-                Modulation Monitor &amp; Carrier Frequency Compliance (§73.1215 / §73.1560)
+                Modulation Monitor &amp; Carrier Frequency Compliance (§73.1570 / §73.1545)
               </div>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
                 <div>
@@ -13056,7 +13056,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const tierColor = du => du >= 20 ? 'text-green-400' : du >= 6 ? 'text-amber-400' : 'text-red-400';
           return (
             <div>
-              <div className="rack-eyebrow mb-1">Co-Channel Interference Budget (§73.182 · §73.207)</div>
+              <div className="rack-eyebrow mb-1">Co-Channel Interference Budget (§73.182 · §73.37)</div>
               <div className="rack-panel p-3 mb-3">
                 <div className="text-xs text-blue-200 mb-2">
                   D/U ratio framework for co-channel AM interference at {d.frequency_khz} kHz.
@@ -13566,7 +13566,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           if (!da.applicable) {
             return (
               <div>
-                <div className="rack-eyebrow mb-1">§73.316 DA Array Design Guide</div>
+                <div className="rack-eyebrow mb-1">§73.150 DA Array Design Guide</div>
                 <div className="font-mono text-[9px] text-textDim italic">{da.reason}</div>
               </div>
             );
@@ -13574,7 +13574,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const modeColor = m => m === 'DA-D' ? 'text-blue-300' : m === 'DA-N' ? 'text-indigo-300' : 'text-violet-300';
           return (
             <div>
-              <div className="rack-eyebrow mb-1">§73.316 DA Array Design Guide</div>
+              <div className="rack-eyebrow mb-1">§73.150 DA Array Design Guide</div>
               {/* Mode badge row */}
               <div className="flex flex-wrap gap-1.5 mb-2">
                 <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule ${modeColor(da.da_mode_type)}`}>
@@ -13644,7 +13644,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               {/* HRP spec */}
               <div className="font-mono text-[9px] text-textDim mb-1">
-                §73.316 HRP: {da.n_hrp_radials} radials at {da.hrp_increment_deg}° increments · Suppression req: ≥{da.suppression_requirement_db} dB
+                §73.150 HRP: {da.n_hrp_radials} radials at {da.hrp_increment_deg}° increments · Suppression req: ≥{da.suppression_requirement_db} dB
               </div>
               {/* Exhibits required */}
               <div className="font-mono text-[9px] text-textDim mb-1">Form 301-AM Required Exhibits</div>
@@ -14177,8 +14177,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   </div>
                 </div>
               )}
-              {/* §73.316 HRP checklist */}
-              <div className="font-mono text-[9px] text-textDim mb-1">§73.316 Compliance Checklist</div>
+              {/* §73.150 HRP checklist */}
+              <div className="font-mono text-[9px] text-textDim mb-1">§73.150 Compliance Checklist</div>
               <div className="space-y-0.5 mb-1">
                 {ap.hrp_compliance_checklist.map(c => (
                   <div key={c.id} className={`flex items-start gap-1.5 px-1.5 py-0.5 rounded border ${c.required ? 'border-amber-400/30 bg-amber-400/5' : 'border-rule bg-surface/40'}`}>

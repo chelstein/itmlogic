@@ -23120,7 +23120,7 @@ async function scoreCandidate(pt, ctx, warnings){
         remote_monitoring: REMOTE_MONITORING,
         equipment_cost_estimate: EQUIPMENT_COST,
         relocation_note: `Transmitter relocation requires re-calibration of all monitoring equipment at the new site. ${isDA_fmpg ? 'Directional array base current ratios must be re-established during proof-of-performance. ' : ''}Carrier frequency reference must be re-established with GPS-locked standard at new transmitter location.`,
-        reference: '47 CFR §73.44; §73.61; §73.62; §73.1215 (modulation monitor); §73.1350; §73.1545 (carrier frequency tolerance ±20 Hz); §73.1570; §73.1820; NRSC-2-B (AM emission mask standard)',
+        reference: '47 CFR §73.44; §73.61; §73.62; §73.1215 (modulation monitor); §73.1350; §73.1545 (carrier frequency tolerance ±20 Hz); §73.1560 (operating power 90–105%); §73.1570; §73.1820; NRSC-2-B (AM emission mask standard)',
         note: `Monitoring requirements: carrier ±20 Hz (§73.1545), modulation 100%/125% (§73.1570)${isDA_fmpg ? ', base current ratios ±5% (§73.62)' : ''}. Remote control permitted (§73.1350(c)).`
       };
     })(),

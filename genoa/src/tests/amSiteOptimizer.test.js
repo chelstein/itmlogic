@@ -6010,7 +6010,7 @@ test('antenna_tuning_unit_commissioning_guide presence and structure', async () 
   assert.strictEqual(g.frequency_khz, 780, 'frequency_khz mismatch');
   assert.strictEqual(g.fcc_class, 'D', 'fcc_class mismatch');
   assert.strictEqual(g.base_resistance_ohm_typical, 36, 'λ/4 vertical base resistance must be 36Ω');
-  assert.strictEqual(g.current_tolerance_cfr, '47 CFR §73.155(a)', 'current tolerance CFR must ref §73.155(a)');
+  assert.strictEqual(g.current_tolerance_cfr, '47 CFR §73.62(a)', 'current tolerance CFR must ref §73.62(a) (DA tolerances; §73.155 is recertification)');
 });
 
 test('antenna_tuning_unit_commissioning_guide KAZM 780kHz physics', async () => {
@@ -6824,7 +6824,7 @@ test('antenna_deicing_guide electrical risks include carrier frequency drift', a
   const riskLabels = g.electrical_risks.map(r => r.risk.toLowerCase());
   assert.ok(riskLabels.some(r => r.includes('carrier') || r.includes('frequency')), 'carrier frequency drift risk must be present');
   const carrierRisk = g.electrical_risks.find(r => r.risk.toLowerCase().includes('carrier') || r.risk.toLowerCase().includes('frequency'));
-  assert.ok(carrierRisk.cfr.includes('73.1215'), 'carrier frequency risk must reference §73.1215');
+  assert.ok(carrierRisk.cfr.includes('73.1545'), 'carrier frequency risk must reference §73.1545 (carrier frequency tolerance)');
 });
 
 test('antenna_deicing_guide annual cost is non-negative and deicing systems array is present', async () => {
@@ -11951,8 +11951,8 @@ test('am_modulation_monitor_and_station_logging_guide KAZM total monitoring cost
 test('am_modulation_monitor_and_station_logging_guide KAZM logging schedule', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_modulation_monitor_and_station_logging_guide;
-  assert.strictEqual(g.log_interval_min,  30, 'log_interval_min should be 30 (§73.1820)');
-  assert.strictEqual(g.readings_per_day,  48, 'readings_per_day should be 48 (every 30 min)');
+  assert.strictEqual(g.log_interval_min,  180, 'log_interval_min should be 180 (§73.1820(a)(2) — intervals not exceeding 3 hours)');
+  assert.strictEqual(g.readings_per_day,  8, 'readings_per_day should be 8 (every 3 hours)');
 });
 
 test('am_modulation_monitor_and_station_logging_guide comparison table columns present', async () => {
@@ -11965,7 +11965,7 @@ test('am_modulation_monitor_and_station_logging_guide comparison table columns p
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.mon_monitor_type,     'standard', 'rank-1 mon_monitor_type should be standard');
   assert.strictEqual(r0.mon_total_low_usd,    5700,       'rank-1 mon_total_low_usd should be $5,700');
-  assert.strictEqual(r0.mon_readings_per_day, 48,         'rank-1 mon_readings_per_day should be 48');
+  assert.strictEqual(r0.mon_readings_per_day, 8,          'rank-1 mon_readings_per_day should be 8 (every 3 hours per §73.1820(a)(2))');
 });
 
 test('am_transmitter_building_and_equipment_shelter_guide present on KAZM candidate', async () => {
@@ -14382,10 +14382,10 @@ it('am_frequency_monitoring_and_technical_compliance_guide mod limits are 100/12
   assert.strictEqual(g.mod_positive_peak_pct, 125, 'positive peak modulation must be 125%');
 });
 
-it('am_frequency_monitoring_and_technical_compliance_guide reference cites §73.1560 and NRSC-2-B', async () => {
+it('am_frequency_monitoring_and_technical_compliance_guide reference cites §73.1545 and NRSC-2-B', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_frequency_monitoring_and_technical_compliance_guide;
-  assert.ok(g.reference.includes('§73.1560'), 'reference must cite §73.1560');
+  assert.ok(g.reference.includes('§73.1545'), 'reference must cite §73.1545 (carrier frequency tolerance; §73.1560 is the operating-power rule)');
   assert.ok(g.reference.includes('NRSC-2-B'), 'reference must cite NRSC-2-B');
 });
 

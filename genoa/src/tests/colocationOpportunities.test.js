@@ -2767,7 +2767,7 @@ test('am_modulation_monitor_and_station_logging_guide present across colocation 
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_modulation_monitor_and_station_logging_guide missing`);
     assert.ok(g.monitor_cost_low_usd > 0, `rank ${c.rank}: monitor_cost_low_usd must be positive`);
     assert.ok(g.total_monitoring_low_usd > 0, `rank ${c.rank}: total_monitoring_low_usd must be positive`);
-    assert.strictEqual(g.log_interval_min, 30, `rank ${c.rank}: log_interval_min should be 30`);
+    assert.strictEqual(g.log_interval_min, 180, `rank ${c.rank}: log_interval_min should be 180 (§73.1820(a)(2))`);
   }
 });
 
