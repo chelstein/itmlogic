@@ -9741,7 +9741,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //     length; trenching, copper wire, and termination labour dominate cost.
       //
       // Physics model:
-      //   λ/4 radial length  = c / (4 × f_kHz × 1000)  [metres]
+      //   FCC standard radial length = 0.35λ per §73.186 / NBS TN-24
+      //   (legacy NEC/Sevick benchmark used λ/4 = c / (4 × f_kHz × 1000) [metres])
       //   Copper #10 AWG mass per radial ≈ 3.14 g/m → lb/radial for material pricing
       //   Ground system R_loss heuristic (Terman):
       //     R_loss ≈ 400 / (n_radials ^ 0.8)   [Ω]   (empirical, valid 20–240 radials)
@@ -14869,7 +14870,7 @@ async function scoreCandidate(pt, ctx, warnings){
     am_tower_lighting_and_aviation_compliance_guide: (() => {
       // 47 CFR Part 17 / 14 CFR Part 77 / FAA AC 70/7460-1M:
       // Towers > 200 ft AGL (60.96 m) require FAA notice (Form 7460-1) and
-      // FCC ASR registration.  AM towers often exceed 200 ft due to λ/4 or λ/2 height.
+      // FCC ASR registration.  AM towers always exceed 200 ft at class standard height (3/8λ Class C/D, 5/8λ Class A/B).
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
@@ -20754,7 +20755,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //      towers > 60–100ft in most zones; towers in agricultural zones often allowed by right
       //   2. Setback requirements: many jurisdictions require setback = tower height (1:1 fall zone)
       //      or 50–100% of tower height from property lines and occupied structures
-      //   3. Height limits: local zoning height limits may not accommodate AM tower height (λ/4)
+      //   3. Height limits: local zoning height limits may not accommodate AM tower height (3/8λ Class C/D, 5/8λ Class A/B)
       //      → variance or special exception required
       //   4. Environmental review: CEQA (California), SEPA (Washington), or local EIR
       //   5. Neighbor notification: typically 300–500ft radius for public hearing notice
