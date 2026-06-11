@@ -6,7 +6,10 @@
 //   boards (each state board defines who may stamp engineering
 //   exhibits).  FCC engineering-data filing requirements that the
 //   PE-stamped exhibit satisfies live in:
-//     47 CFR §73.1610 — FCC right to demand additional engineering data
+//     47 CFR §73.1610 — equipment tests (engineering-readiness data
+//                       produced during construction)
+//     47 CFR §73.3514(b) — FCC authority to require additional
+//                       documents/engineering data in applications
 //     47 CFR §73.3539 — application filing requirements (renewal /
 //                       major-change applications carrying engineering
 //                       data)
