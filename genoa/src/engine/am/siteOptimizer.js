@@ -8883,7 +8883,7 @@ async function scoreCandidate(pt, ctx, warnings){
         site_control_weeks_low,
         site_control_weeks_high,
         due_diligence_items,
-        reference: '47 CFR §73.1350(a); §73.1690(c); §73.3549(a); 47 CFR Part 1 §1.1306–§1.1307 (NEPA); NHPA §106 (16 USC §470f); ASTM E1527-21 (Phase I ESA); FCC Form 7460-1 (FAA coordination)',
+        reference: '47 CFR §73.1350(a); §73.1690(c); §73.3549(a); 47 CFR Part 1 §1.1306–§1.1307 (NEPA); NHPA §106 (16 USC §470f); ASTM E1527-21 (Phase I ESA); FAA Form 7460-1 (FAA obstruction study)',
         note: `SCREENING-GRADE land-use and site-access assessment. Zone risk: ${zone_risk_tier}. Estimated lease: $${lease_low_mo.toLocaleString()}–$${lease_high_mo.toLocaleString()}/mo ($${(lease_10yr_low/1000).toFixed(0)}K–$${(lease_10yr_high/1000).toFixed(0)}K over 10 years). Site control before CP filing: ${site_control_weeks_low}–${site_control_weeks_high} weeks.`
       };
     })(),
@@ -22517,7 +22517,7 @@ async function scoreCandidate(pt, ctx, warnings){
         option_to_purchase_recommended: true,
         option_to_purchase_note: 'Negotiate right of first refusal or option to purchase the site at fair market value. AM transmitter sites are difficult to replicate once lost.',
         relocation_note: `New transmitter site lease must cover: tower base, ${ground_radial_radius_m}m radial ground system, guy wire anchors (${guy_radius_m}m radius), transmitter building, and all-weather access road. Minimum site area: ~${min_site_area_acres} acres. Lease term: ${LEASE_TERM.recommended_years} years minimum.`,
-        reference: '47 CFR §73.49; §73.1560; §73.3533; §73.182; §17.7; §1.1307; FCC Form 7460-1; local zoning/CUP requirements',
+        reference: '47 CFR §73.49; §73.1560; §73.3533; §73.182; §17.7; §1.1307; FAA Form 7460-1; local zoning/CUP requirements',
         note: `Ground lease: ${LEASE_TERM.recommended_years}-year recommended term, 2×10-year renewals. Minimum site area ~${min_site_area_acres} acres (${min_site_radius_m}m radius). ${KEY_PROVISIONS.length} key provisions; ${critical_provisions} CRITICAL. Option to purchase recommended.`
       };
     })(),
@@ -32630,7 +32630,7 @@ async function scoreCandidate(pt, ctx, warnings){
           lighting_install_high_usd: total_lighting_high_usd,
           annual_maintenance_usd:    annual_maint_usd,
         },
-        reference: '47 CFR §17.7, §17.21–§17.23, §17.47, §17.58; FAA AC 70/7460-1M; FCC Form 7460-1; FCC Form 854',
+        reference: '47 CFR §17.7, §17.21–§17.23, §17.47, §17.58; FAA AC 70/7460-1M; FAA Form 7460-1; FCC Form 854 (ASR)',
         note: `Est. tower height ${tower_height_ft} ft AGL. Lighting: ${lighting_type.replace(/_/g,' ')}. ASR registration ${asr_required ? 'REQUIRED' : 'not required'}. ${n_towers > 1 ? `${n_towers}-tower DA array.` : ''}`
       };
     })(),
