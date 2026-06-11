@@ -15625,15 +15625,15 @@ test('KAZM tower_height_ft is ~472.87 ft for 780 kHz Class D (3/8λ)', async () 
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_site_environmental_impact_and_permitting_guide;
   assert.ok(Math.abs(g.tower_height_ft - 472.87) < 0.5, `tower_height_ft expected ~472.87, got ${g.tower_height_ft}`);
-  assert.strictEqual(g.height_exceeds_450ft, true, '472 ft tower exceeds 450 ft §1.1307(b) trigger');
+  assert.strictEqual(g.height_exceeds_450ft, true, '472 ft tower exceeds the 450 ft EA trigger (Note to §1.1307(d))');
 });
 
-test('KAZM NEPA trigger is POSSIBLE due to §1.1307(b) (tower exceeds 450 ft)', async () => {
+test('KAZM NEPA trigger is POSSIBLE due to Note to §1.1307(d) (tower exceeds 450 ft)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_site_environmental_impact_and_permitting_guide;
-  assert.strictEqual(g.nepa_trigger, 'POSSIBLE', '3/8λ Class D tower at 472ft exceeds 450ft §1.1307(b) EA trigger');
-  assert.strictEqual(g.ea_cost_low, 8000, 'EA cost must be $8,000 when §1.1307(b) triggered');
-  assert.strictEqual(g.ea_cost_high, 40000, 'EA cost must be $40,000 when §1.1307(b) triggered');
+  assert.strictEqual(g.nepa_trigger, 'POSSIBLE', '3/8λ Class D tower at 472ft exceeds the 450ft EA trigger (Note to §1.1307(d))');
+  assert.strictEqual(g.ea_cost_low, 8000, 'EA cost must be $8,000 when the 450ft height trigger applies');
+  assert.strictEqual(g.ea_cost_high, 40000, 'EA cost must be $40,000 when the 450ft height trigger applies');
 });
 
 test('KAZM cup_required is true and cost range is reasonable', async () => {
@@ -15653,8 +15653,8 @@ test('candidate_comparison_table env columns are present and valid for KAZM', as
     assert.ok('env_total_permitting_low_usd' in row, 'env_total_permitting_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  // KAZM 780 kHz Class D: 3/8λ = 144m = 473 ft > 450 ft §1.1307(b) threshold → POSSIBLE (not UNLIKELY)
-  assert.strictEqual(r0.env_nepa_trigger, 'POSSIBLE', 'rank-1 env_nepa_trigger should be POSSIBLE (3/8λ 473ft > §1.1307(b) 450ft EA threshold)');
+  // KAZM 780 kHz Class D: 3/8λ = 144m = 473 ft > 450 ft EA threshold (Note to §1.1307(d)) → POSSIBLE (not UNLIKELY)
+  assert.strictEqual(r0.env_nepa_trigger, 'POSSIBLE', 'rank-1 env_nepa_trigger should be POSSIBLE (3/8λ 473ft > 450ft EA threshold per Note to §1.1307(d))');
   assert.strictEqual(r0.env_section_106_required, false, 'rank-1 env_section_106_required should be false (no treaty zone)');
   assert.ok(r0.env_total_permitting_low_usd > 0, 'rank-1 env_total_permitting_low_usd must be positive');
 });

@@ -8763,7 +8763,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // > 450 ft tower height trigger
       const tall_tower_trigger = h_ft_ne > 450;
-      if (tall_tower_trigger) ce_triggers.push({ factor: 'TALL_TOWER_OES', severity: 'HIGH', description: `Tower ${h_ft_ne} ft > 450 ft — FAA Obstruction Evaluation Study (OES) + possible NIAR required. Significant EA trigger probability per §1.1307(a).` });
+      if (tall_tower_trigger) ce_triggers.push({ factor: 'TALL_TOWER_OES', severity: 'HIGH', description: `Tower ${h_ft_ne} ft > 450 ft — FAA Obstruction Evaluation Study (OES) + possible NIAR required. EA required per Note to §1.1307(d) for new structures over 450 ft.` });
 
       // Determine CE eligibility
       const high_severity_count = ce_triggers.filter(t => t.severity === 'HIGH').length;
@@ -8885,7 +8885,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const h_m_lu    = round2(h_frac_lu * lambda_lu);
       const h_ft_lu   = Math.round(h_m_lu * 3.28084);
 
-      // Tower > 450 ft (137 m) triggers additional §1.1307(a)(5) FAA study
+      // Tower > 450 ft (137 m) triggers an EA per Note to §1.1307(d) (plus FAA OES)
       const faa_study_trigger = h_m_lu > 137;
 
       // Urban sites carry higher historic property (NHPA §106) risk
@@ -10363,11 +10363,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //   (a)(2) Wildlife preserves, national refuges
       //   (a)(3) Threatened or endangered species habitat (ESA)
       //   (a)(4) Historical sites / properties in or eligible for NRHP (NHPA §106)
-      //   (a)(5) Floodplains (100-year) or wetlands (CWA §404)
-      //   (a)(6) Sole-source aquifer areas (SDWA)
-      //   (a)(7) Wilderness study areas
-      //   (a)(8) Tribal lands / sacred sites (NHPA / AIRFA)
-      //   (b)   Structures > 450 ft (137 m) AGL always require EA regardless
+      //   (a)(5) Indian religious sites (AIRFA)
+      //   (a)(6) Floodplains (100-year, E.O. 11988)
+      //   (a)(7) Significant surface changes: wetland fill, deforestation, water diversion (CWA §404)
+      //   (a)(8) High-intensity white lights in residential neighborhoods
+      //   Note to §1.1307(d): new antenna structures > 450 ft (137 m) AGL require an EA
+      //         (2011 ASR environmental/migratory-bird rules)
       //
       // NHPA Section 106 (36 CFR Part 800):
       //   FCC has Nationwide Programmatic Agreement (NPA) for tower siting.
@@ -10393,7 +10394,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Simple EA (no wetlands/Section 106 issues): $8,000–$20,000; 60–90 days.
       //   Full EA with wetlands + §106: $25,000–$75,000; 4–12 months.
       //   EIS (if Finding Of No Significant Impact not possible): $200,000+; 1–3 years.
-      //   For AM transmitter towers < 450 ft (no §1.1307(b) trigger):
+      //   For AM transmitter towers < 450 ft (no Note-to-§1.1307(d) height trigger):
       //     Categorical exclusion if none of (a)(1)–(a)(8) apply → $0 EA cost.
       //     EA if any (a) trigger → $8,000–$40,000 typical.
 
@@ -10406,7 +10407,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const tower_height_ft  = round2(design_h_env_m * 3.28084);
       const height_exceeds_450ft = tower_height_ft > 450;
 
-      // --- §1.1307(b) hard trigger ---
+      // --- Note to §1.1307(d) height trigger (450 ft AGL) ---
       const nepa_struct_trigger = height_exceeds_450ft;
 
       // --- NEPA trigger assessment ---
@@ -10416,9 +10417,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const inFloodplainProxy = (pt.fuel_risk === 'HIGH' || pt.fuel_risk === 'EXTREME');
       const inTreatyZone      = !!(pt.treaty_zone);
       const nepa_trigger_reasons = [];
-      if (nepa_struct_trigger)  nepa_trigger_reasons.push(`§1.1307(b): tower height ~${tower_height_ft} ft exceeds 450 ft AGL`);
-      if (inFloodplainProxy)    nepa_trigger_reasons.push('§1.1307(a)(5): high fuel/wildfire risk zone may indicate sensitive habitat (confirm floodplain/wetland via NWIS/NWI)');
-      if (inTreatyZone)         nepa_trigger_reasons.push('§1.1307(a)(4)/(a)(8): treaty zone proximity — NHPA §106 and AIRFA consultation likely required');
+      if (nepa_struct_trigger)  nepa_trigger_reasons.push(`Note to §1.1307(d): tower height ~${tower_height_ft} ft exceeds 450 ft AGL — EA required for new structure`);
+      if (inFloodplainProxy)    nepa_trigger_reasons.push('§1.1307(a)(6)/(a)(7): high fuel/wildfire risk zone may indicate sensitive habitat (confirm floodplain/wetland via NWIS/NWI)');
+      if (inTreatyZone)         nepa_trigger_reasons.push('§1.1307(a)(4)/(a)(5): treaty zone proximity — NHPA §106 and AIRFA consultation likely required');
       const nepa_trigger        = nepa_struct_trigger || inFloodplainProxy || inTreatyZone ? 'POSSIBLE' : 'UNLIKELY';
       const nepa_trigger_note   = nepa_trigger === 'POSSIBLE'
         ? `Preliminary screening indicates EA may be required: ${nepa_trigger_reasons.join('; ')}.`
