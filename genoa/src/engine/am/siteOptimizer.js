@@ -5104,7 +5104,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.186 specifies the standard: 120 radials × 0.35λ buried copper.
       // Prescribes radial count, length, conductor gauge, and burial depth.
       const lambdaM_gs = 300000 / frequency_khz;
-      const qwM_gs = round2(lambdaM_gs / 4);  // λ/4 physics reference only (R_rad = 36.5 Ω)
+      const qwM_gs = round2(lambdaM_gs / 4);  // λ/4 physics reference only (R_rad = 36.6 Ω)
 
       // Ideal radial length is 0.35λ per §73.186 / NBS TN-24; λ/4 is only the antenna physics reference.
       const idealRadialLengthM = round2(lambdaM_gs * 0.35); // 0.35λ per §73.186
