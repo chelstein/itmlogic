@@ -16464,15 +16464,15 @@ test('#93 KAZM < 5 kW: mpe_required=false, eval_type=CE', async () => {
   assert.strictEqual(mpe.eval_type, 'CE', 'eval_type must be CE for < 5 kW');
 });
 
-test('#93 MPE limits follow OET Bulletin 65 formula at 780 kHz', async () => {
+test('#93 MPE limits follow OET Bulletin 65 Table 1 formula at 780 kHz', async () => {
   const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
   const mpe = out.candidates[0].am_rf_exposure_mpe_guide;
-  // Controlled: 1842 / 0.780 = 2361.5 V/m
+  // Controlled: 1842/f(MHz) = 1842/0.780 ≈ 2362 V/m (OET Bulletin 65 Table 1)
   assert.ok(Math.abs(mpe.e_limit_controlled_vm - 1842 / 0.780) < 5,
     `e_limit_controlled_vm should be ~2362, got ${mpe.e_limit_controlled_vm}`);
-  // Uncontrolled = controlled / sqrt(2)
-  assert.ok(Math.abs(mpe.e_limit_uncontrolled_vm - mpe.e_limit_controlled_vm / Math.SQRT2) < 5,
-    'e_limit_uncontrolled_vm should be controlled / sqrt(2)');
+  // Uncontrolled: 614/f(MHz) = 614/0.780 ≈ 787 V/m (OET Bulletin 65 Table 1 — 1/3 of controlled)
+  assert.ok(Math.abs(mpe.e_limit_uncontrolled_vm - 614 / 0.780) < 5,
+    `e_limit_uncontrolled_vm should be ~787 V/m (614/0.780), got ${mpe.e_limit_uncontrolled_vm}`);
 });
 
 test('#93 near-field radius ≈ λ/(2π) at 780 kHz', async () => {
