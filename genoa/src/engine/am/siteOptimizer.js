@@ -9632,7 +9632,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //     authorization is granted.
       //   §73.1680 (Emergency operation): Stations must have operational procedures for
       //     power reduction transitions.
-      //   §73.1800: Station identification at power transitions is required.
+      //   §73.1201: Station identification requirements (hourly, near the hour).
       //   Night power for Class D on clear channels is typically 0 W (silent) unless the
       //     station holds a specific nighttime authorization from the FCC.  Some Class D
       //     stations are licensed for nighttime operation at a fraction of daytime TPO
@@ -9725,7 +9725,7 @@ async function scoreCandidate(pt, ctx, warnings){
         automation_cost_high:     automation_high,
         power_relay_cost_low:     relay_cost_low,
         power_relay_cost_high:    relay_cost_high,
-        reference: '47 CFR §73.99 (PSRA/PSSA); §73.187 (critical hours); §73.1680 (emergency operation); §73.1800 (station ID at transitions); USNO solar tables (for LMS-compliant exact UTC)',
+        reference: '47 CFR §73.99 (PSRA/PSSA); §73.187 (critical hours); §73.1680 (emergency antennas); §73.1201 (station identification); §73.1800 (station log); USNO solar tables (for LMS-compliant exact UTC)',
         note: `${isClearCh ? 'Clear channel — Class D must go SILENT at sunset (§73.99).' : `Non-clear — night power ≈ ${night_power_kw} kW (${100 - power_reduction_pct}% of day TPO).`} Summer: ${summer.day_length_h}h day, sunset ${summer.sunset_utc}. Winter: ${winter.day_length_h}h day, sunset ${winter.sunset_utc}.`
       };
     })(),
@@ -16688,7 +16688,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const scada_high_usd = tpo_kw >= 50 ? 15000 : 0;
       const total_telemetry_low_usd  = base_meters_total_low_usd  + remote_ctrl_cost_low_usd  + connectivity_install_low_usd  + scada_low_usd;
       const total_telemetry_high_usd = base_meters_total_high_usd + remote_ctrl_cost_high_usd + connectivity_install_high_usd + scada_high_usd;
-      // FCC §73.1800 log: power measurements every 30 min when automated, every 3 hr manual
+      // Log cadence: 30-min automated / 3-hr manual intervals are engineering practice
+      // (the pre-1995 log rules); §73.1800 today sets general log standards only
       const log_interval_min = 30;
       const annual_log_entries = Math.round((365 * 24 * 60) / log_interval_min);
       const fcc_remote_control_allowed = true; // §73.1400 permits unmanned operation
@@ -16701,7 +16702,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_telemetry_low_usd, total_telemetry_high_usd,
         log_interval_min, annual_log_entries, fcc_remote_control_allowed,
         reference: '47 CFR §73.61 (base current measurement); §73.1400 (remote control); §73.1800 (station records); §73.1820 (operating power log); §73.1870 (chief operator responsibilities)',
-        note: `${n_elements}-element ${isDA_tel ? 'DA array' : 'NDA antenna'}: ${n_base_meters} base current meter(s) + remote controller + broadband/cellular. Capital: $${total_telemetry_low_usd.toLocaleString()}–$${total_telemetry_high_usd.toLocaleString()}; ongoing connectivity: $${annual_connectivity_usd.toLocaleString()}/yr. §73.1800 log: ${log_interval_min}-min intervals (${annual_log_entries.toLocaleString()} entries/yr).`
+        note: `${n_elements}-element ${isDA_tel ? 'DA array' : 'NDA antenna'}: ${n_base_meters} base current meter(s) + remote controller + broadband/cellular. Capital: $${total_telemetry_low_usd.toLocaleString()}–$${total_telemetry_high_usd.toLocaleString()}; ongoing connectivity: $${annual_connectivity_usd.toLocaleString()}/yr. Station log (§73.1800): ${log_interval_min}-min intervals — engineering practice (${annual_log_entries.toLocaleString()} entries/yr).`
       };
     })(),
 
