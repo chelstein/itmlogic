@@ -15049,7 +15049,7 @@ it('am_contour_overlap_and_co_channel_interference_guide overlap_risk_level is L
 it('candidate_comparison_table cca columns are present and valid for KAZM', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.cca_protection_db_required, 20, 'cca_protection_db_required must be 20 dB');
+  assert.strictEqual(r0.cca_protection_db_required, 26, 'cca_protection_db_required must be 26 dB (§73.182(r)/§73.37(a))');
   assert.ok(['LOW', 'MEDIUM', 'HIGH'].includes(r0.cca_overlap_risk_level), 'cca_overlap_risk_level must be valid');
   assert.ok(r0.cca_total_study_low_usd >= 0, 'cca_total_study_low_usd must be non-negative');
 });
