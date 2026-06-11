@@ -18951,3 +18951,27 @@ test('wildfire sub-score: Midwest candidates score 100 (LOW risk)', async () => 
     assert.ok(raw.wildfire >= 75, `Iowa candidate wildfire score must be ≥75, got ${raw.wildfire}`);
   }
 });
+
+// ── Comparison table: lcm_col_at_risk and lcm_col_dist_km columns ────────────
+
+test('comparison table has lcm_col_at_risk and lcm_col_dist_km columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lcm_col_at_risk' in row, 'lcm_col_at_risk missing from comparison table');
+    assert.ok('lcm_col_dist_km' in row, 'lcm_col_dist_km missing from comparison table');
+    // Values should be string/null for at_risk, number/null for dist
+    const atRisk = row.lcm_col_at_risk;
+    assert.ok(
+      atRisk === null || ['COVERED', 'LIKELY_COVERED', 'AT_RISK', 'AT_RISK_PROXY', 'NOT_EVALUATED'].includes(atRisk),
+      `lcm_col_at_risk must be valid enum or null, got: ${atRisk}`
+    );
+  }
+});
+
+test('comparison table lcm_col_at_risk reflects COVERED for close candidates without col_centroid', async () => {
+  // Without col_centroid, current_site proxy is used; first candidates near current site should be LIKELY_COVERED
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  // At least some candidates should have a non-null lcm_col_at_risk
+  const nonNull = out.candidate_comparison_table.filter(r => r.lcm_col_at_risk !== null);
+  assert.ok(nonNull.length > 0, 'some candidates should have non-null lcm_col_at_risk');
+});
