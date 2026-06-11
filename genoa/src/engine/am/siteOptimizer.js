@@ -8332,7 +8332,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC Form 301-AM filing requirements for DA
       const form_301_da_exhibits = [
         'Horizontal radiation pattern table (72 azimuths, 5° increments, 0°–355°) — §73.150(a) / Form 301-AM',
-        'Vertical radiation pattern (spot radials, 10° increments per §73.150)',
+        'Vertical radiation pattern (spot radials at DA-authorized azimuths, 10° elevation increments 0°–90°) — §73.152',
         'Tabulation of field values at each protected-station bearing',
         'Tower spacing and phasing array parameters (spacing in degrees at operating freq)',
         'Antenna system description (number of towers, phasing/coupling network)',
@@ -30552,7 +30552,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   • Site coordinates: NAD83 datum, accurate to ±1 arc-second.
       //   • Community of license must be visible on map.
       //   • Contours must be labeled with field strength values.
-      //   • For DA, show all 36 radials (every 10°) from M3 calculation.
+      //   • For DA, show all 72 radials (every 5°, 0°–355°) from M3 calculation per §73.150(a).
       //
       // SOFTWARE / METHODS ACCEPTED BY FCC
       // ────────────────────────────────────
@@ -30583,8 +30583,8 @@ async function scoreCandidate(pt, ctx, warnings){
         { contour: 'Interference', purpose: 'Co-channel/adjacent interference', rule: '§73.182',   required: is_da },
       ].filter(c => c.required);
 
-      // DA map requires 36 radials (every 10°)
-      const n_radials = is_da ? 36 : 0;
+      // DA map contour computation uses 72 radials (every 5°, 0°–355°) matching HRP per §73.150(a)
+      const n_radials = is_da ? 72 : 0;
 
       // Map scale by class
       const map_scale = (isClassA || isClassB) ? '1:500,000' : '1:250,000';
