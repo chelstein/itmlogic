@@ -7989,9 +7989,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // for AM; AM antennas typically have near-unity gain relative to isotropic).
       //
       // OET Bulletin 65 (1997 ed.) provides the methodology:
-      //   - Controlled (occupational) MPE limit: 614 V/m (630–3000 kHz)
-      //   - Uncontrolled (general population) MPE limit: 614 / sqrt(2) = 274 V/m
-      //     (frequency-dependent formula for 0.3–3 MHz: 1842/f(MHz) V/m)
+      //   - Controlled (occupational) MPE limit: 1842/f(MHz) V/m (= 1842 V/m at 1 MHz)
+      //   - Uncontrolled (general population) MPE limit: 614/f(MHz) V/m (= 614 V/m at 1 MHz)
+      //     OET Bulletin 65 Table 1 for 0.3–3 MHz; uncontrolled is 1/3 of controlled
       //   - Near-field evaluation radius: the reactive near-field extends to ~λ/2π
       //   - Far-field safe distance (fenced zone): d = (sqrt(30 × P_kw × G) / E_limit) × 1000 m
       //     simplified for AM (G ≈ 1.64 isotropic): d_unc_m = sqrt(49200 × P_kw) / 274
@@ -8012,11 +8012,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // §1.1306 categorical exclusion threshold: 5 kW ERP for general population
       const mpe_required = erp_kw >= 5;
 
-      // OET Bulletin 65 MPE limits for 300 kHz – 3 MHz
-      // Controlled (occupational): 1842/f(MHz) V/m → at 0.3–3 MHz typically 614–6140 V/m
-      // Uncontrolled (general pop): same formula ÷ sqrt(2) for this band
+      // OET Bulletin 65 Table 1 MPE limits for 300 kHz – 3 MHz
+      // Controlled (occupational): 1842/f(MHz) V/m
+      // Uncontrolled (general pop): 614/f(MHz) V/m  (= 100 µW/cm² at 1 MHz reference)
+      // Note: uncontrolled is 1/3 of controlled for this band, NOT 1/√2
       const e_limit_ctrl_vm   = round2(1842 / freq_mhz);
-      const e_limit_unctrl_vm = round2(e_limit_ctrl_vm / Math.SQRT2);
+      const e_limit_unctrl_vm = round2(614  / freq_mhz);
 
       // Safe-distance calculation (OET Bulletin 65 far-field formula):
       //   d (m) = sqrt(30 × P_eff_W × G_isotropic) / E_limit
@@ -11112,8 +11113,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Classification of candidate site noise environment:
       //   Distance to nearest major road / industrial zone from pt.lat, pt.lon is not
       //   available without an external API; we estimate based on:
-      //   - Rural proxy: distance_from_current_km used as urbanization proxy (further = more rural)
-      //     (Heuristic: sites further from city center tend toward lower man-made noise)
+      //   - land_use_class is the canonical urbanization proxy (computed from distance + conductivity)
       //   - Sedona/Flagstaff area: low industrial density → residential zone noise level
 
       // ITU-R P.372-16: atmospheric noise at 780 kHz, North American zone B (continental)
