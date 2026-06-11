@@ -97,9 +97,9 @@ const KNOWN_GOALS = Object.freeze([
 // Goals that are placeholders for the screening-grade pipeline; if
 // enabled, surface them in the candidate's limitations[] so the
 // operator knows the sub-score isn't backed by real data yet.
-const PLACEHOLDER_GOALS = Object.freeze({
-  avoid_wildfire_risk: 'Wildfire / fuel-risk scoring not yet wired (USFS FIA / LANDFIRE integration deferred)',
-});
+// Note: avoid_wildfire_risk now uses a geographic region proxy (no longer null);
+// USFS FIA / LANDFIRE raster would improve it from screening to filing grade.
+const PLACEHOLDER_GOALS = Object.freeze({});
 
 // Status-label vocabulary.
 const LABEL_SCREENING        = 'SCREENING ONLY';
@@ -339,7 +339,7 @@ export async function runSiteOptimizer(body = {}){
   const pctLow = ((confDist.LOW / nScoredTotal) * 100).toFixed(0);
   const confidenceNotes = [
     ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
-    ...(goals.avoid_wildfire_risk ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
+    ...(goals.avoid_wildfire_risk ? ['Wildfire scoring uses geographic region proxy (Western/PNW/SE/Midwest zones). USFS FIA / LANDFIRE raster integration would provide parcel-level fire-risk for higher precision.'] : []),
     ...(!community_of_license_polygon ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : []),
     ...(confDist.LOW === nScoredTotal ? [`All ${nScoredTotal} candidates scored at LOW confidence (zone-table σ + disc-proxy COL) — provide AM_m3.tif and community_of_license_polygon to raise ranking reliability.`]
       : confDist.LOW > nScoredTotal * 0.7 ? [`${pctLow}% of candidates scored at LOW confidence — upgrade conductivity raster and/or COL polygon for more reliable ranking.`]
@@ -2236,11 +2236,11 @@ export async function runSiteOptimizer(body = {}){
       {
         id:          'WILDFIRE_RISK',
         label:       'Wildfire / fuel risk',
-        confidence:  'NOT_EVALUATED',
-        data_source: 'Placeholder (USFS FIA / LANDFIRE integration pending)',
-        score_impact_pts: 0,
-        upgrade_action: 'Wire USFS FIA RiskMap API or LANDFIRE raster. AZ/NM/CA sites are most impacted — wildfire risk can make a high-σ site uninsurable.',
-        upgrade_value: 'Would add wildfire_risk scoring dimension. Currently NOT-EVALUATED for all candidates.'
+        confidence:  'SCREENING',
+        data_source: 'Geographic region proxy: Western US (VERY_HIGH/HIGH), PNW (ELEVATED), SE (MODERATE), Midwest (LOW)',
+        score_impact_pts: goals.avoid_wildfire_risk ? 4 : 0,
+        upgrade_action: 'Wire USFS FIA RiskMap API or LANDFIRE raster for parcel-level fire-risk. AZ/NM/CA sites are most impacted — wildfire risk can make a high-σ site uninsurable.',
+        upgrade_value: 'Would upgrade wildfire_risk from geographic proxy to parcel-level USFS fire-hazard severity zone data.'
       },
       {
         id:          'PARCEL_AVAILABILITY',
@@ -2393,7 +2393,7 @@ export async function runSiteOptimizer(body = {}){
     limitations_global: [
       'Screening-grade output only; engineer-grade NIF / §73.182 / DA-N analysis is required for any filing.',
       'Population sub-score uses a population-density proxy (groundwave reach × density model), not a Census-block sum.',
-      'Wildfire / fuel-risk scoring is a placeholder until USFS FIA / LANDFIRE integration lands.',
+      'Wildfire / fuel-risk scoring uses a geographic region proxy (screening grade); USFS FIA / LANDFIRE raster integration would provide parcel-level precision.',
       'Parcel / zoning availability is not checked — engineer must verify each site is leasable / buildable.',
       'No skywave (§73.182) interference analysis is performed at this stage.'
     ]
@@ -2889,7 +2889,22 @@ async function scoreCandidate(pt, ctx, warnings){
     // sigma=1→2 mS/m gains ~40% reach; sigma=7→8 gains ~5%. sqrt(σ/8)×100
     // captures this better than linear σ/8×100.
     conductivity: Math.max(0, Math.min(100, Math.sqrt(sigma_msm / SIGMA_PREFERRED_MIN_MSM) * 100)),
-    wildfire:     null,   // placeholder
+    // Wildfire risk sub-score: geographic region proxy (same logic as the guide).
+    // Lower risk → higher score: LOW=100, MODERATE=75, ELEVATED=50, HIGH=25, VERY_HIGH=0.
+    // This enables the avoid_wildfire_risk goal to meaningfully differentiate sites
+    // without the USFS FIA/LANDFIRE raster integration (which would upgrade this).
+    wildfire: (() => {
+      const _lat = pt.lat, _lon = pt.lon;
+      const _isWesternUS = _lon < -103 && _lat > 30 && _lat < 49;
+      const _isPacificNW = _lon < -117 && _lon > -125 && _lat > 42;
+      const _isSoutheast = _lat < 35 && _lon > -90;
+      const _wfLevel =
+        (_isWesternUS && _lat > 35 && _lat < 42) ? 'VERY_HIGH' :
+        _isWesternUS                              ? 'HIGH'      :
+        _isPacificNW                              ? 'ELEVATED'  :
+        _isSoutheast                              ? 'MODERATE'  : 'LOW';
+      return { VERY_HIGH: 0, HIGH: 25, ELEVATED: 50, MODERATE: 75, LOW: 100 }[_wfLevel];
+    })(),
     treaty_zone:  treaty_min_border_km == null ? null
       // Farther from border = better; saturates at the treaty threshold.
       : Math.max(0, Math.min(100, (treaty_min_border_km / TREATY_ZONE_PENALTY_KM_MX) * 100))
@@ -2997,7 +3012,14 @@ async function scoreCandidate(pt, ctx, warnings){
     } else if (sk === 'conductivity'){
       reason = `σ=${sigma_msm} mS/m (${sigmaQuality(sigma_msm)}) — source: ${ground_sigma_source}`;
     } else if (sk === 'wildfire'){
-      reason = 'Wildfire risk not yet integrated (USFS FIA / LANDFIRE placeholder)';
+      const _wfLat = pt.lat, _wfLon = pt.lon;
+      const _wfW = _wfLon < -103 && _wfLat > 30 && _wfLat < 49;
+      const _wfL = { VERY_HIGH: 0, HIGH: 25, ELEVATED: 50, MODERATE: 75, LOW: 100 };
+      const _wfLevel = (_wfW && _wfLat > 35 && _wfLat < 42) ? 'VERY_HIGH'
+                     : _wfW ? 'HIGH'
+                     : (_wfLon < -117 && _wfLon > -125 && _wfLat > 42) ? 'ELEVATED'
+                     : (_wfLat < 35 && _wfLon > -90) ? 'MODERATE' : 'LOW';
+      reason = `Geographic wildfire proxy: ${_wfLevel} risk (score ${_wfL[_wfLevel]}/100). Upgrade with USFS FIA/LANDFIRE for parcel precision.`;
     } else if (sk === 'treaty_zone'){
       reason = treaty_zone
         ? `In treaty zone: ${treaty_zone}`
@@ -3036,7 +3058,10 @@ async function scoreCandidate(pt, ctx, warnings){
 
   // --- limitations array (placeholders + missing data) ---
   const limitations = [];
-  if (goals.avoid_wildfire_risk) limitations.push(PLACEHOLDER_GOALS.avoid_wildfire_risk);
+  if (goals.avoid_wildfire_risk) limitations.push(
+    'Wildfire sub-score uses geographic region proxy (Western US / PNW / SE / Midwest zones); ' +
+    'USFS FIA / LANDFIRE raster would provide parcel-level fire-hazard severity zones for higher precision.'
+  );
   if (!community_of_license_polygon){
     limitations.push('Principal-community coverage uses a 10-km disc proxy; supply community_of_license_polygon for filing-grade overlap.');
   }
