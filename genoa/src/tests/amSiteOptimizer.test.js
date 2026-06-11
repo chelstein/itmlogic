@@ -7751,8 +7751,8 @@ test('da_array_design_guide applicable=true for DA-D station with correct shape'
   assert.strictEqual(d.has_daytime_pattern, true, 'DA-D must have daytime pattern');
   assert.strictEqual(d.has_nighttime_pattern, false, 'DA-D must not have nighttime pattern');
   assert.strictEqual(d.array_configurations.length, 4, 'must have 4 array configurations');
-  assert.strictEqual(d.n_hrp_radials, 36, 'must have 36 HRP radials');
-  assert.strictEqual(d.hrp_increment_deg, 10, 'HRP increment must be 10°');
+  assert.strictEqual(d.n_hrp_radials, 72, 'must have 72 HRP radials per §73.150(a)');
+  assert.strictEqual(d.hrp_increment_deg, 5, 'HRP increment must be 5° per §73.150(a)');
 });
 
 test('da_array_design_guide DA-2 has both day and nighttime patterns', async () => {
@@ -17734,11 +17734,11 @@ test('#118 KAZM: coverage mapping guide present with correct shape', async () =>
   assert.ok(g.contour_distances_km?.d_05mvm_km > 0, '0.5 mV/m contour distance must be positive');
 });
 
-test('#118 NDA has no radials; DA has 36 radials', async () => {
+test('#118 NDA has no radials; DA has 72 radials per §73.150(a)', async () => {
   const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
   const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
   assert.strictEqual(nda.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.n_radials, 0, 'NDA: 0 radials');
-  assert.strictEqual(da2.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.n_radials, 36, 'DA-2: 36 radials');
+  assert.strictEqual(da2.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.n_radials, 72, 'DA-2: 72 radials per §73.150(a)');
 });
 
 test('#118 DA-2 requires formal proof; NDA does not', async () => {

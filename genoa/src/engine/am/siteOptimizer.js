@@ -8332,7 +8332,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC Form 301-AM filing requirements for DA
       const form_301_da_exhibits = [
         'Horizontal radiation pattern table (72 azimuths, 5° increments, 0°–355°) — §73.150(a) / Form 301-AM',
-        'Vertical radiation pattern (spot radials, 10° increments per §73.150)',
+        'Vertical radiation pattern (spot radials at DA-authorized azimuths, 10° elevation increments 0°–90°) — §73.152',
         'Tabulation of field values at each protected-station bearing',
         'Tower spacing and phasing array parameters (spacing in degrees at operating freq)',
         'Antenna system description (number of towers, phasing/coupling network)',
@@ -19804,7 +19804,7 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       const exhibits_G_da = isDA_ch ? [
-        { id: 'G1', section: 'G', title: 'DA horizontal radiation pattern (theoretical)', required: true, cfr: '§73.150; §73.151', notes: 'Tabulated field ratios at 36 azimuths (10° increments) for each operating mode (DA-D, DA-N); signed by engineer' },
+        { id: 'G1', section: 'G', title: 'DA horizontal radiation pattern (theoretical)', required: true, cfr: '§73.150(a)', notes: 'Tabulated field ratios at 72 azimuths (5° increments, 0°–355°) per §73.150(a) / Form 301-AM for each operating mode (DA-D, DA-N); signed by engineer' },
         { id: 'G2', section: 'G', title: 'Antenna system design parameters', required: true, cfr: '§73.152; §73.154(a)', notes: 'Phase/ratio values for each element; mutual impedance matrix; driving point impedances; ATU design schematic' },
         { id: 'G3', section: 'G', title: 'Moment method analysis (NEC or MININEC)', required: true, cfr: '§73.150(b); §73.154(a)', notes: 'Full-wave electromagnetic model of the DA array; submitted as Exhibit D to Form 301; used for theoretical pattern' },
         { id: 'G4', section: 'G', title: 'DA proof monitoring specification', required: true, cfr: '§73.61; §73.154(a)', notes: 'Specifies monitoring points, reference parameters, tolerance values (±2° phase, ±0.5 dB ratio per §73.155)' },
@@ -30552,7 +30552,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   • Site coordinates: NAD83 datum, accurate to ±1 arc-second.
       //   • Community of license must be visible on map.
       //   • Contours must be labeled with field strength values.
-      //   • For DA, show all 36 radials (every 10°) from M3 calculation.
+      //   • For DA, show all 72 radials (every 5°, 0°–355°) from M3 calculation per §73.150(a).
       //
       // SOFTWARE / METHODS ACCEPTED BY FCC
       // ────────────────────────────────────
@@ -30583,8 +30583,8 @@ async function scoreCandidate(pt, ctx, warnings){
         { contour: 'Interference', purpose: 'Co-channel/adjacent interference', rule: '§73.182',   required: is_da },
       ].filter(c => c.required);
 
-      // DA map requires 36 radials (every 10°)
-      const n_radials = is_da ? 36 : 0;
+      // DA map contour computation uses 72 radials (every 5°, 0°–355°) matching HRP per §73.150(a)
+      const n_radials = is_da ? 72 : 0;
 
       // Map scale by class
       const map_scale = (isClassA || isClassB) ? '1:500,000' : '1:250,000';
