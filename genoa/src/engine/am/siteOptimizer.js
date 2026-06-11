@@ -16995,7 +16995,7 @@ async function scoreCandidate(pt, ctx, warnings){
         voltage_regulator_low_usd, voltage_regulator_high_usd,
         est_line_ext_ft, line_ext_cost_low_usd, line_ext_cost_high_usd,
         total_utility_low_usd, total_utility_high_usd,
-        reference: 'NEC 2023 Articles 230, 250, 702; NFPA 70 (National Electrical Code); IEEE Std 519-2022 (harmonic limits); utility tariff requirements; 47 CFR §73.1202 (station records — metered power data)',
+        reference: 'NEC 2023 Articles 230, 250, 702; NFPA 70 (National Electrical Code); IEEE Std 519-2022 (harmonic limits); utility tariff requirements; 47 CFR §73.1820 (station log — metered power data)',
         note: `${tpo_kw} kW TPO: facility load ${total_load_kw_es} kW, demand ${demand_kw} kW (NEC 125%). Service: ${service_phase}, ${service_amps}A, ${transformer_kva} kVA transformer. Total utility infrastructure: $${total_utility_low_usd.toLocaleString()}–$${total_utility_high_usd.toLocaleString()} (includes ~${est_line_ext_ft} ft line extension baseline).`
       };
     })(),
@@ -17814,7 +17814,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_construction_permit_and_buildout_timeline_guide: (() => {
-      // Models the FCC Construction Permit (CP) lifecycle (§73.67) and the
+      // Models the FCC Construction Permit (CP) lifecycle (§73.3598) and the
       // full buildout milestone schedule from site decision to license grant.
       // Covers CP processing time, post-grant construction phases, 3-year CP
       // expiration risk, and engineering/filing cost estimates.
@@ -17829,7 +17829,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const cp_processing_months_low  = isDA_cp ?  8 :  6;
       const cp_processing_months_high = isDA_cp ? 18 : 12;
 
-      // CP validity: 3 years from grant per §73.67
+      // CP validity: 3 years from grant per §73.3598(a)
       const cp_validity_years = 3;
 
       // ---- Milestone durations (months) ----
@@ -17917,7 +17917,7 @@ async function scoreCandidate(pt, ctx, warnings){
         engineering_cost_low_usd,
         engineering_cost_high_usd,
         fcc_filing_fee_usd,
-        note: `${filing_type} relocation via ${fcc_form}: CP processing ${cp_processing_months_low}–${cp_processing_months_high} months; post-grant construction ${post_cp_months_low}–${post_cp_months_high} months; total ${total_months_low}–${total_months_high} months decision-to-on-air. CP valid ${cp_validity_years} yrs per §73.67; construction margin ${construction_margin_months_low}–${construction_margin_months_high} months → expiration risk: ${cp_expiration_risk}.`,
+        note: `${filing_type} relocation via ${fcc_form}: CP processing ${cp_processing_months_low}–${cp_processing_months_high} months; post-grant construction ${post_cp_months_low}–${post_cp_months_high} months; total ${total_months_low}–${total_months_high} months decision-to-on-air. CP valid ${cp_validity_years} yrs per §73.3598(a); construction margin ${construction_margin_months_low}–${construction_margin_months_high} months → expiration risk: ${cp_expiration_risk}.`,
         reference: '47 CFR §73.3533 (application for CP); §73.3564 (acceptance of applications); §73.3598 (CP expiration — 3 years); §73.3535 (dismissal of applications); FCC Form 301-AM',
       };
     })(),
@@ -31529,7 +31529,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   tower) where the field strength is measured to confirm pattern
       //   integrity.  Monitor point values become license conditions.
       //
-      // 47 CFR §73.67 — Sampling system specifications.
+      // 47 CFR §73.68 — Sampling systems for antenna monitors.
       //   The antenna monitor sampling system must meet phase/amplitude
       //   accuracy specifications to be used for pattern verification.
       //
@@ -31573,7 +31573,7 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       const DA_ADDITIONAL_STEPS = is_da ? [
-        { step: 7,  task: 'Calibrate antenna monitor against reference bridge', rule: '§73.67' },
+        { step: 7,  task: 'Calibrate antenna monitor against reference bridge', rule: '§73.68' },
         { step: 8,  task: 'Verify phase (±2°) and ratio (±5%) at each tower', rule: '§73.62' },
         { step: 9,  task: 'Conduct field strength proof on ≥8 radials', rule: '§73.151' },
         { step: 10, task: 'Establish and measure monitor point(s)', rule: '§73.158' },
@@ -31615,7 +31615,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_low_usd:  total_low,
           total_high_usd: total_high,
         },
-        reference: '47 CFR §73.62; §73.67; §73.151; §73.154; §73.158; §73.1560; §73.1660; §73.3598',
+        reference: '47 CFR §73.62; §73.68; §73.151; §73.154; §73.158; §73.1560; §73.1660; §73.3598',
         note: `${frequency_khz} kHz (${fcc_class}): ${all_steps.length} commissioning steps. ${is_da ? `DA: formal proof required on ≥8 radials, ${n_monitor_points} monitor point(s). ` : 'NDA: no formal proof required. '}Cost est. $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
       };
     })(),

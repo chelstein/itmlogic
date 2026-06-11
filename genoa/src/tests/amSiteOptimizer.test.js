@@ -10572,7 +10572,7 @@ test('am_construction_permit_and_buildout_timeline_guide KAZM NDA filing type an
   assert.strictEqual(g.fcc_form, 'FCC Form 301-AM', 'AM CP should be on FCC Form 301-AM');
   assert.ok(g.cp_processing_months_low >= 6, 'NDA CP processing should take at least 6 months');
   assert.ok(g.cp_processing_months_high <= 12, 'NDA CP processing should be at most 12 months');
-  assert.strictEqual(g.cp_validity_years, 3, 'CP validity must be 3 years per §73.67');
+  assert.strictEqual(g.cp_validity_years, 3, 'CP validity must be 3 years per §73.3598(a)');
 });
 
 test('am_construction_permit_and_buildout_timeline_guide total timeline is sum of phases', async () => {
