@@ -14453,7 +14453,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const asr_threshold_m  = 60.96;   // 47 CFR §17.7 height trigger
       const asr_threshold_ft = 200;
@@ -14499,7 +14499,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const ground_ring_ft  = round2(Math.PI * 30); // ~30 ft radius buried copper ring
       const ground_ring_low_usd  = round2(ground_ring_ft * 20);
@@ -14536,7 +14536,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const coax_run_ft     = round2(tower_height_m * 3.28084 * 0.5 + 50);
       const coax_diameter   = tpo_kw >= 50 ? '3_inch' : tpo_kw >= 5 ? '1_5_8_inch' : '7_8_inch';
       const loss_per_100ft  = coax_diameter === '3_inch' ? 0.018 : coax_diameter === '1_5_8_inch' ? 0.025 : 0.04;
@@ -14576,7 +14576,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const num_guy_levels  = tower_height_ft > 500 ? 4 : 3;
       const num_anchors_per_level = 3;
@@ -14611,7 +14611,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_ft = round2((is_class_cd ? wavelength_m / 4 : wavelength_m / 2) * 3.28084);
+      const tower_height_ft = round2((is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625) * 3.28084);
       let tower_cap_low, tower_cap_high;
       if      (tower_height_ft <= 200) { tower_cap_low = 20000;  tower_cap_high = 60000; }
       else if (tower_height_ft <= 400) { tower_cap_low = 60000;  tower_cap_high = 180000; }
@@ -14754,7 +14754,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       let standalone_tower_low_usd, standalone_tower_high_usd;
       if (tower_height_ft <= 200) {
@@ -14858,7 +14858,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const needs_faa_notice = tower_height_ft > 200;
       const needs_asr        = needs_faa_notice;
