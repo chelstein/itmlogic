@@ -8146,9 +8146,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_gs = /^DA/i.test(pattern_mode);
 
       // Standard radial length: 0.35λ per §73.186 / NBS TN-24
-      const lambda_gs   = (3e8 / (frequency_khz * 1e3));
-      const qwave_m_gs  = lambda_gs * 0.35;  // 0.35λ per §73.186 / NBS TN-24
-      const qwave_ft_gs = qwave_m_gs * 3.28084;
+      const lambda_gs    = (3e8 / (frequency_khz * 1e3));
+      const radial_len_m = lambda_gs * 0.35;  // 0.35λ standard radial per §73.186 / NBS TN-24
+      const qwave_m_gs   = lambda_gs / 4;     // λ/4 antenna physics reference
+      const qwave_ft_gs  = qwave_m_gs * 3.28084;
 
       // Standard radial count (FCC standard vs. constrained minimum)
       const radials_standard  = 120;
@@ -8156,7 +8157,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const radial_spacing_deg = round2(360 / radials_standard);
 
       // Wire length per radial is 0.35λ; total wire = radials × length (per tower)
-      const wire_length_per_tower_m  = radials_standard * qwave_m_gs;
+      const wire_length_per_tower_m  = radials_standard * radial_len_m;
       const wire_length_per_tower_ft = Math.round(wire_length_per_tower_m * 3.28084);
 
       // DA tower count estimate (1 for NDA)
@@ -8195,7 +8196,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Radial design items
       const design_items = [
         { item: '120 buried radials per tower, uniform 3° spacing', ref: '§73.186', required: true },
-        { item: `Radial length 0.35λ (${Math.round(qwave_ft_gs)} ft at ${frequency_khz} kHz) per §73.186 / NBS TN-24`, ref: '§73.186', required: true },
+        { item: `Radial length 0.35λ (${Math.round(radial_len_m * 3.28084)} ft at ${frequency_khz} kHz) per §73.186 / NBS TN-24`, ref: '§73.186', required: true },
         { item: '#10 AWG bare copper wire, buried 6–12 inches minimum', ref: '§73.186', required: true },
         { item: 'All radials bonded at tower base with low-resistance clamp', ref: '§73.186', required: true },
         { item: 'Ground conductivity (M3 zone) verified per §73.184', ref: '§73.184; §73.186', required: true },
@@ -8225,7 +8226,7 @@ async function scoreCandidate(pt, ctx, warnings){
         ground_efficiency_note,
         design_items,
         reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ); §73.184 (groundwave conductivity map); §73.61 (base current monitors); §73.190(c) (bonding); NBS Technical Note 24',
-        note: `Standard AM ground system: ${radials_standard} radials × ${Math.round(qwave_ft_gs)} ft (0.35λ) = ${wire_length_per_tower_ft.toLocaleString()} LF per tower. DA: ${da_tower_est_gs} tower estimate × = ${Math.round(total_wire_ft).toLocaleString()} LF total. Installed cost: $${ground_cost_low_usd.toLocaleString()}–$${ground_cost_high_usd.toLocaleString()}.`
+        note: `Standard AM ground system: ${radials_standard} radials × ${Math.round(radial_len_m * 3.28084)} ft (0.35λ) = ${wire_length_per_tower_ft.toLocaleString()} LF per tower. DA: ${da_tower_est_gs} tower estimate × = ${Math.round(total_wire_ft).toLocaleString()} LF total. Installed cost: $${ground_cost_low_usd.toLocaleString()}–$${ground_cost_high_usd.toLocaleString()}.`
       };
     })(),
 
@@ -9298,8 +9299,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //     Guy anchors (each): $2,000–$6,000  (6 total for 2-level guys)
 
       const lambda_m       = 299792.458 / frequency_khz;
-      // Class A/B use 0.625λ (FCC optimum); C/D use λ/4 (0.25λ)
-      const h_frac_st      = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      // Class A/B use 0.625λ (FCC optimum); C/D use 3/8λ (0.375λ) planning height
+      const h_frac_st      = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
       const h_m            = round2(h_frac_st * lambda_m);
       const h_ft           = round2(h_m * 3.28084);  // round meters first to match lighting guide
 
@@ -9868,9 +9869,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   FAA/FCC light outage notification service (automated monitor): $300–$800/yr
       //   Lighting inspection log + recordkeeping: engineer time, $500–$1,500/yr
 
-      // tower height: Class A/B use 0.625λ (FCC optimum), C/D use 0.25λ (λ/4)
+      // tower height: Class A/B use 0.625λ (FCC optimum), C/D use 3/8λ (0.375λ) planning height
       const lambda_m           = 299792.458 / frequency_khz;
-      const h_frac_lt          = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_frac_lt          = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
       const tower_height_m_lt  = round2(h_frac_lt * lambda_m);
       const tower_height_ft    = round2(tower_height_m_lt * 3.28084);
 
@@ -13148,7 +13149,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_str = frequency_khz / 1000;
       const lambda_m_str = 299.792458 / freq_mhz_str;
       const isHighClass_str = /^[AB]/i.test(fcc_class);
-      const tower_height_m_str = round2(isHighClass_str ? lambda_m_str / 2 : lambda_m_str / 4);
+      const tower_height_m_str = round2(isHighClass_str ? lambda_m_str * 0.625 : lambda_m_str * 0.375);
       const tower_height_ft_str = round2(tower_height_m_str * 3.28084);
       // Design wind speed (ASCE 7-22, 3-sec gust, Risk Category II): Southwest US typically 90–115 mph
       const design_wind_speed_mph_low  = 90;
@@ -15131,7 +15132,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Workers' comp is required during tower erection and ground system installation.
       const wavelength_m   = round2(300000 / frequency_khz);
       const is_cd = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
 
       // Annual tower property and liability insurance (scales with tower height and power)
@@ -15425,7 +15426,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // and an aviation lighting isolation transformer/choke. These are site-specific costs.
       const wavelength_m   = round2(300000 / frequency_khz);
       const is_cd = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
 
       // Guy wire levels (typically spaced every ~100 ft)
@@ -16068,8 +16069,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower height from frequency and class
       const lambda_insp_m = 300000 / frequency_khz;
       const tower_insp_m  = ['A','B'].includes(fcc_class)
-        ? round2(lambda_insp_m * 0.5)
-        : round2(lambda_insp_m / 4);
+        ? round2(lambda_insp_m * 0.625)
+        : round2(lambda_insp_m * 0.375);
       const tower_insp_ft = Math.round(tower_insp_m * 3.281);
 
       // Annual visual inspection (ground-level + drone or limited climbing)
@@ -16242,11 +16243,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // banding under §17.50 unless an FAA lighting waiver is in effect.  Paint
       // maintenance cycles of 5–7 years are the industry standard.
 
-      // Derive tower height from frequency and class: 0.625λ for A/B (FCC optimum), λ/4 for C/D
+      // Derive tower height from frequency and class: 0.625λ for A/B (FCC optimum), 3/8λ for C/D
       const lambda_pnt_m   = 300000 / frequency_khz;
       const tower_pnt_m    = ['A','B'].includes(fcc_class)
         ? round2(lambda_pnt_m * 0.625)
-        : round2(lambda_pnt_m * 0.25);
+        : round2(lambda_pnt_m * 0.375);
       const tower_pnt_ft   = Math.round(tower_pnt_m * 3.281);
 
       // FAA obstruction marking threshold: 200 ft AGL (61 m)
@@ -16769,8 +16770,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ---- Tower effective collection area (NFPA 780 Annex A) ----
       const lambda_m_lp     = round2(299792.458 / frequency_khz);
-      // 0.625λ for Class A/B (FCC optimum); 0.25λ for C/D (λ/4)
-      const tower_h_m_lp    = round2(lambda_m_lp * (['A','B'].includes(fcc_class) ? 0.625 : 0.25));
+      // 0.625λ for Class A/B (FCC optimum); 3/8λ for C/D (planning design height)
+      const tower_h_m_lp    = round2(lambda_m_lp * (['A','B'].includes(fcc_class) ? 0.625 : 0.375));
       const tower_h_ft_lp   = Math.round(tower_h_m_lp * 3.28084);
       // A_e = π × (3H)² per NFPA 780 simplified model (H in km)
       const A_e_km2         = round2(Math.PI * Math.pow(tower_h_m_lp * 3 / 1000, 2));
@@ -16936,8 +16937,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // rules), the FCC/ACHP/NCSHPO Nationwide Programmatic Agreement (NPA), and
       // the Endangered Species Act §7 consultation process.
       const lambda_m_env        = round2(299792.458 / frequency_khz);
-      // 0.625λ for Class A/B (FCC optimum); 0.25λ for C/D (λ/4)
-      const hf_env              = ['A','B'].includes(fcc_class) ? 0.625 : 0.25;
+      // 0.625λ for Class A/B (FCC optimum); 3/8λ for C/D (planning design height)
+      const hf_env              = ['A','B'].includes(fcc_class) ? 0.625 : 0.375;
       const tower_height_m_env  = round2(lambda_m_env * hf_env);
       const tower_height_ft_env = Math.round(tower_height_m_env * 3.28084);
       // FCC ASR threshold = 200 ft; towers above this height trigger Section 106
@@ -17009,8 +17010,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const quarter_wave_m  = round2(lambda_m / 4);
       const quarter_wave_ft = Math.round(quarter_wave_m * 3.28084);
       // 0.625λ for Class A/B (5/8 wave, FCC optimum ~36.6 Ω radiation resistance);
-      // 0.25λ (λ/4) for Class C/D (minimizes capex for limited-power stations).
-      const height_fraction = ['A','B'].includes(fcc_class) ? 0.625 : 0.25;
+      // 3/8λ (0.375λ) for Class C/D (standard planning/design height).
+      const height_fraction = ['A','B'].includes(fcc_class) ? 0.625 : 0.375;
       const tower_height_m  = round2(lambda_m * height_fraction);
       const tower_height_ft = Math.round(tower_height_m * 3.28084);
       // Wind zone per ASCE 7-22 Figure 26.5-1D (simplified by latitude/longitude)
@@ -18092,13 +18093,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const ground_system_total_high_usd = radial_install_cost_high_usd + atu_cost_high_usd;
 
       // ---- RF Safety (47 CFR §1.1310 / OET Bulletin 65 Supplement B) ----
-      // NOTE: The formulas below (f/1.5 and f/0.3) are approximations adapted from the
-      // 300–1500 MHz microwave band formulas and do NOT reflect the correct OET-65 AM
-      // limits (which are 100 mW/cm² flat for 0.3–1.34 MHz). They are retained here for
-      // test-consistency; use mpe_rf_exposure_summary for the regulatory-accurate values.
       const f_mhz                   = round2(frequency_khz / 1000);
-      const mpe_uncontrolled_mw_cm2  = round2(f_mhz / 1.5);
-      const mpe_controlled_mw_cm2    = round2(f_mhz / 0.3);
+      // OET Bulletin 65 Table 1 power density limits:
+      //   GP (uncontrolled): 0.3–1.34 MHz: 100 mW/cm² flat; 1.34–30 MHz: 180/f² mW/cm²
+      //   OC (controlled):   0.3–3 MHz:    900 mW/cm² flat; 3–30 MHz:    900/f² mW/cm²
+      const mpe_uncontrolled_mw_cm2 = f_mhz < 1.34 ? 100 : round2(180 / (f_mhz * f_mhz));
+      const mpe_controlled_mw_cm2   = f_mhz < 3.0  ? 900 : round2(900 / (f_mhz * f_mhz));
 
       // MPE evaluation required at ≥5 kW TPO per §1.1307 categorical exclusion
       const mpe_evaluation_required = tpo_kw >= 5;
@@ -18111,8 +18111,9 @@ async function scoreCandidate(pt, ctx, warnings){
       else if (tpo_kw >= 5 ) exclusion_zone_m =  35;
       else if (tpo_kw >= 1 ) exclusion_zone_m =  20;
 
-      // Controlled zone ≈ uncontrolled / √5 (MPE ratio of 5:1)
-      const controlled_zone_m = Math.round(exclusion_zone_m / Math.sqrt(5));
+      // Controlled zone: OC/GP ratio is 9:1 for 0.3–1.34 MHz, 5:1 for 1.34–3 MHz
+      const mpe_ratio = f_mhz < 1.34 ? 9 : 5;
+      const controlled_zone_m = Math.round(exclusion_zone_m / Math.sqrt(mpe_ratio));
 
       // RF safety fence is required whenever the exclusion zone exceeds 5 m
       const rf_fence_required  = exclusion_zone_m > 5;
@@ -20127,8 +20128,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_pf     = /^DA/i.test(pattern_mode);
       const is_clear_ch = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const lambda_m    = 300000 / frequency_khz;
-      // Tower height: Class A/B use 0.625λ (FCC optimum); C/D use 0.25λ (λ/4)
-      const h_frac_pf   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      // Tower height: Class A/B use 0.625λ (FCC optimum); C/D use 3/8λ planning height
+      const h_frac_pf   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
       const lambda_q_m  = lambda_m * h_frac_pf;        // class-dependent tower height (m)
       const tower_ft    = Math.round(lambda_q_m * 3.28084);
       const n_radials   = 120;                          // standard AM ground system
@@ -20831,8 +20832,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //     current from flowing on lighting cable into the RF ground system
 
       const wavelength_m     = 300000 / frequency_khz;
-      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
-      const h_frac_faa       = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 3/8λ for C/D (planning height)
+      const h_frac_faa       = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
       const tower_height_m   = Math.round(wavelength_m * h_frac_faa);
       const tower_height_ft  = Math.round(tower_height_m * 3.281);
 
@@ -27252,7 +27253,7 @@ async function scoreCandidate(pt, ctx, warnings){
         required: true,
         cfr: '47 CFR §73.154(e)',
         description: 'Non-directional measurement at standard monitoring point to verify antenna efficiency reference',
-        standard_monitoring_point_m: round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz * 0.02),
+        standard_monitoring_point_m: round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz * 0.02),
         base_current_tolerance_pct: 5
       };
 
@@ -27797,7 +27798,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA = /^DA/i.test(pattern_mode);
       const lambda_m    = round2(300000 / frequency_khz);
-      const std_h_frac  = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;  // 5/8λ Class A/B, λ/4 Class C/D
+      const std_h_frac  = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ Class A/B, 3/8λ Class C/D
       const qwave_h_m   = round2(lambda_m * std_h_frac);
 
       // Tower cost

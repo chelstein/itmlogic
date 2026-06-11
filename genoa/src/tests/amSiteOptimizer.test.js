@@ -5925,9 +5925,9 @@ test('faa_obstruction_marking_guide presence and structure', async () => {
 test('faa_obstruction_marking_guide KAZM 780kHz tower height and ASR requirement', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].faa_obstruction_marking_guide;
-  // λ/4 at 780 kHz = 96m = 315ft → above 200ft → ASR required
-  assert.strictEqual(g.tower_height_m, 96, 'tower height must be λ/4 = 96m');
-  assert.strictEqual(g.tower_height_ft, Math.round(96 * 3.281), 'tower height ft mismatch');
+  // 3/8λ at 780 kHz = 144m = 472ft → above 200ft → ASR required
+  assert.strictEqual(g.tower_height_m, 144, 'tower height must be 3/8λ = 144m');
+  assert.strictEqual(g.tower_height_ft, Math.round(144 * 3.281), 'tower height ft mismatch');
   assert.strictEqual(g.asr_required_by_height, true, '96m (315ft) tower must require ASR');
   assert.strictEqual(g.painting_required, true, 'tower >200ft must require painting');
   assert.strictEqual(g.n_paint_bands, 7, 'standard AM tower has 7 FAA paint bands');
@@ -5936,7 +5936,7 @@ test('faa_obstruction_marking_guide KAZM 780kHz tower height and ASR requirement
 test('faa_obstruction_marking_guide lighting tier for KAZM 780kHz', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].faa_obstruction_marking_guide;
-  const towerFt = Math.round(96 * 3.281); // 315ft → L-810_RED_STEADY tier
+  const towerFt = Math.round(144 * 3.281); // 472ft → L-810_RED_STEADY tier
   const expectedTier = towerFt < 200 ? 'NONE' : towerFt < 500 ? 'L-810_RED_STEADY' : towerFt < 800 ? 'L-864_MED_RED_FLASH' : 'L-860_HIGH_WHITE';
   assert.strictEqual(g.faa_lighting_tier, expectedTier, 'lighting tier mismatch for 315ft tower');
   assert.strictEqual(g.rf_decoupling_required, true, 'RF decoupling required for tower >200ft');
@@ -9632,8 +9632,8 @@ test('station_total_project_cost_pro_forma_guide KAZM 780 kHz NDA total range pl
 test('station_total_project_cost_pro_forma_guide tower height matches 780 kHz λ/4', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].station_total_project_cost_pro_forma_guide;
-  assert.strictEqual(g.tower_height_m, 96,  'tower_height_m must be 96 (λ/4 at 780 kHz)');
-  assert.strictEqual(g.tower_height_ft, 315, 'tower_height_ft must be 315');
+  assert.strictEqual(g.tower_height_m, 144, 'tower_height_m must be 144 (3/8λ at 780 kHz)');
+  assert.strictEqual(g.tower_height_ft, 473, 'tower_height_ft must be 473');
   assert.strictEqual(g.n_radials, 120, 'n_radials must be 120');
   // Radial length: 0.35λ per §73.186 = Math.round(300000/780 × 0.35) = 135m
   assert.strictEqual(g.radial_length_m, 135, 'radial_length_m must be 135 (0.35λ per §73.186)');
@@ -10380,8 +10380,8 @@ test('am_grounding_system_and_rf_safety_guide KAZM RF safety fence required', as
   // 5 kW ≥ 5 kW threshold → MPE evaluation required
   assert.strictEqual(g.mpe_evaluation_required, true, '5 kW station requires MPE evaluation');
   assert.strictEqual(g.rf_fence_required, true, 'exclusion zone >5m requires RF fence');
-  // 780 kHz uncontrolled MPE: 0.78/1.5 = 0.52 mW/cm²
-  assert.strictEqual(g.mpe_uncontrolled_mw_cm2, 0.52, 'uncontrolled MPE should be 0.52 mW/cm²');
+  // 780 kHz uncontrolled MPE: flat 100 mW/cm² for 0.3–1.34 MHz per OET Bulletin 65 Table 1
+  assert.strictEqual(g.mpe_uncontrolled_mw_cm2, 100, 'uncontrolled MPE should be 100 mW/cm² for 0.3–1.34 MHz');
   assert.ok(g.exclusion_zone_m > 0, 'exclusion zone must be positive');
   assert.ok(g.controlled_zone_m < g.exclusion_zone_m, 'controlled zone must be less than uncontrolled zone');
 });
@@ -10974,11 +10974,11 @@ test('am_tower_structural_and_wind_loading_guide present on KAZM candidate', asy
 test('am_tower_structural_and_wind_loading_guide KAZM wavelength and tower height', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_structural_and_wind_loading_guide;
-  // 780 kHz: λ = 299792.458/780 = 384.35 m; 0.25λ = 96.09 m = 315 ft
+  // 780 kHz: λ = 299792.458/780 = 384.35 m; λ/4 = 96.09 m = 315 ft; 3/8λ = 144.13 m = 473 ft
   assert.strictEqual(g.lambda_m, 384.35, 'lambda_m should be 384.35 m for 780 kHz');
-  assert.strictEqual(g.quarter_wave_ft, 315, 'quarter_wave_ft should be 315 ft');
-  assert.strictEqual(g.tower_height_ft, 315, 'Class D uses 0.25λ = 315 ft tower');
-  assert.strictEqual(g.tia_class, 'Class II', '315 ft tower should be TIA-222-H Class II');
+  assert.strictEqual(g.quarter_wave_ft, 315, 'quarter_wave_ft should be 315 ft (physics λ/4 reference)');
+  assert.strictEqual(g.tower_height_ft, 473, 'Class D uses 3/8λ = 473 ft planning tower height');
+  assert.strictEqual(g.tia_class, 'Class II', '473 ft tower is TIA-222-H Class II (200–500 ft)');
 });
 
 test('am_tower_structural_and_wind_loading_guide KAZM wind and ice zone', async () => {
@@ -10994,9 +10994,9 @@ test('am_tower_structural_and_wind_loading_guide KAZM wind and ice zone', async 
 test('am_tower_structural_and_wind_loading_guide KAZM tower cost estimates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_structural_and_wind_loading_guide;
-  // 315 ft Class II guyed: $500/ft low + foundation $200/ft + 3 guy anchors $5k each
-  assert.strictEqual(g.guyed_low_usd, 157500, 'guyed_low_usd = 315 × $500 = $157,500');
-  assert.strictEqual(g.total_guyed_low_usd, 235500, 'total_guyed_low_usd should be $235,500');
+  // 473 ft Class II guyed: $500/ft low + foundation $200/ft + 4 guy tiers × $5k each
+  assert.strictEqual(g.guyed_low_usd, 236500, 'guyed_low_usd = 473 × $500 = $236,500');
+  assert.strictEqual(g.total_guyed_low_usd, 351100, 'total_guyed_low_usd = 236500 + 94600 + 20000 = $351,100');
   assert.ok(g.total_guyed_high_usd > g.total_guyed_low_usd, 'high cost must exceed low');
   assert.ok(g.selfsupport_low_usd > g.guyed_low_usd, 'self-supporting must cost more than guyed');
 });
@@ -11009,8 +11009,8 @@ test('am_tower_structural_and_wind_loading_guide comparison table columns presen
     assert.ok('tw_tia_class'      in row, 'tw_tia_class missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.tw_height_ft, 315, 'rank-1 tw_height_ft should be 315');
-  assert.strictEqual(r0.tw_guyed_low_usd, 235500, 'rank-1 tw_guyed_low_usd should be $235,500');
+  assert.strictEqual(r0.tw_height_ft, 473, 'rank-1 tw_height_ft should be 473');
+  assert.strictEqual(r0.tw_guyed_low_usd, 351100, 'rank-1 tw_guyed_low_usd should be $351,100');
   assert.strictEqual(r0.tw_tia_class, 'Class II', 'rank-1 tw_tia_class should be Class II');
 });
 
@@ -11019,17 +11019,17 @@ test('am_nepa_and_environmental_permitting_guide present on KAZM candidate', asy
   const g = out.candidates[0].am_nepa_and_environmental_permitting_guide;
   assert.ok(g !== undefined && g !== null, 'am_nepa_and_environmental_permitting_guide should be present');
   assert.ok(typeof g.nepa_level === 'string', 'nepa_level should be a string');
-  assert.ok(g.triggers_section_106 === true, 'KAZM 315 ft tower must trigger Section 106');
+  assert.ok(g.triggers_section_106 === true, 'KAZM 473 ft tower must trigger Section 106');
 });
 
 test('am_nepa_and_environmental_permitting_guide KAZM tower height and NEPA determination', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nepa_and_environmental_permitting_guide;
-  // Class D 0.25λ at 780 kHz = 315 ft → triggers Section 106 (>200 ft) but not EA (≤450 ft)
-  assert.strictEqual(g.tower_height_ft_env, 315, 'tower_height_ft_env should be 315');
-  assert.strictEqual(g.triggers_section_106, true, 'Section 106 triggered at 315 ft (>200 ft ASR threshold)');
-  assert.strictEqual(g.triggers_ea, false, 'EA not triggered at 315 ft (≤450 ft threshold)');
-  assert.ok(g.nepa_level.includes('Categorical Exclusion'), 'NEPA level should indicate CE eligibility');
+  // Class D 3/8λ at 780 kHz = 473 ft → triggers Section 106 (>200 ft) AND EA (>450 ft)
+  assert.strictEqual(g.tower_height_ft_env, 473, 'tower_height_ft_env should be 473');
+  assert.strictEqual(g.triggers_section_106, true, 'Section 106 triggered at 473 ft (>200 ft ASR threshold)');
+  assert.strictEqual(g.triggers_ea, true, 'EA triggered at 473 ft (>450 ft threshold)');
+  assert.ok(g.nepa_level.includes('Environmental Assessment'), 'NEPA level should require EA at 473 ft');
 });
 
 test('am_nepa_and_environmental_permitting_guide KAZM Section 106 timeline', async () => {
@@ -11038,14 +11038,14 @@ test('am_nepa_and_environmental_permitting_guide KAZM Section 106 timeline', asy
   assert.ok(g.shpo_review_weeks_low > 0, 'SHPO review must have positive low timeline');
   assert.ok(g.shpo_review_weeks_high >= g.shpo_review_weeks_low, 'SHPO high must be ≥ low');
   assert.ok(g.tribal_consult_weeks_high >= g.tribal_consult_weeks_low, 'tribal consult high must be ≥ low');
-  assert.strictEqual(g.env_review_weeks_low, 12, 'CE path timeline low should be 12 weeks');
-  assert.strictEqual(g.env_review_weeks_high, 32, 'CE path timeline high should be 32 weeks');
+  assert.strictEqual(g.env_review_weeks_low, 26, 'EA path timeline low should be 26 weeks (EA required at 473 ft)');
+  assert.strictEqual(g.env_review_weeks_high, 104, 'EA path timeline high should be 104 weeks (EA required at 473 ft)');
 });
 
 test('am_nepa_and_environmental_permitting_guide KAZM environmental cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nepa_and_environmental_permitting_guide;
-  // Phase1 $2500 + wetland $3000 + S106 survey $5000 + ESA $2000 = $12,500 low
+  // Phase1 $2500 + wetland $3000 + S106 survey $5000 + ESA $2000 = $12,500 low (EA prep only in high)
   assert.strictEqual(g.total_env_cost_low_usd, 12500, 'total_env_cost_low_usd should be $12,500');
   assert.ok(g.total_env_cost_high_usd > g.total_env_cost_low_usd, 'high cost must exceed low');
   assert.ok(g.section_106_survey_low_usd > 0, 'Section 106 survey cost must be positive');
@@ -11061,7 +11061,7 @@ test('am_nepa_and_environmental_permitting_guide comparison table columns presen
   const r0 = out.candidate_comparison_table[0];
   assert.ok(r0.env_nepa_level.length > 0, 'rank-1 env_nepa_level should be non-empty');
   assert.strictEqual(r0.env_total_cost_low_usd, 12500, 'rank-1 env_total_cost_low_usd should be $12,500');
-  assert.strictEqual(r0.env_weeks_low, 12, 'rank-1 env_weeks_low should be 12');
+  assert.strictEqual(r0.env_weeks_low, 26, 'rank-1 env_weeks_low should be 26 (EA required at 3/8λ = 473 ft)');
 });
 
 test('am_electrical_service_and_power_infrastructure_guide present on KAZM candidate', async () => {
@@ -11183,10 +11183,10 @@ test('am_lightning_protection_and_surge_suppression_guide KAZM monsoon zone clas
 test('am_lightning_protection_and_surge_suppression_guide KAZM collection area and strikes', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_lightning_protection_and_surge_suppression_guide;
-  // 315 ft = 96.09 m tower; A_e = π×(3×96.09/1000)² = π×0.08311 = 0.261 → round2 = 0.26
-  assert.strictEqual(g.tower_h_ft_lp, 315, 'tower_h_ft_lp should be 315 ft');
-  assert.strictEqual(g.A_e_km2, 0.26, 'A_e_km2 should be 0.26 km²');
-  assert.strictEqual(g.N_s, 1.95, 'N_s should be 1.95 strikes/yr for KAZM');
+  // 473 ft = 144.13 m tower; A_e = π×(3×144.13/1000)² = π×0.18696 = 0.587 → round2 = 0.59
+  assert.strictEqual(g.tower_h_ft_lp, 473, 'tower_h_ft_lp should be 473 ft (3/8λ planning height)');
+  assert.strictEqual(g.A_e_km2, 0.59, 'A_e_km2 should be 0.59 km²');
+  assert.strictEqual(g.N_s, 4.43, 'N_s should be 4.43 strikes/yr for KAZM');
 });
 
 test('am_lightning_protection_and_surge_suppression_guide KAZM protection costs', async () => {
@@ -11207,7 +11207,7 @@ test('am_lightning_protection_and_surge_suppression_guide comparison table colum
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.lp_N_g_adj, 7.5, 'rank-1 lp_N_g_adj should be 7.5');
-  assert.strictEqual(r0.lp_N_s, 1.95, 'rank-1 lp_N_s should be 1.95');
+  assert.strictEqual(r0.lp_N_s, 4.43, 'rank-1 lp_N_s should be 4.43');
   assert.strictEqual(r0.lp_total_cost_low_usd, 5800, 'rank-1 lp_total_cost_low_usd should be $5,800');
 });
 
@@ -11763,8 +11763,8 @@ test('am_tower_base_insulator_and_rf_isolation_guide KAZM tower geometry', async
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_base_insulator_and_rf_isolation_guide;
   assert.strictEqual(g.wavelength_m,      384.62, 'KAZM 780 kHz wavelength_m should be 384.62');
-  assert.strictEqual(g.tower_height_ft,   315.49, 'KAZM Class D tower_height_ft should be 315.49 (λ/4)');
-  assert.strictEqual(g.n_guy_levels,      3,      'KAZM 315-ft tower should have 3 guy levels');
+  assert.strictEqual(g.tower_height_ft,   473.2,  'KAZM Class D tower_height_ft should be 473.2 (3/8λ)');
+  assert.strictEqual(g.n_guy_levels,      4,      'KAZM 473-ft tower should have 4 guy levels');
 });
 
 test('am_tower_base_insulator_and_rf_isolation_guide KAZM insulator type and cost', async () => {
@@ -11772,14 +11772,14 @@ test('am_tower_base_insulator_and_rf_isolation_guide KAZM insulator type and cos
   const g = out.candidates[0].am_tower_base_insulator_and_rf_isolation_guide;
   assert.strictEqual(g.base_insulator_type,    'standard_porcelain', 'KAZM Class D should use standard_porcelain');
   assert.strictEqual(g.base_insulator_low_usd, 500,  'KAZM base_insulator_low_usd should be $500');
-  assert.strictEqual(g.rf_choke_total_low_usd, 600,  'KAZM rf_choke_total_low_usd should be $600 (3 × $200)');
+  assert.strictEqual(g.rf_choke_total_low_usd, 800,  'KAZM rf_choke_total_low_usd should be $800 (4 × $200)');
 });
 
 test('am_tower_base_insulator_and_rf_isolation_guide KAZM total costs', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_base_insulator_and_rf_isolation_guide;
-  assert.strictEqual(g.total_rf_isolation_low_usd,  2100, 'KAZM total_rf_isolation_low_usd should be $2,100');
-  assert.strictEqual(g.total_rf_isolation_high_usd, 7900, 'KAZM total_rf_isolation_high_usd should be $7,900');
+  assert.strictEqual(g.total_rf_isolation_low_usd,  2300, 'KAZM total_rf_isolation_low_usd should be $2,300');
+  assert.strictEqual(g.total_rf_isolation_high_usd, 8700, 'KAZM total_rf_isolation_high_usd should be $8,700');
 });
 
 test('am_tower_base_insulator_and_rf_isolation_guide comparison table columns present', async () => {
@@ -11790,9 +11790,9 @@ test('am_tower_base_insulator_and_rf_isolation_guide comparison table columns pr
     assert.ok('rfi_n_guy_levels'    in row, 'rfi_n_guy_levels missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.rfi_tower_height_ft, 315.49, 'rank-1 rfi_tower_height_ft should be 315.49');
-  assert.strictEqual(r0.rfi_total_low_usd,   2100,   'rank-1 rfi_total_low_usd should be $2,100');
-  assert.strictEqual(r0.rfi_n_guy_levels,    3,      'rank-1 rfi_n_guy_levels should be 3');
+  assert.strictEqual(r0.rfi_tower_height_ft, 473.2,  'rank-1 rfi_tower_height_ft should be 473.2');
+  assert.strictEqual(r0.rfi_total_low_usd,   2300,   'rank-1 rfi_total_low_usd should be $2,300');
+  assert.strictEqual(r0.rfi_n_guy_levels,    4,      'rank-1 rfi_n_guy_levels should be 4');
 });
 
 test('am_emergency_alert_system_equipment_guide present on KAZM candidate', async () => {
@@ -12161,8 +12161,8 @@ test('am_broadcast_tower_structural_inspection_guide present on KAZM candidate',
 test('am_broadcast_tower_structural_inspection_guide KAZM tower and guy levels', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_broadcast_tower_structural_inspection_guide;
-  assert.strictEqual(g.tower_insp_ft, 315, 'KAZM 780 kHz Class D tower should be 315 ft');
-  assert.strictEqual(g.n_guy_levels,   3,  '315 ft tower should have 3 guy levels');
+  assert.strictEqual(g.tower_insp_ft, 473, 'KAZM 780 kHz Class D tower should be 473 ft');
+  assert.strictEqual(g.n_guy_levels,   4,  '473 ft tower should have 4 guy levels');
   assert.strictEqual(g.detailed_inspection_cycle_years, 3, 'Detailed inspection cycle should be 3 years');
   assert.strictEqual(g.design_life_years, 50, 'Design life should be 50 years');
 });
@@ -12170,16 +12170,16 @@ test('am_broadcast_tower_structural_inspection_guide KAZM tower and guy levels',
 test('am_broadcast_tower_structural_inspection_guide KAZM annual inspection costs', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_broadcast_tower_structural_inspection_guide;
-  assert.strictEqual(g.annual_inspection_low_usd,  2000, 'Annual inspection low should be $2,000');
-  assert.strictEqual(g.annual_inspection_high_usd, 3500, 'Annual inspection high should be $3,500');
-  assert.strictEqual(g.detailed_amortized_annual_usd, 3333, '3-yr inspection amortized should be $3,333');
+  assert.strictEqual(g.annual_inspection_low_usd,  3000, 'Annual inspection low should be $3,000');
+  assert.strictEqual(g.annual_inspection_high_usd, 5000, 'Annual inspection high should be $5,000');
+  assert.strictEqual(g.detailed_amortized_annual_usd, 5000, '3-yr inspection amortized should be $5,000');
 });
 
 test('am_broadcast_tower_structural_inspection_guide KAZM total inspection reserve', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_broadcast_tower_structural_inspection_guide;
-  assert.strictEqual(g.total_annual_inspection_low_usd,  6083, 'Total annual inspection reserve low should be $6,083');
-  assert.strictEqual(g.total_annual_inspection_high_usd, 9083, 'Total annual inspection reserve high should be $9,083');
+  assert.strictEqual(g.total_annual_inspection_low_usd,  9000, 'Total annual inspection reserve low should be $9,000');
+  assert.strictEqual(g.total_annual_inspection_high_usd, 13000, 'Total annual inspection reserve high should be $13,000');
   assert.ok(g.total_annual_inspection_high_usd > g.total_annual_inspection_low_usd, 'High must exceed low');
 });
 
@@ -12191,9 +12191,9 @@ test('am_broadcast_tower_structural_inspection_guide comparison table columns pr
     assert.ok('insp_3yr_detail_low_usd' in row, 'insp_3yr_detail_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.insp_tower_height_ft,    315,  'rank-1 insp_tower_height_ft should be 315');
-  assert.strictEqual(r0.insp_annual_reserve_low, 6083, 'rank-1 insp_annual_reserve_low should be $6,083');
-  assert.strictEqual(r0.insp_3yr_detail_low_usd, 5000, 'rank-1 insp_3yr_detail_low_usd should be $5,000');
+  assert.strictEqual(r0.insp_tower_height_ft,    473,  'rank-1 insp_tower_height_ft should be 473');
+  assert.strictEqual(r0.insp_annual_reserve_low, 9000, 'rank-1 insp_annual_reserve_low should be $9,000');
+  assert.strictEqual(r0.insp_3yr_detail_low_usd, 8000, 'rank-1 insp_3yr_detail_low_usd should be $8,000');
 });
 
 test('am_annual_regulatory_compliance_and_fee_guide present on KAZM candidate', async () => {
@@ -12300,24 +12300,24 @@ test('am_tower_painting_and_aviation_marking_guide present on KAZM candidate', a
 test('am_tower_painting_and_aviation_marking_guide KAZM tower height and marking', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_painting_and_aviation_marking_guide;
-  assert.strictEqual(g.tower_pnt_ft, 315, 'KAZM 780 kHz Class D λ/4 tower should be 315 ft');
-  assert.strictEqual(g.requires_aviation_marking, true, '315 ft tower requires FAA aviation marking');
+  assert.strictEqual(g.tower_pnt_ft, 473, 'KAZM 780 kHz Class D 3/8λ tower should be 473 ft');
+  assert.strictEqual(g.requires_aviation_marking, true, '473 ft tower requires FAA aviation marking');
   assert.strictEqual(g.fcc_class, 'D', 'fcc_class should be D');
 });
 
 test('am_tower_painting_and_aviation_marking_guide KAZM paint cost calculations', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_painting_and_aviation_marking_guide;
-  assert.strictEqual(g.initial_paint_cost_low_usd,  4725, '315 ft × $15/ft should be $4,725');
-  assert.strictEqual(g.initial_paint_cost_high_usd, 9450, '315 ft × $30/ft should be $9,450');
-  assert.strictEqual(g.annual_paint_reserve_usd,    1350, '$9,450 / 7yr should be $1,350/yr');
+  assert.strictEqual(g.initial_paint_cost_low_usd,  7095, '473 ft × $15/ft should be $7,095');
+  assert.strictEqual(g.initial_paint_cost_high_usd, 14190, '473 ft × $30/ft should be $14,190');
+  assert.strictEqual(g.annual_paint_reserve_usd,    2027, '$14,190 / 7yr should be $2,027/yr');
 });
 
 test('am_tower_painting_and_aviation_marking_guide KAZM lifecycle costs', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_painting_and_aviation_marking_guide;
-  assert.strictEqual(g.life_20yr_paint_low_usd,  13500, '20yr lifecycle low should be $13,500');
-  assert.strictEqual(g.life_20yr_paint_high_usd, 37800, '20yr lifecycle high should be $37,800');
+  assert.strictEqual(g.life_20yr_paint_low_usd,  20271, '20yr lifecycle low should be $20,271');
+  assert.strictEqual(g.life_20yr_paint_high_usd, 56760, '20yr lifecycle high should be $56,760');
   assert.ok(g.lighting_only_initial_low_usd > 0, 'Lighting alternative cost must be positive for >200 ft tower');
 });
 
@@ -12329,9 +12329,9 @@ test('am_tower_painting_and_aviation_marking_guide comparison table columns pres
     assert.ok('pnt_annual_reserve_usd'   in row, 'pnt_annual_reserve_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.pnt_tower_height_ft,      315,  'rank-1 pnt_tower_height_ft should be 315');
-  assert.strictEqual(r0.pnt_initial_cost_low_usd, 4725, 'rank-1 pnt_initial_cost_low_usd should be $4,725');
-  assert.strictEqual(r0.pnt_annual_reserve_usd,   1350, 'rank-1 pnt_annual_reserve_usd should be $1,350');
+  assert.strictEqual(r0.pnt_tower_height_ft,      473,  'rank-1 pnt_tower_height_ft should be 473');
+  assert.strictEqual(r0.pnt_initial_cost_low_usd, 7095, 'rank-1 pnt_initial_cost_low_usd should be $7,095');
+  assert.strictEqual(r0.pnt_annual_reserve_usd,   2027, 'rank-1 pnt_annual_reserve_usd should be $2,027');
 });
 
 test('am_noise_floor_and_rf_environment_analysis_guide present on KAZM candidate', async () => {
@@ -14249,10 +14249,10 @@ it('am_tower_structural_analysis_guide is present on every candidate', async () 
   }
 });
 
-it('am_tower_structural_analysis_guide guy_levels is 4 for KAZM 315 ft tower (ceil(315/100))', async () => {
+it('am_tower_structural_analysis_guide guy_levels is 5 for KAZM 473 ft tower (ceil(473/100))', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_structural_analysis_guide;
-  assert.strictEqual(g.guy_levels, 4, `KAZM 315 ft tower should have 4 guy levels`);
+  assert.strictEqual(g.guy_levels, 5, `KAZM 473 ft tower should have 5 guy levels`);
 });
 
 it('am_tower_structural_analysis_guide total_structural_low_usd is positive', async () => {
@@ -14273,7 +14273,7 @@ it('candidate_comparison_table str columns are present and valid for KAZM', asyn
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
   assert.ok(r0.str_total_structural_low_usd > 0, 'str_total_structural_low_usd must be positive');
-  assert.strictEqual(r0.str_guy_levels, 4, 'str_guy_levels should be 4 for KAZM');
+  assert.strictEqual(r0.str_guy_levels, 5, 'str_guy_levels should be 5 for KAZM');
   assert.strictEqual(r0.str_design_wind_speed_mph_low, 90, 'str_design_wind_speed_mph_low should be 90');
 });
 
@@ -15750,11 +15750,11 @@ test('KAZM 780 kHz: am_tower_lighting_and_painting_compliance_guide present on a
   }
 });
 
-test('KAZM 780 kHz: tower_height_ft ≈ 315 ft and ASR required (>200 ft)', async () => {
+test('KAZM 780 kHz: tower_height_ft ≈ 473 ft and ASR required (>200 ft)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_lighting_and_painting_compliance_guide;
-  assert.ok(g.tower_height_ft > 300 && g.tower_height_ft < 330,
-    `tower_height_ft should be ~315 ft for 780 kHz, got ${g.tower_height_ft}`);
+  assert.ok(g.tower_height_ft > 460 && g.tower_height_ft < 490,
+    `tower_height_ft should be ~473 ft (3/8λ) for 780 kHz, got ${g.tower_height_ft}`);
   assert.strictEqual(g.asr_required, true, 'ASR must be required when tower > 200 ft');
   assert.strictEqual(g.asr_threshold_ft, 200, 'asr_threshold_ft must be 200 ft (§17.7)');
 });
@@ -15763,7 +15763,7 @@ test('KAZM 780 kHz: lighting_type is MEDIUM_INTENSITY_L864_L865', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_lighting_and_painting_compliance_guide;
   assert.strictEqual(g.lighting_type, 'MEDIUM_INTENSITY_L864_L865',
-    `780 kHz tower ~315 ft should require MEDIUM_INTENSITY_L864_L865, got ${g.lighting_type}`);
+    `780 kHz tower ~473 ft should require MEDIUM_INTENSITY_L864_L865, got ${g.lighting_type}`);
   assert.strictEqual(g.faa_notification_required, true, 'FAA notice required when ASR required');
 });
 
