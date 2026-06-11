@@ -9298,8 +9298,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const lambda_m       = 299792.458 / frequency_khz;
       // Class A/B use 0.625λ (FCC optimum); C/D use λ/4 (0.25λ)
       const h_frac_st      = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
-      const h_ft           = round2(h_frac_st * lambda_m * 3.28084);
       const h_m            = round2(h_frac_st * lambda_m);
+      const h_ft           = round2(h_m * 3.28084);  // round meters first to match lighting guide
 
       // Wind load parameters (TIA-222-H / ASCE 7-22, Exposure C, V=115 mph, Z≈315ft)
       const V_mph          = 115;   // basic wind speed 3-sec gust (Flagstaff area typical)
@@ -23143,10 +23143,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const safe_work_power_threshold_kw = 0.050; // 50W — above this, RF PPE required on structure
       const rf_ppe_required = tpo_kw > safe_work_power_threshold_kw;
 
-      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.375λ (3/8λ) for C/D
       const c_mps = 299792458;
       const wavelength_m_tc = c_mps / (frequency_khz * 1000);
-      const h_frac_tc = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_frac_tc = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
       const three_eights_height_m = round2(wavelength_m_tc * h_frac_tc);  // class-dependent height
 
       // Fall protection zones and requirements per OSHA §1910.268 / ANSI/TIA-1019-A
@@ -25842,7 +25842,7 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       // Typical Class D and Class A physical height targets
-      const standardHeightFrac = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const standardHeightFrac = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
       const standardHeightM    = round2(standardHeightFrac * lambda_ah);
       const standardHeightFt   = round2(standardHeightM * 3.28084);
       const standardElecDeg    = round2(standardHeightFrac * 360);
@@ -26234,7 +26234,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower height determines zoning review burden; §11.4 NEPA environmental filing
 
       const lambda_zl    = round2(300000 / frequency_khz);
-      const towerH_m_zl  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_zl); // 5/8λ Class A/B, λ/4 Class C/D
+      const towerH_m_zl  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_zl); // 5/8λ Class A/B, 3/8λ Class C/D
       const towerH_ft_zl = round2(towerH_m_zl * 3.28084);
 
       // Zoning district compatibility tiers
