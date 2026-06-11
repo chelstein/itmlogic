@@ -31314,7 +31314,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // REHABILITATION COSTS
       //   Corrosion inspection + resistance test (annual): $500–$1,500
       //   Replace damaged radial connections (per connection): $150–$400
-      //   Add supplemental radials (per radial, buried, λ/4): $300–$800
+      //   Add supplemental radials (per radial, buried, 0.35λ per §73.186): $300–$800
       //   Full ground rehabilitation (120 radials): $36,000–$96,000
       //   Exothermic weld bus upgrade: $5,000–$15,000
 
