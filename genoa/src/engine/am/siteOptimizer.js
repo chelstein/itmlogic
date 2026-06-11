@@ -7410,7 +7410,7 @@ async function scoreCandidate(pt, ctx, warnings){
           'AC 70/7460-1M (FAA Obstruction Marking and Lighting)'
         ],
         reference: '47 CFR §17.7 (ASR registration); §17.21–§17.50 (marking/lighting); TIA-222-H; AC 70/7460-1M; ASCE 7-22; IBC 2021',
-        note: `Tower structural assessment guide is a screening-grade reference. Actual structural design, foundation engineering, and FAA obstruction study must be performed by licensed structural/geotechnical engineers and registered in the FAA aeronautical study database before construction. All height and loading values are based on λ/4 antenna theory at ${frequency_khz} kHz and latitude-based TIA-222-H zone assignment.`
+        note: `Tower structural assessment guide is a screening-grade reference. Actual structural design, foundation engineering, and FAA obstruction study must be performed by licensed structural/geotechnical engineers and registered in the FAA aeronautical study database before construction. Height and loading values are based on Class ${fcc_class} standard height (${isHighClass_ts ? '5/8λ' : '3/8λ'} = ${tower_h_ts} m) at ${frequency_khz} kHz and latitude-based TIA-222-H zone assignment.`
       };
     })(),
 
@@ -12750,7 +12750,7 @@ async function scoreCandidate(pt, ctx, warnings){
         field_meas_cost_usd,
         atu_retune_trigger: 'base current deviation >2% OR SWR change >10%',
         reference: '47 CFR §73.61 (base current monitoring, ±2% tolerance); §73.68 (DA field measurements after change); §73.150(b)(3) (antenna monitoring points for DA); §73.154 (proof of performance); FCC Form 302-AM; ARRL Antenna Impedance Handbook (typical R_rad values for vertical monopoles)',
-        note: `${frequency_khz} kHz, ${tpo_kw} kW, λ/4 = ${standard_height_m_bcim} m: I_base ≈ ${i_base_a} A (R_rad ≈ ${r_rad_est_ohm} Ω). §73.61 tolerance ±2% → ${i_base_low_a}–${i_base_high_a} A. ${is_da_bcim ? `DA: §73.150 phase/ratio monitor required. §73.68 full field proof triggered after any ATU change. Field meas. budget ~$${field_meas_cost_usd.toLocaleString()}.` : 'NDA: single thermocouple ammeter + annual calibration.'}`
+        note: `${frequency_khz} kHz, ${tpo_kw} kW, Class ${fcc_class} std height (${isHighCls_bcim ? '5/8λ' : '3/8λ'}) = ${standard_height_m_bcim} m: I_base ≈ ${i_base_a} A (R_rad ≈ ${r_rad_est_ohm} Ω, λ/4 ref). §73.61 tolerance ±2% → ${i_base_low_a}–${i_base_high_a} A. ${is_da_bcim ? `DA: §73.150 phase/ratio monitor required. §73.68 full field proof triggered after any ATU change. Field meas. budget ~$${field_meas_cost_usd.toLocaleString()}.` : 'NDA: single thermocouple ammeter + annual calibration.'}`
       };
     })(),
 
