@@ -4778,8 +4778,8 @@ async function scoreCandidate(pt, ctx, warnings){
         additional_engineering_weeks_min: add_wks_min,
         additional_engineering_weeks_max: add_wks_max,
         note: `Commission a ${study_type.replace(/_/g, ' ')} study before filing. DA engineering adds ${add_wks_min}–${add_wks_max} weeks; budget for multiple antenna modeling iterations.`,
-        rule: '47 CFR §73.150 / §73.316',
-        reference: '47 CFR §73.150 (DA authorization); §73.152 (AM DA operation); §73.316 (horizontal pattern); §73.25 (clear channel protection); §73.182 (skywave interference); §73.154(a) (DA proof of performance)',
+        rule: '47 CFR §73.150 / §73.152',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.25 (clear channel protection); §73.182 (skywave interference); §73.154(a) (DA proof of performance)',
       };
     })(),
     // Signal environment advisory — characterizes the directional interference
@@ -5063,7 +5063,7 @@ async function scoreCandidate(pt, ctx, warnings){
         note: nifStatus === WARN ? 'NIF study must demonstrate no increase in nighttime interference from authorized site — required before Form 301-AM can be accepted.' : null
       });
 
-      // Gate 7: §73.316 DA pattern (if recommended)
+      // Gate 7: §73.150 DA pattern (if recommended) — note: §73.316 is FM, not AM
       // Sources in priority order:
       //   1. pattern_mode already DA → operator declared, definitely required
       //   2. COL coverage gap 40–79% → directional pattern may recover coverage
@@ -5075,10 +5075,10 @@ async function scoreCandidate(pt, ctx, warnings){
                           : daProxy     ? 'COL coverage gap — DA pattern may recover coverage'
                           :               'Not indicated at this screening level';
       gates.push({
-        id: 'DA_PATTERN', label: '§73.316 directional antenna pattern',
+        id: 'DA_PATTERN', label: '§73.150 directional antenna pattern',
         status: daStatus,
         value: daValue,
-        rule: '47 CFR §73.150 / §73.316',
+        rule: '47 CFR §73.150 / §73.152',
         note: isAlreadyDA
           ? 'Operator-declared DA mode: §73.150 array design, §73.68 antenna monitor, and §73.182 nighttime NIF study are all required before Form 301-AM filing.'
           : daProxy
@@ -6374,10 +6374,10 @@ async function scoreCandidate(pt, ctx, warnings){
       };
     })(),
 
-    // §73.150/§73.152/§73.316 Directional Antenna Pattern Optimization Guide.
+    // §73.150/§73.152 Directional Antenna Pattern Optimization Guide (AM).
     // For DA stations: provides element spacing, orientation, current ratio
     // guidance, pattern shape candidates, COL minimum field requirement,
-    // and §73.316 filing compliance checklist.
+    // and §73.150(a) filing compliance checklist (72-radial HRP, 5° increments).
     // For NDA stations: provides non-directional coverage summary and
     // note on when DA could improve COL coverage or reduce blanket population.
     antenna_pattern_optimization_guide: (() => {
@@ -6423,7 +6423,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { spacing_label: 'λ/2',  spacing_m: round2(lambdaM / 2),        spacing_deg: 180, pattern_type: 'FIGURE_EIGHT', gain_over_nda_db: round2(4.8), note: 'Figure-8 pattern; two nulls; gain toward COL; high suppression at 90°/270°' }
       ];
 
-      // §73.316 horizontal radiation pattern compliance checklist
+      // §73.150(a) / Form 301-AM horizontal radiation pattern compliance checklist
       const hrpChecklist = [
         { id: 'HRP_TABLE', item: 'Horizontal radiation pattern table at 5° increments (0°–355°, 72 values)', required: isDA_ap, note: '§73.150(a) / Form 301-AM Exhibit: full 72-radial theoretical pattern at 5° increments required for AM DA authorization' },
         { id: 'HRP_CONTOUR', item: 'Effective field (mV/m at 1 km) for each radial tabulated', required: isDA_ap, note: '§73.150(a): EF at 1 km computed from base current ratios and pattern; referenced to maximum value = 1.0' },
@@ -6471,7 +6471,7 @@ async function scoreCandidate(pt, ctx, warnings){
         element_spacing_options: isDA_ap ? spacingOptions : null,
         hrp_compliance_checklist: hrpChecklist,
         n_checklist_required: hrpChecklist.filter(i => i.required).length,
-        reference: '47 CFR §73.150 (DA operation); §73.152 (DA-D/DA-N); §73.316 (pattern measurements); §73.24(j) (COL field); §73.207/§73.215 (protection)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.154 (proof of performance); §73.24(j) (COL field); §73.207/§73.215 (protection)',
         note: 'Pattern optimization guidance is screening-grade. Actual DA element positions, current ratios, and phasing must be determined by a licensed broadcast engineer using full §73.182 analysis and field measurements per §73.154.'
       };
     })(),
@@ -6953,7 +6953,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     // Per-candidate FCC pre-filing regulatory compliance checklist.
-    // 12 items drawn from §73.24, §73.182, §73.316, §1.1306, §1.1310,
+    // 12 items drawn from §73.24, §73.182, §73.150, §1.1306, §1.1310,
     // §17.7, §73.190, and §73.315.  Each item is evaluated at screening
     // grade from available candidate data and assigned a status of
     // PASS, WARN, FAIL, or NOT_EVALUATED.
@@ -7111,7 +7111,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fail_count: counts.FAIL,
         not_evaluated_count: counts.NOT_EVALUATED,
         items: items_rc,
-        reference: '47 CFR §73.24(g)(j); §73.182; §73.316; §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3534; OET Bulletin 65',
+        reference: '47 CFR §73.24(g)(j); §73.182; §73.150 (AM DA); §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3534; OET Bulletin 65',
         note: 'regulatory_compliance_checklist is a screening-grade pre-filing assessment only. All WARN and NOT_EVALUATED items require professional engineering study, legal review, or additional data collection before Form 301-AM can be filed. Consult a licensed broadcast consultant and FCC communications attorney before filing.'
       };
     })(),
@@ -7670,7 +7670,7 @@ async function scoreCandidate(pt, ctx, warnings){
         form:    'FCC Form 302-AM',
         exhibits: [
           isDA_pp
-            ? '§73.150/§73.316: Directional antenna proof report including all 72-radial FI traversals, element phases/ratios, composite field intensity plots, and comparison to licensed pattern'
+            ? '§73.150/§73.154: Directional antenna proof report including all 72-radial FI traversals (5° increments), element phases/ratios, composite field intensity plots, and comparison to licensed pattern'
             : '§73.154(b): Non-directional proof report with 8-radial inverse-distance traversal data',
           'Ground system description and base current measurement data (§73.190)',
           `RF exposure (MPE) evaluation ${mpe_required ? '— required at this TPO' : '— simplified evaluation at this TPO'}`,
@@ -8229,25 +8229,26 @@ async function scoreCandidate(pt, ctx, warnings){
       // at specific azimuths, submitted with FCC Form 301-AM (new CP application).
       //
       // Key rules:
-      //   §73.316 — DA pattern design requirements, tabulation of field values,
-      //             suppression requirement (dominant station protection)
+      //   §73.150 — AM DA authorization and HRP table requirements (5° increments, 72 values)
+      //   §73.152 — DA operation (day/night/critical hours operation)
       //   §73.207 — minimum mileage separations (D/U ratios govern protection)
       //   §73.215 — interference standards; D/U protection determines required suppression
       //   §73.154 — proof of performance after construction (Form 302-AM)
       //   §1.1310 — RF exposure (MPE) evaluation (DA increases near-field complexity)
       //
-      // Suppression ratio: §73.316 itself does not specify a fixed minimum suppression
-      // ratio.  Suppression is whatever is needed to maintain D/U protection margins
-      // under §73.207/§73.215 toward each protected station.  In practice, Class A
+      // Note: §73.316 governs FM directional antennas, NOT AM. For AM, §73.150 applies.
+      //
+      // Suppression ratio: §73.150/§73.207 together determine the required suppression,
+      // not a fixed minimum. Suppression is whatever is needed to maintain D/U protection
+      // margins under §73.207/§73.215 toward each protected station.  In practice, Class A
       // clear-channel dominants typically require 30–50 dB of nighttime suppression
       // in the protection azimuth; Class B regional require 20–40 dB; Class C local
       // may need 10–25 dB depending on co-channel or first-adjacent scenario.
       //
-      // Horizontal radiation pattern (HRP): §73.316(b) requires a table of relative
-      // field values at every 10° azimuth (36 values, 0°–350°) for each pattern
-      // (day/night/critical hours if separately defined).  This table is filed as
-      // an exhibit to Form 301-AM.  Additional spot azimuths (bearing to each
-      // protected station) must also be provided.
+      // Horizontal radiation pattern (HRP): §73.150(a) / Form 301-AM Exhibit requires
+      // a table of relative field values at every 5° azimuth (72 values, 0°–355°) for
+      // each authorized pattern (DA-D, DA-N, or both for DA-2).  Additional spot azimuths
+      // (bearing to each protected station) must also be tabulated.
       //
       // Tower array sizing:  Small 2–3 tower arrays handle moderate suppression needs;
       // 4–6 tower arrays handle deep suppression (>30 dB) or complex multi-station
@@ -8260,7 +8261,7 @@ async function scoreCandidate(pt, ctx, warnings){
           applicable: false,
           reason: `Station operates NDA (${pattern_mode}) — DA pattern design not required for relocation unless site change necessitates conversion to DA.`,
           conversion_trigger: `Conversion from NDA to DA may be required if the new site cannot achieve co-channel or adjacent-channel D/U protection using NDA groundwave pattern.`,
-          reference: '47 CFR §73.316; §73.207; §73.215'
+          reference: '47 CFR §73.150 (AM DA authorization); §73.207 (spacing); §73.215 (interference standards)'
         };
       }
 
@@ -8310,8 +8311,8 @@ async function scoreCandidate(pt, ctx, warnings){
         tower_count_high = Math.min(tower_count_high + 1, 8);
       }
 
-      // §73.316(b): HRP table — 36 azimuth values at 10° increments, plus protection spot azimuths
-      const hrp_azimuths      = 36;       // 0°, 10°, ..., 350°
+      // §73.150(a) / Form 301-AM: HRP table — 72 azimuth values at 5° increments, plus spot azimuths
+      const hrp_azimuths      = 72;       // 0°, 5°, 10°, ..., 355°
       const spot_azimuths_min = 2;        // at minimum, 1 spot per protected station + verification points
       const spot_azimuths_typical = isClearCh_da ? 6 : isRegionalCh_da ? 4 : 2;
 
@@ -8330,7 +8331,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // FCC Form 301-AM filing requirements for DA
       const form_301_da_exhibits = [
-        'Horizontal radiation pattern table (36 azimuths, 10° increment) — §73.316(b)',
+        'Horizontal radiation pattern table (72 azimuths, 5° increments, 0°–355°) — §73.150(a) / Form 301-AM',
         'Vertical radiation pattern (spot radials, 10° increments per §73.150)',
         'Tabulation of field values at each protected-station bearing',
         'Tower spacing and phasing array parameters (spacing in degrees at operating freq)',
@@ -8341,10 +8342,10 @@ async function scoreCandidate(pt, ctx, warnings){
         'Common point impedance and power calculations'
       ].filter(Boolean);
 
-      // Key §73.316 compliance checklist
+      // Key §73.150 / Form 301-AM DA compliance checklist
       const compliance_checklist = [
-        { item: 'HRP table at 36 azimuths (0°–350°, 10° increment)', required: true, ref: '§73.316(b)' },
-        { item: 'Spot values at each protected-station bearing', required: true, ref: '§73.316(b)' },
+        { item: 'HRP table at 72 azimuths (0°–355°, 5° increments)', required: true, ref: '§73.150(a) / Form 301-AM' },
+        { item: 'Spot values at each protected-station bearing', required: true, ref: '§73.150(a); §73.207' },
         { item: 'D/U protection margin ≥ required threshold at each protected station', required: true, ref: '§73.207; §73.215' },
         { item: 'Proof-of-performance field measurement plan (72-radial FI traversal)', required: true, ref: '§73.154(a)' },
         { item: 'FCC Form 302-AM proof within 6 months of CP grant', required: true, ref: '§73.154' },
@@ -8376,7 +8377,7 @@ async function scoreCandidate(pt, ctx, warnings){
         design_weeks_high,
         construction_premium_pct_low,
         construction_premium_pct_high,
-        reference: '47 CFR §73.316 (DA requirements); §73.207 (mileage separations); §73.215 (interference standards); §73.154 (proof of performance); §73.61 (base current monitors); §73.68 (monitor points); §73.69 (emergency NDA); §73.190 (ground system); §1.1310 (MPE)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.207 (mileage separations); §73.215 (interference standards); §73.154 (proof of performance); §73.61 (base current monitors); §73.68 (monitor points); §73.69 (emergency NDA); §73.190 (ground system); §1.1310 (MPE)',
         note: `Class ${fcc_class} ${pattern_mode} on ${frequency_khz} kHz (${isClearCh_da ? 'clear' : isRegionalCh_da ? 'regional' : 'local'} channel) — estimated ${tower_count_low}–${tower_count_high} tower array, ${supp_low_db}–${supp_high_db} dB suppression depth. Pattern design: ${design_weeks_low}–${design_weeks_high} weeks, $${design_cost_low_usd.toLocaleString()}–$${design_cost_high_usd.toLocaleString()}.`
       };
     })(),
@@ -11906,8 +11907,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   • Requires licensed broadcast engineer
       //   • Results filed as exhibit to FCC Form 302-AM (license to cover)
       //
-      // §73.316(b): Horizontal radiation pattern:
-      //   • Table of relative field values at ≥10° increments required on file at FCC
+      // §73.150(a) / Form 301-AM: Horizontal radiation pattern:
+      //   • Table of relative field values at 5° increments (72 radials) filed with Form 301-AM
       //   • Pattern must be designed by a licensed Professional Engineer
       //
       // §73.68(c) waiver: available for emergency operations; station may operate non-directional
@@ -11972,7 +11973,7 @@ async function scoreCandidate(pt, ctx, warnings){
         amendment_high_usd,
         total_da_low_usd,
         total_da_high_usd,
-        reference: '47 CFR §73.55 (DA logging); §73.61(b) (current ratio tolerance); §73.68 (phase/ratio verification); §73.154(a) (DA proof of performance); §73.316(b) (horizontal pattern)',
+        reference: '47 CFR §73.55 (DA logging); §73.61(b) (current ratio tolerance); §73.68 (phase/ratio verification); §73.154(a) (DA proof of performance); §73.150(a) (horizontal pattern — 72 radials at 5°)',
         note: isDA
           ? `DA station (${pattern_mode}): phase tolerance ±${phase_tolerance_deg}°, ratio tolerance ±${ratio_tolerance_pct}% per §73.61(b)/§73.68. ${proof_radials}-radial proof required per §73.154(a). Emergency NDA allowed ≤${emergency_nda_days} days without STA (§73.68(c)). Total first-year DA compliance: $${total_da_low_usd.toLocaleString()}–$${total_da_high_usd.toLocaleString()}.`
           : `NDA station (${pattern_mode}): no DA phase/ratio monitoring required. DA-specific compliance cost = $0.`
@@ -21951,7 +21952,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const COL_PRESERVATION_STRATEGIES = [
         { priority: 1, action: 'Verify 0.5 mV/m contour over COL at each candidate site', detail: 'Run FCC curves (§73.190) to confirm daytime 0.5 mV/m contour includes COL city limits or community center', cfr: '§73.24(h)' },
         { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that COL is within 0.5 mV/m daytime contour', cfr: '§73.3533; §73.3573' },
-        { priority: 3, action: 'Consider directional antenna to maintain COL service', detail: 'If NDA relocation degrades COL service, a DA pattern with a stronger lobe toward COL may preserve service', cfr: '§73.316; §73.24(h)' },
+        { priority: 3, action: 'Consider directional antenna to maintain COL service', detail: 'If NDA relocation degrades COL service, a DA pattern with a stronger lobe toward COL may preserve service', cfr: '§73.150; §73.24(h)' },
         { priority: 4, action: 'If COL change is unavoidable, file formal COL change request', detail: 'File a major change Form 301-AM with an explicit COL change request; coordinate with FCC communications counsel', cfr: '§73.3573(f)' }
       ];
 
@@ -21990,7 +21991,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   2. Contour map: daytime and nighttime 0.5 mV/m and 0.1 mV/m service contours
       //   3. Interference analysis: showing no new interference under §73.182 to co-channel/adj-channel
       //   4. DA horizontal radiation pattern (if directional): table of normalized relative field values
-      //      at 5° increments per §73.316; must show day and night patterns separately
+      //      at 5° increments (72 radials) per §73.150(a) / Form 301-AM; day and night patterns separately
       //   5. Antenna efficiency data: calculated from proposed ground system parameters
       //   6. Tower height and structure: AGL and AMSL heights; guy configuration if applicable
       //   7. FAA Form 7460-1 (Notice of Proposed Construction) or FAA determination if tower > 61m AGL
@@ -22019,7 +22020,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'SITE_COORDS',      label: 'Site coordinates (NAD83 lat/lon)', cfr: '§73.3533; §73.25', required: true, note: 'Must be NAD83 datum; GPS survey with sub-meter accuracy required' },
         { id: 'CONTOUR_MAP',      label: 'Service area contour map', cfr: '§73.182; §73.3533', required: true, note: 'Day and night 0.5 mV/m and 0.1 mV/m service contours using FCC curves (§73.190)' },
         { id: 'INTERFERENCE',     label: 'Interference analysis', cfr: '§73.182', required: true, note: 'Must show no new objectionable interference to all co-channel and adjacent-channel stations' },
-        { id: 'DA_PATTERN',       label: 'DA horizontal radiation pattern table', cfr: '§73.316', required: isDA_lm, note: 'Normalized relative field values at 5° increments; day and night patterns separately' },
+        { id: 'DA_PATTERN',       label: 'DA horizontal radiation pattern table', cfr: '§73.150(a)', required: isDA_lm, note: 'Normalized relative field values at 5° increments (72 radials, 0°–355°) per §73.150(a) / Form 301-AM; day and night patterns separately' },
         { id: 'ANTENNA_EFF',      label: 'Antenna efficiency and ground system data', cfr: '§73.190; §73.24', required: true, note: 'Ground system parameters; predicted efficiency factor used in power/contour calculations' },
         { id: 'TOWER_HEIGHT',     label: 'Tower height (AGL/AMSL) and structural data', cfr: '§73.1560; §17.7', required: true, note: 'Height of antenna structure above ground level and above mean sea level' },
         { id: 'FAA_CLEARANCE',    label: 'FAA Form 7460-1 or FAA determination', cfr: '§17.7; §17.23', required: true, note: 'Required for any structure > 61m AGL; FAA determination must be attached to LMS filing' },
@@ -22062,8 +22063,8 @@ async function scoreCandidate(pt, ctx, warnings){
           da_optimistic_months: 9,
           da_conservative_months: 18
         },
-        relocation_note: `File FCC Form 301-AM via LMS. ${n_required_exhibits} required exhibits including interference analysis, contour map, FAA determination, and ASR number. $325 filing fee. ${isDA_lm ? 'DA station requires horizontal radiation pattern table (§73.316). Processing: 9–18 months.' : 'NDA station. Processing: 3–9 months.'} CP valid for 3 years; 6-month extension available.`,
-        reference: '47 CFR §73.3533; §73.3534; §73.3539; §73.3580; §73.316; §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
+        relocation_note: `File FCC Form 301-AM via LMS. ${n_required_exhibits} required exhibits including interference analysis, contour map, FAA determination, and ASR number. $325 filing fee. ${isDA_lm ? 'DA station requires horizontal radiation pattern table per §73.150(a) (72 radials at 5°). Processing: 9–18 months.' : 'NDA station. Processing: 3–9 months.'} CP valid for 3 years; 6-month extension available.`,
+        reference: '47 CFR §73.3533; §73.3534; §73.3539; §73.3580; §73.150 (AM DA); §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
         note: `Form 301-AM via FCC LMS. ${n_required_exhibits} required exhibits. Filing fee: $325. CP term: 3 years + 6-month extension. Processing: ${isDA_lm ? '9–18' : '3–9'} months. Public notice triggers 30-day petition window for major changes.`
       };
     })(),
@@ -24063,8 +24064,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
     // DA array physical design guide.
     // Covers multi-element array configurations, element spacing, amplitude/phase ratios,
-    // mutual coupling correction, suppression ratio mechanics (§73.316/§73.207),
-    // Form 301-AM engineering exhibits, and base current monitoring tolerances (§73.61).
+    // mutual coupling correction, suppression ratio mechanics (§73.207/§73.215),
+    // Form 301-AM engineering exhibits (§73.150(a) 72-radial HRP), and base current monitoring (§73.61).
     // Distinct from antenna_pattern_optimization_guide (COL bearing / whether DA is needed).
     da_array_design_guide: (() => {
       const isDA_da  = /^DA/i.test(pattern_mode);
@@ -24074,7 +24075,7 @@ async function scoreCandidate(pt, ctx, warnings){
           applicable: false,
           pattern_mode,
           reason: 'Station operates non-directional (NDA). No DA array design required. Consult antenna_pattern_optimization_guide if DA operation is being considered.',
-          reference: '47 CFR §73.150; §73.316',
+          reference: '47 CFR §73.150 (AM DA authorization); §73.152 (DA-D/DA-N operation)',
           note: null
         };
       }
@@ -24173,12 +24174,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // Actual required suppression from NIF analysis (§73.182) will vary by case.
       const SUPP_REQ_DB_da = 28.3;
 
-      // §73.316 pattern measurements — horizontal radiation pattern exhibits
+      // §73.150(a) / Form 301-AM DA pattern exhibits (not §73.316 which is FM)
       const formExhibits = [
         { exhibit: 'Schedule B (Antenna)',      description: 'Tower heights (degrees electrical), self-impedance values', required: true },
         { exhibit: 'Schedule C (Transmitter)',  description: 'Transmitter make/model, authorized TPO', required: true },
         { exhibit: 'Exhibit E (Pattern Plots)', description: 'Theoretical HRP and NDA pattern plots (0°–360°, linear field scale)', required: true },
-        { exhibit: 'Exhibit F (HRP Table)',     description: 'Horizontal radiation pattern table at 10° increments, EF at 1 km, normalized to RMS or dominant radial', required: true },
+        { exhibit: 'Exhibit F (HRP Table)',     description: 'Horizontal radiation pattern table at 5° increments (72 radials, 0°–355°) per §73.150(a), EF at 1 km, normalized to maximum radial = 1.0', required: true },
         { exhibit: 'Exhibit G (Phasing Data)',  description: 'Base current ratios (I_n/I_1), phase angles, and antenna monitor reference parameters', required: true },
         { exhibit: 'Exhibit H (Suppression)',   description: 'Suppression ratios toward each co-channel protected station within the §73.207 D/U analysis area', required: true },
         { exhibit: 'Exhibit I (Mutual Z)',      description: 'Self- and mutual-impedance matrix for all element pairs at operating frequency', required: recConfig_da.n_elements > 2 },
@@ -24218,12 +24219,12 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         array_configurations: arrayConfigs,
         suppression_requirement_db: SUPP_REQ_DB_da,
-        suppression_note: `§73.316/§73.207: suppression ratio of ≥${SUPP_REQ_DB_da} dB toward interfered-with co-channel protected contours. Actual required suppression from §73.182 NIF analysis may be higher.`,
-        n_hrp_radials: 36,
-        hrp_increment_deg: 10,
+        suppression_note: `§73.207/§73.215: suppression ratio of ≥${SUPP_REQ_DB_da} dB toward interfered-with co-channel protected contours. Actual required suppression from §73.182 NIF analysis may be higher.`,
+        n_hrp_radials: 72,
+        hrp_increment_deg: 5,
         form_301am_exhibits: formExhibits,
         base_current_monitoring: baseCurrentMonitoring_da,
-        reference: '47 CFR §73.150 (DA authorization); §73.152 (DA-D/DA-N); §73.316 (pattern measurements/HRP); §73.207 (co-channel D/U protection); §73.61 (base current monitoring); §73.182 (NIF analysis)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N); §73.207 (co-channel D/U protection); §73.61 (base current monitoring); §73.182 (NIF analysis); §73.154 (proof of performance)',
         note: 'DA array element positions, amplitude ratios, and phase angles are engineering estimates for screening purposes. Actual design requires a licensed broadcast engineer, full mutual impedance matrix computation, and §73.182 NIF analysis. Proof-of-performance field measurements per §73.154 required before FCC issues license to cover (Form 302-AM).'
       };
     })(),
@@ -25049,7 +25050,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Mitigation strategies when D/U is marginal
       const mitigationStrategies = [
-        { id: 'da_nulling',        strategy: 'Directional Antenna (DA) null toward interferer', applicable: !isDA_cc, impact_db: '20–35 dB null depth achievable', rule: '§73.316', note: 'Most effective single mitigation; requires §73.316 directional antenna authorization.' },
+        { id: 'da_nulling',        strategy: 'Directional Antenna (DA) null toward interferer', applicable: !isDA_cc, impact_db: '20–35 dB null depth achievable', rule: '§73.150', note: 'Most effective single mitigation; requires §73.150 DA authorization and 72-radial HRP at 5°.' },
         { id: 'power_reduction',   strategy: 'Nighttime power reduction', applicable: true, impact_db: '3–10 dB reduction in undesired signal at victim', rule: '§73.21/§73.25', note: 'Reduces interference but also reduces desired coverage.' },
         { id: 'site_selection',    strategy: 'Site relocation away from interfered-with contour', applicable: true, impact_db: 'Variable — depends on distance improvement', rule: '§73.37', note: 'Optimizer primary function: find sites with improved D/U margins.' },
         { id: 'iboc_reduction',    strategy: 'IBOC nighttime digital power reduction', applicable: true, impact_db: '6–10 dB reduction in IBOC hash', rule: '§73.404(c)', note: 'Reduces IBOC sideband interference without affecting analog coverage.' }
@@ -25104,7 +25105,7 @@ async function scoreCandidate(pt, ctx, warnings){
           milestones: [
             { id: 'spacing_study',    task: '§73.37 spacing analysis (all channels)', days: 10, rule: '§73.37', note: 'Must clear co-channel, first-adjacent, and second-adjacent for all class pairs.' },
             { id: 'nif_study',        task: `§73.182 NIF study (${isClear_cpt ? 'clear channel' : 'regional'})`, days: isClear_cpt ? 30 : 15, rule: '§73.182', note: 'Skywave NIF must cover all domestic and international stations within protection distance.' },
-            { id: 'da_pattern',       task: isDA_cpt ? 'Directional antenna pattern design + §73.316 HRP' : 'Non-directional antenna design', days: isDA_cpt ? 21 : 7, rule: '§73.316', note: isDA_cpt ? '36-radial HRP at 10° increments; suppression ≥ 28.3 dB per §73.207.' : 'Non-DA antenna design simpler but confirm vertical radiation pattern.' },
+            { id: 'da_pattern',       task: isDA_cpt ? 'Directional antenna pattern design + §73.150(a) HRP (72 radials)' : 'Non-directional antenna design', days: isDA_cpt ? 21 : 7, rule: '§73.150', note: isDA_cpt ? '72-radial HRP at 5° increments per §73.150(a); suppression ≥ 28.3 dB per §73.207.' : 'Non-DA antenna design simpler but confirm vertical radiation pattern.' },
             { id: 'coverage_map',     task: '§73.183 coverage map (groundwave contour)', days: 7, rule: '§73.183', note: 'Required Schedule D exhibit for Form 301-AM.' },
             { id: 'env_assessment',   task: 'Environmental assessment (§1.1301–§1.1319)', days: 14, rule: '§1.1301', note: 'Required for towers > 450 ft AGL or in environmentally sensitive areas.' },
             { id: 'asr_filing',       task: 'ASR registration (FCC Form 854)', days: 7, rule: '§17.7', note: 'Required for structures ≥ 61m AGL. Must be registered before CP issuance.' }
@@ -27650,7 +27651,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Additional exhibits triggered by station characteristics:
       //   • TPO ≥ 1 kW:  OET-65 RF radiation hazard analysis required
       //   • TPO > 5 kW:  Environmental Assessment (EA) per §1.1307(a)(5)
-      //   • DA mode:     Horizontal Radiation Pattern (HRP) table (§73.316),
+      //   • DA mode:     Horizontal Radiation Pattern (HRP) table per §73.150(a) (72 radials, 5°),
       //                  antenna array technical data, phasor description
       //   • Tower ≥ 60.96m (200 ft): FAA Form 7460-1 / ASR registration (§17.7)
       //   • Class A/B:   Nighttime NIF analysis (§73.182 skywave tables)
@@ -27681,7 +27682,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'E3', name: 'Tower/Site Description + Ground System Data',    required: true },
         { id: 'E4', name: '§73.24(j) Community Coverage Analysis',          required: true },
         { id: 'E5', name: 'OET-65 RF Radiation Hazard Analysis',            required: rf_hazard_required },
-        { id: 'E6', name: 'Horizontal Radiation Pattern Table (§73.316)',   required: isDA },
+        { id: 'E6', name: 'Horizontal Radiation Pattern Table (§73.150(a) — 72 radials at 5°)', required: isDA },
         { id: 'E7', name: 'Antenna Array Technical Data / Phasor Desc.',    required: isDA },
         { id: 'E8', name: 'FAA Form 7460-1 / ASR Registration (§17.7)',     required: asr_required },
         { id: 'E9', name: 'Environmental Assessment EA (§1.1307(a)(5))',    required: ea_required },
@@ -27718,7 +27719,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_filing_cost_low_usd:    prep_cost_low  + fcc_filing_fee_usd,
         total_filing_cost_high_usd:   prep_cost_high + fcc_filing_fee_usd,
         form:                         'FCC Form 301-AM',
-        reference:                    '47 CFR §73.182; §73.316; §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
+        reference:                    '47 CFR §73.182; §73.150 (AM DA — 72-radial HRP); §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
         note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Quarter-wave tower: ${quarter_wave_height_m}m (${asr_required ? 'ASR required' : 'ASR likely not required'}). Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
       };
     })(),
@@ -28524,7 +28525,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { section: 'Section IV', item: 'Co-channel and adjacent-channel interference study (§73.182)', required: true },
         { section: 'Section IV', item: 'International station check (US/MX, US/CA treaties)', required: isClearCh || isRegional },
         { section: 'Section V',  item: 'Nighttime RSS skywave calculation if Class A, B, or D', required: hasSkywave },
-        { section: 'Section VI', item: 'DA antenna pattern table if directional (§73.316)', required: hasDaytimeDA },
+        { section: 'Section VI', item: 'DA antenna pattern table if directional (§73.150(a) — 72 radials at 5°)', required: hasDaytimeDA },
         { section: 'Section VII', item: 'Environmental notification (NEPA/NHPA) if applicable', required: true }
       ];
 
@@ -32948,7 +32949,7 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
       id:    'ENGINEERING_DESIGN',
       label: 'Engineering design',
       weeks: any_poor_sigma ? '12–24' : '8–16',
-      description: `Soil resistivity surveys, antenna system design (§73.316/§73.45), ${any_poor_sigma ? 'extended ground system engineering (poor σ), ' : ''}RF exposure study (OET-65 §1.1307).`,
+      description: `Soil resistivity surveys, antenna system design (§73.150/§73.45), ${any_poor_sigma ? 'extended ground system engineering (poor σ), ' : ''}RF exposure study (OET-65 §1.1307).`,
       blocking: true
     },
     {
@@ -33349,10 +33350,10 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
     id: 'ANTENNA_STUDY',
     description: `Design and model AM vertical antenna system for ${frequency_khz} kHz`,
     status: 'REQUIRED',
-    rule: '47 CFR §73.316 / §73.45',
+    rule: isDa ? '47 CFR §73.150 / §73.154' : '47 CFR §73.45 / §73.154',
     note: isDa
-      ? 'DA pattern specified — §73.316 directional antenna measurements required (24 radials, theoretical and measured patterns)'
-      : 'Non-directional antenna — standard §73.45 field intensity / efficiency certification required'
+      ? '§73.150(a) DA pattern required: horizontal radiation pattern table at 5° increments (72 radials, 0°–355°), theoretical and measured patterns (§73.154 proof)'
+      : 'Non-directional antenna — §73.45 antenna efficiency certification and §73.154 proof-of-performance (8 radials at 45° intervals) required'
   });
 
   const asrNote = asr_registration_required
@@ -33433,10 +33434,10 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
   if (isDa){
     items.push({
       id: 'DA_PATTERN',
-      description: 'File theoretical and measured horizontal radiation pattern per §73.316',
+      description: 'File theoretical horizontal radiation pattern table per §73.150(a) / Form 301-AM',
       status: 'REQUIRED',
-      rule: '47 CFR §73.316',
-      note: 'DA pattern: 25 spaced radials at 15° increments required for measured patterns; suppression ratios must satisfy §73.207/§73.215 D/U spacing'
+      rule: '47 CFR §73.150(a)',
+      note: 'Theoretical HRP: 72 radials at 5° increments (0°–355°) per §73.150(a). Measured proof per §73.154: all DA-authorized azimuths + verification radials. Suppression ratios must satisfy §73.207/§73.215 D/U protection.'
     });
   }
 
