@@ -9885,8 +9885,8 @@ test('environmental_permitting_and_nepa_compliance_guide present on KAZM candida
   const g = out.candidates[0].environmental_permitting_and_nepa_compliance_guide;
   assert.ok(g, 'NEPA guide must be present');
   assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
-  assert.strictEqual(g.tower_height_m, 96, 'tower height must be 96m (λ/4 at 780 kHz)');
-  assert.strictEqual(g.tower_height_ft, 315, 'tower height must be 315ft');
+  assert.strictEqual(g.tower_height_m,  144, 'tower height must be 144m (3/8λ Class D at 780 kHz)');
+  assert.strictEqual(g.tower_height_ft, 472, 'tower height must be 472ft (3/8λ Class D)');
 });
 
 test('environmental_permitting_and_nepa_compliance_guide NEPA tier is valid enum', async () => {
@@ -9901,7 +9901,7 @@ test('environmental_permitting_and_nepa_compliance_guide NEPA tier is valid enum
 test('environmental_permitting_and_nepa_compliance_guide KAZM 780 kHz exceeds 61m threshold', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].environmental_permitting_and_nepa_compliance_guide;
-  assert.strictEqual(g.exceeds_61m_agl, true, '96m tower must exceed 61m AGL threshold');
+  assert.strictEqual(g.exceeds_61m_agl, true, '144m tower must exceed 61m AGL threshold');
   assert.strictEqual(g.section_106_nhpa_required, true, 'Section 106 must be required for > 61m tower');
   assert.strictEqual(g.rf_mpe_assessment_required, true, 'RF MPE assessment required for 5 kW station');
 });
@@ -10056,7 +10056,7 @@ test('tower_structural_wind_and_ice_load_design_guide present on KAZM candidate'
   const g = out.candidates[0].tower_structural_wind_and_ice_load_design_guide;
   assert.ok(g, 'wind/ice guide must be present');
   assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
-  assert.strictEqual(g.tower_height_m, 96, 'tower height must be 96m at 780 kHz');
+  assert.strictEqual(g.tower_height_m, 144, 'tower height must be 144m (3/8λ Class D at 780 kHz)');
   assert.strictEqual(g.design_standard, 'ANSI/TIA-222-H (2017) / ASCE 7-22', 'design standard must be TIA-222-H');
 });
 
