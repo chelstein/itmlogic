@@ -20137,7 +20137,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   1. FCC regulatory fees (Form 301 CP + Form 302-AM license to cover)
       //   2. Professional services (broadcast attorney + engineer)
       //   3. Site acquisition costs (excl. land price: survey, ESA, permits)
-      //   4. Tower construction (guyed monopole: 0.625λ for Class A/B, 0.25λ for C/D)
+      //   4. Tower construction (guyed monopole: 0.625λ for Class A/B, 0.375λ for C/D)
       //   5. Ground radial system (120 radials × 0.35λ per §73.186 / NBS TN-24)
       //   6. Transmitter & ATU equipment
       //   7. Transmitter building (structure, HVAC, generator, security)
@@ -20924,7 +20924,7 @@ async function scoreCandidate(pt, ctx, warnings){
         monitoring_cfr:             '47 CFR §17.48',
         faa_ac:                     'FAA AC 70/7460-1M',
         reference: '47 CFR §17.7 (ASR registration); §17.23 (painting); §17.47 (lighting); §17.48 (monitoring); FAA Advisory Circular 70/7460-1M; FCC Form 854 (ASR update)',
-        note: `Tower: ${tower_height_ft}ft (${tower_height_m}m, λ/4 at ${frequency_khz} kHz). ${asr_required_by_height ? `ASR required (>200ft). ` : 'Below 200ft — ASR not required by height. '}FAA tier: ${faa_lighting_tier}. ${n_paint_bands > 0 ? `${n_paint_bands} paint bands (§17.23), cost ~$${painting_cost_usd.toLocaleString()}. ` : 'No painting required. '}Lighting cost: ~$${lighting_cost_usd.toLocaleString()}. ${rf_decoupling_required ? 'RF decoupling required on lighting cables.' : ''}`
+        note: `Tower: ${tower_height_ft}ft (${tower_height_m}m, ${['A', 'B'].includes(fcc_class) ? '5/8λ' : '3/8λ'} at ${frequency_khz} kHz). ${asr_required_by_height ? `ASR required (>200ft). ` : 'Below 200ft — ASR not required by height. '}FAA tier: ${faa_lighting_tier}. ${n_paint_bands > 0 ? `${n_paint_bands} paint bands (§17.23), cost ~$${painting_cost_usd.toLocaleString()}. ` : 'No painting required. '}Lighting cost: ~$${lighting_cost_usd.toLocaleString()}. ${rf_decoupling_required ? 'RF decoupling required on lighting cables.' : ''}`
       };
     })(),
 
@@ -26519,7 +26519,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA_rc     = /^DA/i.test(pattern_mode);
       const isClear_rc  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
-      const needsASR_rc = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * 300000 / frequency_khz) > 61; // class-dependent height for ASR check
+      const needsASR_rc = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz) > 61; // class-dependent design height for ASR check (3/8λ C/D, 5/8λ A/B)
 
       // Pre-filing requirements
       const PRE_FILING = [
