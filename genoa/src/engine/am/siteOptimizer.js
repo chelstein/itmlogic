@@ -31268,7 +31268,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // GROUND SYSTEM DESIGN STANDARDS (FCC/ANSI)
       // ───────────────────────────────────────────
-      //   Minimum recommended:  120 radials × λ/4 length buried at ~15 cm.
+      //   FCC standard (§73.186 / NBS TN-24): 120 radials × 0.35λ length buried at ~15 cm.
       //   For Class A: often 120+ radials ≥ λ/2 (higher efficiency).
       //   Radial wire: #10 AWG copper (bare) is standard; tinned copper
       //   preferred in corrosive soils.
@@ -31300,9 +31300,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const rec_radials = isClassA ? 120 : 120;  // 120 is baseline; Class A often more
 
       // λ/4 radial length (use exact speed of light to match §73.182(n) calculations)
-      const lambda_m      = round2(299792458 / (frequency_khz * 1000));
-      const qw_m          = round2(lambda_m / 4);
-      const qw_ft         = round2(qw_m * 3.28084);
+      const lambda_m          = round2(299792458 / (frequency_khz * 1000));
+      const std_radial_len_m  = round2(lambda_m * 0.35);   // FCC standard: 0.35λ per §73.186 / NBS TN-24
+      const std_radial_len_ft = round2(std_radial_len_m * 3.28084);
 
       // Number of towers (DA-2 = 2, DA-N ≥ 3, NDA = 1)
       const n_towers = /^DA-2/i.test(pattern_mode) ? 2
@@ -31338,8 +31338,8 @@ async function scoreCandidate(pt, ctx, warnings){
         recommended_radials_per_tower: rec_radials,
         n_towers,
         total_radials,
-        radial_length_m: qw_m,
-        radial_length_ft: qw_ft,
+        radial_length_m: std_radial_len_m,
+        radial_length_ft: std_radial_len_ft,
         inspection_schedule: INSPECTION_SCHEDULE,
         n_inspection_tasks: INSPECTION_SCHEDULE.length,
         da_sampling_maintenance: is_da,
@@ -31357,7 +31357,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_rehab_high_usd: rehab_high,
         },
         reference: '47 CFR §73.68; §73.69; §73.1560',
-        note: `${frequency_khz} kHz: λ/4 radial = ${qw_ft} ft (${qw_m} m). ${n_towers} tower(s) × ${rec_radials} radials = ${total_radials} total. Annual inspection est. $${(ANNUAL_INSP_LOW + SAMPLING_MAINT_ANNUAL).toLocaleString()}–$${(ANNUAL_INSP_HIGH + SAMPLING_MAINT_ANNUAL).toLocaleString()}. Full rehab: $${rehab_low.toLocaleString()}–$${rehab_high.toLocaleString()}.`
+        note: `${frequency_khz} kHz: 0.35λ radial = ${std_radial_len_ft} ft (${std_radial_len_m} m). ${n_towers} tower(s) × ${rec_radials} radials = ${total_radials} total. Annual inspection est. $${(ANNUAL_INSP_LOW + SAMPLING_MAINT_ANNUAL).toLocaleString()}–$${(ANNUAL_INSP_HIGH + SAMPLING_MAINT_ANNUAL).toLocaleString()}. Full rehab: $${rehab_low.toLocaleString()}–$${rehab_high.toLocaleString()}.`
       };
     })(),
 
