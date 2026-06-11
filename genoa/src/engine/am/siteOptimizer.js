@@ -11167,7 +11167,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Proximity to industrial noise sources:
       //   Power lines (50/60 Hz harmonics), switching power supplies, motor drives,
       //   and industrial equipment radiate broadband MF interference.
-      //   FCC §73.49 fencing + §73.1219 shielding help at transmitter; listener-end
+      //   §73.49 fencing plus standard transmitter-site shielding practice help; listener-end
       //   noise is beyond operator control but affects served-population reception quality.
       //
       // Classification of candidate site noise environment:
@@ -15533,7 +15533,7 @@ async function scoreCandidate(pt, ctx, warnings){
         lighting_isolation_high_usd,
         total_rf_isolation_low_usd,
         total_rf_isolation_high_usd,
-        reference: '47 CFR §73.49 (base insulator); §73.1213 (guy wire RF isolation); TIA-222 guy wire standards; IEEE 100 (RF choke sizing)',
+        reference: '47 CFR §73.49 (base insulator/enclosure); TIA-222 guy wire standards (insulator practice); IEEE 100 (RF choke sizing)',
         note: `${tower_height_ft} ft ${base_insulator_type} base insulator $${base_insulator_low_usd.toLocaleString()}–$${base_insulator_high_usd.toLocaleString()} + ${n_guy_levels}-level guy RF chokes $${rf_choke_total_low_usd.toLocaleString()}–$${rf_choke_total_high_usd.toLocaleString()} + lightning gap + lighting isolation; total $${total_rf_isolation_low_usd.toLocaleString()}–$${total_rf_isolation_high_usd.toLocaleString()}`
       };
     })(),
@@ -22263,19 +22263,19 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_monitoring_point_guide: (() => {
-      // §73.1213: AM broadcast stations (particularly directional) must establish and maintain
+      // §73.61: AM DA stations must measure field strength at the monitoring points in their
       // monitoring points to verify that the antenna system is operating within authorized parameters.
       //
       // Monitoring point requirements:
-      //   - §73.1213(a): Licensee must monitor at monitoring points specified in station authorization
+      //   - §73.61(a): Licensee must measure at monitoring points specified in the station authorization
       //   - Monitoring points are established during proof-of-performance (§73.154) and recorded in FCC records
       //   - For DA stations: at least one monitoring point per authorized antenna pattern (day/night/critical)
       //   - For NDA stations: monitoring points are optional but recommended for license renewal documentation
       //
-      // §73.1215: Frequency monitoring — carrier must stay within ±20 Hz, modulation ≤100% unmod / ≤125% on peaks
-      // §73.1216: AM modulation monitoring — must monitor modulation level continuously when on-air
-      // §73.1213(b): Pattern monitoring — DA stations must verify relative field strength at each monitoring point
-      //   agrees within ±5% of the authorized value on a regular basis
+      // §73.1545(a): carrier must stay within ±20 Hz; §73.1570(b): modulation ≤100% negative / ≤125% positive peaks
+      // §73.1570(a): licensee must maintain modulation levels per the rule (continuous monitoring is standard practice)
+      // §73.61 / §73.62(a): DA stations verify monitoring-point field strengths; sample current
+      //   ratios must stay within ±5% and phases within ±3° of licensed values
       //
       // Physical monitoring point setup:
       //   - Monitoring points are geographic locations (typically 1–10 km from tower) in the direction of
@@ -22312,10 +22312,10 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const RELOCATION_STEPS = [
         { priority: 1, action: 'Identify provisional monitoring point locations for CP application', detail: 'Choose candidate monitoring point sites along main DA lobes and nulls; confirm GPS coordinates', cfr: '§73.154; §73.3533' },
-        { priority: 2, action: 'Obtain access permissions for monitoring points on private land', detail: 'Some monitoring points may require landowner permission; document access agreements', cfr: '§73.1213' },
+        { priority: 2, action: 'Obtain access permissions for monitoring points on private land', detail: 'Some monitoring points may require landowner permission; document access agreements', cfr: '§73.61' },
         { priority: 3, action: 'Establish monitoring points during proof-of-performance', detail: 'Measure field strength at all monitoring points during 72-radial proof (DA) or 8-radial proof (NDA)', cfr: '§73.154(a)' },
         { priority: 4, action: 'File monitoring point data with FCC Form 302-AM', detail: 'Include monitoring point GPS coordinates, measured FS values, and antenna system parameters as an exhibit', cfr: '§73.3526; Form 302-AM' },
-        { priority: 5, action: 'Install remote FSM units at permanent monitoring points', detail: 'After license to cover is issued, install remote monitoring hardware at established monitoring points for ongoing compliance', cfr: '§73.1213(b)' }
+        { priority: 5, action: 'Install remote FSM units at permanent monitoring points', detail: 'After license to cover is issued, install remote monitoring hardware at established monitoring points for ongoing compliance', cfr: '§73.61' }
       ];
 
       const annual_monitoring_cost_usd = isDA_mon ? 3000 : 1200; // DA stations need more monitoring
@@ -22335,10 +22335,10 @@ async function scoreCandidate(pt, ctx, warnings){
         relocation_steps: RELOCATION_STEPS,
         n_relocation_steps: RELOCATION_STEPS.length,
         estimated_annual_monitoring_cost_usd: annual_monitoring_cost_usd,
-        fcc_tolerance_pct: 5, // ±5% of authorized field value per §73.1213(b)
+        fcc_tolerance_pct: 5, // ±5% sample current ratio per §73.62(a); monitoring-point fields per §73.61
         carrier_tolerance_hz: 20, // ±20 Hz per §73.1215
         relocation_note: `${isDA_mon ? `DA station (${pattern_mode}): ${n_monitoring_points} monitoring points required (${n_points_per_pattern} per pattern × ${n_patterns} patterns). New monitoring points must be established during proof-of-performance and filed with FCC Form 302-AM.` : `NDA station: ${n_monitoring_points} recommended monitoring points. New points should be measured during proof and documented.`} Monitoring point distances: ${min_distance_m}–${max_useful_distance_m}m from tower (at ${frequency_khz} kHz). FCC tolerance: ±${5}% of authorized field value.`,
-        reference: '47 CFR §73.1213; §73.1215; §73.1216; §73.154; Form 302-AM exhibit requirements',
+        reference: '47 CFR §73.1545(a) (frequency tolerance); §73.1570 (modulation); §73.61/§73.62 (DA monitoring); §73.154 (partial proof); Form 302-AM exhibit requirements',
         note: `AM monitoring: ${n_monitoring_points} points required (${n_patterns} patterns × ${n_points_per_pattern}). Distance range: ${min_distance_m}–${max_useful_distance_m}m. Annual cost: ~$${annual_monitoring_cost_usd.toLocaleString()}. ${isDA_mon ? 'DA: remote FSM recommended for continuous pattern monitoring.' : 'NDA: manual quarterly monitoring adequate.'}`
       };
     })(),
