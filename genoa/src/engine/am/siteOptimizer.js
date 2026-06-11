@@ -3738,16 +3738,16 @@ async function scoreCandidate(pt, ctx, warnings){
       // Empirical formula from Terman (Electronics and Radio Engineering, 1955):
       //   R_g ≈ (120 × ρ_ohm_m) / (N × L)
       // where ρ = soil resistivity (Ω·m) = 1/(σ × 0.001) = 1000/σ_mSm
-      // Using 120 radials at λ/4 length as reference ground system.
+      // FCC standard ground system: 120 radials at 0.35λ per §73.186 / NBS TN-24.
       // Skin-depth correction: actual R_g scales roughly as sqrt(f) for surface-wave,
       // but the dominant term is the soil resistivity.
       const rho_ohm_m   = 1000 / sigma_msm;         // soil resistivity (Ω·m) from σ
       const N_radials   = 120;
-      const L_radial_m  = qwM;
+      const L_radial_m  = round2(lambdaM * 0.35);   // 0.35λ per §73.186 / NBS TN-24
       const rg_formula  = round2(Math.min(30, (120 * rho_ohm_m) / (N_radials * L_radial_m)));
 
-      // Extended ground system (180 radials at 1.5×λ/4) reduces R_g further.
-      const rg_extended = round2(Math.min(30, (120 * rho_ohm_m) / (180 * qwM * 1.5)));
+      // Extended ground system (180 radials at 1.5×0.35λ) reduces R_g further.
+      const rg_extended = round2(Math.min(30, (120 * rho_ohm_m) / (180 * L_radial_m * 1.5)));
 
       const r_total_qw      = round2(rrQw + rg_formula);
       const r_total_qw_ext  = round2(rrQw + rg_extended);
