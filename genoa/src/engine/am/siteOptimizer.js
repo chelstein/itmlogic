@@ -7057,7 +7057,7 @@ async function scoreCandidate(pt, ctx, warnings){
         : item('da_pattern', 'Directional antenna (DA) pattern requirements', '47 CFR §73.150 / §73.154', 'PASS',
           `Pattern mode ${pattern_mode}: non-directional antenna. §73.150 DA pattern requirements do not apply. Standard 8-radial inverse-distance proof of performance required at new site per §73.154.`);
 
-      // 8. Ground system — §73.190 (AM stations must have efficient ground radial system)
+      // 8. Ground system — §73.186 / §73.190 (AM stations must have efficient ground radial system per §73.186; §73.190 governs certification)
       const sigmaAdequate = sigma_msm >= SIGMA_PREFERRED_MIN_MSM;
       const i8 = (() => {
         if (ground_sigma_filing_grade === 'filing') return item('ground_system', 'Ground system conductivity & §73.190 certification', '47 CFR §73.190', 'PASS',
@@ -14095,12 +14095,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM tower sites require land for the tower base, ground system, and
       // a safety exclusion zone mandated by FCC RF exposure rules (§1.1310/OET-65).
       // Land options: purchase or long-term lease (20–40 yr preferred for broadcast).
-      // Site acreage needed: ground radials extend up to 1/4 wavelength = ~96 m (315 ft).
+      // Site acreage needed: ground radials extend 0.35λ per §73.186 / NBS TN-24 (~135 m / 443 ft at 780 kHz).
       // Minimum site: ~1–2 acres for NDA; ~2–5 acres for DA array (multiple towers).
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const isDA_re        = /^DA/i.test(pattern_mode);
-      const radial_m       = round2(wavelength_m / 4);    // ground system reach
+      const radial_m       = round2(wavelength_m * 0.35); // 0.35λ ground system reach per §73.186 / NBS TN-24
       const radial_ft      = round2(radial_m * 3.28084);
       const min_acres_nda  = 2;
       const min_acres_da   = 5;
@@ -25212,12 +25212,12 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     radial_system_engineering_guide: (() => {
-      // AM ground radial system design per §73.190 and Terman/Belrose (1966) groundwave efficiency theory
-      // Terman (1943): N radials reduces ground loss resistance; optimum: 120 radials at 0.4λ length
-      // Belrose (1966): marginal benefit of each additional radial diminishes beyond ~120
+      // AM ground radial system design per §73.186 / NBS TN-24 and Terman/Belrose (1966) groundwave efficiency theory
+      // §73.186 / NBS TN-24: 120 radials × 0.35λ is the FCC standard (reference design for AM ground system certification).
+      // Terman (1943): N radials reduces ground loss resistance; Belrose (1966): beyond ~120 radials, marginal benefit diminishes.
       const lambda_rs   = round2(300000 / frequency_khz);        // wavelength in meters
-      const qwave_rs    = round2(lambda_rs / 4);                  // quarter-wave (m)
-      const optRadialLen_m = round2(0.4 * lambda_rs);             // Terman optimum: 0.4λ
+      const qwave_rs    = round2(lambda_rs / 4);                  // quarter-wave physics reference
+      const optRadialLen_m = round2(0.35 * lambda_rs);            // 0.35λ per §73.186 / NBS TN-24 FCC standard
       const optRadialLen_ft= round2(optRadialLen_m * 3.28084);
 
       // Standard FCC radial counts: §73.186 / NBS TN-24 specifies 120 radials × 0.35λ for efficient system
@@ -25287,8 +25287,8 @@ async function scoreCandidate(pt, ctx, warnings){
         radial_spacing_deg:       round2(360 / recommendedN),
         compliance_checklist:     complianceItems,
         n_compliance_items:       complianceItems.length,
-        reference: '47 CFR §73.190; Terman (1943) "Radio Engineers Handbook"; Belrose (1966) IRE; IEEE 1100; NEC Article 250',
-        note: `Recommended: ${recommendedN} radials at ${optRadialLen_m} m (0.4λ) length, #${recommendedAWG.awg} AWG copper. Total copper: ${totalRadialLength_m} m. Estimated material cost: $${materialCost_usd.toLocaleString()}.`
+        reference: '47 CFR §73.186 (AM ground system standard — 120 × 0.35λ); §73.190 (conductivity map, certification); Terman (1943) "Radio Engineers Handbook"; Belrose (1966) IRE; NBS TN-24; IEEE 1100; NEC Article 250',
+        note: `Recommended: ${recommendedN} radials at ${optRadialLen_m} m (0.35λ per §73.186) length, #${recommendedAWG.awg} AWG copper. Total copper: ${totalRadialLength_m} m. Estimated material cost: $${materialCost_usd.toLocaleString()}.`
       };
     })(),
 
@@ -32811,7 +32811,8 @@ function frequencyChannelClass(frequency_khz){
   return 'regional';
 }
 
-// Ground radial system sizing — §73.190 FCC ground system engineering reference.
+// Ground radial system sizing — §73.186 FCC ground system design standard (120 × 0.35λ per NBS TN-24).
+// §73.190 governs conductivity measurement and certification; §73.186 governs the system design.
 // Returns a structured object with recommended radial count, length, copper estimate,
 // and certification method.  Based on the FCC AM Antenna Systems engineering guide and
 // standard 120-radial buried-copper system practice.
