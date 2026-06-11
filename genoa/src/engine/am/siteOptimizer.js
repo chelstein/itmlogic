@@ -17454,7 +17454,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_stl_cost_low_usd,
         total_stl_cost_high_usd,
         note: `STL run: ${stl_distance_km}km (${stl_distance_mi}mi). Technology: ${stl_technology.replace(/_/g, ' ')}${fcc_part_74_license_required ? ` — FCC Part 74.550 license required ($${fcc_license_fee_usd.toLocaleString()})` : ' — no FCC STL license needed'}; latency: ${stl_latency_ms}ms. Backup: ${backup_technology ? backup_technology.replace(/_/g, ' ') : 'dual-path IP recommended'}. Total: $${total_stl_cost_low_usd.toLocaleString()}–$${total_stl_cost_high_usd.toLocaleString()}; annual: $${stl_annual_low_usd.toLocaleString()}–$${stl_annual_high_usd.toLocaleString()}.`,
-        reference: '47 CFR Part 74 Subpart D (STL auxiliary broadcast stations); §74.502 (STL eligibility); §74.535 (frequency coordination); §73.1350 (transmission system operation)',
+        reference: '47 CFR Part 74 Subpart E (aural broadcast auxiliary stations — STL/ICR); §74.502 (frequency assignment); §74.535 (emission and bandwidth); §73.1350 (transmission system operation)',
       };
     })(),
 
@@ -23597,8 +23597,8 @@ async function scoreCandidate(pt, ctx, warnings){
         { step: 2, action: 'Contour overlay study', detail: 'Verify FM translator 60 dBu contour fits within AM 2 mV/m daytime contour (§74.1232(d)(1))', cfr: '§74.1232(d)' },
         { step: 3, action: 'Interference analysis', detail: 'Protect all full-power FM, LPFM, and existing FM translators per §74.1204 spacing tables', cfr: '§74.1204' },
         { step: 4, action: 'File FCC Form 349', detail: 'Submit application for FM translator construction permit during FCC filing window or as singleton filing', cfr: '§74.1231; Form 349' },
-        { step: 5, action: 'Construction', detail: 'Build translator facility; typical 6–18 months after grant', cfr: '§74.1263' },
-        { step: 6, action: 'License', detail: 'File FCC Form 350 (license to cover) after construction, test, and proof of performance', cfr: '§74.1265' }
+        { step: 5, action: 'Construction', detail: 'Build translator facility; typical 6–18 months after grant', cfr: '§73.3598 (construction period)' },
+        { step: 6, action: 'License', detail: 'File FCC Form 350 (license to cover) after construction, test, and proof of performance', cfr: '§73.3536 (license to cover)' }
       ];
 
       // Cost estimate for AM-to-FM translator
