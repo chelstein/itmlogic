@@ -6711,7 +6711,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const isClear_lt  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const isDA_lt     = /^DA/i.test(pattern_mode);
       const hasTreaty_lt = !!treaty_zone;
-      const asrReq_lt   = (300000 / frequency_khz / 4) > 60.96;
+      const asrReq_lt   = ((300000 / frequency_khz) * (/^[AB]$/i.test(fcc_class) ? 0.625 : 0.375)) > 60.96; // 3/8λ C/D, 5/8λ A/B per §17.7
       const isHighPow_lt = tpo_kw >= 25;
 
       // Phase 1: Pre-application (site study, engineering design, NEPA/NHPA)
