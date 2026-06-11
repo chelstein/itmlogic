@@ -3725,7 +3725,7 @@ async function scoreCandidate(pt, ctx, warnings){
     //     FCC AM Antenna Design Manual:
     //       R_g ≈ 120 / (σ_mSm × N_radials × L_radial_m) × k_f(frequency)
     //     where k_f accounts for skin-depth frequency scaling.
-    //   We use 120 radials at λ/4 as the reference ground system.
+    //   We use 120 radials at 0.35λ (§73.186 / NBS TN-24) as the reference ground system.
     //   R_total = R_r + R_g
     //   Efficiency = R_r / R_total
     antenna_base_impedance: (() => {
