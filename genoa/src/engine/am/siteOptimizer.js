@@ -31364,7 +31364,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const isClassA = fcc_class.toUpperCase() === 'A';
       const rec_radials = isClassA ? 120 : 120;  // 120 is baseline; Class A often more
 
-      // λ/4 radial length (use exact speed of light to match §73.182(n) calculations)
+      // 0.35λ standard radial length per §73.186 / NBS TN-24 (use exact speed of light to match §73.182(n) calculations)
       const lambda_m          = round2(299792458 / (frequency_khz * 1000));
       const std_radial_len_m  = round2(lambda_m * 0.35);   // FCC standard: 0.35λ per §73.186 / NBS TN-24
       const std_radial_len_ft = round2(std_radial_len_m * 3.28084);
