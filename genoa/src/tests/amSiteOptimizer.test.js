@@ -6202,7 +6202,7 @@ test('frequency_coordination_with_adjacent_stations_guide KAZM 780kHz clear chan
 test('frequency_coordination_with_adjacent_stations_guide D/U protection ratios', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].frequency_coordination_with_adjacent_stations_guide;
-  assert.strictEqual(g.co_channel_du_ratio_db, 20, 'co-channel D/U must be 20 dB');
+  assert.strictEqual(g.co_channel_du_ratio_db, 26, 'co-channel D/U must be 26 dB (20:1 per §73.182(r)/§73.37(a))');
   assert.strictEqual(g.first_adj_du_ratio_db, 6, '1st adjacent D/U must be 6 dB');
   assert.strictEqual(g.second_adj_du_ratio_db, 0, '2nd adjacent D/U must be 0 dB');
   assert.strictEqual(g.n_du_ratio_pairs, 4, 'must have 4 D/U ratio pairs');
@@ -8151,7 +8151,7 @@ test('co_channel_interference_budget presence and structure', async () => {
 test('co_channel_interference_budget D/U thresholds and NIF', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const d = out.candidates[0].co_channel_interference_budget;
-  assert.strictEqual(d.du_daytime_min_db, 20, 'daytime co-channel D/U must be 20 dB');
+  assert.strictEqual(d.du_daytime_min_db, 26, 'daytime co-channel D/U must be 26 dB (§73.182(r))');
   assert.strictEqual(d.du_nighttime_min_db, 0, 'nighttime D/U must be 0 dB');
   // KAZM is Class D on clear channel 780 kHz — NIF required
   assert.strictEqual(d.nif_study_required, true, 'Class D on clear channel must require NIF study');
@@ -9150,7 +9150,7 @@ test('frequency_spectrum_coordination co-channel relationship is first with corr
   const f = out.candidates[0].frequency_spectrum_coordination;
   const coChannel = f.channel_relationships.find(r => r.id === 'CO_CHANNEL');
   assert.ok(coChannel != null, 'CO_CHANNEL relationship must be present');
-  assert.strictEqual(coChannel.du_daytime_db, 20, 'co-channel D/U must be 20 dB daytime');
+  assert.strictEqual(coChannel.du_daytime_db, 26, 'co-channel D/U must be 26 dB daytime (§73.182(r))');
   assert.strictEqual(coChannel.du_nighttime_db, 0, 'co-channel D/U must be 0 dB nighttime');
 });
 
@@ -13689,7 +13689,7 @@ test('KAZM 780 kHz Class D clear channel D/U requirements', async () => {
   const g = out.candidates[0].am_interference_protection_contour_guide;
   assert.strictEqual(g.is_clear_channel,        true, '780 kHz should be clear channel');
   assert.strictEqual(g.is_class_cd,             true, 'Class D is_class_cd should be true');
-  assert.strictEqual(g.du_cochannel_db,           20, 'D/U co-channel should be 20 dB');
+  assert.strictEqual(g.du_cochannel_db,           26, 'D/U co-channel should be 26 dB (§73.182(r))');
   assert.strictEqual(g.du_adjacent_channel_db,     6, 'D/U adjacent channel should be 6 dB');
 });
 
@@ -13715,7 +13715,7 @@ test('am_interference_protection_contour_guide comparison table columns present'
     assert.ok('ipc_is_clear_channel' in row, 'ipc_is_clear_channel missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.ipc_du_cochannel_db,  20,   'rank-1 ipc_du_cochannel_db should be 20');
+  assert.strictEqual(r0.ipc_du_cochannel_db,  26,   'rank-1 ipc_du_cochannel_db should be 26 (§73.182(r))');
   assert.strictEqual(r0.ipc_study_low_usd,    3000, 'rank-1 ipc_study_low_usd should be 3000');
   assert.strictEqual(r0.ipc_is_clear_channel, true, 'rank-1 ipc_is_clear_channel should be true');
 });
@@ -15033,10 +15033,10 @@ it('am_contour_overlap_and_co_channel_interference_guide adjacent channels are �
   assert.strictEqual(g.adjacent_ch_high_khz, 790, 'adjacent upper channel must be 790 kHz');
 });
 
-it('am_contour_overlap_and_co_channel_interference_guide protection_db_required is 20 dB per §73.182(c)', async () => {
+it('am_contour_overlap_and_co_channel_interference_guide protection_db_required is 26 dB per §73.182(r)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_contour_overlap_and_co_channel_interference_guide;
-  assert.strictEqual(g.protection_db_required, 20, '§73.182(c) requires 20 dB co-channel D/U');
+  assert.strictEqual(g.protection_db_required, 26, '§73.182(r)/§73.37(a) require 26 dB (20:1) co-channel D/U');
 });
 
 it('am_contour_overlap_and_co_channel_interference_guide overlap_risk_level is LOW/MEDIUM/HIGH', async () => {

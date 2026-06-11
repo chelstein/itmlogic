@@ -3780,7 +3780,7 @@ test('colocation candidates include am_contour_overlap_and_co_channel_interferen
   for (const c of out.candidates) {
     const g = c.am_contour_overlap_and_co_channel_interference_guide;
     assert.ok(g, `candidate missing am_contour_overlap_and_co_channel_interference_guide`);
-    assert.strictEqual(g.protection_db_required, 20, '§73.182(c) D/U requirement = 20 dB');
+    assert.strictEqual(g.protection_db_required, 26, '§73.182(r)/§73.37(a) D/U requirement = 26 dB (20:1)');
     assert.strictEqual(g.adjacent_ch_low_khz, 770, 'adjacent lower channel is 770 kHz');
     assert.strictEqual(g.adjacent_ch_high_khz, 790, 'adjacent upper channel is 790 kHz');
   }

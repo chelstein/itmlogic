@@ -6465,7 +6465,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const hrpChecklist = [
         { id: 'HRP_TABLE', item: 'Horizontal radiation pattern table at 5° increments (0°–355°, 72 values)', required: isDA_ap, note: '§73.150(a) / Form 301-AM Exhibit: full 72-radial theoretical pattern at 5° increments required for AM DA authorization' },
         { id: 'HRP_CONTOUR', item: 'Effective field (mV/m at 1 km) for each radial tabulated', required: isDA_ap, note: '§73.150(a): EF at 1 km computed from base current ratios and pattern; referenced to maximum value = 1.0' },
-        { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: isDA_ap, note: '§73.207 / §73.182: D/U at interfered-with protected contour must meet minimum spacing table limits; not a §73.316 requirement (which applies to FM)' },
+        { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: isDA_ap, note: '§73.37(a) / §73.182(r): D/U at the interfered-with protected contour must meet the overlap table limits; not a §73.316 requirement (which applies to FM)' },
         { id: 'DA_LICENSE_STATUS', item: 'DA pattern must be approved via FCC Form 302-AM (license to cover)', required: isDA_ap, note: '§73.3533: proof-of-performance measurements required before DA operation authorized' },
         { id: 'MONITOR_POINT', item: 'FCC-specified monitor points during DA operation', required: isDA_ap && isClear_ap, note: '§73.61/§73.62: clear-channel DA stations require FCC-specified monitoring' },
         { id: 'COL_MIN_FIELD', item: `COL minimum field: ${colReqdMvm} mV/m at ${dist_to_col_km} km toward ${col_bearing_deg}°`, required: true, note: `§73.24(i): 5 mV/m groundwave field must reach community of license from candidate site. NDA estimate: ${field_at_col_nda_mvm != null ? `${field_at_col_nda_mvm} mV/m` : 'N/A'}.` },
@@ -6509,7 +6509,7 @@ async function scoreCandidate(pt, ctx, warnings){
         element_spacing_options: isDA_ap ? spacingOptions : null,
         hrp_compliance_checklist: hrpChecklist,
         n_checklist_required: hrpChecklist.filter(i => i.required).length,
-        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.154 (proof of performance); §73.24(i) (COL field); §73.207/§73.215 (protection)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.154 (proof of performance); §73.24(i) (COL field); §73.37/§73.182 (protection)',
         note: 'Pattern optimization guidance is screening-grade. Actual DA element positions, current ratios, and phasing must be determined by a licensed broadcast engineer using full §73.182 analysis and field measurements per §73.154.'
       };
     })(),
@@ -6775,7 +6775,7 @@ async function scoreCandidate(pt, ctx, warnings){
           key_tasks:    [
             'Finalize engineering exhibits (coverage, blanket pop, MPE)',
             'Prepare environmental exhibits (NEPA/NHPA sign-off documentation)',
-            isDA_lt ? 'DA pattern exhibits per §73.150(a) (72-radial HRP at 5° increments, suppression ratios per §73.207)' : 'NDA radiation pattern certification',
+            isDA_lt ? 'DA pattern exhibits per §73.150(a) (72-radial HRP at 5° increments, suppression ratios per §73.37/§73.182)' : 'NDA radiation pattern certification',
             'FCC filing attorney review and LMS Form 301-AM submission',
             'Pay application fee (§73.3520)'
           ]
@@ -8275,16 +8275,16 @@ async function scoreCandidate(pt, ctx, warnings){
       // Key rules:
       //   §73.150 — AM DA authorization and HRP table requirements (5° increments, 72 values)
       //   §73.152 — DA operation (day/night/critical hours operation)
-      //   §73.207 — minimum mileage separations (D/U ratios govern protection)
-      //   §73.215 — interference standards; D/U protection determines required suppression
+      //   §73.37(a) — prohibited contour overlap table (D/U ratios govern protection)
+      //   §73.182 — AM engineering standards; D/U protection determines required suppression
       //   §73.154 — proof of performance after construction (Form 302-AM)
       //   §1.1310 — RF exposure (MPE) evaluation (DA increases near-field complexity)
       //
       // Note: §73.316 governs FM directional antennas, NOT AM. For AM, §73.150 applies.
       //
-      // Suppression ratio: §73.150/§73.207 together determine the required suppression,
+      // Suppression ratio: §73.150/§73.37 together determine the required suppression,
       // not a fixed minimum. Suppression is whatever is needed to maintain D/U protection
-      // margins under §73.207/§73.215 toward each protected station.  In practice, Class A
+      // margins under §73.37/§73.182 toward each protected station.  In practice, Class A
       // clear-channel dominants typically require 30–50 dB of nighttime suppression
       // in the protection azimuth; Class B regional require 20–40 dB; Class C local
       // may need 10–25 dB depending on co-channel or first-adjacent scenario.
@@ -8305,7 +8305,7 @@ async function scoreCandidate(pt, ctx, warnings){
           applicable: false,
           reason: `Station operates NDA (${pattern_mode}) — DA pattern design not required for relocation unless site change necessitates conversion to DA.`,
           conversion_trigger: `Conversion from NDA to DA may be required if the new site cannot achieve co-channel or adjacent-channel D/U protection using NDA groundwave pattern.`,
-          reference: '47 CFR §73.150 (AM DA authorization); §73.207 (spacing); §73.215 (interference standards)'
+          reference: '47 CFR §73.150 (AM DA authorization); §73.37 (contour overlap protection); §73.182 (AM engineering standards)'
         };
       }
 
@@ -8315,7 +8315,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const isRegionalCh_da = !isClearCh_da && !isLocalCh_da;
 
       // Suppression depth estimates (dB) by class and channel type
-      // Based on §73.207 D/U protection ratios and typical interference environments
+      // Based on §73.37(a)/§73.182(r) D/U protection ratios and typical interference environments
       let supp_low_db, supp_high_db, da_complexity, tower_count_low, tower_count_high;
 
       if (isClearCh_da && fcc_class === 'A') {
@@ -8389,8 +8389,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Key §73.150 / Form 301-AM DA compliance checklist
       const compliance_checklist = [
         { item: 'HRP table at 72 azimuths (0°–355°, 5° increments)', required: true, ref: '§73.150(a) / Form 301-AM' },
-        { item: 'Spot values at each protected-station bearing', required: true, ref: '§73.150(a); §73.207' },
-        { item: 'D/U protection margin ≥ required threshold at each protected station', required: true, ref: '§73.207; §73.215' },
+        { item: 'Spot values at each protected-station bearing', required: true, ref: '§73.150(a); §73.37' },
+        { item: 'D/U protection margin ≥ required threshold at each protected station', required: true, ref: '§73.37(a); §73.182(r)' },
         { item: 'Proof-of-performance field measurement plan (72-radial FI traversal)', required: true, ref: '§73.154(a)' },
         { item: 'FCC Form 302-AM proof within 6 months of CP grant', required: true, ref: '§73.154' },
         { item: 'Antenna monitor with sample loops at each tower', required: true, ref: '§73.69; §73.68' },
@@ -8421,7 +8421,7 @@ async function scoreCandidate(pt, ctx, warnings){
         design_weeks_high,
         construction_premium_pct_low,
         construction_premium_pct_high,
-        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.207 (mileage separations); §73.215 (interference standards); §73.154 (proof of performance); §73.61 (DA field strength measurements); §73.68 (sampling systems); §73.69 (antenna monitors); §73.189(b)(4) (ground system); §73.190 (conductivity/certification); §1.1310 (MPE)',
+        reference: '47 CFR §73.150 (AM DA authorization — 72-radial HRP at 5°); §73.152 (DA-D/DA-N operation); §73.37(a) (contour overlap protection); §73.182 (AM engineering standards); §73.154 (partial proof); §73.61 (DA field strength measurements); §73.68 (sampling systems); §73.69 (antenna monitors); §73.189(b)(4) (ground system); §73.190 (conductivity/certification); §1.1310 (MPE)',
         note: `Class ${fcc_class} ${pattern_mode} on ${frequency_khz} kHz (${isClearCh_da ? 'clear' : isRegionalCh_da ? 'regional' : 'local'} channel) — estimated ${tower_count_low}–${tower_count_high} tower array, ${supp_low_db}–${supp_high_db} dB suppression depth. Pattern design: ${design_weeks_low}–${design_weeks_high} weeks, $${design_cost_low_usd.toLocaleString()}–$${design_cost_high_usd.toLocaleString()}.`
       };
     })(),
@@ -8602,7 +8602,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   FCC uses Midnight Summer groundwave + skywave propagation curves (M3/SkyWave).
       //   This guide uses a simplified proxy:
       //     D/U criterion: desired/undesired signal ratio at the reference contour.
-      //       Co-channel: D/U ≥ 20 dB (10:1 field strength ratio)
+      //       Co-channel: D/U ≥ 26 dB (20:1 field strength ratio per §73.182(r) / §73.37(a))
       //       First adjacent (±10 kHz): D/U ≥ 6 dB (2:1)
       //       Second adjacent (±20 kHz): D/U ≥ 0 dB (1:1) — generally no constraint
       //     Required separation from co-channel station (Class A):
@@ -8637,13 +8637,13 @@ async function scoreCandidate(pt, ctx, warnings){
       //   E_sky(d) ≈ C × sqrt(P_kw) / d   [mV/m]  where C ≈ 100 for Class D NDA
       // D/U ratio at dominant station's 0.5 mV/m contour (r_dom ≈ 700 km for 50 kW Class A):
       const r_dom_km   = isClear ? 700 : isRegional ? 400 : 200; // approximate protected contour radius
-      const du_req_db  = 20; // co-channel D/U requirement in dB
-      const du_req_lin = Math.pow(10, du_req_db / 20); // 10× field strength
+      const du_req_db  = 26; // co-channel D/U requirement in dB (§73.182(r): 20:1 field strength)
+      const du_req_lin = Math.pow(10, du_req_db / 20); // 20× field strength
       // For the PROPOSED station to NOT violate NIF at r_dom_km,
-      // its skywave field at r_dom_km must be < (0.5 mV/m) / du_req_lin = 0.05 mV/m
+      // its skywave field at r_dom_km must be < (0.5 mV/m) / du_req_lin = 0.025 mV/m
       const sky_c      = 100; // simplified sky constant for Class D NDA
       const e_sky_at_rdom = round2(sky_c * Math.sqrt(tpo_kw) / r_dom_km);
-      const e_limit_sky   = round2(0.5 / du_req_lin);    // 0.05 mV/m for 20 dB
+      const e_limit_sky   = round2(0.5 / du_req_lin);    // 0.025 mV/m for 26 dB
       const du_margin_db  = round2(20 * Math.log10(e_limit_sky / e_sky_at_rdom));
       const nif_ok_screen = du_margin_db >= 0;
 
@@ -11695,12 +11695,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //   A station's 2 mV/m contour must not overlap the 0.5 mV/m contour of an adjacent-channel
       //   station (in the same direction of propagation).  This is the first-adjacent rule.
       //
-      // §73.182(c): Minimum D/U (Desired/Undesired) ratios (co-channel, daytime):
-      //   Class B/D: must protect Class A's 0.5 mV/m contour with D/U ≥ 20 dB (10:1 field strength).
+      // §73.182(r) / §73.37(a): Minimum D/U (Desired/Undesired) ratios (co-channel, daytime):
+      //   Class B/D: must protect Class A's 0.5 mV/m contour with D/U ≥ 26 dB (20:1 field strength).
       //   The FCC uses the groundwave method (§73.184 / FCC gwave.js) to compute D and U.
       //
-      // §73.182(d): The interfering signal of the undesired station (U) at the reference point
-      //   (the desired's 0.5 mV/m contour boundary) must be ≤ D/10 (20 dB below desired).
+      // At the reference point (the desired's 0.5 mV/m contour boundary) the undesired
+      //   signal must be ≤ D/20 (26 dB below desired) per §73.182(r).
       //
       // Candidate site risk assessment:
       //   The closer a candidate is to co-channel or adjacent-channel stations, the higher the
@@ -11723,7 +11723,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA = /^DA/i.test(pattern_mode);
       const reach_km = reach_scale_km ?? 0;
 
-      const protection_db_required = 20;   // §73.182(c) — 20 dB co-channel D/U minimum
+      const protection_db_required = 26;   // §73.182(r) / §73.37(a) — 26 dB (20:1) co-channel D/U
       const adjacent_channel_hz    = 10;   // ±10 kHz for AM (§73.37(b))
       const adjacent_ch_low        = frequency_khz - adjacent_channel_hz;
       const adjacent_ch_high       = frequency_khz + adjacent_channel_hz;
@@ -13915,15 +13915,15 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_interference_protection_contour_guide: (() => {
-      // FCC §73.207 defines minimum D/U (desired-to-undesired) field strength ratios
-      // required to protect AM stations from interference. §73.215 specifies the
+      // 47 CFR §73.182(r) and §73.37(a) define the minimum D/U (desired-to-undesired)
+      // field strength ratios protecting AM stations from interference, and specify the
       // interference-free service area for AM stations.
       // Key concepts:
       // - Class A (clear channel) protects its 0.1 mV/m groundwave contour daytime
       // - Class B protects its 0.5 mV/m groundwave contour
       // - Class C/D: receive no co-channel protection; must protect Class A/B from skywave
-      // D/U ratios per §73.207:
-      //   - Co-channel: D must be 20 dB > U at protected contour (10:1 field strength ratio)
+      // D/U ratios per §73.182(r) / §73.37(a):
+      //   - Co-channel: D must be 26 dB > U at protected contour (20:1 field strength ratio per §73.182(r))
       //   - Adjacent channel (±10 kHz): D must be 6 dB > U (2:1 ratio)
       const is_clear_ic   = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const is_local_ic   = LOCAL_CHANNEL_KHZ.has(frequency_khz);
@@ -13933,8 +13933,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Protected contour field strength per class:
       const protected_contour_mvm = is_class_ab ? (fcc_class.toUpperCase() === 'A' ? 0.1 : 0.5) : null;
       // D/U ratio requirements:
-      const du_cochannel_db        = 20;   // §73.207(a)
-      const du_adjacent_channel_db = 6;    // §73.207(b)
+      const du_cochannel_db        = 26;   // §73.182(r) / §73.37(a) — 20:1 field strength
+      const du_adjacent_channel_db = 6;    // §73.182(r) — first adjacent (±10 kHz): 6 dB (2:1)
       // Interference engineering study cost:
       // Basic D/U analysis (FCC Groundwave Assistant + skywave calculator): $3,000–$10,000
       // Complex (multiple interferers, DA pattern optimization): $8,000–$25,000
@@ -13956,7 +13956,7 @@ async function scoreCandidate(pt, ctx, warnings){
         du_adjacent_channel_db,
         study_low_usd, study_high_usd,
         skywave_protection_km_low, skywave_protection_km_high,
-        reference: '47 CFR §73.207 (D/U ratios); §73.182 (service and interference); §73.183 (groundwave field strength tables); §73.25 (clear channel dominant station protection); FCC Groundwave Assistant; MWAA (Medium Wave Antenna Analysis)',
+        reference: '47 CFR §73.182(r)/§73.37(a) (D/U ratios); §73.182 (service and interference); §73.183 (groundwave field strength tables); §73.25 (clear channel dominant station protection); FCC Groundwave Assistant; MWAA (Medium Wave Antenna Analysis)',
         note: `Class ${fcc_class} ${is_clear_ic ? 'clear' : is_local_ic ? 'local' : 'regional'} channel — D/U co-channel: ${du_cochannel_db} dB; adjacent: ${du_adjacent_channel_db} dB. ${is_class_cd_i && is_clear_ic ? `Skywave protection zone: ${skywave_protection_km_low}–${skywave_protection_km_high} km. Must not interfere with dominant Class A. ` : ''}Engineering study: $${study_low_usd.toLocaleString()}–$${study_high_usd.toLocaleString()}`
       };
     })(),
@@ -20726,7 +20726,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { type: 'ENGINEER', id: 'TECH_EXHIBITS', label: 'Form 301-AM technical exhibits preparation', typical_cost_usd: eng_technical_exhibits, required: true, notes: `Coverage contour maps, ${isDA_bac ? 'DA pattern calculations and 72-radial FI pattern' : 'NDA contour calculations'}, interference analysis, RF exposure study` },
         { type: 'ENGINEER', id: 'PROOF', label: `Proof-of-performance (${isDA_bac ? 'DA 72-radial FI' : 'NDA inverse-distance'})`, typical_cost_usd: eng_proof_typ, required: true, notes: `Field measurements, data reduction, and report for FCC Form 302-AM; ${isDA_bac ? 'DA proof is ~2× cost of NDA due to 72-radial traversal requirement (§73.154(a))' : 'NDA proof: 8-radial inverse-distance measurement (§73.154(b))'}` },
         { type: 'ENGINEER', id: 'ATU_COMMISSIONING', label: 'ATU design and commissioning', typical_cost_usd: eng_atu_commissioning, required: true, notes: 'Base impedance measurement; ATU design; commissioning supervision at site during tower erection and tuning' },
-        { type: 'ENGINEER', id: 'INTERFERENCE', label: 'Interference analysis (short-spacing)', typical_cost_usd: eng_interference_analysis, required: false, notes: 'Required only if short-spaced to another station; co-channel and adjacent-channel D/U analysis per §73.182/§73.207' }
+        { type: 'ENGINEER', id: 'INTERFERENCE', label: 'Interference analysis (short-spacing)', typical_cost_usd: eng_interference_analysis, required: false, notes: 'Required only if short-spaced to another station; co-channel and adjacent-channel D/U analysis per §73.182(r)/§73.37(a)' }
       ];
 
       const n_required_services = PROFESSIONAL_SERVICES.filter(s => s.required).length;
@@ -21343,9 +21343,9 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Daytime D/U protection ratios (engineering practice)
       const DU_RATIOS = [
-        { offset_khz: 0,   label: 'Co-channel',        du_ratio_db: 20, field_ratio: 10.0, cfr: '§73.182' },
-        { offset_khz: 10,  label: 'First adjacent',    du_ratio_db: 6,  field_ratio: 2.0,  cfr: '§73.207' },
-        { offset_khz: 20,  label: 'Second adjacent',   du_ratio_db: 0,  field_ratio: 1.0,  cfr: '§73.207' },
+        { offset_khz: 0,   label: 'Co-channel',        du_ratio_db: 26, field_ratio: 20.0, cfr: '§73.182(r) / §73.37(a)' },
+        { offset_khz: 10,  label: 'First adjacent',    du_ratio_db: 6,  field_ratio: 2.0,  cfr: '§73.182(r) / §73.37(a)' },
+        { offset_khz: 20,  label: 'Second adjacent',   du_ratio_db: 0,  field_ratio: 1.0,  cfr: '§73.182(r)' },
         { offset_khz: 30,  label: 'Third adjacent',    du_ratio_db: -6, field_ratio: 0.5,  cfr: 'Engineering practice' }
       ];
 
@@ -21356,13 +21356,14 @@ async function scoreCandidate(pt, ctx, warnings){
       // Frequency coordination analysis steps required for relocation CP filing
       const COORD_STEPS = [
         { step: 1, action: 'Co-channel station inventory within 1500 km', detail: 'Pull all co-channel AM stations from FCC LMS; compute daytime 0.5 mV/m and 2 mV/m contour intersections with proposed site coordinates', tool: 'FCC LMS / AM Query tool', cfr: '§73.182' },
-        { step: 2, action: 'Adjacent-channel station inventory within 500 km', detail: 'Pull all ±10 kHz and ±20 kHz channel stations from LMS; apply §73.207 minimum separation table; flag any potential short-spacing', tool: 'FCC LMS', cfr: '§73.207' },
-        { step: 3, action: 'D/U interference analysis for short-spaced stations', detail: 'For any station within §73.207 minimum separation distance, compute ITM/Longley-Rice predicted field strengths and D/U ratios at protected contours; document compliance or interference', tool: 'FCC AM interference calculator / ITM', cfr: '§73.209; §73.182' },
+        { step: 2, action: 'Adjacent-channel station inventory within 500 km', detail: 'Pull all ±10 kHz and ±20 kHz channel stations from LMS; apply the §73.37(a) overlap table; flag any potential prohibited overlap', tool: 'FCC LMS', cfr: '§73.37(a)' },
+        { step: 3, action: 'D/U interference analysis for short-spaced stations', detail: 'For any station with potential contour overlap per §73.37(a), compute predicted field strengths and D/U ratios at protected contours; document compliance or interference', tool: 'FCC AM interference calculator / ITM', cfr: '§73.37; §73.182' },
         { step: 4, action: 'Night-time skywave analysis (if applicable)', detail: isClearChannel ? `780 kHz is a CLEAR CHANNEL; night-time skywave from Class A dominant (e.g., WBBM/Chicago) must be protected; Class D secondary stations must not increase interference to dominant station's 0.5 mV/m contour` : 'N/A for regional/local channel', tool: 'FCC skywave prediction model', cfr: '§73.182(a); §73.24(b)' },
-        { step: 5, action: 'Coordination agreement with affected stations (if needed)', detail: 'If interference analysis shows potential impact, negotiate engineering agreement with affected station; document agreement as exhibit to FCC Form 301-AM', tool: 'Direct station-to-station contact', cfr: '§73.209; §73.525' }
+        { step: 5, action: 'Coordination agreement with affected stations (if needed)', detail: 'If interference analysis shows potential impact, negotiate engineering agreement with affected station; document agreement as exhibit to FCC Form 301-AM', tool: 'Direct station-to-station contact', cfr: '§73.37; §73.182' }
       ];
 
-      // Minimum separation requirements for Class D (approx. from §73.207 table)
+      // Illustrative separation distances for Class D (engineering practice; AM protection
+      // is contour-overlap based per §73.37(a), not fixed mileage separations)
       // These are illustrative engineering values; actual values depend on class pairing
       const SEPARATION_MINIMUMS_KM = {
         co_channel_class_a:      800,
@@ -21387,7 +21388,7 @@ async function scoreCandidate(pt, ctx, warnings){
         skywave_protection_required,
         n_du_ratio_pairs:            DU_RATIOS.length,
         du_protection_ratios:        DU_RATIOS,
-        co_channel_du_ratio_db:      20,
+        co_channel_du_ratio_db:      26,
         first_adj_du_ratio_db:       6,
         second_adj_du_ratio_db:      0,
         separation_minimums_km:      SEPARATION_MINIMUMS_KM,
@@ -25090,7 +25091,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.207: minimum D/U for co-channel is determined by class pair spacing tables
       // Daytime groundwave D/U reference: 20 dB minimum for protected service (§73.182)
 
-      const DU_DAYTIME_MIN_DB_cc   = 20;  // dB — daytime co-channel D/U threshold
+      const DU_DAYTIME_MIN_DB_cc   = 26;  // dB — daytime co-channel D/U (§73.182(r): 20:1)
       const DU_NIGHTTIME_MIN_DB_cc = 0;   // dB — skywave D/U (equal-field threshold for NIF study)
       const isClear_cc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const isDA_cc    = /^DA/i.test(pattern_mode);
@@ -26758,7 +26759,7 @@ async function scoreCandidate(pt, ctx, warnings){
         {
           id: 'CO_CHANNEL',       label: 'Co-channel (0 kHz separation)',
           cfr: '47 CFR §73.182',
-          du_daytime_db:  20,     du_nighttime_db: 0,
+          du_daytime_db:  26,     du_nighttime_db: 0,
           min_spacing_km: isClear_fsc ? 1610 : 402,
           class_applies:  'ALL',
           notes: 'Dominant-to-secondary ratio (D/U ≥ 20 dB day; ≥ 0 dB night). Clear channel adds 1610 km day separation.'
