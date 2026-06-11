@@ -1744,7 +1744,7 @@ export async function runSiteOptimizer(body = {}){
     rep_total_power_low_usd:            c.am_rural_electric_and_standby_power_guide?.cost_estimates?.total_power_low_usd ?? null,
     rep_total_load_kw:                  c.am_rural_electric_and_standby_power_guide?.total_load_kw ?? null,
     gnd_total_radials:                  c.am_rf_ground_system_inspection_and_maintenance_guide?.total_radials ?? null,
-    gnd_radial_length_ft:               c.am_rf_ground_system_inspection_and_maintenance_guide?.radial_length_ft ?? null,
+    gnd_insp_radial_length_ft:          c.am_rf_ground_system_inspection_and_maintenance_guide?.radial_length_ft ?? null,
     gnd_rehab_low_usd:                  c.am_rf_ground_system_inspection_and_maintenance_guide?.rehabilitation_cost?.total_rehab_low_usd ?? null,
     gnd_annual_low_usd:                 c.am_rf_ground_system_inspection_and_maintenance_guide?.annual_cost?.total_annual_low_usd ?? null,
     gnd_n_inspection_tasks:             c.am_rf_ground_system_inspection_and_maintenance_guide?.n_inspection_tasks ?? null,
@@ -8927,7 +8927,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ── 3. Ground radial system (120-radial full system) ──
       const n_rad_pf        = 120;
-      const rad_len_ft_pf   = Math.round(lambda_pf * 3.28084);    // 1λ radials
+      const rad_len_ft_pf   = Math.round(lambda_pf * 0.35 * 3.28084);  // 0.35λ per §73.186 / NBS TN-24
       const total_wire_pf   = n_rad_pf * rad_len_ft_pf;
       const gnd_low_pf      = Math.round(total_wire_pf * 0.53);   // $0.53/ft wire + burial labor
       const gnd_high_pf     = Math.round(total_wire_pf * 0.85);
@@ -9291,8 +9291,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //     Guy anchors (each): $2,000–$6,000  (6 total for 2-level guys)
 
       const lambda_m       = 299792.458 / frequency_khz;
-      const h_ft           = round2(lambda_m / 4 * 3.28084);   // λ/4 tower height in feet
-      const h_m            = round2(lambda_m / 4);
+      // Class A/B use 0.625λ (FCC optimum); C/D use λ/4 (0.25λ)
+      const h_frac_st      = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_ft           = round2(h_frac_st * lambda_m * 3.28084);
+      const h_m            = round2(h_frac_st * lambda_m);
 
       // Wind load parameters (TIA-222-H / ASCE 7-22, Exposure C, V=115 mph, Z≈315ft)
       const V_mph          = 115;   // basic wind speed 3-sec gust (Flagstaff area typical)
@@ -9365,7 +9367,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_structural_low_usd:  total_low,
         total_structural_high_usd: total_high,
         reference: 'ANSI/TIA-222-H (2017, Addendum 1 2021) – Structural Standard for Antenna Supporting Structures; ASCE 7-22 – Minimum Design Loads; TIA-222-H §2.6 (wind load); TIA-222-H Table A1 (foundation depth); 47 CFR §73.49 (tower fencing)',
-        note: `Tower: ${h_ft} ft (${h_m} m) λ/4 at ${frequency_khz} kHz. Wind load: ${W_total} lbf (V=${V_mph} mph, Exp C). Base moment: ${M_base_ftkip} ft-kip. Steel: ~${steel_tons} tons. ${is_guyed ? `Guyed (${n_guy_levels} levels, ${n_guy_anchors} anchors)` : 'Self-supporting'}. Total estimated: $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
+        note: `Tower: ${h_ft} ft (${h_m} m) at ${frequency_khz} kHz (Class ${fcc_class}: ${h_frac_st}λ). Wind load: ${W_total} lbf (V=${V_mph} mph, Exp C). Base moment: ${M_base_ftkip} ft-kip. Steel: ~${steel_tons} tons. ${is_guyed ? `Guyed (${n_guy_levels} levels, ${n_guy_anchors} anchors)` : 'Self-supporting'}. Total estimated: $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
       };
     })(),
 
@@ -9410,9 +9412,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // E(r) = 60 × I_base / r  [V/m]  (pattern factor k_h = 1, NDA)
       const eField = (r_m) => round2(60 * i_base / r_m);
 
-      // FCC MPE limits per §1.1310 Table 1 (0.3–3.0 MHz band)
-      const e_limit_gp_vm = 614;   // V/m general population
-      const e_limit_oc_vm = 1842;  // V/m occupational/controlled
+      // FCC MPE limits per §1.1310 Table 1 / OET Bulletin 65 (0.3–3.0 MHz band)
+      // E-field limits are frequency-dependent: E = 614/f(MHz) general population, 1842/f(MHz) occupational.
+      // Using fixed 614 V/m would understate the required exclusion zone above 1 MHz.
+      const e_limit_gp_vm = round2(614  / f_mhz);   // V/m general population (614/f)
+      const e_limit_oc_vm = round2(1842 / f_mhz);   // V/m occupational/controlled (1842/f)
 
       // Required exclusion radii
       const r_gp_m  = round2(60 * i_base / e_limit_gp_vm);   // general-population fence
@@ -9463,7 +9467,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fence_cost_high_usd:   fence_cost_high,
         study_cost_low_usd:    study_cost_low,
         study_cost_high_usd:   study_cost_high,
-        reference: '47 CFR §1.1310 (MPE limits); §1.1307(b) (categorical exclusion); OET Bulletin 65 Ed. 97-01 §4.2 (AM near-field formula); FCC §1.1310 Table 1 (0.3–3.0 MHz E-field limits: 614 V/m GP, 1842 V/m OC)',
+        reference: '47 CFR §1.1310 (MPE limits); §1.1307(b) (categorical exclusion); OET Bulletin 65 Ed. 97-01 §4.2 (AM near-field formula); FCC §1.1310 Table 1 (0.3–3.0 MHz: E_gp = 614/f(MHz) V/m, E_oc = 1842/f(MHz) V/m)',
         note: `${eval_required ? 'MPE evaluation REQUIRED' : 'Categorically excluded (TPO ≤ 1 kW)'} at ${tpo_kw} kW. GP exclusion radius: ${r_gp_m} m (${r_gp_ft} ft). OC exclusion: ${r_oc_m} m (${r_oc_ft} ft). I_base ≈ ${i_base} A. ${fence_needed ? `Perimeter fence ≈ ${perimeter_ft} ft ($${fence_cost_low.toLocaleString()}–$${fence_cost_high.toLocaleString()}).` : 'Fence may not be required.'}`
       };
     })(),
@@ -9853,10 +9857,11 @@ async function scoreCandidate(pt, ctx, warnings){
       //   FAA/FCC light outage notification service (automated monitor): $300–$800/yr
       //   Lighting inspection log + recordkeeping: engineer time, $500–$1,500/yr
 
-      // --- tower height from λ/4 ---
+      // tower height: Class A/B use 0.625λ (FCC optimum), C/D use 0.25λ (λ/4)
       const lambda_m           = 299792.458 / frequency_khz;
-      const quarter_wave_m     = lambda_m / 4;
-      const tower_height_ft    = round2(quarter_wave_m * 3.28084);
+      const h_frac_lt          = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const tower_height_m_lt  = round2(h_frac_lt * lambda_m);
+      const tower_height_ft    = round2(tower_height_m_lt * 3.28084);
 
       // --- ASR threshold ---
       // 47 CFR §17.7: > 200 ft (60.96 m) AGL requires ASR
@@ -9916,7 +9921,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       return {
         tower_height_ft,
-        tower_height_m:          round2(quarter_wave_m),
+        tower_height_m:          tower_height_m_lt,
         asr_threshold_ft,
         asr_required,
         lighting_type,
@@ -9936,7 +9941,7 @@ async function scoreCandidate(pt, ctx, warnings){
         faa_notification_required,
         faa_notification_note,
         reference: '47 CFR §17.7 (ASR ≥200 ft); §17.21–§17.23 (painting and lighting); §17.47 (24-hr monitoring); §17.48 (2-year illumination records); §17.49 (30-min outage notification); FAA AC 70/7460-1L (2015) Tables 1–4 (obstruction marking and lighting)',
-        note: `Tower: ~${tower_height_ft} ft (${round2(quarter_wave_m)} m). ASR ${asr_required ? 'REQUIRED' : 'not required'}. Lighting: ${lighting_type.replace(/_/g, ' ')}. ${n_paint_bands} paint bands. Capital: $${total_lighting_low_usd.toLocaleString()}–$${total_lighting_high_usd.toLocaleString()}. Annual maintenance: $${annual_maintenance_low}–$${annual_maintenance_high}/yr.`
+        note: `Tower: ~${tower_height_ft} ft (${tower_height_m_lt} m). ASR ${asr_required ? 'REQUIRED' : 'not required'}. Lighting: ${lighting_type.replace(/_/g, ' ')}. ${n_paint_bands} paint bands. Capital: $${total_lighting_low_usd.toLocaleString()}–$${total_lighting_high_usd.toLocaleString()}. Annual maintenance: $${annual_maintenance_low}–$${annual_maintenance_high}/yr.`
       };
     })(),
 
@@ -25599,7 +25604,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const easCost = 8000; // IPAWS-compatible EAS unit
 
       // 8. FCC fees and engineering
-      const fccFilingFee = 6465;  // §73.3525 major change filing fee
+      const fccFilingFee = 6465;  // major change filing fee per §1.1102 FCC fee schedule
       const engineeringLow  = 25000;
       const engineeringHigh = 75000; // includes NIF study, spacing, DA pattern, proof of performance
 
@@ -28235,8 +28240,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Measurements on all authorized radials per the license DA parameters
       //   - Filed via Form 302-AM or as part of a CP or modification application
       //
-      // NDA proof requirements (§73.152):
-      //   - Spot checks if FCC questions the antenna efficiency
+      // NDA proof requirements:
+      //   §73.151 applies only to DA stations; NDA stations are not required to file a
+      //   formal proof of performance unless ordered by the Commission per §73.154(e).
       //   - No periodic proof required for NDA stations
       //
       // Field measurement methodology:
@@ -28327,10 +28333,10 @@ async function scoreCandidate(pt, ctx, warnings){
         form_302_schedule:          FORM302_SCHEDULE,
         equipment:                  EQUIPMENT,
         n_equipment_required:       EQUIPMENT.filter(e => e.required).length,
-        reference: '47 CFR §73.151; §73.152; §73.154; FCC Form 302-AM Instructions',
+        reference: '47 CFR §73.151 (DA proof requirements); §73.154 (proof filing — NDA exempt unless ordered); §73.152 (vertical radiation pattern, separate rule); FCC Form 302-AM Instructions',
         note: proofRequired
           ? `DA proof required: ${n_radials} radials at ${radial_step_deg}° step, ${MIN_POINTS_PER_RADIAL} points/radial (${total_measurement_points} total measurements). File Form 302-AM within 90 days of first operation.`
-          : `Non-directional station — no periodic proof of performance required per §73.152 (unless ordered by FCC).`
+          : `Non-directional station — no periodic proof of performance required (§73.151 applies only to DA stations; NDA exempt unless ordered by FCC per §73.154).`
       };
     })(),
 

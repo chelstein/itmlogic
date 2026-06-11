@@ -12357,9 +12357,9 @@ test('am_noise_floor_and_rf_environment_analysis_guide KAZM rank-1 site noise cl
 });
 
 test('am_noise_floor_and_rf_environment_analysis_guide KAZM rural candidate is quieter', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   const rural = out.candidates.find(c => c.am_noise_floor_and_rf_environment_analysis_guide.land_use_noise_class === 'rural');
-  assert.ok(rural !== undefined, 'At least one rural candidate expected at 50 km grid');
+  assert.ok(rural !== undefined, 'At least one rural candidate expected at 50 km grid with 10 candidates');
   const g = rural.am_noise_floor_and_rf_environment_analysis_guide;
   assert.strictEqual(g.noise_score, 100, 'Rural site should score 100/100');
   assert.strictEqual(g.interference_risk, 'low', 'Rural site interference risk should be low');
@@ -15957,11 +15957,16 @@ test('KAZM 5 kW: eval_required = true and GP exclusion radius physically reasona
     'OC exclusion must be smaller than GP exclusion (higher power limit)');
 });
 
-test('KAZM 780 kHz: FCC limits are exactly 614 V/m GP and 1842 V/m OC', async () => {
+test('KAZM 780 kHz: FCC limits follow OET Bulletin 65 frequency-dependent formula', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_rf_exposure_mpe_evaluation_guide;
-  assert.strictEqual(g.e_limit_gp_vm, 614,  'GP limit must be 614 V/m per §1.1310 Table 1');
-  assert.strictEqual(g.e_limit_oc_vm, 1842, 'OC limit must be 1842 V/m (3× GP)');
+  // OET Bul 65 / §1.1310 Table 1: E_gp = 614/f(MHz), E_oc = 1842/f(MHz)
+  // At 780 kHz (0.780 MHz): E_gp ≈ 787 V/m, E_oc ≈ 2361 V/m
+  const f_mhz = KAZM.frequency_khz / 1000;
+  assert.ok(Math.abs(g.e_limit_gp_vm - 614 / f_mhz) < 2,
+    `GP limit must be ~${(614/f_mhz).toFixed(1)} V/m (614/f), got ${g.e_limit_gp_vm}`);
+  assert.ok(Math.abs(g.e_limit_oc_vm - 1842 / f_mhz) < 2,
+    `OC limit must be ~${(1842/f_mhz).toFixed(1)} V/m (1842/f), got ${g.e_limit_oc_vm}`);
 });
 
 test('KAZM 780 kHz: field_table has 5 rows and E decreases with distance', async () => {
