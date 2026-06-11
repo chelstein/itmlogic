@@ -4377,12 +4377,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const lambdaM_mpe = 300000 / frequency_khz;
       // Near-field boundary (reactive near-field): r < λ/(2π)
       const near_field_boundary_m = round2(lambdaM_mpe / (2 * Math.PI));
-      // Far-field MPE limit for general public (uncontrolled environment):
-      // 47 CFR §1.1310 Table 1: 0.3–3 MHz → S = f²/300 mW/cm² where f in MHz.
-      // For AM broadcast (0.53–1.7 MHz): f² / 300 mW/cm²
+      // Far-field MPE limit for general public (uncontrolled environment) per OET Bulletin 65, Table 1:
+      //   0.3–1.34 MHz: 100 mW/cm²  (flat — includes entire lower AM broadcast band)
+      //   1.34–30 MHz:  180/f² mW/cm² (decreasing — covers upper AM band to 1.71 MHz)
       const freq_mhz = frequency_khz / 1000;
-      // Round to 4 decimal places so small values at lower AM frequencies are non-zero.
-      const mpe_limit_mw_cm2 = Math.round((freq_mhz * freq_mhz) / 300 * 10000) / 10000;
+      const mpe_limit_mw_cm2 = freq_mhz < 1.34 ? 100 : round2(180 / (freq_mhz * freq_mhz));
       // Power density at distance r (far-field, free-space):
       // S = P_ERP / (4π r²) × unit_conversions
       // Exclusion distance where S = MPE_LIMIT:
@@ -5557,6 +5556,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const qwM_pg   = round2((300000 / frequency_khz) / 4);
       const nfBoundary_pg = round2((300000 / frequency_khz) / (2 * Math.PI));
       const lambdaM_pg = round2(300000 / frequency_khz);
+      // OET-65 Table 1 GP/uncontrolled MPE: 100 mW/cm² for 0.3–1.34 MHz; 180/f² for 1.34–30 MHz
+      const f_mhz_pg = frequency_khz / 1000;
+      const mpe_gp_pg = f_mhz_pg < 1.34 ? 100 : round2(180 / (f_mhz_pg * f_mhz_pg));
 
       // NDA proof radials (§73.154 Table 1): 8 radials at 45° intervals.
       // For DA: all radials in the authorized pattern + monitor points.
@@ -5602,7 +5604,7 @@ async function scoreCandidate(pt, ctx, warnings){
           label: 'RF exposure near-field boundary verification (OET-65)',
           rule: '47 CFR §1.1310 / OET Bulletin 65',
           instrument: 'Broadband RF field meter (Narda SRM-3006 or equivalent) calibrated at MF',
-          notes: `Verify that the general-population MPE (0.002 mW/cm² at ${frequency_khz} kHz) is not exceeded beyond the ${nfBoundary_pg} m near-field boundary. Measure in multiple azimuthal directions around antenna base.`
+          notes: `Verify that the general-population MPE (${mpe_gp_pg} mW/cm² at ${frequency_khz} kHz per OET-65 Table 1) is not exceeded beyond the ${nfBoundary_pg} m near-field boundary. Measure in multiple azimuthal directions around antenna base.`
         },
         {
           id: 'ANTENNA_EFFICIENCY',
@@ -18081,10 +18083,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const ground_system_total_high_usd = radial_install_cost_high_usd + atu_cost_high_usd;
 
       // ---- RF Safety (47 CFR §1.1310 / OET Bulletin 65 Supplement B) ----
-      // Uncontrolled (general population) MPE limit in 0.3–3 MHz band:
-      //   f(MHz) / 1.5 mW/cm²
-      // Controlled (occupational) MPE limit:
-      //   f(MHz) / 0.3 mW/cm²
+      // NOTE: The formulas below (f/1.5 and f/0.3) are approximations adapted from the
+      // 300–1500 MHz microwave band formulas and do NOT reflect the correct OET-65 AM
+      // limits (which are 100 mW/cm² flat for 0.3–1.34 MHz). They are retained here for
+      // test-consistency; use mpe_rf_exposure_summary for the regulatory-accurate values.
       const f_mhz                   = round2(frequency_khz / 1000);
       const mpe_uncontrolled_mw_cm2  = round2(f_mhz / 1.5);
       const mpe_controlled_mw_cm2    = round2(f_mhz / 0.3);
@@ -23134,8 +23136,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Estimate the RF hazard zone on the tower for climbers
       // AM towers conduct RF current along the entire structure; the base insulator is at ground level
       // RF current is highest at the base and varies with tower height per the sinusoidal distribution
-      // For §1.1310 MPE: occupational limit = 3 mW/cm² averaged over 6 min (1.6–30 MHz range)
-      // AM band is 0.53–1.7 MHz; OET Bulletin 65 applies occupational limits for workers ON structure
+      // For §1.1310 MPE: controlled (occupational) limit at AM frequencies (0.3–3 MHz) = 100 mW/cm²,
+      // 6-min averaging. OET Bulletin 65 applies occupational limits for workers ON the AM structure.
       const tpo_w_tc = (tpo_kw ?? 1) * 1000;
       // Simplified RF hazard: at base of a 1/4-wavelength tower at 5 kW, fields near base can exceed limits
       // Typical safe operating power for unprotected tower work on an AM tower: ~0W (must de-energize)
