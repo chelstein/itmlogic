@@ -6777,7 +6777,7 @@ async function scoreCandidate(pt, ctx, warnings){
             'Prepare environmental exhibits (NEPA/NHPA sign-off documentation)',
             isDA_lt ? 'DA pattern exhibits per §73.150(a) (72-radial HRP at 5° increments, suppression ratios per §73.37/§73.182)' : 'NDA radiation pattern certification',
             'FCC filing attorney review and LMS Form 301-AM submission',
-            'Pay application fee (§73.3520)'
+            'Pay application fee (§1.1104 fee schedule)'
           ]
         },
         {
@@ -6858,7 +6858,7 @@ async function scoreCandidate(pt, ctx, warnings){
         risk_note,
         treaty_zone_present:       hasTreaty_lt,
         asr_required:              asrReq_lt,
-        reference: '47 CFR §73.3520 (application fee); §73.3533 (CP application); §73.3536 (license to cover); §73.3598 (construction period); 47 CFR §1.47 (public notice); FCC Media Bureau AM processing data',
+        reference: '47 CFR §1.1104 (application fee schedule); §73.3533 (CP application); §73.3536 (license to cover); §73.3598 (construction period); 47 CFR §1.47 (public notice); FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. Contested applications, environmental appeals, or treaty complications can add years. All phase estimates are calendar weeks.'
       };
     })(),
@@ -11959,7 +11959,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // 47 CFR §73.68 — Directional antenna phase and ratio monitoring requirements.
       // Applies ONLY to DA (directional antenna) stations. NDA stations: all DA items are zero/N/A.
       //
-      // §73.55: All DA AM stations must measure phase and current ratio at specified times
+      // §73.1820 (station log) / §73.62: DA AM stations must measure phase and current ratio at specified times
       //   (typically twice per day: once near noon, once near midnight) and log the readings.
       //   Measurements must be compared to FCC-authorized values (from proof of performance).
       //
@@ -12049,7 +12049,7 @@ async function scoreCandidate(pt, ctx, warnings){
         amendment_high_usd,
         total_da_low_usd,
         total_da_high_usd,
-        reference: '47 CFR §73.55 (DA logging); §73.62(a) (current ratio ±5% / phase ±3°); §73.68 (sampling systems); §73.154(a) (DA proof of performance); §73.150(a) (horizontal pattern — 72 radials at 5°)',
+        reference: '47 CFR §73.1820 (station log — DA parameter entries); §73.62(a) (current ratio ±5% / phase ±3°); §73.68 (sampling systems); §73.154(a) (DA proof of performance); §73.150(a) (horizontal pattern — 72 radials at 5°)',
         note: isDA
           ? `DA station (${pattern_mode}): phase tolerance ±${phase_tolerance_deg}°, ratio tolerance ±${ratio_tolerance_pct}% per §73.62(a). ${proof_radials}-radial proof required per §73.154(a). Out-of-tolerance operation: ≤${emergency_nda_days} days before STA required (§73.62(c); substantial variance must terminate in 3 min per §73.62(b)). Total first-year DA compliance: $${total_da_low_usd.toLocaleString()}–$${total_da_high_usd.toLocaleString()}.`
           : `NDA station (${pattern_mode}): no DA phase/ratio monitoring required. DA-specific compliance cost = $0.`
@@ -19880,7 +19880,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const exhibits_C = [
         { id: 'C1', section: 'C', title: 'Co-channel groundwave interference analysis (§73.182)', required: true, cfr: '§73.182; §73.24', notes: 'FCC gwave.js or ITU-R P.368 method; 25 mV/m contour must not violate co-channel station 0.1 mV/m' },
-        { id: 'C2', section: 'C', title: 'Adjacent channel interference check (±10 kHz)', required: true, cfr: '§73.187; §73.188', notes: 'Adjacent channel stations within 320 km; 0.025 mV/m protection threshold' },
+        { id: 'C2', section: 'C', title: 'Adjacent channel interference check (±10 kHz)', required: true, cfr: '§73.37; §73.182', notes: 'Adjacent channel stations within 320 km; 0.025 mV/m protection threshold' },
         { id: 'C3', section: 'C', title: 'Blanket interference analysis (§73.24(g))', required: true, cfr: '§73.24(g)', notes: '1000 mV/m contour population < 1% of US population; disc approximation or USGS population data acceptable' },
         { id: 'C4', section: 'C', title: 'Nighttime skywave interference analysis (§73.182)', required: is_clear_ch || (fcc_class === 'B'), cfr: '§73.182; §73.24(g)', notes: 'Required for Class A, B, and D on clear/regional channels; NIF contour must not violate protected stations' },
       ];
@@ -22793,8 +22793,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.3999: Indecency and obscenity — FCC prohibits indecent content between 6 AM and 10 PM
       // §73.4005: Obscene content — prohibited at all times
       // §73.1206: Telephone conversation broadcasts — must get consent before recording/airing a call
-      // §73.1207: Rebroadcasting — must get consent of originating station; FCC anti-simulcast rule (§73.242)
-      // §73.4035: Lotteries — lottery information may be broadcast only for authorized lotteries
+      // §73.1207: Rebroadcasting — must get consent of originating station; program duplication limit (§73.3556)
+      // §73.1211: Lotteries — lottery information may be broadcast only for authorized lotteries
       // §73.1217: Broadcast hoaxes — FCC may impose forfeitures for hoaxes that cause harm
       // §73.1210: Joint sales agreements (JSA) / Local marketing agreements (LMA) — attribution rules
       //
@@ -22828,11 +22828,12 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Rebroadcasting
       // §73.1207: Must get written or oral consent of originating station before rebroadcasting
-      // §73.242: AM stations may not simulcast on FM under certain circumstances (anti-simulcast rule)
+      // §73.3556: Duplication of programming on commonly owned or time-brokered stations
+      //   (the radio duplication limit; §73.242 was the pre-1986 FM nonduplication rule and no longer exists)
       const REBROADCAST_RULES = {
         consent_required: true,
         cfr: '§73.1207',
-        anti_simulcast_cfr: '§73.242',
+        anti_simulcast_cfr: '§73.3556',
         am_fm_simulcast_restriction: 'AM and commonly-owned FM may simulcast if FM is within AM service area, but must offer separate programming for some portion of broadcast day'
       };
 
@@ -22858,7 +22859,7 @@ async function scoreCandidate(pt, ctx, warnings){
         high_priority_elements: high_priority,
         max_forfeiture_indecency_usd: INDECENCY_RULES.max_forfeiture_per_incident_usd,
         relocation_note: 'Content compliance is evaluated during license renewal; ensure a clean complaint record during the 2-year period before renewal to support the relocation and license continuation.',
-        reference: '47 CFR §73.1206; §73.1207; §73.1210; §73.1212; §73.1217; §73.3526; §73.3555; §73.3999; §73.4005; §73.4035; FCC Enforcement Bureau indecency forfeiture policy',
+        reference: '47 CFR §73.1206; §73.1207; §73.1210; §73.1212; §73.1217; §73.3526; §73.3555; §73.3999; §73.4005; §73.1211; FCC Enforcement Bureau indecency forfeiture policy',
         note: `Content compliance: ${COMPLIANCE_ELEMENTS.length} program elements required, ${high_priority} HIGH priority. Indecency safe harbor: 10 PM–6 AM. Max forfeiture: $${INDECENCY_RULES.max_forfeiture_per_incident_usd.toLocaleString()} per incident.`
       };
     })(),
@@ -24343,7 +24344,8 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     // FCC AM Revitalization FM Translator Opportunity.
-    // §73.850 + MB Docket 13-249 (Report & Order, FCC 15-142, adopted Jul 2015).
+    // 47 CFR Part 74 Subpart L (§74.1201 et seq.) + MB Docket 13-249 (Report & Order, FCC 15-142, adopted Jul 2015).
+    // (§73.850 is the LPFM operating-schedule rule — translators are Part 74.)
     // AM stations may apply for an FM translator (≤250 W ERP) to rebroadcast the AM
     // programming.  The translator 60 dBu contour must lie entirely within the AM
     // station's daytime 2 mV/m groundwave contour OR within 25 miles of the AM
@@ -24353,7 +24355,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // For FM Class A translator at 250 W ERP, 60 dBu radius ≈ 12–15 km depending on HAAT.
       // Screening approximation: r_60dbu_km ≈ 12.5 km for 250 W ERP / 30 m HAAT.
       // (Standard HAAT for a new translator on a short tower.)
-      const TRANSLATOR_MAX_ERP_KW_ft = 0.25;     // 250 W ERP maximum per §73.850(b)
+      const TRANSLATOR_MAX_ERP_KW_ft = 0.25;     // 250 W ERP maximum per §74.1235(b)
       const TRANSLATOR_HAAT_M        = 30;        // typical low-tower translator HAAT for screening
       const FM_60DBU_RADIUS_250W_KM  = 12.5;      // screening approximation at 250 W / 30 m HAAT
 
@@ -24415,9 +24417,9 @@ async function scoreCandidate(pt, ctx, warnings){
         note: 'Run a full LMS search using the CDBS FM query tool or BIA FM database. A broadcast engineer or attorney can run the §73.207 spacing table analysis.'
       };
 
-      // LPFM protection requirements per §73.850(d)
+      // LPFM protection requirements per §74.1204 (translator interference protection)
       const lpfmProtection = {
-        rule:            '47 CFR §73.850(d)',
+        rule:            '47 CFR §74.1204',
         co_channel:      'AM-revitalization translator must protect LPFM stations on the same channel within 7 km (or per §73.807 minimum distance)',
         first_adjacent:  'Protect LPFM stations on ±200 kHz within FCC-defined short-spacing table distances',
         note:            'LPFM has secondary but protected status relative to translators under the 2015 rules. Conduct full §73.807 analysis before selecting an FM channel.'
@@ -24427,7 +24429,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const form349Exhibits = [
         { exhibit: 'Exhibit A (Technical)', description: 'Proposed FM translator coordinates, antenna height (HAAT), ERP, FM channel, directional antenna (if any)', required: true },
         { exhibit: 'Exhibit B (Interference)', description: '§73.207 spacing analysis showing no conflicts with co/adj-channel full-power FM or translators', required: true },
-        { exhibit: 'Exhibit C (LPFM)', description: '§73.807/§73.850(d) LPFM protection showing minimum separation met', required: true },
+        { exhibit: 'Exhibit C (LPFM)', description: '§74.1204 LPFM protection showing minimum separation met (LPFM spacing per §73.807)', required: true },
         { exhibit: 'Exhibit D (AM Contour)', description: 'Demonstration that FM 60 dBu contour is within AM 2 mV/m daytime contour or 25 mi of AM transmitter', required: true },
         { exhibit: 'Exhibit E (AM Revitalization Eligibility)', description: 'Certification of continuous AM operation since October 1, 2015 (or applicable date)', required: true },
         { exhibit: 'Environmental Certification', description: 'NEPA §1.1307 environmental assessment or negative declaration', required: true }
@@ -24456,7 +24458,7 @@ async function scoreCandidate(pt, ctx, warnings){
         audience_gain_note:           audienceGainNote,
         filing_form:                  'FCC Form 349 (Translator / Booster Station Application)',
         docket:                       'MB Docket No. 13-249 (FCC 15-142)',
-        reference: '47 CFR §73.850 (translator general); §73.850(b) (AM revitalization power limit); §73.850(d) (LPFM protection); §73.207 (spacing tables); §73.313 (FM propagation); MB Docket 13-249',
+        reference: '47 CFR §74.1201 (translator general); §74.1235(b) (translator power limit — 250 W); §74.1204 (LPFM/FM interference protection); §73.207 (spacing tables); §73.313 (FM propagation); MB Docket 13-249 (AM revitalization)',
         note: 'FM translator opportunity is a screening-grade assessment. Actual channel availability requires a full §73.207 spacing analysis against all FM stations in the area using FCC LMS data. A licensed broadcast engineer or communications attorney should conduct the channel search and prepare Form 349.'
       };
     })(),
@@ -26847,7 +26849,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { item: 'Third adjacent station search (±30 kHz)',    cfr: '§73.37; §73.182', required: true,  tool: 'FCC LMS API' },
         { item: 'IBOC interference study',                    cfr: '§73.404', required: false, tool: 'iBiquity/xperi modeling software' },
         { item: 'NIF study (clear channel)',                  cfr: '§73.182', required: nifRequired, tool: 'FCC groundwave/skywave propagation software' },
-        { item: 'Treaty protection analysis (Canada/Mexico)', cfr: '§73.1205', required: true,  tool: 'FCC treaty database; AMQUERY' }
+        { item: 'Treaty protection analysis (Canada/Mexico)', cfr: '§73.1650', required: true,  tool: 'FCC treaty database; AMQUERY' }
       ];
 
       // Typical engineering timeline for coordination study
@@ -26874,7 +26876,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_coordination_items:        coordinationItems.length,
         n_required_items:            coordinationItems.filter(i => i.required).length,
         coordination_timeline:        coordinationTimeline,
-        reference: '47 CFR §73.182 (NIF analysis); §73.37 (AM minimum distance separations); §73.184 (AM groundwave curves); §73.404 (IBOC/HD Radio); §73.1205 (treaty protection); FCC AM Allocation Engineering Data; REC Networks AMQUERY',
+        reference: '47 CFR §73.182 (NIF analysis); §73.37 (AM minimum distance separations); §73.184 (AM groundwave curves); §73.404 (IBOC/HD Radio); §73.1650 (international agreements); FCC AM Allocation Engineering Data; REC Networks AMQUERY',
         note: `${chanClass_fsc} channel at ${frequency_khz} kHz. Co-channel zone: ${coordinationZone_km} km. NIF study: ${nifRequired ? 'required' : 'not required'}.`
       };
     })(),
@@ -28988,7 +28990,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // at the operating frequency. Guard (detuning) networks must be verified
       // periodically and logged in the station's technical records.
       //
-      // References: 47 CFR §73.150; §73.153; §73.154; §73.158; §73.159; §73.1215;
+      // References: 47 CFR §73.150; §73.153; §73.154; §73.158; §73.69; §73.1215;
       //             NAB Engineering Handbook (11th ed.), Ch. 5
 
       const isDA_dtv  = /^DA/i.test(pattern_mode);
@@ -29013,14 +29015,14 @@ async function scoreCandidate(pt, ctx, warnings){
       //   2. Antenna system modification (coax, ATU component, tower work)
       //   3. Ground system modification (radial addition/removal)
       //   4. After storm/lightning event
-      //   5. Quarterly: §73.159 antenna monitor system verification
+      //   5. Quarterly: §73.69 antenna monitor system verification
       //   6. Any base current departure ≥ 5% (DA) or > 10% (NDA) from licensed value
       const PHASOR_TRIGGERS = [
         { id: 'TRANSMITTER_CHANGE', label: 'Transmitter replacement / power change',       cfr: '§73.1350', frequency: 'AS NEEDED' },
         { id: 'ANTENNA_MOD',        label: 'Antenna system modification (coax, ATU, tower)', cfr: '§73.154', frequency: 'AS NEEDED' },
         { id: 'GROUND_MOD',         label: 'Ground system modification',                    cfr: '§73.190',  frequency: 'AS NEEDED' },
         { id: 'STORM_EVENT',        label: 'After storm, lightning, or physical damage',    cfr: '§73.1350', frequency: 'AS NEEDED' },
-        { id: 'QUARTERLY_MONITOR',  label: 'Antenna monitor system verification',           cfr: '§73.159',  frequency: 'QUARTERLY' },
+        { id: 'QUARTERLY_MONITOR',  label: 'Antenna monitor system verification',           cfr: '§73.69',   frequency: 'QUARTERLY' },
         { id: 'BASE_CURRENT_EXCEEDANCE', label: `Base current departure ≥ ${isDA_dtv ? 5 : 10}% from licensed value`, cfr: isDA_dtv ? '§73.154' : '§73.1350', frequency: 'IMMEDIATE' }
       ];
 
@@ -29038,13 +29040,13 @@ async function scoreCandidate(pt, ctx, warnings){
         { condition: 'Ground system major modification (> 20 radials)',   cfr: '§73.190', mandatory: false }
       ] : [];
 
-      // ---- Antenna monitor system requirements (§73.158/§73.159) ----
+      // ---- Antenna monitor system requirements (§73.158/§73.69) ----
       // DA stations: must use an approved antenna monitor to continuously display
       // base currents and phases for all towers; readings logged at prescribed intervals.
       // NDA stations: base current logged at each TPO change and at least every 3 hours.
       const MONITOR_REQUIREMENTS = {
         type:            isDA_dtv ? 'ANTENNA_MONITOR_SYSTEM' : 'BASE_CURRENT_METER',
-        cfr:             isDA_dtv ? '§73.158; §73.159' : '§73.1215',
+        cfr:             isDA_dtv ? '§73.158; §73.69' : '§73.1215',
         log_interval_hr: isDA_dtv ? 3 : 3,
         display:         isDA_dtv ? 'Continuous base current + phase display for all towers' : 'Base current meter at transmitter; TPO power level reading',
         calibration:     'Annual calibration recommended; documented in station records',
@@ -29083,7 +29085,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_da_proof_retriggers: DA_PROOF_RETRIGGERS.length,
         antenna_monitor: MONITOR_REQUIREMENTS,
         cost_estimates: COST,
-        reference: '47 CFR §73.150; §73.153; §73.154; §73.158; §73.159; §73.190; §73.1215; NAB Engineering Handbook Ch. 5',
+        reference: '47 CFR §73.150; §73.153; §73.154; §73.158; §73.69; §73.190; §73.1215; NAB Engineering Handbook Ch. 5',
         note: `${isDA_dtv ? `DA station (${active_towers_typ}-tower array typical). Phasor re-check required on ${PHASOR_TRIGGERS.length} trigger events. Full DA proof (~$${(COST.full_da_proof_low_usd/1000).toFixed(0)}K–$${(COST.full_da_proof_high_usd/1000).toFixed(0)}K) required after tower mod.` : `NDA station. Base current meter required; logged every 3 hours. Phasor check on ${PHASOR_TRIGGERS.length} trigger events ($${COST.phasor_check_per_event_usd}/event).`}`
       };
     })(),
@@ -30788,12 +30790,13 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Type acceptance is demonstrated by an FCC ID or prior acceptance
       //   letter from the Commission.
       //
-      // 47 CFR §73.1665 — Transmitter measurements.
-      //   Licensee must measure and verify operating power within 10% of
-      //   authorized power (§73.1560).  For TPO measurements, transmitter
-      //   output power must be measured at the transmitter output terminals.
+      // 47 CFR §73.1665 — Main transmitters.
+      //   Each station must have at least one main transmitter meeting the
+      //   technical standards for its class.  Operating power must stay
+      //   within the §73.1560 limits, measured at the transmitter output
+      //   terminals (direct method per §73.51).
       //
-      // 47 CFR §73.1670 — Digital modulation and IBOC.
+      // 47 CFR §73.404 — AM IBOC (digital modulation).
       //   If operating with IBOC (HD Radio), additional FCC authorization
       //   is required.  IBOC AM is hybrid digital+analog; power injection
       //   limits apply separately from the analog TPO.
@@ -30900,7 +30903,7 @@ async function scoreCandidate(pt, ctx, warnings){
         max_licensed_am_power_kw: 50,
         iboc_requires_separate_auth: true,
         discontinued_models_ok: true,
-        reference: '47 CFR §73.1560; §73.1660; §73.1665; §73.1670',
+        reference: '47 CFR §73.1560; §73.1660; §73.1665 (main transmitters); §73.404 (IBOC)',
         note: `${tpo_kw_num} kW (${power_category}): authorized range ${min_power_kw}–${max_power_kw} kW (+5%/−10%). Transmitter cost est. $${total_equipment_low.toLocaleString()}–$${total_equipment_high.toLocaleString()}. ${is_da ? `DA element tolerance ±${da_element_tolerance_pct}%.` : 'NDA: TPO tolerance only.'} Max AM power 50 kW.`
       };
     })(),
@@ -33618,7 +33621,7 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
       id: 'INTERNATIONAL_TREATY_COORDINATION',
       description: 'Initiate FCC International Bureau coordination for US/MX or US/CA treaty compliance',
       status: 'REQUIRED',
-      rule: 'US/Mexico AM Agreement (1986); US/Canada Letter of Understanding (1991); 47 CFR §73.1205',
+      rule: 'US/Mexico AM Agreement (1986); US/Canada Letter of Understanding (1991); 47 CFR §73.1650',
       note: 'One or more candidate sites fall within treaty coordination zones. FCC IB approval is required before filing; the process adds 3–12 months. Power limits, antenna pattern restrictions, and frequency assignments may be modified as a result.'
     });
   }

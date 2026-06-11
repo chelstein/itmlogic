@@ -7830,7 +7830,7 @@ test('am_fm_translator_opportunity has correct shape and key fields', async () =
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const t = out.candidates[0].am_fm_translator_opportunity;
   assert.strictEqual(t.am_revitalization_eligible, true, 'all AM stations eligible for revitalization');
-  assert.strictEqual(t.translator_max_erp_kw, 0.25, '250 W ERP max per §73.850(b)');
+  assert.strictEqual(t.translator_max_erp_kw, 0.25, '250 W ERP max per §74.1235(b)');
   assert.strictEqual(t.fm_60dbu_radius_screening_km, 12.5, '60 dBu screening radius must be 12.5 km');
   assert.strictEqual(t.filing_windows.length, 3, 'must have 3 filing window entries');
   assert.strictEqual(t.form_349_exhibits.length, 6, 'must have 6 Form 349 exhibits');

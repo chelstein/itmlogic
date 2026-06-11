@@ -294,7 +294,7 @@ export const WARNING_CODES = Object.freeze({
 
   AM_INTERNATIONAL_TREATY_ZONE: { severity: 'warning', phase: 'engine',
     title: 'AM transmitter site inside US/MX or US/CA bilateral treaty zone',
-    description: 'The proposed transmitter coordinates fall within a US/Mexico or US/Canada bilateral AM treaty zone.  Stations in these zones must protect co-channel and adjacent-channel foreign stations per the applicable bilateral agreement (NARBA or US/Canada agreement) under 47 CFR §73.187 / §73.188.  A separate bilateral interference study is required before this application can be filed; the engineer of record must perform it and attach the exhibit to the FCC submission.  This engine does not produce bilateral treaty studies.' },
+    description: 'The proposed transmitter coordinates fall within a US/Mexico or US/Canada bilateral AM treaty zone.  Stations in these zones must protect co-channel and adjacent-channel foreign stations per the applicable bilateral agreement (NARBA or US/Canada agreement) under 47 CFR §73.1650 (international agreements) / §73.182.  A separate bilateral interference study is required before this application can be filed; the engineer of record must perform it and attach the exhibit to the FCC submission.  This engine does not produce bilateral treaty studies.' },
 
   AM_DA_PATTERN_COMPLIANCE_FAIL: { severity: 'blocker', phase: 'engine',
     title: 'AM DA pattern §73.150 compliance failure',
