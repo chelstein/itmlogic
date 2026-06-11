@@ -2842,15 +2842,17 @@ test('mpe_rf_exposure_summary.recommended_fence_distance_m >= near_field_boundar
   }
 });
 
-test('mpe_rf_exposure_summary fence distance increases with higher TPO', async () => {
+test('mpe_rf_exposure_summary far-field exclusion distance increases with higher TPO', async () => {
+  // At AM frequencies the near-field boundary (λ/2π ≈ 61m at 780kHz) dominates fence_distance
+  // for typical AM power levels.  The far_field_exclusion_m is what scales with TPO.
   const low  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, candidate_limit: 1 });
   const high = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, candidate_limit: 1 });
   assert.equal(low.available, true);
   assert.equal(high.available, true);
-  const fenceLow  = low.candidates[0].mpe_rf_exposure_summary.recommended_fence_distance_m;
-  const fenceHigh = high.candidates[0].mpe_rf_exposure_summary.recommended_fence_distance_m;
-  assert.ok(fenceHigh > fenceLow,
-    `higher TPO should produce larger fence distance: ${fenceHigh} not > ${fenceLow}`);
+  const excLow  = low.candidates[0].mpe_rf_exposure_summary.far_field_exclusion_m;
+  const excHigh = high.candidates[0].mpe_rf_exposure_summary.far_field_exclusion_m;
+  assert.ok(excHigh > excLow,
+    `higher TPO should produce larger far-field exclusion: ${excHigh} not > ${excLow}`);
 });
 
 // ---------- engineering_summary ----------
@@ -13003,8 +13005,8 @@ test('KAZM total capital cost range', async () => {
 test('KAZM simple payback years', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
-  assert.strictEqual(g.simple_payback_years_low,  0.3, 'payback_years_low should be 0.3');
-  assert.strictEqual(g.simple_payback_years_high, 5.1, 'payback_years_high should be 5.1');
+  assert.strictEqual(g.simple_payback_years_low,  0.48, 'payback_years_low should be 0.48 (240000/500000)');
+  assert.strictEqual(g.simple_payback_years_high, 7.3,  'payback_years_high should be 7.3 (730000/100000)');
   assert.strictEqual(g.annual_revenue_low,  100000, 'annual_revenue_low should be $100,000');
   assert.strictEqual(g.annual_revenue_high, 500000, 'annual_revenue_high should be $500,000');
 });
@@ -17671,14 +17673,20 @@ test('#116 DA station has more da_certifications than NDA', async () => {
   assert.ok(gDA2.n_da_certifications > 0, 'DA-2 must have at least one DA certification');
 });
 
-test('#116 annual cost includes ASR inspection only when ASR required', async () => {
+test('#116 annual cost includes ASR inspection for all AM Class D stations (3/8λ exceeds 61m)', async () => {
+  // At 3/8λ design height, all Class D AM frequencies have towers > 61m (200ft):
+  //   1600 kHz: 3/8λ = 70.3m > 61m → ASR required
+  //   540 kHz:  3/8λ = 208m  > 61m → ASR required
   const highFreq = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
   const lowFreq  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
   const annHigh = highFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
   const annLow  = lowFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
-  assert.strictEqual(annHigh.asr_annual_inspection_usd, 0, '1600 kHz: no ASR inspection cost');
-  assert.ok(annLow.asr_annual_inspection_usd > 0, '540 kHz: must have ASR inspection cost');
-  assert.ok(annLow.total_annual_low_usd > annHigh.total_annual_low_usd, 'low-freq annual cost > high-freq');
+  assert.ok(annHigh.asr_annual_inspection_usd > 0, '1600 kHz 3/8λ=70m > 61m: ASR inspection cost required');
+  assert.ok(annLow.asr_annual_inspection_usd  > 0, '540 kHz 3/8λ=208m > 61m: ASR inspection cost required');
+  // DA station (pattern adds DA parameter monitoring cost) vs NDA
+  const da2Out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const annDA2 = da2Out.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
+  assert.ok(annDA2.total_annual_low_usd > annHigh.total_annual_low_usd, 'DA station annual cost > NDA due to pattern monitoring');
 });
 
 test('#116 candidate_comparison_table has rdb_* columns', async () => {
