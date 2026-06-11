@@ -9288,8 +9288,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // Simplified structural model:
       //   For a self-supporting (self-support) or guyed monopole (AM standard):
-      //     Tower height h  = λ/4 in feet (from station frequency)
-      //     Tower diameter  ≈ 2 ft at base (typical 300 ft AM tower, tapered)
+      //     Tower height h  = class-aware design height (3/8λ Class C/D, 5/8λ Class A/B)
+      //     Tower diameter  ≈ 2 ft at base (typical AM tower, tapered)
       //     Wind pressure   per TIA-222-H: P = 0.00256 × K_z × K_zt × K_d × V² × G × C_f × A_f
       //       V = basic wind speed (assume 115 mph for continental US – AZ/NM typical)
       //       K_z = 1.27 (exposure C, h = 315 ft)
@@ -17197,7 +17197,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const tower_inspection_usd_high = 5000;
 
       // ---- Tower lighting maintenance (if applicable) ----
-      // Medium intensity (typical for 315-ft tower): $2,000–$5,000/yr
+      // Medium intensity (standard AM tower 200–500 ft range): $2,000–$5,000/yr
       const lighting_maint_low_usd  = 2000;
       const lighting_maint_high_usd = 5000;
 
