@@ -14088,7 +14088,7 @@ it('candidate_comparison_table faa columns are correct for KAZM Class D', async 
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.faa_notice_required, true, 'faa_notice_required should be true');
-  assert.ok(Math.abs(r0.faa_tower_height_ft - 315.26) < 0.5, `faa_tower_height_ft expected ~315.26, got ${r0.faa_tower_height_ft}`);
+  assert.ok(Math.abs(r0.faa_tower_height_ft - 472.87) < 0.5, `faa_tower_height_ft expected ~472.87, got ${r0.faa_tower_height_ft}`);
   assert.strictEqual(r0.faa_study_cost_low_usd, 3500, 'faa_study_cost_low_usd should be 3500');
 });
 
@@ -14440,10 +14440,10 @@ it('am_antenna_tower_lighting_and_marking_guide lighting_required is true for KA
   assert.strictEqual(g.lighting_required, true, 'KAZM 315 ft tower must require lighting (> 200 ft)');
 });
 
-it('am_antenna_tower_lighting_and_marking_guide paint_bands is 8 for KAZM (ceil(315/100)*2)', async () => {
+it('am_antenna_tower_lighting_and_marking_guide paint_bands is 10 for KAZM (ceil(473/100)*2)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_antenna_tower_lighting_and_marking_guide;
-  assert.strictEqual(g.paint_bands, 8, `paint_bands should be 8 for 315 ft tower`);
+  assert.strictEqual(g.paint_bands, 10, `paint_bands should be 10 for 473 ft tower`);
 });
 
 it('am_antenna_tower_lighting_and_marking_guide reference cites §17.21 and AC 70/7460-1M', async () => {

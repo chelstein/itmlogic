@@ -12919,7 +12919,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_ltg = frequency_khz / 1000;
       const lambda_m_ltg = 299.792458 / freq_mhz_ltg;
       const isHighClass_ltg = /^[AB]/i.test(fcc_class);
-      const tower_height_m_ltg   = round2(isHighClass_ltg ? lambda_m_ltg / 2 : lambda_m_ltg / 4);
+      const tower_height_m_ltg   = round2(isHighClass_ltg ? lambda_m_ltg * 0.625 : lambda_m_ltg * 0.375);
       const tower_height_ft_ltg  = round2(tower_height_m_ltg * 3.28084);
       const lighting_required = tower_height_ft_ltg > 200;
       const lighting_category = tower_height_ft_ltg >= 500
@@ -13117,7 +13117,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_sec = frequency_khz / 1000;
       const lambda_m_sec = 299.792458 / freq_mhz_sec;
       const isHighClass_sec = /^[AB]/i.test(fcc_class);
-      const tower_height_m_sec = round2(isHighClass_sec ? lambda_m_sec / 2 : lambda_m_sec / 4);
+      const tower_height_m_sec = round2(isHighClass_sec ? lambda_m_sec * 0.625 : lambda_m_sec * 0.375);
       const tower_height_ft_sec = round2(tower_height_m_sec * 3.28084);
       // Guy anchor radius: typically 70–80% of tower height for guyed AM monopoles
       const guy_radius_ft_low  = round2(tower_height_ft_sec * 0.70);
@@ -13213,7 +13213,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_ins = frequency_khz / 1000;
       const lambda_m_ins = 299.792458 / freq_mhz_ins;
       const isHighClass_ins = /^[AB]/i.test(fcc_class);
-      const tower_height_m_ins = round2(isHighClass_ins ? lambda_m_ins / 2 : lambda_m_ins / 4);
+      const tower_height_m_ins = round2(isHighClass_ins ? lambda_m_ins * 0.625 : lambda_m_ins * 0.375);
       const tower_height_ft_ins = round2(tower_height_m_ins * 3.28084);
       // Tower replacement cost: ~$800–$1,500 per foot for guyed AM monopole (Rohn/Valmont grade)
       const tower_replacement_cost_per_ft_low  = 800;
@@ -13319,7 +13319,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_z = frequency_khz / 1000;
       const lambda_m_z = 299.792458 / freq_mhz_z;
       const isHighClass_z = /^[AB]/i.test(fcc_class);
-      const tower_height_m_z = round2(isHighClass_z ? lambda_m_z / 2 : lambda_m_z / 4);
+      const tower_height_m_z = round2(isHighClass_z ? lambda_m_z * 0.625 : lambda_m_z * 0.375);
       const tower_height_ft_z = round2(tower_height_m_z * 3.28084);
       // Setback requirement: 1.0× tower height (most common), 1.5× in some jurisdictions
       const setback_factor_typical = 1.0;
@@ -13415,7 +13415,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_faa = frequency_khz / 1000;
       const lambda_m_faa = 299.792458 / freq_mhz_faa;
       const isHighClass_faa = /^[AB]/i.test(fcc_class);
-      const tower_height_m_faa = round2(isHighClass_faa ? lambda_m_faa / 2 : lambda_m_faa / 4);
+      const tower_height_m_faa = round2(isHighClass_faa ? lambda_m_faa * 0.625 : lambda_m_faa * 0.375);
       const tower_height_ft_faa = round2(tower_height_m_faa * 3.28084);
       const faa_notice_threshold_ft = 200;
       const notice_required = tower_height_ft_faa > faa_notice_threshold_ft;
