@@ -17440,7 +17440,7 @@ test('#111 KAZM NDA: chief operator qualification guide present with correct sha
   assert.strictEqual(g.rp_permit_cost_usd, 0, 'RP permit is free (FCC ULS)');
   assert.strictEqual(g.chief_operator_designation.required, true, 'chief operator must be required');
   assert.strictEqual(g.chief_operator_designation.must_be_us_citizen, true, 'must be US citizen');
-  assert.strictEqual(g.unattended_operation.authorized, true, '§73.801 unattended must be authorized');
+  assert.strictEqual(g.unattended_operation.authorized, true, '§73.1300 unattended must be authorized');
   assert.strictEqual(g.log_retention_years, undefined, 'log retention is not a field on this guide (it is on pml guide)');
 });
 

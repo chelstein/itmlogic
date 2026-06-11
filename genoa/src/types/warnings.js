@@ -286,7 +286,7 @@ export const WARNING_CODES = Object.freeze({
 
   AM_73_24G_FAIL: { severity: 'blocker', phase: 'engine',
     title: 'AM §73.24(g) blanket-interference population ratio exceeds 1%',
-    description: 'The population within the 1000 mV/m blanket-interference contour exceeds 1.0% of the population within the 25 mV/m service contour (47 CFR §73.24(g)).  The licensee must submit a blanketing-interference remediation plan (§73.318(b)) and commit to receiver-treatment funds before filing.  This is a pre-construction showing requirement.' },
+    description: 'The population within the 1000 mV/m blanket-interference contour exceeds 1.0% of the population within the 25 mV/m service contour (47 CFR §73.24(g)).  The licensee must submit a blanketing-interference remediation plan (§73.88 — AM blanketing; §73.318 is the FM equivalent) and commit to receiver-treatment funds before filing.  This is a pre-construction showing requirement.' },
 
   AM_73_24J_FAIL: { severity: 'blocker', phase: 'engine',
     title: 'AM §73.24(i) community coverage — 5 mV/m contour does not encompass city of license',

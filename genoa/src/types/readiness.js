@@ -116,7 +116,7 @@ export function readiness({ warnings = [], exhibit = {} }){
   if (blockers.find(b => b.code === 'CONTOUR_MONOTONICITY_VIOLATION'))
     recommendations.push('Contour distance ordering is inconsistent; re-run compute and inspect the radial table for the flagged radials.');
   if (blockers.find(b => b.code === 'AM_73_24G_FAIL'))
-    recommendations.push('Submit a §73.318(b) blanketing-interference remediation plan and commit to receiver-treatment funding before filing (47 CFR §73.24(g)).');
+    recommendations.push('Submit a §73.88 blanketing-interference remediation plan and commit to receiver-treatment funding before filing (47 CFR §73.24(g); §73.318 is the FM blanketing rule).');
   if (blockers.find(b => b.code === 'AM_73_24J_FAIL'))
     recommendations.push('Increase power, reduce frequency, or modify the site to bring the 5 mV/m groundwave contour around the entire community of license before filing (47 CFR §73.24(i)).');
   if (blockers.find(b => b.code === 'FCCAM_UNAVAILABLE_BERRY_FALLBACK'))

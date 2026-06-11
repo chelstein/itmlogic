@@ -185,7 +185,8 @@ export function buildHaatBasisGovernanceSection(exhibit, options = {}) {
     'automatically a defect; it is a basis-selection issue that must be explicitly ' +
     'declared by the engineer of record.  Final certification of the HAAT basis is ' +
     'the responsibility of the qualified broadcast engineer of record per ' +
-    '47 CFR §73.801 / §73.1690.'
+    '47 CFR §1.17 and §73.1015 (truthful and accurate statements); ' +
+    'transmission system modifications are governed by §73.1690.'
   );
 
   return {
