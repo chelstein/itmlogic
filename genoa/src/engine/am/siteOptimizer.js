@@ -18972,9 +18972,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_clear_ch_str = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const is_local_ch_str = LOCAL_CHANNEL_KHZ.has(frequency_khz);
 
-      // Tower height (λ/4 for this station)
+      // Tower height: 3/8λ for Class C/D, 5/8λ for Class A/B (FCC planning optimum)
       const lambda_m_str    = Math.round(299792 / frequency_khz);
-      const tower_height_m  = Math.round(lambda_m_str / 4);
+      const isHighClass_str = /^[AB]$/i.test(fcc_class);
+      const tower_height_m  = Math.round(lambda_m_str * (isHighClass_str ? 0.625 : 0.375));
       const tower_height_ft = Math.round(tower_height_m * 3.28084);
 
       // Geographic wind zone from candidate latitude/longitude
@@ -19439,10 +19440,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_clear_ch_env = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const is_local_ch_env = LOCAL_CHANNEL_KHZ.has(frequency_khz);
 
-      // Tower height estimate: λ/4 for standard AM antenna
-      const wavelength_m   = 299792 / frequency_khz;
-      const tower_height_m = Math.round(wavelength_m / 4);
-      const tower_height_ft= Math.round(tower_height_m * 3.28084);
+      // Tower height: 3/8λ for Class C/D, 5/8λ for Class A/B (FCC planning optimum)
+      const wavelength_m    = 299792 / frequency_khz;
+      const isHighClass_env = /^[AB]$/i.test(fcc_class);
+      const tower_height_m  = Math.round(wavelength_m * (isHighClass_env ? 0.625 : 0.375));
+      const tower_height_ft = Math.round(tower_height_m * 3.28084);
 
       // Antenna array complexity
       const n_towers = isDA_env ? (tpo_kw > 10 ? 4 : 2) : 1;
