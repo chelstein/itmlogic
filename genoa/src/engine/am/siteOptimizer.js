@@ -3887,7 +3887,7 @@ async function scoreCandidate(pt, ctx, warnings){
           id: 'DA_ENGINEERING',
           label: `§73.150 DA ${isFull ? 'day+night' : 'daytime'} pattern study`,
           low_usd: da_low, high_usd: da_high,
-          note: `Includes antenna array design, NEC modeling, pattern iteration, and §73.316 radial table. ${isFull ? 'Full day+night DA significantly increases engineering hours.' : ''}`
+          note: `Includes antenna array design, NEC modeling, pattern iteration, and §73.150(a) 72-radial HRP table (5° increments). ${isFull ? 'Full day+night DA significantly increases engineering hours.' : ''}`
         });
       }
 
@@ -5337,13 +5337,13 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         {
           id:          'LMS_DA_PATTERN',
-          form:        'Form 301-AM — Exhibit G / §73.316 pattern table',
+          form:        'Form 301-AM — Exhibit G / §73.150(a) pattern table',
           exhibit:     'Directional antenna (DA) horizontal pattern',
           status:      daRecom ? 'REQUIRED' : 'CONDITIONAL',
-          rule:        '47 CFR §73.150 / §73.316',
+          rule:        '47 CFR §73.150 / §73.152 / §73.154',
           responsible: 'Licensed broadcast engineer (antenna)',
           note:        daRecom
-            ? '§73.316 requires horizontal pattern table in 5° increments (72 tabulated values + 0°). DA pattern must be modeled with moment-method software; physical proof measurement required after construction.'
+            ? '§73.150(a) / Form 301-AM: horizontal pattern table in 5° increments (72 tabulated values, 0°–355°). DA pattern must be modeled with moment-method (NEC) software; proof-of-performance field-intensity measurements required after construction per §73.154.'
             : 'NDA operation proposed. DA pattern exhibit not required unless NIF failure or objection requires pattern protection.'
         },
         {
@@ -5586,7 +5586,7 @@ async function scoreCandidate(pt, ctx, warnings){
           rule: '47 CFR §73.154',
           instrument: 'Calibrated FCC field-intensity meter (Narda, ETS-Lindgren, or equivalent) with λ/4 whip',
           notes: isDA_pg
-            ? `DA pattern: measure all azimuthal radials specified in authorized DA pattern, plus 8 orthogonal radials for verification. Monitor points must be measured at authorized reference field. §73.316 requires submission of measured pattern vs. theoretical.`
+            ? `DA pattern: measure all azimuthal radials specified in authorized DA pattern, plus 8 orthogonal radials for verification. Monitor points must be measured at authorized reference field. §73.154(a) requires submission of measured pattern vs. theoretical to obtain license to cover (Form 302-AM).`
             : `Drive 8 radials at 0°/45°/90°/135°/180°/225°/270°/315° from antenna. Record FI every ${round2(lambdaM_pg / 8)} m (λ/8) from base out to minimum 2 km. Compute inverse-distance normalized field at 1 km for each radial.`
         },
         {
@@ -5637,7 +5637,7 @@ async function scoreCandidate(pt, ctx, warnings){
         measurements: proofMeasurements,
         nda_radial_plan: isDA_pg ? null : ndaRadials,
         filing_trigger: 'FCC Form 302-AM (license to cover) must be filed within 3 years of CP grant date (§73.3534). Proof measurements must be complete before 302-AM is submitted.',
-        reference: '47 CFR §73.154 (proof of performance); §73.190 (antenna efficiency); §73.316 (DA pattern measurements); OET Bulletin 65 (RF exposure).',
+        reference: '47 CFR §73.154 (proof of performance); §73.190 (antenna efficiency); §73.150(a) (DA pattern table, 5° increments); FCC Form 302-AM (license to cover); OET Bulletin 65 (RF exposure).',
         note: 'This is a screening-grade proof guide. Actual proof methodology must be coordinated with the licensed broadcast engineer of record and FCC counsel before construction.'
       };
     })(),
@@ -6737,7 +6737,7 @@ async function scoreCandidate(pt, ctx, warnings){
           key_tasks:    [
             'Finalize engineering exhibits (coverage, blanket pop, MPE)',
             'Prepare environmental exhibits (NEPA/NHPA sign-off documentation)',
-            isDA_lt ? 'DA pattern exhibits per §73.316 (36-radial HRP, suppression ratios)' : 'NDA radiation pattern certification',
+            isDA_lt ? 'DA pattern exhibits per §73.150(a) (72-radial HRP at 5° increments, suppression ratios per §73.207)' : 'NDA radiation pattern certification',
             'FCC filing attorney review and LMS Form 301-AM submission',
             'Pay application fee (§73.3520)'
           ]
@@ -7044,13 +7044,13 @@ async function scoreCandidate(pt, ctx, warnings){
           'File for treaty coordination through FCC International Bureau before or concurrent with Form 301-AM. Allow 6–18 months for coordination clearance.');
       })();
 
-      // 7. Directional antenna pattern — §73.316 / §73.150
+      // 7. Directional antenna pattern — §73.150 / §73.154
       const i7 = isDA_rc
-        ? item('da_pattern', 'Directional antenna (DA) pattern requirements', '47 CFR §73.316 / §73.150', 'WARN',
-          `Pattern mode ${pattern_mode}: §73.316 requires a horizontal radiation pattern table (36 radials at 10° increments) and suppression ratios filed with Form 301-AM. §73.150 requires proof-of-performance measurements at the new site (72-radial FI traversals per §73.154).`,
-          'Engage an AM DA design engineer. Prepare §73.316 HRP table, field intensity contour map, and §73.150 DA proof schedule. Budget 16–52 weeks for pre-application pattern design.')
-        : item('da_pattern', 'Directional antenna (DA) pattern requirements', '47 CFR §73.316 / §73.150', 'PASS',
-          `Pattern mode ${pattern_mode}: non-directional antenna. §73.316 DA pattern requirements do not apply. Standard 8-radial inverse-distance proof of performance required at new site.`);
+        ? item('da_pattern', 'Directional antenna (DA) pattern requirements', '47 CFR §73.150 / §73.154', 'WARN',
+          `Pattern mode ${pattern_mode}: §73.150(a) requires a horizontal radiation pattern table at 5° increments (72 radials, 0°–355°) and suppression ratios filed with Form 301-AM. §73.154 requires proof-of-performance field-intensity measurements at the new site (minimum 8 radials + DA-authorized radials, per §73.154(a)).`,
+          'Engage an AM DA design engineer. Prepare §73.150(a) HRP table (72-radial, 5° increments), field intensity contour map, and §73.154 DA proof schedule. Budget 16–52 weeks for pre-application pattern design.')
+        : item('da_pattern', 'Directional antenna (DA) pattern requirements', '47 CFR §73.150 / §73.154', 'PASS',
+          `Pattern mode ${pattern_mode}: non-directional antenna. §73.150 DA pattern requirements do not apply. Standard 8-radial inverse-distance proof of performance required at new site per §73.154.`);
 
       // 8. Ground system — §73.190 (AM stations must have efficient ground radial system)
       const sigmaAdequate = sigma_msm >= SIGMA_PREFERRED_MIN_MSM;
