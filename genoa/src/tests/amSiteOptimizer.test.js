@@ -8208,7 +8208,7 @@ test('radial_system_engineering_guide wavelength and radial length', async () =>
   const lambda = 300000 / KAZM.frequency_khz;
   assert.ok(Math.abs(r.wavelength_m - lambda) < 1, 'wavelength must match 300000/freq_khz');
   assert.ok(r.optimum_radial_length_m > 0, 'optimum radial length must be positive');
-  assert.ok(r.optimum_radial_length_m < r.wavelength_m, 'radial length (0.4λ) must be less than full wavelength');
+  assert.ok(r.optimum_radial_length_m < r.wavelength_m, 'radial length (0.35λ per §73.186) must be less than full wavelength');
   assert.ok(r.optimum_radial_length_ft > r.optimum_radial_length_m, 'ft must be greater than m');
 });
 
@@ -13471,7 +13471,7 @@ test('KAZM NDA site requires 2 acres minimum', async () => {
   const g = out.candidates[0].am_real_estate_and_land_acquisition_guide;
   assert.strictEqual(g.isDA,      false, 'KAZM NDA so isDA should be false');
   assert.strictEqual(g.min_acres, 2,     'NDA requires 2 acres minimum');
-  assert.strictEqual(g.radial_ft, 315.26, 'KAZM radial_ft should be 315.26');
+  assert.strictEqual(g.radial_ft, 441.34, 'KAZM radial_ft should be 441.34 (0.35λ per §73.186)');
 });
 
 test('KAZM land purchase total cost', async () => {
