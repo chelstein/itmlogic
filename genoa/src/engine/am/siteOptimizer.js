@@ -29478,8 +29478,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
     adjacent_market_coverage_analysis: (() => {
       // Adjacent market and COL (City of License) coverage analysis for AM relocation
-      // §73.318: Contour protection from FM; but for AM, key metric is city of license coverage
       // §73.187/§73.24: COL must receive a specified minimum field strength
+      // (§73.318 is the FM blanketing interference rule — not applicable to AM coverage analysis)
       // FCC defines minimum COL field strength by class:
       //   Class A: 5 mV/m day; Class B/C/D: 5 mV/m (day)/2 mV/m night to be "primary"
       // Daytime groundwave reach at 0.5 mV/m defines the primary service contour
@@ -29572,7 +29572,7 @@ async function scoreCandidate(pt, ctx, warnings){
         primary_service_area_km2: COVERAGE_ZONES[0].area_km2,
         reach_pct_change_vs_current_site: reach_pct_change,
         translator_opportunity: TRANSLATOR_OPPORTUNITY,
-        reference: '47 CFR §73.24; §73.182; §73.187; §73.318; §74.1200; FCC AMTA 2020; FCC Form 349',
+        reference: '47 CFR §73.24; §73.182; §73.187; §74.1200; FCC AMTA 2020; FCC Form 349',
         note: `Class ${fcc_class} at ${frequency_khz} kHz. Primary 0.5 mV/m reach: ${primary_reach_km} km (${COVERAGE_ZONES[0].area_km2} km²). COL min: ${myThreshold.day_mvm} mV/m day.${reach_pct_change != null ? ` Reach change vs current site: ${reach_pct_change > 0 ? '+' : ''}${reach_pct_change}%.` : ''} FM translator (250W) authorized under AMTA.`
       };
     })(),
