@@ -14699,11 +14699,13 @@ it('am_tower_structural_load_and_wind_survival_guide is present on each candidat
   }
 });
 
-it('am_tower_structural_load_and_wind_survival_guide tower_height_m matches λ/4 for 780 kHz', async () => {
+// KAZM is Class D at 780 kHz: class standard height = 3/8λ = 0.375 × (300000/780) ≈ 144.13 m.
+// λ/4 (96.15 m) was previously used here, which underestimated structural loads by ~(144/96)² ≈ 2.25×.
+it('am_tower_structural_load_and_wind_survival_guide tower_height_m matches 3/8λ for Class D 780 kHz', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_structural_load_and_wind_survival_guide;
-  // λ/4 at 780 kHz = 300000/780/4 ≈ 96.15 m
-  assert.ok(Math.abs(g.tower_height_m - 96.15) < 0.1, `tower_height_m ${g.tower_height_m} should be ~96.15 m`);
+  // Class D at 780 kHz: 3/8λ = 0.375 × 384.62 ≈ 144.13 m
+  assert.ok(Math.abs(g.tower_height_m - 144.13) < 0.5, `tower_height_m ${g.tower_height_m} should be ~144.13 m (3/8λ Class D)`);
 });
 
 it('am_tower_structural_load_and_wind_survival_guide wind_force_kn > 0 and base_moment_knm > 0', async () => {

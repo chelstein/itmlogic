@@ -12538,8 +12538,9 @@ async function scoreCandidate(pt, ctx, warnings){
 
     am_tower_structural_load_and_wind_survival_guide: (() => {
       // EIA/TIA-222-H wind load on a self-supporting AM tower.
-      // Tower height: λ/4 at the station frequency is the "standard" electrical height; real towers
-      //   range ±10% but λ/4 is the design reference.
+      // Tower height: class-specific planning height — 5/8λ for Class A/B, 3/8λ for Class C/D.
+      //   FCC Class C/D standard is 3/8λ (§73.316 / AM antenna engineering practice); Class A/B use 5/8λ.
+      //   Structural loads scale ∝ H² so using the correct class height is critical for accurate estimates.
       // Design wind speed: 90 mph basic (ASCE 7-22 Risk Category II, Exposure C for open terrain).
       //   3-second gust → mean-hourly adjustment factor ≈ 0.85 → V_mean ≈ 76.5 mph.
       //   EIA/TIA-222-H specifies 3-second gust, so we use V_3s = 90 mph directly.
@@ -12558,7 +12559,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   FAA paint/lighting inspection: $2,000–$5,000 (if applicable per 47 CFR §17.50)
       const f_khz        = frequency_khz;
       const lambda_m     = 300000 / f_khz;                       // free-space wavelength, metres
-      const H_m          = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_m); // 5/8λ Class A/B, λ/4 Class C/D
+      const isHighCls_tsw = /^[AB]$/i.test(fcc_class);
+      const H_m          = round2((isHighCls_tsw ? 0.625 : 0.375) * lambda_m); // 5/8λ Class A/B, 3/8λ Class C/D
       const V_mph        = 90;                                    // 3-sec gust, ASCE 7-22 Risk Cat II
       const V_ms         = round2(V_mph * 0.44704);              // m/s
       const rho_air      = 1.225;                                 // kg/m³ at sea level
@@ -12607,7 +12609,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_structural_low_usd,
         total_structural_high_usd,
         reference: '47 CFR §17.50 (tower lighting); EIA/TIA-222-H (structural standard); ASCE 7-22 (wind loads); 47 CFR §73.49 (antenna enclosure)',
-        note: `${H_m} m tower (λ/4 at ${f_khz} kHz); ${V_mph} mph 3-sec gust → ${F_wind_kn} kN wind force, ${M_base_knm} kN·m base moment. Compliance tier: ${compliance_tier}. Foundation must resist ${M_capacity_knm} kN·m (1.5× safety factor per TIA-222-H §2.4). ${H_m > 60 ? 'Tower height >60 m requires full SE-stamped TIA-222-H analysis and FAA lighting inspection per §17.50.' : 'Standard structural analysis sufficient.'}`
+        note: `${H_m} m tower (Class ${fcc_class} ${isHighCls_tsw ? '5/8λ' : '3/8λ'} at ${f_khz} kHz); ${V_mph} mph 3-sec gust → ${F_wind_kn} kN wind force, ${M_base_knm} kN·m base moment. Compliance tier: ${compliance_tier}. Foundation must resist ${M_capacity_knm} kN·m (1.5× safety factor per TIA-222-H §2.4). ${H_m > 60 ? 'Tower height >60 m requires full SE-stamped TIA-222-H analysis and FAA lighting inspection per §17.50.' : 'Standard structural analysis sufficient.'}`
       };
     })(),
 
@@ -12695,11 +12697,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //   λ/4 → R_rad ≈ 36.6 Ω; 0.2λ (short) → R_rad ≈ 10 Ω; 0.6λ → R_rad ≈ 74 Ω.
       // ATU re-tuning trigger: base current deviation > 2% or SWR change > 10%.
       const is_da_bcim = /^DA/i.test(pattern_mode);
-      // Electrical length fraction (proxy from frequency and typical tower height)
+      // Electrical length fraction using class-specific planning height: 5/8λ for A/B, 3/8λ for C/D.
       const lambda_m_bcim = round2(300000 / frequency_khz);
-      const standard_height_m_bcim = round2(lambda_m_bcim / 4); // λ/4 standard
-      const elec_deg_bcim = 90; // λ/4 = 90 electrical degrees
-      // R_rad for λ/4 monopole over perfect ground ≈ 36.6 Ω
+      const isHighCls_bcim = /^[AB]$/i.test(fcc_class);
+      const standard_height_m_bcim = round2(lambda_m_bcim * (isHighCls_bcim ? 0.625 : 0.375));
+      const elec_deg_bcim = isHighCls_bcim ? 225 : 135; // 5/8λ = 225° for A/B, 3/8λ = 135° for C/D
+      // R_rad screening estimate: λ/4 monopole reference (36.6 Ω); actual R_rad varies with height.
       const r_rad_est_ohm = 36.6;
       const i_base_a = round2(Math.sqrt((tpo_kw * 1000) / r_rad_est_ohm));
       // §73.61 tolerance: ±2% of authorized base current
