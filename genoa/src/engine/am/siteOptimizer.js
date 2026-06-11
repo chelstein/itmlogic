@@ -28076,13 +28076,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const qwave_h_m    = round2(lambda_m / 4);
       const theta_deg    = round2(360 * qwave_h_m / lambda_m); // should be ~90°
 
-      // Radiation resistance at exactly quarter-wave (θ=90°)
-      // R_r(90°) = 36.5 Ω (classical monopole result)
-      const theta_rad = (theta_deg * Math.PI) / 180;
-      const R_r = round2(
-        197.4 * Math.pow(1 - Math.cos(theta_rad), 2) +
-        40 * theta_rad * theta_rad * Math.sin(theta_rad)
-      );
+      // Radiation resistance at exactly quarter-wave (θ=90°):
+      // R_r = 36.6 Ω — well-established result for lossless λ/4 monopole over
+      // perfect infinite ground plane (Terman, 1955; Laport, 1952; ARRL Handbook).
+      // (Terman rounds to 36.5 Ω; both values are cited in the literature.)
+      const R_r = 36.6;
 
       // Efficiency at three ground-system quality levels
       const R_loss_good   = 1.5;   // 120 radials
