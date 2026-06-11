@@ -9522,8 +9522,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   47 CFR §73.68: AM antenna system — the transmission line is part of the
       //     "antenna system" and its impedance characteristics must be accounted for
       //     in the base-current calculations submitted with FCC Form 302-AM.
-      //   §73.1215: Antenna resistance measurements; feed system must maintain repeatable
-      //     impedance to within prescribed tolerances.
+      //   §73.68 / §73.154: Antenna system measurements — feed system impedance and base
+      //     resistance must be measured and submitted with Form 302-AM.
+      //     (§73.1215 covers indicating instruments, not antenna resistance.)
       //
       // Engineering model:
       //   AM band (0.53–1.7 MHz) typically uses one of:
@@ -9613,7 +9614,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_158_low_usd:       total_158_low,
         total_158_high_usd:      total_158_high,
         recommended_cable:       recommended,
-        reference: '47 CFR §73.68 (antenna system); §73.1215 (impedance measurements); Andrew/CommScope LDF4-50A, LDF6-50A data sheets (attenuation vs frequency); ARRL Antenna Book ch. 24 (feed line loss)',
+        reference: '47 CFR §73.68 (antenna system); §73.154 (proof measurements including impedance); Andrew/CommScope LDF4-50A, LDF6-50A data sheets (attenuation vs frequency); ARRL Antenna Book ch. 24 (feed line loss)',
         note: `At ${frequency_khz} kHz (${f_mhz} MHz): 7/8" loss=${loss_78_db_typical} dB/100ft, 1-5/8" loss=${loss_158_db_typical} dB/100ft for ${typical_line_ft}-ft run. Recommended: ${recommended} for ${p_kw} kW TPO.`
       };
     })(),
@@ -11765,8 +11766,10 @@ async function scoreCandidate(pt, ctx, warnings){
     am_station_power_supply_and_electrical_infrastructure_guide: (() => {
       // AM transmitter site electrical infrastructure requirements.
       //
-      // §73.1215: Transmitter and supporting equipment must be maintained in good operating condition.
+      // §73.1350: Transmission system operation — licensee must maintain the transmitter and all
+      //   supporting equipment in proper operating condition and correct off-normal conditions promptly.
       //   Includes power supply, rectifier, HV power supply, and all ancillary electrical equipment.
+      //   (§73.1215 covers indicating instruments specifically; not a general maintenance rule.)
       //
       // AC input power requirements:
       //   Typical AM transmitter efficiency: 60–75% (solid state) or 50–65% (tube-based legacy).
@@ -11848,7 +11851,7 @@ async function scoreCandidate(pt, ctx, warnings){
         permit_high_usd,
         total_electrical_low_usd,
         total_electrical_high_usd,
-        reference: '47 CFR §73.1215 (equipment maintenance); §11.35 (EAS backup power); NEC Art. 702 (optional standby); NEC 230.67 (SPD); NEC 250 (grounding)',
+        reference: '47 CFR §73.1350 (transmission system operation / equipment maintenance); §11.35 (EAS backup power); NEC Art. 702 (optional standby); NEC 230.67 (SPD); NEC 250 (grounding)',
         note: `${p_kw} kW TPO at ${round2(eta * 100)}% TX efficiency → AC input ${ac_input_kw} kW + 30% overhead = ${site_load_kw} kW site load. ${service_phase} service. Generator: ${gen_tier} diesel (NEC 702.5 ×1.25 sizing = ${gen_kw_required} kW required). NEC 230.67 SPD required at service entrance. RF and power grounds must be bonded per NEC 250.`
       };
     })(),
@@ -11856,8 +11859,9 @@ async function scoreCandidate(pt, ctx, warnings){
     am_transmission_line_and_atu_engineering_guide: (() => {
       // Transmission line and ATU (Antenna Tuning Unit) engineering for AM broadcast stations.
       //
-      // §73.1215: Equipment must be maintained in good operating condition; includes ATU, phasor,
-      //   and transmission line components.
+      // §73.1350: Transmission system operation requires all equipment (ATU, phasor,
+      //   transmission line) to be kept in proper operating condition.
+      //   (§73.1215 covers indicating instruments specifically; not a general maintenance rule.)
       //
       // Transmission line choices for AM:
       //   Open-wire (balanced): 600 Ω characteristic Z; typical for AM sites; very low loss at MF
@@ -11939,7 +11943,7 @@ async function scoreCandidate(pt, ctx, warnings){
         atu_design_high_usd,
         total_atu_low_usd,
         total_atu_high_usd,
-        reference: '47 CFR §73.1215 (equipment maintenance); §73.1690 (modification of transmission systems); IEEE Std 100-1992 (ATU design); §73.154 (proof of performance requires ATU stable)',
+        reference: '47 CFR §73.1350 (transmission system operation / equipment maintenance); §73.1690 (modification of transmission systems); IEEE Std 100-1992 (ATU design); §73.154 (proof of performance requires ATU stable)',
         note: `${atu_type} required at new site; ATU design by licensed PE mandatory. VSWR target ≤${vswr_target}:1. ${line_type} ${line_run_m} m run → estimated line loss ${line_loss_db} dB. New antenna impedance measurement at candidate site before ATU fabrication. Total: $${total_atu_low_usd.toLocaleString()}–$${total_atu_high_usd.toLocaleString()}.`
       };
     })(),
@@ -12049,9 +12053,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM tower base insulator: the electrically-critical component that floats the tower at RF voltage.
       //
       // §73.49: AM antenna towers must be physically enclosed (fence) — the insulator itself is not
-      //   addressed by a single rule but is an equipment maintenance obligation under §73.1215.
+      //   addressed by a single rule but is an equipment maintenance obligation under §73.1350.
       //
-      // §73.1215: Licensees must maintain equipment in good operating condition.  A cracked or
+      // §73.1350: Licensees must maintain equipment in proper operating condition.  A cracked or
       //   contaminated base insulator causes an RF short to ground — reduces radiation efficiency,
       //   may cause SWR misfeed, and can damage the transmitter final stage.
       //
@@ -12139,7 +12143,7 @@ async function scoreCandidate(pt, ctx, warnings){
         report_high_usd,
         total_protection_low_usd,
         total_protection_high_usd,
-        reference: '47 CFR §73.1215 (equipment maintenance); §73.49 (antenna enclosure); ANSI/IEEE Std 1313.1 (insulation coordination); NFPA 780 (lightning protection); §73.51 (direct method power)',
+        reference: '47 CFR §73.1350 (transmission system operation / equipment maintenance); §73.49 (antenna enclosure); ANSI/IEEE Std 1313.1 (insulation coordination); NFPA 780 (lightning protection); §73.51 (direct method power)',
         note: `V_peak = ${V_peak_kv} kV at ${tpo_kw} kW / ${R_base} Ω nominal base impedance. Insulator rating ≥ ${insulator_rating_kv_min} kV BIL (margin factor ${insulator_margin_ratio.toFixed(1)}×). ${n_elements > 1 ? `DA station: ${n_elements} tower elements, inspect all bases. ` : ''}RF choke + spark gap + MOV provide DC bonding and lightning protection across base insulator per NFPA 780.`
       };
     })(),
@@ -12561,7 +12565,7 @@ async function scoreCandidate(pt, ctx, warnings){
     am_tower_structural_load_and_wind_survival_guide: (() => {
       // EIA/TIA-222-H wind load on a self-supporting AM tower.
       // Tower height: class-specific planning height — 5/8λ for Class A/B, 3/8λ for Class C/D.
-      //   FCC Class C/D standard is 3/8λ (§73.316 / AM antenna engineering practice); Class A/B use 5/8λ.
+      //   FCC Class C/D standard is 3/8λ (AM antenna engineering practice; §73.316 is FM — no AM CFR rule mandates this height); Class A/B use 5/8λ.
       //   Structural loads scale ∝ H² so using the correct class height is critical for accurate estimates.
       // Design wind speed: 90 mph basic (ASCE 7-22 Risk Category II, Exposure C for open terrain).
       //   3-second gust → mean-hourly adjustment factor ≈ 0.85 → V_mean ≈ 76.5 mph.
@@ -17284,7 +17288,7 @@ async function scoreCandidate(pt, ctx, warnings){
         opex_10yr_pv_low_usd,
         opex_10yr_pv_high_usd,
         note: `Annual OPEX: electricity ${annual_kwh_total.toLocaleString()} kWh/yr ($${elec_cost_low_usd.toLocaleString()}–$${elec_cost_high_usd.toLocaleString()}); equip maintenance $${equip_maint_low_usd.toLocaleString()}–$${equip_maint_high_usd.toLocaleString()}; FCC fee $${fcc_annual_fee_usd.toLocaleString()}; insurance $${insurance_low_usd.toLocaleString()}–$${insurance_high_usd.toLocaleString()}. Total: $${total_annual_low_usd.toLocaleString()}–$${total_annual_high_usd.toLocaleString()}/yr; 10-yr NPV at 5%: $${opex_10yr_pv_low_usd.toLocaleString()}–$${opex_10yr_pv_high_usd.toLocaleString()}.`,
-        reference: '47 CFR §73.1215 (equipment maintenance); FCC Schedule of Application Fees (annual regulatory fees); §11.35 (EAS equipment); NEC Art. 702 (emergency power)',
+        reference: '47 CFR §73.1350 (transmission system operation / equipment maintenance); FCC Schedule of Application Fees (annual regulatory fees); §11.35 (EAS equipment); NEC Art. 702 (emergency power)',
       };
     })(),
 
@@ -17443,7 +17447,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_stl_cost_low_usd,
         total_stl_cost_high_usd,
         note: `STL run: ${stl_distance_km}km (${stl_distance_mi}mi). Technology: ${stl_technology.replace(/_/g, ' ')}${fcc_part_74_license_required ? ` — FCC Part 74.550 license required ($${fcc_license_fee_usd.toLocaleString()})` : ' — no FCC STL license needed'}; latency: ${stl_latency_ms}ms. Backup: ${backup_technology ? backup_technology.replace(/_/g, ' ') : 'dual-path IP recommended'}. Total: $${total_stl_cost_low_usd.toLocaleString()}–$${total_stl_cost_high_usd.toLocaleString()}; annual: $${stl_annual_low_usd.toLocaleString()}–$${stl_annual_high_usd.toLocaleString()}.`,
-        reference: '47 CFR Part 74 Subpart D (STL auxiliary broadcast stations); §74.502 (STL eligibility); §74.535 (frequency coordination); §73.1215 (equipment maintenance)',
+        reference: '47 CFR Part 74 Subpart D (STL auxiliary broadcast stations); §74.502 (STL eligibility); §74.535 (frequency coordination); §73.1350 (transmission system operation)',
       };
     })(),
 
@@ -17702,7 +17706,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_infrastructure_low_usd,
         total_infrastructure_high_usd,
         note: `Transmitter building: ${bld_sqft_low}–${bld_sqft_high} sq ft ${isDA_bld ? '(DA phasing room included)' : '(NDA)'}; electrical service: ${electrical_service_amps}A/${electrical_service_volts}V; HVAC: ${hvac_tons}-ton; emergency generator: ${generator_kw} kW (${fuel_tank_gal}-gal fuel storage). Total site infrastructure: $${total_infrastructure_low_usd.toLocaleString()}–$${total_infrastructure_high_usd.toLocaleString()}.`,
-        reference: '47 CFR §73.1215 (equipment maintenance / transmitter building); NEC Art. 702 (optional standby power); NEC 230.67 (SPD); NFPA 101 (Life Safety Code for occupied buildings)',
+        reference: '47 CFR §73.1350 (transmission system operation / transmitter building); NEC Art. 702 (optional standby power); NEC 230.67 (SPD); NFPA 101 (Life Safety Code for occupied buildings)',
       };
     })(),
 
@@ -17798,7 +17802,7 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_maint_low_usd,
         annual_maint_high_usd,
         note: `${nominal_tx_kw} kW ${power_class_tx} power class AM transmitter (TPO: ${tpo_kw} kW); backup at ${backup_tx_kw} kW recommended${isDA_tx ? '; DA phasing cabinet required' : ''}. ${n_base_current_meters} base current meter${n_base_current_meters > 1 ? 's' : ''} (§73.61); remote control required (§73.1400). Total equipment: $${total_equipment_low_usd.toLocaleString()}–$${total_equipment_high_usd.toLocaleString()} excl. ATU/ground system; annual maintenance: $${annual_maint_low_usd.toLocaleString()}–$${annual_maint_high_usd.toLocaleString()}.`,
-        reference: '47 CFR §73.1560(a) (operating power 90–105% of authorized); §73.1675 (auxiliary transmitters); §73.1215 (equipment maintenance); §73.1400 (transmission system requirements)',
+        reference: '47 CFR §73.1560(a) (operating power 90–105% of authorized); §73.1675 (auxiliary transmitters); §73.1350 (transmission system operation); §73.1400 (transmission system requirements)',
       };
     })(),
 
@@ -22257,7 +22261,7 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         atu_location_note: 'ATU should be at or very near tower base to minimize RF transmission line loss. Outdoor weatherproof ATU cabinet is an alternative to running coax to the transmitter building.',
         relocation_note: `${tpo_kw_num} kW transmitter → ${heat_dissipation_kw} kW heat dissipation + solar gain → ${hvac_tons} tons HVAC. Recommended building: ${recommended_floor_area_sqft} sq ft (12×20 ft). Estimated cost: $${(prefab_cost + site_prep_cost + grounding_cost).toLocaleString()} (prefab) to $${(block_cost + site_prep_cost + grounding_cost + 10000).toLocaleString()} (block).`,
-        reference: '47 CFR §73.49; §73.182; §73.1215; NEC §250; IEEE Std 1100; IBC; NFPA 70/72; manufacturer specifications',
+        reference: '47 CFR §73.49; §73.182; §73.1350 (transmission system operation); NEC §250; IEEE Std 1100; IBC; NFPA 70/72; manufacturer specifications',
         note: `Transmitter building: ${recommended_floor_area_sqft} sq ft recommended. HVAC: ${hvac_tons} tons (${heat_dissipation_kw} kW transmitter heat + solar). Estimated build cost: $${(prefab_cost + site_prep_cost + grounding_cost).toLocaleString()} typical.`
       };
     })(),
@@ -29098,7 +29102,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   (a) Frequency and mode of operation match the CP authorization.
       //   (b) Equipment ID (transmitter), antenna system details.
       //   (c) Radiation pattern and base currents (DA only): ±3°, ±5% tolerance per §73.154.
-      //   (d) HAAT/RCAMSL computed from final site survey (§73.685 / §73.1215).
+      //   (d) HAAT/RCAMSL computed from final site survey (§73.685).
       //   (e) FAA notification (if tower ≥ 200 ft AGL) within 5 business days of completion.
       //   (f) RF exposure compliance statement per OET Bulletin 65.
       //   (g) Emergency Alert System operability certification per §11.35.
@@ -29107,8 +29111,8 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'FREQ_MODE',      required: true,    label: 'Frequency/mode matches CP authorization',           cfr: '§73.3536' },
         { id: 'EQUIP_ID',       required: true,    label: 'Transmitter equipment ID (FCC Part 73 certified)',  cfr: '§73.1660' },
         { id: 'ANTENNA_SYS',    required: true,    label: 'Antenna system parameters (HAAT, RCAMSL, pattern)', cfr: '§73.685' },
-        { id: 'SITE_SURVEY',    required: true,    label: 'Licensed site coordinates verified by survey',      cfr: '§73.1215' },
-        { id: 'FAA_NOTICE',     required: true,    label: 'FAA Form 7460-2 filed within 5 days of completion', cfr: '§17.7; §73.1215' },
+        { id: 'SITE_SURVEY',    required: true,    label: 'Licensed site coordinates verified by survey',      cfr: '§73.685' },
+        { id: 'FAA_NOTICE',     required: true,    label: 'FAA Form 7460-2 filed within 5 days of completion', cfr: '§17.7; 14 CFR §77.9' },
         { id: 'RF_EXPOSURE',    required: true,    label: 'OET Bulletin 65 RF exposure compliance statement',  cfr: '§1.1310' },
         { id: 'EAS_CERT',       required: true,    label: 'EAS equipment operability certification',           cfr: '§11.35' },
         { id: 'DA_PROOF',       required: isDA_ltc, label: 'DA Proof of Performance (§73.154): base currents, phases, field measurements', cfr: '§73.154; §73.62' },
@@ -29560,10 +29564,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Transmitter power monitoring and station operating log compliance.
       //
       // 47 CFR §73.1560 — Operating power limits.
-      //   AM stations must operate within ±10% (for DA-N/DA-D/DA-2 stations)
-      //   or ±5% (for NDA Class A/B) of the licensed antenna input power (AIP),
-      //   measured at the base of the radiating antenna.
-      //   Tolerance: ±10% for all AM stations in §73.1560(a)(1).
+      //   AM stations must operate between 90% and 105% of authorized power (asymmetric).
+      //   The 90–105% range applies to all AM stations (NDA and DA).  Measured at the
+      //   base of the radiating antenna as antenna input power (AIP) via I²R.
+      //   There is no ±10%/±5% split by DA class — those symmetric bands are incorrect.
       //
       // 47 CFR §73.1215 — Antenna base current meters.
       //   Each AM radiating antenna element must have a calibrated base current
@@ -30900,11 +30904,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //   An NDA station radiates 5 mV/m in all directions; a DA station must
       //   show 5 mV/m in the direction of the COL from the transmitter site.
       //
-      // 47 CFR §73.215 — Directional antenna short-spacing.
+      // 47 CFR §73.150 / §73.182 — AM DA authorization and interference protection.
       //   When a DA station cannot meet the §73.24(i) standard omnidirectionally,
-      //   a directional antenna may be required.  §73.215 sets the conditions
+      //   a directional antenna may be required.  §73.150 authorizes AM DA patterns
+      //   (72-radial HRP at 5° increments); §73.182 (NIF analysis) sets the conditions
       //   under which a station operating with a DA pattern still qualifies
-      //   for protection from interference.
+      //   for protection from interference.  (§73.215 is an FM rule — not applicable to AM.)
       //
       // 47 CFR §73.37 — Short-spacing.
       //   New AM stations or moves may not create short-spacing to existing
@@ -31001,7 +31006,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_high_usd: waiver_total_high,
         },
         waiver_standard: '47 CFR §1.3 / §1.925 — public interest, no undue interference',
-        reference: '47 CFR §73.24(i); §73.37; §73.215; §1.3; §1.925',
+        reference: '47 CFR §73.24(i); §73.37; §73.150; §73.182; §1.3; §1.925',
         note: `${frequency_khz} kHz (${fcc_class}): COL coverage status = ${coverage_status}. 5 mV/m reach ≈ ${r5_km ?? 'N/A'} km. ${waiver_likely_needed ? 'Waiver may be needed — est. $' + waiver_total_low.toLocaleString() + '–$' + waiver_total_high.toLocaleString() + '.' : 'Coverage likely adequate.'} Co-channel min spacing: ${co_channel_min_km} km.`
       };
     })(),
