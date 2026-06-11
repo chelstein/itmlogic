@@ -18771,8 +18771,8 @@ test('#140 DA station has more towers than NDA', async () => {
 });
 
 test('#140 tower height triggers correct ASR requirement', async () => {
-  // At 780 kHz, quarter-wave ~318 ft, tower ~169 ft => no ASR required
-  // At 540 kHz, quarter-wave ~459 ft, tower ~243 ft => ASR required
+  // Class D: 3/8λ tower. At 780 kHz, 3/8λ ≈ 472 ft → ASR required, MEDIUM_INTENSITY.
+  // At 540 kHz, 3/8λ ≈ 683 ft → ASR required, HIGH_INTENSITY.
   const loFreqOut = await runSiteOptimizer({ ...KAZM, frequency_khz: 540, candidate_limit: 1 });
   const g = loFreqOut.candidates[0].am_faa_tower_lighting_and_obstruction_marking_guide;
   assert.ok(g.tower_height_ft > 200, '540 kHz tower must exceed 200 ft ASR threshold');
