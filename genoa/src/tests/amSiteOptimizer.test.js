@@ -15612,8 +15612,9 @@ test('candidate_comparison_table env columns are present and valid for KAZM', as
     assert.ok('env_total_permitting_low_usd' in row, 'env_total_permitting_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.env_nepa_trigger, 'UNLIKELY', 'rank-1 env_nepa_trigger should be UNLIKELY');
-  assert.strictEqual(r0.env_section_106_required, false, 'rank-1 env_section_106_required should be false');
+  // KAZM 780 kHz Class D: 3/8λ = 144m = 473 ft > 450 ft §1.1307(b) threshold → POSSIBLE (not UNLIKELY)
+  assert.strictEqual(r0.env_nepa_trigger, 'POSSIBLE', 'rank-1 env_nepa_trigger should be POSSIBLE (3/8λ 473ft > §1.1307(b) 450ft EA threshold)');
+  assert.strictEqual(r0.env_section_106_required, false, 'rank-1 env_section_106_required should be false (no treaty zone)');
   assert.ok(r0.env_total_permitting_low_usd > 0, 'rank-1 env_total_permitting_low_usd must be positive');
 });
 
