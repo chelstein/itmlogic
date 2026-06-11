@@ -31163,10 +31163,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const tpo_kw_num = Number(tpo_kw) || 5;
       const dist_km    = pt.distance_from_current_km ?? 0;
 
-      // Utility availability estimate based on distance proxy
+      // Utility availability estimate using land_use_class (consistent with other cost guides)
       const utility_availability =
-        dist_km < 15 ? 'LIKELY_AVAILABLE'
-        : dist_km < 35 ? 'POSSIBLE_EXTENSION'
+        land_use_class === 'SUBURBAN'       ? 'LIKELY_AVAILABLE'
+        : land_use_class === 'SUBURBAN_RURAL' ? 'POSSIBLE_EXTENSION'
         : 'LIKELY_EXTENSION_REQUIRED';
 
       // Utility extension distance estimate (rough)
