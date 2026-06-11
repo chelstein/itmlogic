@@ -6989,8 +6989,6 @@ async function scoreCandidate(pt, ctx, warnings){
       const ASR_M = 60.96;   // §17.7 200-ft threshold
       const MPE_ERP_THRESHOLD_KW = 5.0;  // OET-65 / §1.1310 threshold for FM; AM threshold varies
       const lambda_rc = 300000 / frequency_khz;
-      const qwave_rc  = lambda_rc / 4;
-      const hwave_rc  = lambda_rc / 2;
       const isHighClass_rc  = /^[AB]$/i.test(fcc_class);
       const designH_rc      = lambda_rc * (isHighClass_rc ? 0.625 : 0.375);
       const isDA_rc   = /^DA/i.test(pattern_mode);
