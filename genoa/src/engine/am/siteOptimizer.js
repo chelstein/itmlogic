@@ -8883,7 +8883,7 @@ async function scoreCandidate(pt, ctx, warnings){
         site_control_weeks_low,
         site_control_weeks_high,
         due_diligence_items,
-        reference: '47 CFR §73.1350(a); §73.1690(c); §73.3549(a); 47 CFR Part 1 §1.1306–§1.1307 (NEPA); NHPA §106 (16 USC §470f); ASTM E1527-21 (Phase I ESA); FCC Form 7460-1 (FAA coordination)',
+        reference: '47 CFR §73.1350(a); §73.1690(c); §73.3549(a); 47 CFR Part 1 §1.1306–§1.1307 (NEPA); NHPA §106 (16 USC §470f); ASTM E1527-21 (Phase I ESA); FAA Form 7460-1 (FAA obstruction study)',
         note: `SCREENING-GRADE land-use and site-access assessment. Zone risk: ${zone_risk_tier}. Estimated lease: $${lease_low_mo.toLocaleString()}–$${lease_high_mo.toLocaleString()}/mo ($${(lease_10yr_low/1000).toFixed(0)}K–$${(lease_10yr_high/1000).toFixed(0)}K over 10 years). Site control before CP filing: ${site_control_weeks_low}–${site_control_weeks_high} weeks.`
       };
     })(),
@@ -19751,7 +19751,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   F. Site certification (signed by engineer and applicant)
       //   G. DA-specific exhibits (omit for NDA)
       //
-      // Source: FCC Form 301 instructions (rev. 2024-01); 47 CFR §73.1 et seq.
+      // Source: FCC Form 301-AM instructions (rev. 2024-01); 47 CFR §73.1 et seq.
 
       const isDA_ch = /^DA/i.test(pattern_mode);
       const is_clear_ch = CLEAR_CHANNEL_KHZ.has(frequency_khz);
@@ -19762,7 +19762,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const asr_required_ch = lambda_q_m_ch > 61;   // §17.7: >200 ft AGL
 
       const exhibits_A = [
-        { id: 'A1', section: 'A', title: 'FCC Form 301 main application (fully completed)', required: true, cfr: '§73.3533; §73.3536', notes: 'All sections completed; signed by applicant; Section I: ownership, Section III: technical specs' },
+        { id: 'A1', section: 'A', title: 'FCC Form 301-AM main application (fully completed)', required: true, cfr: '§73.3533; §73.3536', notes: 'All sections completed; signed by applicant; Section I: ownership, Section III: technical specs' },
         { id: 'A2', section: 'A', title: 'Legal name and entity documentation', required: true, cfr: '§73.1020; §73.3533', notes: 'Operating company name, state of incorporation, list of officers/principals with FCC 47 ID' },
         { id: 'A3', section: 'A', title: 'Ownership disclosure (FCC Form 323)', required: true, cfr: '§73.3615', notes: 'Biennial ownership filing must be current; ownership changes require Form 316 or 314 separately' },
         { id: 'A4', section: 'A', title: 'CORES entity registration', required: true, cfr: '§1.8001', notes: 'All entities named in application must have a valid CORES FRN (FCC Registration Number)' },
@@ -19806,7 +19806,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const exhibits_G_da = isDA_ch ? [
         { id: 'G1', section: 'G', title: 'DA horizontal radiation pattern (theoretical)', required: true, cfr: '§73.150(a)', notes: 'Tabulated field ratios at 72 azimuths (5° increments, 0°–355°) per §73.150(a) / Form 301-AM for each operating mode (DA-D, DA-N); signed by engineer' },
         { id: 'G2', section: 'G', title: 'Antenna system design parameters', required: true, cfr: '§73.152; §73.154(a)', notes: 'Phase/ratio values for each element; mutual impedance matrix; driving point impedances; ATU design schematic' },
-        { id: 'G3', section: 'G', title: 'Moment method analysis (NEC or MININEC)', required: true, cfr: '§73.150(b); §73.154(a)', notes: 'Full-wave electromagnetic model of the DA array; submitted as Exhibit D to Form 301; used for theoretical pattern' },
+        { id: 'G3', section: 'G', title: 'Moment method analysis (NEC or MININEC)', required: true, cfr: '§73.150(b); §73.154(a)', notes: 'Full-wave electromagnetic model of the DA array; submitted as Exhibit D to Form 301-AM; used for theoretical pattern' },
         { id: 'G4', section: 'G', title: 'DA proof monitoring specification', required: true, cfr: '§73.61; §73.154(a)', notes: 'Specifies monitoring points, reference parameters, tolerance values (±2° phase, ±0.5 dB ratio per §73.155)' },
       ] : [];
 
@@ -19819,7 +19819,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const deficiency_triggers = [
         { rank: 1, issue: 'Missing nighttime skywave analysis', cfr: '§73.182', how_to_avoid: 'Run §73.182 skywave NIF contour analysis before filing; include FCC SKYWAVE tool output as exhibit' },
         { rank: 2, issue: 'Incomplete NEPA checklist (§1.1306)', cfr: '§1.1306', how_to_avoid: 'Complete all 13 NEPA categories; consult environmental attorney if any "yes" — EA may be required' },
-        { rank: 3, issue: 'ASR number missing for tower ≥ 200 ft', cfr: '§17.4; §17.7', how_to_avoid: 'Register ASR in FCC ASR system before filing Form 301; ASR number is required in LMS before grant' },
+        { rank: 3, issue: 'ASR number missing for tower ≥ 200 ft', cfr: '§17.4; §17.7', how_to_avoid: 'Register ASR in FCC ASR system before filing Form 301-AM; ASR number is required in LMS before grant' },
         { rank: 4, issue: 'Site coordinates not in NAD83', cfr: '§73.1020(c)', how_to_avoid: 'Convert all GPS coordinates to NAD83 using NGS NADCON5 tool; WGS84 and NAD83 differ by ~1m in CONUS' },
         { rank: 5, issue: 'RF exposure (MPE) exhibit missing', cfr: '§1.1310; OET-65', how_to_avoid: 'Calculate MPE per OET Bulletin 65; include calculation exhibit showing compliance with general population limits' },
       ];
@@ -19850,7 +19850,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_deficiency_risks:     deficiency_triggers.length,
         filing_fee_usd:         4200,
         filing_system:          'FCC LMS (Licensing Management System)',
-        reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301 Instructions (2024); OET Bulletin 65; NHPA §106',
+        reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301-AM Instructions (2024); OET Bulletin 65; NHPA §106',
         note: `FCC Form 301-AM ${isDA_ch ? `DA (${pattern_mode})` : 'NDA'} application for ${frequency_khz} kHz Class ${fcc_class}: ${n_required} required exhibits across ${isDA_ch ? 7 : 6} sections. Top deficiency risk: ${deficiency_triggers[0].issue}. ${asr_required_ch ? `ASR registration required (tower ≈ ${tower_ft_ch} ft). ` : ''}Filing fee: $4,200.`
       };
     })(),
@@ -20206,7 +20206,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Project timeline milestones (calendar months from first FCC filing).
       const timeline_milestones = [
-        { milestone: 'Engineering study + Form 301 filed',     month_start: 0,  month_end: 2,  parallel: false },
+        { milestone: 'Engineering study + Form 301-AM filed',   month_start: 0,  month_end: 2,  parallel: false },
         { milestone: 'FCC CP processing',                       month_start: 2,  month_end: 20, parallel: false },
         { milestone: 'Site acquisition + permitting',           month_start: 1,  month_end: 12, parallel: true  },
         { milestone: 'Tower construction + radial installation',month_start: 12, month_end: 18, parallel: false },
@@ -20267,7 +20267,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // NDA stations do NOT need a DA proof; 8-radial NDA proof (§73.154(b)) suffices.
       //
       // FCC filing fees (47 CFR §1.1102, 2024 schedule):
-      //   Form 301 (AM major CP): $4,200
+      //   Form 301-AM (AM major CP): $4,200
       //   Form 302-AM (license to cover): $435
 
       const is_clear_ch  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
@@ -20315,11 +20315,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const tx_cost_high_usd  = 45000;
       const install_cost_usd  = 7500;  // electrical, bonding, rigging, commissioning
 
-      // Engineering: interference analysis + Form 301 exhibit prep.
+      // Engineering: interference analysis + Form 301-AM exhibit prep.
       const eng_study_low_usd  = 4000;
       const eng_study_high_usd = 8000;
 
-      // CP processing timeline (Form 301 filings, not streamlined).
+      // CP processing timeline (Form 301-AM filings, not streamlined).
       const cp_months_low  = 6;
       const cp_months_high = 18;
 
@@ -20341,8 +20341,8 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         {
           step: 2,
-          action: 'File FCC Form 301 (CP application)',
-          form: 'Form 301',
+          action: 'File FCC Form 301-AM (CP application)',
+          form: 'Form 301-AM',
           cost_range_usd: `$${form301_fee_usd.toLocaleString()}`,
           timeline: '1–2 weeks',
           notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307)'
@@ -20400,8 +20400,8 @@ async function scoreCandidate(pt, ctx, warnings){
         cp_processing_months_high: cp_months_high,
         n_upgrade_steps:           upgrade_steps.length,
         upgrade_steps,
-        reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.1620 (CP construction period); §1.1102 (filing fees); FCC Form 301 (CP application); FCC Form 302-AM (license to cover)',
-        note: `${frequency_khz} kHz Class ${fcc_class} (${pattern_mode}) — current ${tpo_kw} kW TPO. ${can_upgrade_day ? `Daytime upgrade to ${upgraded_tpo_kw} kW available (§73.21 Class ${fcc_class} ceiling) — groundwave coverage radius grows ~${coverage_gain_pct}% (√ERP scaling). Requires Form 301 CP, ~${cp_months_low}–${cp_months_high} month FCC processing, and new ${upgraded_tpo_kw} kW transmitter.` : `No daytime headroom — already at Class ${fcc_class} ceiling of ${day_max_kw} kW.`} Nighttime ceiling: ${night_max_kw} kW${night_upgrade_requires_da_n ? ' (Class D secondary; DA-N antenna + §73.182 skywave analysis required for night upgrade)' : ''}.`
+        reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.1620 (CP construction period); §1.1102 (filing fees); FCC Form 301-AM (CP application); FCC Form 302-AM (license to cover)',
+        note: `${frequency_khz} kHz Class ${fcc_class} (${pattern_mode}) — current ${tpo_kw} kW TPO. ${can_upgrade_day ? `Daytime upgrade to ${upgraded_tpo_kw} kW available (§73.21 Class ${fcc_class} ceiling) — groundwave coverage radius grows ~${coverage_gain_pct}% (√ERP scaling). Requires Form 301-AM CP, ~${cp_months_low}–${cp_months_high} month FCC processing, and new ${upgraded_tpo_kw} kW transmitter.` : `No daytime headroom — already at Class ${fcc_class} ceiling of ${day_max_kw} kW.`} Nighttime ceiling: ${night_max_kw} kW${night_upgrade_requires_da_n ? ' (Class D secondary; DA-N antenna + §73.182 skywave analysis required for night upgrade)' : ''}.`
       };
     })(),
 
@@ -22517,7 +22517,7 @@ async function scoreCandidate(pt, ctx, warnings){
         option_to_purchase_recommended: true,
         option_to_purchase_note: 'Negotiate right of first refusal or option to purchase the site at fair market value. AM transmitter sites are difficult to replicate once lost.',
         relocation_note: `New transmitter site lease must cover: tower base, ${ground_radial_radius_m}m radial ground system, guy wire anchors (${guy_radius_m}m radius), transmitter building, and all-weather access road. Minimum site area: ~${min_site_area_acres} acres. Lease term: ${LEASE_TERM.recommended_years} years minimum.`,
-        reference: '47 CFR §73.49; §73.1560; §73.3533; §73.182; §17.7; §1.1307; FCC Form 7460-1; local zoning/CUP requirements',
+        reference: '47 CFR §73.49; §73.1560; §73.3533; §73.182; §17.7; §1.1307; FAA Form 7460-1; local zoning/CUP requirements',
         note: `Ground lease: ${LEASE_TERM.recommended_years}-year recommended term, 2×10-year renewals. Minimum site area ~${min_site_area_acres} acres (${min_site_radius_m}m radius). ${KEY_PROVISIONS.length} key provisions; ${critical_provisions} CRITICAL. Option to purchase recommended.`
       };
     })(),
@@ -28430,7 +28430,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const NHPA_HEIGHT_TRIGGER_M  = round2(NHPA_HEIGHT_TRIGGER_FT * 0.3048);
       const nhpaLikelyRequired     = fcc_class === 'A' || fcc_class === 'B';  // proxy only
 
-      // Environmental checklist (Form 301 Section VII items)
+      // Environmental checklist (Form 301-AM Section VII items)
       const ENV_CHECKLIST = [
         { item: 'NEPA Categorical Exclusion or Environmental Assessment', required: true,  cfr: '§1.1307' },
         { item: 'RF Exposure evaluation (OET-65 procedure)', required: tpo_kw >= 1.0, cfr: '§1.1310; OET-65' },
@@ -28502,7 +28502,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const ADJ_CHANNEL_DU_DB = 6;   // §73.182(g) ±10 kHz minimum D/U
       const SEC_ADJ_DU_DB     = 0;   // §73.182(k) ±20 kHz — equal signal acceptable
 
-      // Required groundwave study radius (km) for Form 301 co-channel search
+      // Required groundwave study radius (km) for Form 301-AM co-channel search
       // §73.182 table lookup requires searching to the 0.5 mV/m co-channel contour.
       // As a proxy: 0.5 mV/m ~ 1.5× the 25 mV/m distance for typical erp/HAAT.
       // Use class-based search radius floor from FCC practice.
@@ -32630,7 +32630,7 @@ async function scoreCandidate(pt, ctx, warnings){
           lighting_install_high_usd: total_lighting_high_usd,
           annual_maintenance_usd:    annual_maint_usd,
         },
-        reference: '47 CFR §17.7, §17.21–§17.23, §17.47, §17.58; FAA AC 70/7460-1M; FCC Form 7460-1; FCC Form 854',
+        reference: '47 CFR §17.7, §17.21–§17.23, §17.47, §17.58; FAA AC 70/7460-1M; FAA Form 7460-1; FCC Form 854 (ASR)',
         note: `Est. tower height ${tower_height_ft} ft AGL. Lighting: ${lighting_type.replace(/_/g,' ')}. ASR registration ${asr_required ? 'REQUIRED' : 'not required'}. ${n_towers > 1 ? `${n_towers}-tower DA array.` : ''}`
       };
     })(),
@@ -33342,7 +33342,7 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
     id: 'SITE_SURVEY',
     description: 'Conduct professional site survey (zoning, lease availability, setbacks)',
     status: 'REQUIRED',
-    rule: 'General engineering practice; FCC Form 301 §I',
+    rule: 'General engineering practice; FCC Form 301-AM §I',
     note: null
   });
 
