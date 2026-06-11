@@ -2094,7 +2094,7 @@ const DEMO_RESULT = {
           { id: 'BASE_CURRENT_METERS', label: 'Base current meter (1 tower)', required: true, examples: 'Deltec, Potomac Instruments, Bird', typical_cost_usd: 1200, cfr: '§73.1350(b)(3); §73.61' },
           { id: 'PLATE_TELEMETRY', label: 'Plate voltage/current telemetry', required: true, examples: 'Transmitter built-in metering or external transducer', typical_cost_usd: 500, cfr: '§73.1350(b)(5)' },
           { id: 'MOD_MONITOR', label: 'Modulation monitor', required: true, examples: 'Orban 9200AM, CRL Systems, Inovonics 531', typical_cost_usd: 2500, cfr: '§73.1570; §73.1350(b)(4)' },
-          { id: 'FREQ_MONITOR', label: 'Frequency monitor', required: true, examples: 'Belar FMS-1, ERI Model 100', typical_cost_usd: 2000, cfr: '§73.1215; ±20 Hz tolerance' },
+          { id: 'FREQ_MONITOR', label: 'Frequency monitor', required: true, examples: 'Belar FMS-1, ERI Model 100', typical_cost_usd: 2000, cfr: '§73.1215 (monitor required); §73.1545 (±20 Hz tolerance)' },
           { id: 'CELLULAR_DATA', label: 'Cellular data backup for remote control link', required: false, examples: 'LTE/4G cellular modem; redundant to primary internet', typical_cost_usd: 150, cfr: 'Engineering best practice' },
           { id: 'ATS', label: 'Automatic Transmission System (ATS) for unattended operation', required: false, examples: 'Built into Burk ARC or standalone ATS controller', typical_cost_usd: 2000, cfr: '§73.1400' }
         ],
@@ -2105,7 +2105,7 @@ const DEMO_RESULT = {
           { parameter: 'Modulation (positive)', limit: '100%', action: 'Reduce modulation; alert operator', cfr: '§73.1570' },
           { parameter: 'Modulation (negative)', limit: '125%', action: 'Reduce modulation; alert operator', cfr: '§73.1570' },
           { parameter: 'Loss of modulation', limit: '3 hours continuous', action: 'Alert operator; automatic off-air after timeout', cfr: '§73.1400(b)' },
-          { parameter: 'Carrier frequency', limit: '±20 Hz (AM)', action: 'Alert operator; FCC §73.1215', cfr: '§73.1215' },
+          { parameter: 'Carrier frequency', limit: '±20 Hz (AM)', action: 'Alert operator; FCC §73.1545', cfr: '§73.1545' },
           { parameter: 'Power reduction', limit: 'Any fault condition', action: 'Reduce to 10% TPO or off-air per §73.1350', cfr: '§73.1350(e)' }
         ],
         da_phasor_monitoring: null,
@@ -2114,7 +2114,7 @@ const DEMO_RESULT = {
         modulation_limit_negative_pct: 125,
         control_point_license_copy_required: true,
         reference: '47 CFR §73.1350 (remote control); §73.1400 (ATS); §73.61 (base current monitoring); §73.1545 (frequency tolerance); §73.1570 (modulation monitor)',
-        note: 'NDA 780 kHz: remote control authorized §73.1350. ATS (unattended) authorized §73.1400. 5 required RC components, $9,700 estimated cost. 1 tower monitored. Frequency tolerance ±20 Hz (§73.1215).'
+        note: 'NDA 780 kHz: remote control authorized §73.1350. ATS (unattended) authorized §73.1400. 5 required RC components, $9,700 estimated cost. 1 tower monitored. Frequency tolerance ±20 Hz (§73.1545).'
       },
       fcc_silent_station_authorization_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -2649,7 +2649,7 @@ const DEMO_RESULT = {
       frequency_monitoring_plan_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', is_directional: false,
         carrier_frequency_monitoring: {
-          max_deviation_hz: 20, cfr: '§73.1215(b)',
+          max_deviation_hz: 20, cfr: '§73.1545',
           monitoring_method: 'GPS-locked frequency reference or calibrated frequency counter',
           check_frequency: 'Weekly minimum; continuous with automatic monitoring system preferred'
         },
@@ -2677,7 +2677,7 @@ const DEMO_RESULT = {
           total_estimated_usd: { low: 4300, high: 22000 }
         },
         reference: '47 CFR §73.44; §73.61; §73.62; §73.1215; §73.1350; §73.1570; §73.1820; NRSC-2-B',
-        note: 'Monitoring: carrier ±20 Hz (§73.1215), modulation 100%/125% (§73.1570). Remote control permitted (§73.1350(c)).'
+        note: 'Monitoring: carrier ±20 Hz (§73.1545), modulation 100%/125% (§73.1570). Remote control permitted (§73.1350(c)).'
       },
       asr_registration_update_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -2861,7 +2861,7 @@ const DEMO_RESULT = {
           { step: 3, action: 'Interference analysis', detail: 'Protect all full-power FM, LPFM, existing translators', cfr: '§74.1204' },
           { step: 4, action: 'File FCC Form 349', detail: 'Submit construction permit application in filing window', cfr: '§74.1231; Form 349' },
           { step: 5, action: 'Construction', detail: 'Build translator facility', cfr: '§74.1263' },
-          { step: 6, action: 'License', detail: 'File FCC Form 350 after construction', cfr: '§74.1265' }
+          { step: 6, action: 'License', detail: 'File FCC Form 2100 Schedule 350 after construction', cfr: '§73.3536(b)(5)' }
         ],
         n_filing_steps: 6,
         cost_estimate: {

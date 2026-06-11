@@ -7975,7 +7975,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
                 <div><span style={{ color: '#6b7280' }}>Assigned frequency:</span> <strong>{g.freq_hz?.toLocaleString()} Hz ({g.frequency_khz} kHz)</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Tolerance (§73.1215):</span> <strong>±{g.tolerance_hz} Hz ({g.tolerance_ppm} ppm)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Tolerance (§73.1545):</span> <strong>±{g.tolerance_hz} Hz ({g.tolerance_ppm} ppm)</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Lower limit:</span> <strong>{g.lower_limit_hz?.toLocaleString()} Hz</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Upper limit:</span> <strong>{g.upper_limit_hz?.toLocaleString()} Hz</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Required methods:</span> <strong>{g.n_required_methods} of {g.n_monitoring_methods}</strong></div>

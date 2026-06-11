@@ -615,7 +615,7 @@ async function scoreInfrastructureCandidate(site, ctx, warnings){
 
   const regulatory_notes = [];
   if (site.asr_number){
-    regulatory_notes.push(`ASR ${site.asr_number} registered – co-locate notification required (47 CFR §17 / §73.1692).`);
+    regulatory_notes.push(`ASR ${site.asr_number} registered – co-locate notification required (47 CFR §17; §1.30002 if near AM array).`);
   }
   if (sameBandAm){
     regulatory_notes.push(`Same-band AM host on ${site.frequency_khz} kHz – §73.182 nighttime / IBOC interaction study required.`);

@@ -92,8 +92,8 @@ export function checkAm73_24g({ exhibit } = {}){
       observed:  `${(ratio * 100).toFixed(2)}% (blanket=${blanketPop.toLocaleString('en-US')} of intl-25=${intl25Pop.toLocaleString('en-US')} persons)`,
       pass:      ratioPass,
       detail:    ratioPass
-        ? 'Blanket population is within the §73.24(g) 1% threshold.  Licensee remains responsible for remediating individual complaints per §73.318(b) but is not subject to the pre-construction Section 73.24(g) showing.'
-        : 'Blanket population EXCEEDS the §73.24(g) 1% threshold.  Licensee must submit a §73.318(b) blanketing-interference remediation plan with the application; many filings of this kind disclose the percentage and commit to receiver-treatment funds.'
+        ? 'Blanket population is within the §73.24(g) 1% threshold.  Licensee remains responsible for remediating individual complaints per §73.88 (AM blanketing) but is not subject to the pre-construction Section 73.24(g) showing.'
+        : 'Blanket population EXCEEDS the §73.24(g) 1% threshold.  Licensee must submit a §73.88 (AM blanketing) remediation plan with the application; many filings of this kind disclose the percentage and commit to receiver-treatment funds.'
     });
   } else {
     result.findings.push({
