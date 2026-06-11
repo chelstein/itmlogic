@@ -101,6 +101,20 @@ const KNOWN_GOALS = Object.freeze([
 // USFS FIA / LANDFIRE raster would improve it from screening to filing grade.
 const PLACEHOLDER_GOALS = Object.freeze({});
 
+// Geographic wildfire risk proxy — same boundaries used in scoring, score_breakdown_detail,
+// and the vegetation management guide so all three are always in sync.
+// LOW=100, MODERATE=75, ELEVATED=50, HIGH=25, VERY_HIGH=0.
+const WF_SCORE = Object.freeze({ VERY_HIGH: 0, HIGH: 25, ELEVATED: 50, MODERATE: 75, LOW: 100 });
+function wildfireRiskLevel(lat, lon){
+  const isWesternUS = lon < -103 && lat > 30 && lat < 49;
+  const isPacificNW = lon < -117 && lon > -125 && lat > 42;
+  const isSoutheast = lat < 35 && lon > -90;
+  return (isWesternUS && lat > 35 && lat < 42) ? 'VERY_HIGH'
+       : isWesternUS                            ? 'HIGH'
+       : isPacificNW                            ? 'ELEVATED'
+       : isSoutheast                            ? 'MODERATE' : 'LOW';
+}
+
 // Status-label vocabulary.
 const LABEL_SCREENING        = 'SCREENING ONLY';
 const LABEL_PROMISING        = 'PROMISING';
@@ -2897,18 +2911,7 @@ async function scoreCandidate(pt, ctx, warnings){
     // Lower risk → higher score: LOW=100, MODERATE=75, ELEVATED=50, HIGH=25, VERY_HIGH=0.
     // This enables the avoid_wildfire_risk goal to meaningfully differentiate sites
     // without the USFS FIA/LANDFIRE raster integration (which would upgrade this).
-    wildfire: (() => {
-      const _lat = pt.lat, _lon = pt.lon;
-      const _isWesternUS = _lon < -103 && _lat > 30 && _lat < 49;
-      const _isPacificNW = _lon < -117 && _lon > -125 && _lat > 42;
-      const _isSoutheast = _lat < 35 && _lon > -90;
-      const _wfLevel =
-        (_isWesternUS && _lat > 35 && _lat < 42) ? 'VERY_HIGH' :
-        _isWesternUS                              ? 'HIGH'      :
-        _isPacificNW                              ? 'ELEVATED'  :
-        _isSoutheast                              ? 'MODERATE'  : 'LOW';
-      return { VERY_HIGH: 0, HIGH: 25, ELEVATED: 50, MODERATE: 75, LOW: 100 }[_wfLevel];
-    })(),
+    wildfire: WF_SCORE[wildfireRiskLevel(pt.lat, pt.lon)],
     treaty_zone:  treaty_min_border_km == null ? null
       // Farther from border = better; saturates at the treaty threshold.
       : Math.max(0, Math.min(100, (treaty_min_border_km / TREATY_ZONE_PENALTY_KM_MX) * 100))
@@ -3016,14 +3019,8 @@ async function scoreCandidate(pt, ctx, warnings){
     } else if (sk === 'conductivity'){
       reason = `σ=${sigma_msm} mS/m (${sigmaQuality(sigma_msm)}) — source: ${ground_sigma_source}`;
     } else if (sk === 'wildfire'){
-      const _wfLat = pt.lat, _wfLon = pt.lon;
-      const _wfW = _wfLon < -103 && _wfLat > 30 && _wfLat < 49;
-      const _wfL = { VERY_HIGH: 0, HIGH: 25, ELEVATED: 50, MODERATE: 75, LOW: 100 };
-      const _wfLevel = (_wfW && _wfLat > 35 && _wfLat < 42) ? 'VERY_HIGH'
-                     : _wfW ? 'HIGH'
-                     : (_wfLon < -117 && _wfLon > -125 && _wfLat > 42) ? 'ELEVATED'
-                     : (_wfLat < 35 && _wfLon > -90) ? 'MODERATE' : 'LOW';
-      reason = `Geographic wildfire proxy: ${_wfLevel} risk (score ${_wfL[_wfLevel]}/100). Upgrade with USFS FIA/LANDFIRE for parcel precision.`;
+      const _wfLevel = wildfireRiskLevel(pt.lat, pt.lon);
+      reason = `Geographic wildfire proxy: ${_wfLevel} risk (score ${WF_SCORE[_wfLevel]}/100). Upgrade with USFS FIA/LANDFIRE for parcel precision.`;
     } else if (sk === 'treaty_zone'){
       reason = treaty_zone
         ? `In treaty zone: ${treaty_zone}`
@@ -32302,24 +32299,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.49: Fenced transmitter sites must prevent access to RF hazard areas.
       // Wildfire risk at AM transmitter sites has risen sharply — radial ground systems
       // are particularly vulnerable to ground fires destroying buried copper conductors.
-      const lat      = pt.lat ?? 38;
-      const lon      = pt.lon ?? -97;
-
-      // US wildfire risk proxy by geographic region
-      // Western US (lon > -103, lat 30–49): HIGH to VERY_HIGH
-      // Pacific Northwest / Rocky Mountain (lon > -117, lat > 42): ELEVATED
-      // Southeast / Gulf Coast (lat < 35, lon > -90): MODERATE (lightning-ignition)
-      // Midwest / Great Plains: LOW
-      // Western US = lon < -103 (more negative = further west); Eastern US = lon > -90
-      const isWesternUS  = lon < -103 && lat > 30 && lat < 49;
-      const isPacificNW  = lon < -117 && lon > -125 && lat > 42;
-      const isSoutheast  = lat < 35 && lon > -90;
-
-      const wildfire_risk_level =
-        (isWesternUS && lat > 35 && lat < 42) ? 'VERY_HIGH' :
-        isWesternUS                            ? 'HIGH'      :
-        isPacificNW                            ? 'ELEVATED'  :
-        isSoutheast                            ? 'MODERATE'  : 'LOW';
+      const wildfire_risk_level = wildfireRiskLevel(pt.lat ?? 38, pt.lon ?? -97);
 
       const ea_required = ['VERY_HIGH','HIGH'].includes(wildfire_risk_level);
 
