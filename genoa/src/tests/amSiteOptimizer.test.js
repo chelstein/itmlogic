@@ -222,18 +222,19 @@ test('zone-table mode does NOT emit REACH_PLACEHOLDER for clusters (expected per
     `conductivity_mode must be 'raster' or 'zone-table', got: ${out.conductivity_mode}`);
 });
 
-test('placeholder goal (avoid_wildfire_risk) surfaces in candidate limitations', async () => {
+test('avoid_wildfire_risk goal surfaces in candidate limitations; fuel_risk is computed', async () => {
   const out = await runSiteOptimizer({
     ...KAZM,
     optimization_goals: { ...KAZM.optimization_goals, avoid_wildfire_risk: true }
   });
   assert.equal(out.available, true);
+  const VALID_RISK = new Set(['LOW', 'MODERATE', 'HIGH', 'EXTREME']);
   for (const c of out.candidates){
     assert.ok(
       c.limitations.some((l) => /Wildfire/i.test(l)),
-      'wildfire-risk placeholder must surface in limitations when enabled'
+      'wildfire-risk must surface in limitations when enabled'
     );
-    assert.equal(c.fuel_risk, 'NOT-EVALUATED');
+    assert.ok(VALID_RISK.has(c.fuel_risk), `fuel_risk must be a valid risk level, got: ${c.fuel_risk}`);
   }
 });
 
