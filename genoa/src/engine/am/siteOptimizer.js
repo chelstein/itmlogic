@@ -29773,7 +29773,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Weekly log review duties
       const WEEKLY_LOG_DUTIES = [
         { duty: 'Review operating logs; sign and date confirming review',   cfr: '§73.1870(b)(1)' },
-        { duty: 'Verify transmitter power within ±10% AIP (§73.1560)',      cfr: '§73.1870(b)(2)' },
+        { duty: 'Verify transmitter power within 90–105% of authorized AIP (§73.1560)', cfr: '§73.1870(b)(2)' },
         { duty: 'Check DA antenna monitor readings (DA stations only)',      cfr: '§73.1870(b)(3)', da_only: true },
         { duty: 'Confirm EAS equipment operational; log weekly test',        cfr: '§73.1870(b)(4)' },
         { duty: 'Review any equipment failures and corrective action taken', cfr: '§73.1870(b)(5)' }
@@ -30788,10 +30788,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // POWER TOLERANCE
       // ───────────────
-      //   §73.1560: Station must not operate at more than 105% or less than 90%
-      //   of authorized power (the ±10% tolerance commonly cited is actually
-      //   asymmetric: +5% high, -10% low).
-      //   For DA stations: each element's relative power must be within ±5%.
+      //   §73.1560: Station must operate between 90% and 105% of authorized power
+      //   (asymmetric — floor is −10% of authorized, ceiling is +5% of authorized).
+      //   The symmetric "±10%" shorthand sometimes seen in practice is incorrect.
+      //   For DA stations: each element's relative base current must be within ±5%.
       //
       // TYPICAL AM TRANSMITTER POWER RANGES (KW → MODEL CATEGORY)
       //   < 1 kW:   Low-power local (Class D)
@@ -31378,10 +31378,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   maintain accurate phase/ratio readings.
       //
       // 47 CFR §73.1560 — Operating power.
-      //   Station must sustain ±10% of authorized power.  A corroded or
-      //   degraded ground system reduces antenna efficiency and effective
-      //   radiated power, which may cause the station to fall below the
-      //   −10% lower limit.
+      //   Station must operate within 90–105% of authorized power (asymmetric).
+      //   A corroded or degraded ground system reduces antenna efficiency and
+      //   effective radiated power, which may cause the station to fall below
+      //   the 90% (−10%) lower limit.
       //
       // GROUND SYSTEM DESIGN STANDARDS (FCC/ANSI)
       // ───────────────────────────────────────────
@@ -31516,7 +31516,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // ──────────────────────────────
       //   1. Verify transmitter type acceptance (§73.1660)
       //   2. Measure base impedance (bridge measurement)
-      //   3. Verify operating power within ±10% of authorized (§73.1560)
+      //   3. Verify operating power within 90–105% of authorized (§73.1560)
       //   4. Set up base current meter and calibrate
       //   5. Conduct 5 mV/m spot measurement in the direction of COL
       //   6. File License to Cover (Form 302-AM) with measurements
@@ -31544,8 +31544,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const NDA_STEPS = [
         { step: 1, task: 'Verify transmitter type acceptance (FCC ID)', rule: '§73.1660' },
-        { step: 2, task: 'Measure base impedance (bridge measurement)', rule: '§73.1560' },
-        { step: 3, task: 'Verify operating power within ±10% of authorized', rule: '§73.1560' },
+        { step: 2, task: 'Measure base impedance (bridge measurement)', rule: '§73.51' },
+        { step: 3, task: 'Verify operating power within 90–105% of authorized (asymmetric)', rule: '§73.1560' },
         { step: 4, task: 'Install and calibrate base current meter', rule: '§73.1665' },
         { step: 5, task: '5 mV/m spot measurement toward community of license', rule: '§73.24(i)' },
         { step: 6, task: 'File License to Cover (FCC Form 302-AM)', rule: '§73.3598' },
