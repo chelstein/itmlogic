@@ -1870,6 +1870,41 @@ test('antenna_height_profile: quarter_wave_m × 4 ≈ wavelength_m', async () =>
   }
 });
 
+// Class D at 780 kHz: 3/8λ = 144.13 m >> 60.96 m → ASR always required at standard height.
+// Verifies that the note uses class-aware height, not λ/4 (96.15 m), for the ASR statement.
+test('antenna_height_profile: class_standard_height_m present and always triggers ASR', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const ahp = c.antenna_height_profile;
+    assert.ok(typeof ahp.class_standard_height_m === 'number' && ahp.class_standard_height_m > 0,
+      `class_standard_height_m must be a positive number (rank ${c.rank})`);
+    // Class D at 780 kHz: 3/8λ = 144.13 m
+    assert.ok(ahp.class_standard_height_m > 60.96,
+      `class_standard_height_m must exceed §17.7 ASR threshold of 60.96 m; got ${ahp.class_standard_height_m} (rank ${c.rank})`);
+    // Note must reference class-aware height (not a false "not required" message)
+    assert.ok(ahp.note.includes('EXCEEDS') || ahp.note.includes('exceeds'),
+      `note must reference ASR requirement via class standard height (rank ${c.rank}): ${ahp.note}`);
+  }
+});
+
+// At high-band AM (1600 kHz): λ/4 = 46.9 m (below 60.96 m), but Class D 3/8λ = 70.3 m → still above threshold.
+test('antenna_height_profile: class_standard_height_m triggers ASR at high-band AM (1600 kHz)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, fcc_class: 'D', candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const ahp = c.antenna_height_profile;
+    // λ/4 at 1600 kHz = 46.9 m < 60.96 m — quarter_wave_asr_required should be false
+    assert.ok(ahp.quarter_wave_asr_required === false,
+      `1600 kHz λ/4 ≈ 46.9 m must be below ASR threshold (rank ${c.rank})`);
+    // Class D 3/8λ at 1600 kHz = 70.3 m > 60.96 m — class_standard_height must exceed threshold
+    assert.ok(ahp.class_standard_height_m > 60.96,
+      `Class D 3/8λ at 1600 kHz must exceed ASR threshold; got ${ahp.class_standard_height_m} (rank ${c.rank})`);
+    assert.ok(ahp.note.includes('EXCEEDS') || ahp.note.includes('exceeds'),
+      `note must flag ASR requirement even when λ/4 < 60.96 m (rank ${c.rank}): ${ahp.note}`);
+  }
+});
+
 test('groundwave_contour_table present on every candidate with 4 standard FCC contours', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   assert.equal(out.available, true);
@@ -17577,6 +17612,24 @@ test('#114 NDA station has 1 tower and ASR not triggered for high-frequency stat
   assert.strictEqual(g.n_towers, 1, 'NDA must have 1 tower');
   // 1600 kHz: λ/4 ≈ 46.9 m ≈ 154 ft < 200 ft ASR threshold
   assert.strictEqual(g.asr_triggered_qw, false, '1600 kHz λ/4 must NOT trigger ASR (< 200 ft)');
+});
+
+// Class D at 1600 kHz: λ/4 = 46.9 m (< 200 ft) but 3/8λ = 70.3 m (> 200 ft).
+// class_standard_height and asr_triggered_class_standard must use class-aware height.
+test('#114 class_standard_height present and correct for Class D 1600 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, fcc_class: 'D', candidate_limit: 1 });
+  const g   = out.candidates[0].am_tia222_tower_structural_certification_guide;
+  // λ/4 = 46.9 m < 61 m → asr_triggered_qw must be false
+  assert.strictEqual(g.asr_triggered_qw, false, '1600 kHz λ/4 below ASR threshold');
+  // Class D 3/8λ = 70.3 m > 61 m → class_standard_height must exceed ASR threshold
+  assert.ok(typeof g.class_standard_height_m === 'number', 'class_standard_height_m must be a number');
+  assert.ok(g.class_standard_height_m > 60.96,
+    `Class D 3/8λ at 1600 kHz must exceed ASR threshold; got ${g.class_standard_height_m} m`);
+  assert.strictEqual(g.asr_triggered_class_standard, true,
+    'Class D at 1600 kHz: 3/8λ=70.3m must trigger ASR even though λ/4 does not');
+  // Note must mention class standard height ASR status
+  assert.ok(g.note.includes('ASR (class standard height): REQUIRED'),
+    `note must flag class-standard ASR requirement: ${g.note}`);
 });
 
 test('#114 candidate_comparison_table has tia_* columns', async () => {

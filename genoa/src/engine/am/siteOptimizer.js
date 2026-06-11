@@ -3529,7 +3529,7 @@ async function scoreCandidate(pt, ctx, warnings){
           estimated_erp_kw: round2(tpo_kw * Math.pow(10, 1.7 / 10)),
           asr_required:    (lambdaM * 0.625) > 60.96,
           pros:            '~1.7 dB ERP gain over λ/4; maximum groundwave efficiency for most soil types.',
-          cons:            'Taller physical structure; always triggers §17.7 ASR + FAA study at most AM frequencies. Higher construction cost.'
+          cons:            'Taller physical structure; always triggers §17.7 ASR + FAA study at all AM frequencies (5/8λ ≥ 97 m at max 1710 kHz). Higher construction cost.'
         },
         {
           id:              'QUARTER_WAVE',
@@ -3542,7 +3542,7 @@ async function scoreCandidate(pt, ctx, warnings){
           estimated_erp_kw: round2(tpo_kw),
           asr_required:    qwM > 60.96,
           pros:            'Industry standard; FCC groundwave curves calibrated to λ/4 reference. Simplest engineering.',
-          cons:            'Not maximum efficiency. At most AM frequencies (< 1.6 MHz), λ/4 exceeds ASR threshold (200 ft = 60.96 m).'
+          cons:            'Not maximum efficiency. Below ~1230 kHz, λ/4 exceeds the §17.7 ASR 200 ft (60.96 m) threshold; check asr_required for this frequency.'
         },
         {
           id:              '0_19_LAMBDA',
@@ -4217,6 +4217,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const hw  = round2(lambdaM / 2);       // 180° — null pattern above; rarely used
       const fe  = round2(lambdaM * 5 / 8);  // 225° — maximum gain, used on some Class A clear-channel
 
+      // Class-specific standard planning height: 5/8λ for A/B, 3/8λ for C/D.
+      // At all AM frequencies, this height exceeds 60.96 m → ASR always required.
+      const isHighCls_ahp = /^[AB]$/i.test(fcc_class);
+      const std_h_ahp = round2(lambdaM * (isHighCls_ahp ? 0.625 : 0.375));
+
       // Relative radiation efficiency vs. quarter-wave baseline.
       // M3 groundwave tables assume 90° (λ/4) electrical height.
       // Shorter antennas have less radiation resistance, reducing ERP.
@@ -4238,6 +4243,7 @@ async function scoreCandidate(pt, ctx, warnings){
         quarter_wave_m: qw,
         five_eighths_wave_m: fe,
         half_wave_m: hw,
+        class_standard_height_m: std_h_ahp,
         quarter_wave_asr_required: qw > ASR_M,
         // Electrical height (degrees) if ASR precludes a full λ/4 tower.
         // Only relevant at frequencies where λ/4 > 60.96 m (< ~1230 kHz for all AM).
@@ -4248,7 +4254,7 @@ async function scoreCandidate(pt, ctx, warnings){
           efficiency_loss_db: round2(10 * Math.log10(asr_limited_eff)),
           note: `ASR constraint (no FAA exemption): max height ${ASR_M} m → ${asr_limited_deg}° electrical height. Efficiency vs. λ/4 baseline: ${(asr_limited_eff * 100).toFixed(0)}%. File FCC Form 854 before construction.`
         } : null,
-        note: `At ${frequency_khz} kHz: λ/4=${qw} m, 5λ/8=${fe} m, λ/2=${hw} m. ${qw > ASR_M ? `ALL standard heights EXCEED the §17.7 60.96 m ASR trigger — FCC Form 854 and FAA 7460-1 aeronautical study required.` : `λ/4 is within ASR limit (${ASR_M} m); ASR registration not required at standard height.`}`
+        note: `At ${frequency_khz} kHz: λ/4=${qw} m, 5λ/8=${fe} m, λ/2=${hw} m. Class ${fcc_class} standard height (${isHighCls_ahp ? '5/8λ' : '3/8λ'} = ${std_h_ahp} m) ${std_h_ahp > ASR_M ? `EXCEEDS the §17.7 60.96 m ASR threshold — FCC Form 854 and FAA 7460-1 aeronautical study required.` : `is within the §17.7 ASR threshold (${ASR_M} m).`}`
       };
     })(),
     // TPO power sweep — for 4-5 representative transmitter power levels within the
@@ -11489,10 +11495,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Site lease and property acquisition — the dominant practical constraint in AM relocation.
       //
       // Site area requirement:
-      //   Standard 120-radial ground system: radials extend λ/4 from tower base.
-      //   At 780 kHz: λ/4 = 96.15 m → full radial circle area = π × r² = π × 96.15² = 29,054 m².
-      //   Add 20% buffer for fence perimeter, access road, and outbuilding: ~34,865 m² = 8.6 acres.
-      //   Minimum practical site: ~5–7 acres for NDA; DA with multiple towers needs 10–25 acres.
+      //   Standard 120-radial ground system: radials extend 0.35λ from tower base per §73.186 / NBS TN-24.
+      //   At 780 kHz: 0.35λ = 134.6 m → full radial circle area = π × r² = π × 134.6² = 56,881 m².
+      //   Add 20% buffer for fence perimeter, access road, and outbuilding: ~68,257 m² = 16.9 acres.
+      //   Minimum practical site: ~10–17 acres for NDA; DA with multiple towers needs 20–40 acres.
       //
       // Key lease provisions required for broadcast tower sites:
       //   • 24/7 access for maintenance and FCC inspection compliance
@@ -15042,7 +15048,7 @@ async function scoreCandidate(pt, ctx, warnings){
         hardware_low_usd, hardware_high_usd,
         total_low_usd, total_high_usd,
         reference: 'FCC AM Antenna Ground Systems; IEEE Std 100; NEC ground system practice; ARRL AM engineering data',
-        note: `${frequency_khz} kHz: λ/4=${radial_length_ft.toFixed(0)} ft; ${recommended_radials} radials recommended; ground system total ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
+        note: `${frequency_khz} kHz: 0.35λ=${radial_length_ft.toFixed(0)} ft (§73.186 standard radial); ${recommended_radials} radials recommended; ground system total ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
       };
     })(),
 
@@ -30133,6 +30139,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const asr_height_trigger = qw_m ? qw_m > ASR_HEIGHT_THRESHOLD_M : null;
       const five_eighth_asr_trigger = five_eighth_m ? five_eighth_m > ASR_HEIGHT_THRESHOLD_M : null;
 
+      // Class-aware standard planning height: 5/8λ for A/B, 3/8λ for C/D.
+      const isHighCls_tia = /^[AB]$/i.test(fcc_class);
+      const class_std_h_m_tia  = lambda_m ? round2(lambda_m * (isHighCls_tia ? 0.625 : 0.375)) : null;
+      const class_std_h_ft_tia = class_std_h_m_tia ? Math.round(class_std_h_m_tia * 3.28084) : null;
+      const asr_triggered_class_standard = class_std_h_m_tia ? class_std_h_m_tia > ASR_HEIGHT_THRESHOLD_M : null;
+
       // Tower type recommendation
       const tower_type = n_towers > 1 ? 'guyed_vertical_array'
         : qw_ft > 600 ? 'guyed_vertical_tall'
@@ -30161,12 +30173,15 @@ async function scoreCandidate(pt, ctx, warnings){
         tower_type_label,
         asr_triggered_qw:         asr_height_trigger,
         asr_triggered_5_8:        five_eighth_asr_trigger,
+        class_standard_height_ft: class_std_h_ft_tia,
+        class_standard_height_m:  class_std_h_m_tia,
+        asr_triggered_class_standard,
         pe_analysis_cost_per_tower_usd,
         total_pe_analysis_low_usd:  total_pe_analysis_low,
         total_pe_analysis_high_usd: total_pe_analysis_high,
         upgrade_cost_per_tower_usd: upgrade_cost_usd,
         reference: 'ANSI/TIA-222-H (2017); ASCE 7-16 §26.5, §10; 47 CFR §17.7; FCC Form 854',
-        note: `${frequency_khz} kHz: λ/4 = ${qw_ft} ft (${qw_m} m), 5/8λ = ${five_eighth_ft} ft. ${n_towers} tower(s), Structural Category ${structural_category}. Wind: ${wind_speed_mph} mph. Ice: ${ice_thickness_in} in. ASR (λ/4): ${asr_height_trigger ? 'REQUIRED (>200 ft)' : 'not required (<200 ft)'}.`
+        note: `${frequency_khz} kHz: λ/4 = ${qw_ft} ft (${qw_m} m), 5/8λ = ${five_eighth_ft} ft. Class ${fcc_class} standard height (${isHighCls_tia ? '5/8λ' : '3/8λ'} = ${class_std_h_ft_tia} ft). ${n_towers} tower(s), Structural Category ${structural_category}. Wind: ${wind_speed_mph} mph. Ice: ${ice_thickness_in} in. ASR (λ/4): ${asr_height_trigger ? 'REQUIRED (>200 ft)' : 'not required (<200 ft)'}. ASR (class standard height): ${asr_triggered_class_standard ? 'REQUIRED' : 'not required'}.`
       };
     })(),
 
