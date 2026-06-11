@@ -5012,15 +5012,25 @@ async function scoreCandidate(pt, ctx, warnings){
       });
 
       // Gate 3: §17.7 ASR registration
+      // WARN when λ/4 > 60.96m (standard antenna definitely exceeds threshold).
+      // WARN when λ/4 ≤ 60.96m but λ/2 > 60.96m (final height determines applicability).
+      // PASS when even λ/2 < 60.96m (very high frequency — both standard heights clear threshold).
       const lambdaM_g = 300000 / frequency_khz;
       const qwM_g = lambdaM_g / 4;
-      const asrReqd = qwM_g > 60.96;
+      const hwM_g = lambdaM_g / 2;
+      const asrCertain  = qwM_g > 60.96;
+      const asrPossible = !asrCertain && hwM_g > 60.96;
+      const asrStatus   = (asrCertain || asrPossible) ? WARN : PASS;
       gates.push({
         id: 'ASR_REGISTRATION', label: '§17.7 ASR tower registration',
-        status: asrReqd ? WARN : PASS,
-        value: `λ/4 ≈ ${Math.round(qwM_g)} m (threshold 60.96 m)`,
+        status: asrStatus,
+        value: `λ/4 ≈ ${Math.round(qwM_g)} m, λ/2 ≈ ${Math.round(hwM_g)} m (threshold 60.96 m)`,
         rule: '47 CFR §17.7',
-        note: asrReqd ? `FCC Form 854 + FAA aeronautical study (7460-1) required before construction.` : null
+        note: asrCertain
+          ? `FCC Form 854 + FAA aeronautical study (7460-1) required before construction (λ/4 exceeds 200 ft).`
+          : asrPossible
+          ? `Final tower height determines ASR applicability — if > 60.96 m (200 ft), FCC Form 854 + FAA Form 7460-1 required.`
+          : null
       });
 
       // Gate 4: §1.1307 RF exposure (MPE)

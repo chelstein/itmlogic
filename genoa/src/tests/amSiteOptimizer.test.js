@@ -18623,10 +18623,15 @@ test('#137 candidate_comparison_table has wfr_* columns', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('wfr_wildfire_risk_level' in row, 'wfr_wildfire_risk_level missing');
+    assert.ok('wfr_wildfire_sub_score'  in row, 'wfr_wildfire_sub_score missing');
     assert.ok('wfr_ea_required'         in row, 'wfr_ea_required missing');
     assert.ok('wfr_veg_clearance_ft'    in row, 'wfr_veg_clearance_ft missing');
     assert.ok('wfr_total_low_usd'       in row, 'wfr_total_low_usd missing');
   }
+  // KAZM is in Arizona (Western US) — should have non-null sub-score ≤ 50
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.wfr_wildfire_sub_score != null, 'wfr_wildfire_sub_score should not be null');
+  assert.ok(r0.wfr_wildfire_sub_score <= 50, `KAZM (AZ) wildfire sub-score ${r0.wfr_wildfire_sub_score} should be ≤50 (HIGH or VERY_HIGH risk)`);
 });
 
 // ---- Feature #138: am_fcc_application_fee_budget_guide ----
