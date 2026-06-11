@@ -7996,12 +7996,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // for AM; AM antennas typically have near-unity gain relative to isotropic).
       //
       // OET Bulletin 65 (1997 ed.) provides the methodology:
-      //   - Controlled (occupational) MPE limit: 1842/f(MHz) V/m (= 1842 V/m at 1 MHz)
-      //   - Uncontrolled (general population) MPE limit: 614/f(MHz) V/m (= 614 V/m at 1 MHz)
-      //     OET Bulletin 65 Table 1 for 0.3–3 MHz; uncontrolled is 1/3 of controlled
+      //   - OET Bulletin 65 / 47 CFR §1.1310 Table 1 E-field limits:
+      //       GP (uncontrolled): 0.3–1.34 MHz = 614 V/m flat; 1.34–30 MHz = 824/f V/m
+      //       OC (controlled):   0.3–3 MHz    = 1842 V/m flat; 3–30 MHz   = 1842/f V/m
       //   - Near-field evaluation radius: the reactive near-field extends to ~λ/2π
-      //   - Far-field safe distance (fenced zone): d = (sqrt(30 × P_kw × G) / E_limit) × 1000 m
-      //     simplified for AM (G ≈ 1.64 isotropic): d_unc_m = sqrt(49200 × P_kw) / 274
+      //   - Far-field safe distance (fenced zone): d = sqrt(30 × P_W × G) / E_limit [m]
       //
       // FCC rule: ERP ≥ 5 kW daytime → formal RF exposure evaluation and
       // submittal with FCC Form 301-AM as an engineering exhibit.
@@ -8019,12 +8018,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // §1.1306 categorical exclusion threshold: 5 kW ERP for general population
       const mpe_required = erp_kw >= 5;
 
-      // OET Bulletin 65 Table 1 MPE limits for 300 kHz – 3 MHz
-      // Controlled (occupational): 1842/f(MHz) V/m
-      // Uncontrolled (general pop): 614/f(MHz) V/m  (= 100 µW/cm² at 1 MHz reference)
-      // Note: uncontrolled is 1/3 of controlled for this band, NOT 1/√2
-      const e_limit_ctrl_vm   = round2(1842 / freq_mhz);
-      const e_limit_unctrl_vm = round2(614  / freq_mhz);
+      // OET Bulletin 65 / 47 CFR §1.1310 Table 1 MPE E-field limits:
+      //   GP (uncontrolled): 0.3–1.34 MHz = 614 V/m flat; 1.34–30 MHz = 824/f(MHz) V/m
+      //   OC (controlled):   0.3–3 MHz    = 1842 V/m flat; 3–30 MHz   = 1842/f(MHz) V/m
+      // The entire AM broadcast band (0.53–1.71 MHz) straddles the 1.34 MHz GP boundary;
+      // use frequency-dependent selection to be correct for upper-AM stations.
+      const e_limit_ctrl_vm   = freq_mhz < 3.0  ? 1842 : round2(1842 / freq_mhz);
+      const e_limit_unctrl_vm = freq_mhz < 1.34 ? 614  : round2(824  / freq_mhz);
 
       // Safe-distance calculation (OET Bulletin 65 far-field formula):
       //   d (m) = sqrt(30 × P_eff_W × G_isotropic) / E_limit
@@ -9419,11 +9419,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // E(r) = 60 × I_base / r  [V/m]  (pattern factor k_h = 1, NDA)
       const eField = (r_m) => round2(60 * i_base / r_m);
 
-      // FCC MPE limits per §1.1310 Table 1 / OET Bulletin 65 (0.3–3.0 MHz band)
-      // E-field limits are frequency-dependent: E = 614/f(MHz) general population, 1842/f(MHz) occupational.
-      // Using fixed 614 V/m would understate the required exclusion zone above 1 MHz.
-      const e_limit_gp_vm = round2(614  / f_mhz);   // V/m general population (614/f)
-      const e_limit_oc_vm = round2(1842 / f_mhz);   // V/m occupational/controlled (1842/f)
+      // FCC MPE limits per 47 CFR §1.1310 Table 1 / OET Bulletin 65:
+      //   GP (uncontrolled): 0.3–1.34 MHz = 614 V/m flat; 1.34–30 MHz = 824/f V/m
+      //   OC (controlled):   0.3–3 MHz    = 1842 V/m flat; 3–30 MHz   = 1842/f V/m
+      const e_limit_gp_vm = f_mhz < 1.34 ? 614  : round2(824  / f_mhz);
+      const e_limit_oc_vm = f_mhz < 3.0  ? 1842 : round2(1842 / f_mhz);
 
       // Required exclusion radii
       const r_gp_m  = round2(60 * i_base / e_limit_gp_vm);   // general-population fence
@@ -9474,7 +9474,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fence_cost_high_usd:   fence_cost_high,
         study_cost_low_usd:    study_cost_low,
         study_cost_high_usd:   study_cost_high,
-        reference: '47 CFR §1.1310 (MPE limits); §1.1307(b) (categorical exclusion); OET Bulletin 65 Ed. 97-01 §4.2 (AM near-field formula); FCC §1.1310 Table 1 (0.3–3.0 MHz: E_gp = 614/f(MHz) V/m, E_oc = 1842/f(MHz) V/m)',
+        reference: '47 CFR §1.1310 (MPE limits); §1.1307(b) (categorical exclusion); OET Bulletin 65 Ed. 97-01 §4.2 (AM near-field formula); §1.1310 Table 1: 0.3–1.34 MHz: E_gp = 614 V/m flat; 1.34–30 MHz: E_gp = 824/f V/m; 0.3–3 MHz: E_oc = 1842 V/m flat',
         note: `${eval_required ? 'MPE evaluation REQUIRED' : 'Categorically excluded (TPO ≤ 1 kW)'} at ${tpo_kw} kW. GP exclusion radius: ${r_gp_m} m (${r_gp_ft} ft). OC exclusion: ${r_oc_m} m (${r_oc_ft} ft). I_base ≈ ${i_base} A. ${fence_needed ? `Perimeter fence ≈ ${perimeter_ft} ft ($${fence_cost_low.toLocaleString()}–$${fence_cost_high.toLocaleString()}).` : 'Fence may not be required.'}`
       };
     })(),
@@ -13435,31 +13435,38 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_rf_exposure_and_oet65_compliance_guide: (() => {
-      // 47 CFR §1.1310 / OET Bulletin 65: General population/uncontrolled MPE limit
-      // for MF (AM) broadcast: 614 mV/m (E-field), or equivalently 100 µW/cm² power density
-      // Controlled (occupational): 1842 mV/m, 1000 µW/cm²
-      // Exclusion zone: radius where field exceeds MPE limit
-      // FCC formula (OET-65 Ed. 97-01): for vertical monopole over ground,
-      //   E (mV/m) = 222 * sqrt(ERP_kW) / d_km  (approximate far-field)
-      // Solve for d_min where E = 614 mV/m:  d_min_km = 222*sqrt(ERP_kW)/614
+      // 47 CFR §1.1310 / OET Bulletin 65: General population/uncontrolled MPE limits.
+      // For 0.3–1.34 MHz (lower AM band): 614 V/m, 100 mW/cm² (flat).
+      // Controlled (occupational): 1842 V/m, 900 mW/cm² (flat for 0.3–3 MHz).
+      //
+      // Exclusion zone: far-field approximation for a vertical monopole over ground.
+      // Safety formula: d_m = sqrt(30 × G × P_W) / E_limit_Vm
+      // For AM monopole (G ≈ 1.64 half-wave dipole equivalent):
+      //   d_m = sqrt(30 × 1.64 × ERP_W) / E_limit_Vm  (not the coverage mV/m formula)
+      const freq_mhz_oet65 = frequency_khz / 1000;
       const erp_kw = round2(tpo_kw * 0.85); // assume 85% antenna efficiency for NDA
-      const mpe_general_mv_per_m = 614;
-      const mpe_controlled_mv_per_m = 1842;
-      const mpe_general_uW_per_cm2 = 100;
-      const exclusion_radius_km_general    = round2((222 * Math.sqrt(erp_kw)) / mpe_general_mv_per_m);
-      const exclusion_radius_m_general     = round2(exclusion_radius_km_general * 1000);
-      const exclusion_radius_km_controlled = round2((222 * Math.sqrt(erp_kw)) / mpe_controlled_mv_per_m);
-      const exclusion_radius_m_controlled  = round2(exclusion_radius_km_controlled * 1000);
-      // Threshold: §1.1310 requires an evaluation if ERP > 5 kW for AM
+      const erp_w  = erp_kw * 1000;
+      const G_iso  = 1.64;  // isotropic gain of half-wave dipole (AM monopole reference)
+      // OET-65 Table 1 E-field limits:
+      const mpe_general_v_per_m   = freq_mhz_oet65 < 1.34 ? 614  : round2(824  / freq_mhz_oet65);
+      const mpe_controlled_v_per_m = freq_mhz_oet65 < 3.0  ? 1842 : round2(1842 / freq_mhz_oet65);
+      const mpe_general_mw_cm2    = freq_mhz_oet65 < 1.34 ? 100  : round2(180  / (freq_mhz_oet65 * freq_mhz_oet65));
+      const exclusion_radius_m_general    = round2(Math.sqrt(30 * G_iso * erp_w) / mpe_general_v_per_m);
+      const exclusion_radius_m_controlled = round2(Math.sqrt(30 * G_iso * erp_w) / mpe_controlled_v_per_m);
+      const exclusion_radius_km_general    = round2(exclusion_radius_m_general    / 1000);
+      const exclusion_radius_km_controlled = round2(exclusion_radius_m_controlled / 1000);
+      // Threshold: conservative formal evaluation trigger at > 5 kW ERP.
+      // (47 CFR §1.1307(b) categorical exclusion for AM is actually ≤ 1 kW; stations above
+      // that threshold should evaluate. 5 kW used here as formal filing exhibit threshold.)
       const evaluation_required = tpo_kw > 5;
       const evaluation_cost_low_usd  = 1500;
       const evaluation_cost_high_usd = 4500;
       return {
         tpo_kw,
         erp_kw,
-        mpe_general_mv_per_m,
-        mpe_controlled_mv_per_m,
-        mpe_general_uW_per_cm2,
+        mpe_general_v_per_m,
+        mpe_controlled_v_per_m,
+        mpe_general_mw_cm2,
         exclusion_radius_km_general,
         exclusion_radius_m_general,
         exclusion_radius_km_controlled,
@@ -13467,8 +13474,8 @@ async function scoreCandidate(pt, ctx, warnings){
         evaluation_required,
         evaluation_cost_low_usd,
         evaluation_cost_high_usd,
-        reference: '47 CFR §1.1307(b) (environmental RF trigger); §1.1310 (MPE limits — general population: 614 mV/m, 100 µW/cm²; occupational: 1842 mV/m, 1000 µW/cm²); FCC OET Bulletin 65 Ed. 97-01 (evaluation methodology); IEEE C95.1-2019 (RF safety standard)',
-        note: `ERP ~${erp_kw} kW → general population exclusion zone ~${exclusion_radius_m_general} m (${exclusion_radius_km_general} km); controlled ~${exclusion_radius_m_controlled} m. Formal §1.1310 evaluation ${evaluation_required ? 'REQUIRED (ERP > 5 kW)' : 'not required (ERP ≤ 5 kW) — retain calculation on file'}. MPE limit: ${mpe_general_mv_per_m} mV/m (${mpe_general_uW_per_cm2} µW/cm²) general population.`
+        reference: '47 CFR §1.1307(b) (categorical exclusion ≤ 1 kW); §1.1310 (MPE limits — GP: 614 V/m / 100 mW/cm² flat for 0.3–1.34 MHz; OC: 1842 V/m / 900 mW/cm² flat for 0.3–3 MHz); OET Bulletin 65 Ed. 97-01; IEEE C95.1-2019',
+        note: `ERP ~${erp_kw} kW → GP exclusion zone ~${exclusion_radius_m_general} m; OC zone ~${exclusion_radius_m_controlled} m. Formal §1.1310 evaluation ${evaluation_required ? 'REQUIRED (ERP > 5 kW)' : 'not required at this ERP — retain calculation on file'}. GP MPE: ${mpe_general_v_per_m} V/m (${mpe_general_mw_cm2} mW/cm²).`
       };
     })(),
 
@@ -13476,7 +13483,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz = frequency_khz / 1000;
       const lambda_m = 299.792458 / freq_mhz;
       const isHighClass_tf = /^[AB]/i.test(fcc_class);
-      const tower_height_m   = round2(isHighClass_tf ? lambda_m / 2 : lambda_m / 4);
+      const tower_height_m   = round2(isHighClass_tf ? lambda_m * 0.625 : lambda_m * 0.375);  // 5/8λ A/B, 3/8λ C/D
       const tower_height_ft  = round2(tower_height_m * 3.28084);
       // Base pier: cylindrical concrete anchor beneath tower base plate
       const base_pier_depth_ft_low  = round2(Math.max(6,  tower_height_ft * 0.05));
@@ -14936,12 +14943,14 @@ async function scoreCandidate(pt, ctx, warnings){
 
     am_rf_radiation_safety_and_compliance_guide: (() => {
       // 47 CFR §1.1310 / OET Bulletin 65 Ed. 97-01 MPE compliance for AM broadcast.
-      // Uncontrolled (general population) E-field limit at 0.3–3 MHz: 274 V/m.
+      // Uncontrolled (GP) E-field: 0.3–1.34 MHz = 614 V/m flat; 1.34–30 MHz = 824/f V/m.
+      // Power density: 0.3–1.34 MHz = 100 mW/cm² flat; 1.34–30 MHz = 180/f² mW/cm².
       // Exclusion zone uses the simplified far-field approximation: r = sqrt(30 P G) / E_limit.
       // For AM vertical monopole, gain G ≈ 2 (omnidirectional reference dipole).
-      const e_limit_vm     = 274;   // V/m uncontrolled, 0.3-3 MHz
-      const h_limit_am     = 0.728; // A/m uncontrolled
-      const mpe_limit_mw_cm2 = 20;  // mW/cm² uncontrolled general population
+      const f_mhz_rfr      = frequency_khz / 1000;
+      const e_limit_vm     = f_mhz_rfr < 1.34 ? 614 : round2(824 / f_mhz_rfr);
+      const h_limit_am     = 163;  // A/m uncontrolled, 0.3–3 MHz (OET-65 Table 1)
+      const mpe_limit_mw_cm2 = f_mhz_rfr < 1.34 ? 100 : round2(180 / (f_mhz_rfr * f_mhz_rfr));
       const power_w        = tpo_kw * 1000;
       const gain_linear    = 2.0;   // omnidirectional AM vertical
       const exclusion_zone_m = round2(Math.sqrt(30 * power_w * gain_linear) / e_limit_vm);
@@ -20721,8 +20730,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Avoid residential zones: most stringent and most likely to generate opposition
 
       const wavelength_m     = 300000 / frequency_khz;
-      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
-      const h_frac_zn        = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 3/8λ for C/D (design height)
+      const h_frac_zn        = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
       const tower_height_m   = Math.round(wavelength_m * h_frac_zn);
       const tower_height_ft  = Math.round(tower_height_m * 3.281);
 
@@ -21047,8 +21056,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Subtotal tower: ~$215,000 (excludes ground radials, which are separate)
 
       const wavelength_m     = 300000 / frequency_khz;
-      // Tower height: 0.625λ for Class A/B (FCC optimum), 0.25λ for C/D
-      const h_frac_cc        = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      // Tower height: 0.625λ for Class A/B (FCC optimum), 3/8λ for C/D (design height)
+      const h_frac_cc        = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
       const tower_height_m   = Math.round(wavelength_m * h_frac_cc);
       const tower_height_ft  = Math.round(tower_height_m * 3.281);
 
@@ -25540,9 +25549,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Practical minimum: §73.49 fence must be outside exclusion zone
       const exclusionRadius_m = Math.max(exclusionRadius_m_calc, 3); // minimum 3m per engineering practice
 
-      // Occupational (controlled) exposure limit is 5× less restrictive than general population
-      const occupationalMPE_mw_cm2 = MPE_POWER_DENSITY_MW_CM2 * 5; // 500 mW/cm² for MF
-      const occupationalExclusionM = round2(exclusionRadius_m / Math.sqrt(5)); // ~sqrt(5) factor
+      // Occupational (controlled) exposure: OET-65 Table 1 at 0.3–3 MHz = 900 mW/cm² (= 9× GP).
+      // (Above 1.34 MHz the ratio is 5×; for AM broadcast the 0.3–3 MHz row gives 900/100 = 9.)
+      const occupationalMPE_mw_cm2 = MPE_POWER_DENSITY_MW_CM2 * 9; // 900 mW/cm² for 0.3–3 MHz OC
+      const occupationalExclusionM = round2(exclusionRadius_m / Math.sqrt(9)); // /3 factor (OC = 9× GP)
 
       // Compliance status
       const complianceStatus = evaluationRequired_mpe ? 'EVALUATION_REQUIRED' : 'CATEGORICALLY_EXCLUDED';
@@ -25595,8 +25605,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const landCostLow  = 50000;
       const landCostHigh = 250000; // wide range: rural vs suburban
 
-      // 2. Tower costs: class-dependent height (5/8λ for Class A/B, λ/4 for C/D)
-      const towerH_m = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_cost);
+      // 2. Tower costs: class-dependent design height (5/8λ for Class A/B, 3/8λ for C/D)
+      const towerH_m = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_cost);
       const baseTowerCostPerM = 2200; // USD/m installed (guy-wire self-supporting)
       const towerCostLow  = round2(towerH_m * baseTowerCostPerM * 0.8);
       const towerCostHigh = round2(towerH_m * baseTowerCostPerM * 1.6);
@@ -27350,13 +27360,13 @@ async function scoreCandidate(pt, ctx, warnings){
     rf_exposure_compliance_guide: (() => {
       // OET Bulletin 65 / 47 CFR §1.1310 MPE (Maximum Permissible Exposure) analysis for AM broadcast
       // AM frequency range 0.3–3 MHz: general population MPE limit = 100 mW/cm²
-      // Controlled (occupational) MPE = 500 mW/cm² at 0.3–3 MHz
+      // Controlled (occupational) MPE = 900 mW/cm² at 0.3–3 MHz per OET Bulletin 65 Table 1
       // Evaluation threshold for AM: 5 kW ERP
 
       const freq_mhz    = frequency_khz / 1000;
       const mpe_eval_required = tpo_kw >= 5; // §1.1310 Table 1 threshold for AM
       const MPE_LIMIT_GP_mwcm2  = 100; // general population / uncontrolled (0.3–3 MHz)
-      const MPE_LIMIT_OCC_mwcm2 = 500; // occupational / controlled (0.3–3 MHz)
+      const MPE_LIMIT_OCC_mwcm2 = 900; // occupational / controlled (0.3–3 MHz) per OET-65 Table 1
 
       // Near-field estimate: approximate exclusion zones
       // Power density S (mW/cm²) near a vertical monopole ≈ 60 * P_kW * (1000)^2 / (4π * r_m²)
@@ -30328,11 +30338,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_da = /^DA/i.test(pattern_mode);
       const is_da2 = /^DA-2/i.test(pattern_mode);
 
-      // ASR requirement: tower height from class-dependent standard height.
-      // 5/8λ for Class A/B (FCC optimum); λ/4 for Class C/D.
+      // ASR requirement: tower height from class-dependent design height.
+      // 5/8λ for Class A/B (FCC optimum); 3/8λ for C/D (planning design height).
       const lambda_m      = 300000 / frequency_khz;   // speed of light / freq
-      const qw_m          = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.25) * lambda_m);
-      const asr_required  = qw_m > 61;                // >200 ft AGL triggers ASR
+      const qw_m          = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_m);
+      const asr_required  = qw_m > 61;                // >200 ft AGL triggers ASR (47 CFR §17.7)
 
       // Annual database maintenance cost estimates (USD)
       const OPIF_ANNUAL_USD       = 0;         // no FCC fee, internal labor ~$200

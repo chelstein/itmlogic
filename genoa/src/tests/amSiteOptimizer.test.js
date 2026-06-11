@@ -5870,10 +5870,10 @@ test('zoning_and_land_use_compliance_guide presence and structure', async () => 
 test('zoning_and_land_use_compliance_guide KAZM 780kHz tower setback physics', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].zoning_and_land_use_compliance_guide;
-  // λ/4 at 780 kHz = 96m = 315ft; setback = tower height (1:1 fall zone)
-  assert.strictEqual(g.tower_height_m, 96, 'tower height must be λ/4 = 96m');
-  assert.strictEqual(g.setback_m_required, 96, 'setback must equal tower height (1:1 fall zone)');
-  assert.strictEqual(g.setback_ft_required, Math.round(96 * 3.281), 'setback ft mismatch');
+  // 3/8λ at 780 kHz = 144m = 472ft; setback = tower height (1:1 fall zone)
+  assert.strictEqual(g.tower_height_m, 144, 'tower height must be 3/8λ = 144m at 780 kHz (planning design height)');
+  assert.strictEqual(g.setback_m_required, 144, 'setback must equal tower height (1:1 fall zone)');
+  assert.strictEqual(g.setback_ft_required, Math.round(144 * 3.281), 'setback ft mismatch');
   assert.strictEqual(g.preferred_zoning_type, 'AGRICULTURAL', 'agricultural zoning must be preferred');
 });
 
@@ -5904,7 +5904,7 @@ test('zoning_and_land_use_compliance_guide comparison table columns present', as
     assert.ok('zulcg_setback_m' in row, `rank ${row.rank} missing zulcg_setback_m`);
     assert.ok('zulcg_n_env_triggers' in row, `rank ${row.rank} missing zulcg_n_env_triggers`);
     assert.ok('zulcg_permit_weeks_rural' in row, `rank ${row.rank} missing zulcg_permit_weeks_rural`);
-    assert.strictEqual(row.zulcg_setback_m, 96, `rank ${row.rank} setback must be 96m`);
+    assert.strictEqual(row.zulcg_setback_m, 144, `rank ${row.rank} setback must be 144m (3/8λ at 780 kHz)`);
     assert.strictEqual(row.zulcg_n_env_triggers, 6, `rank ${row.rank} must have 6 env triggers`);
   }
 });
@@ -6037,9 +6037,9 @@ test('tower_construction_contract_guide presence and structure', async () => {
 test('tower_construction_contract_guide KAZM 780kHz tower height physics', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].tower_construction_contract_guide;
-  // λ = 300000/780 = 384.6m; λ/4 = round(96.15) = 96m; 96m × 3.281 = 315 ft (rounded)
-  assert.strictEqual(g.tower_height_m, 96, 'tower height must be λ/4 = 96m for 780kHz');
-  assert.strictEqual(g.tower_height_ft, Math.round(96 * 3.281), 'tower height in feet mismatch');
+  // λ = 300000/780 = 384.6m; 3/8λ = round(144.23) = 144m; 144m × 3.281 = 472 ft (rounded)
+  assert.strictEqual(g.tower_height_m, 144, 'tower height must be 3/8λ = 144m for 780kHz Class D');
+  assert.strictEqual(g.tower_height_ft, Math.round(144 * 3.281), 'tower height in feet mismatch');
   assert.strictEqual(g.n_towers, 1, 'NDA station has 1 tower');
   assert.strictEqual(g.is_da, false, 'KAZM NDA must produce is_da=false');
 });
@@ -6071,7 +6071,7 @@ test('tower_construction_contract_guide comparison table columns present', async
     assert.ok('tccg_tower_height_ft' in row, `rank ${row.rank} missing tccg_tower_height_ft`);
     assert.ok('tccg_cost_typ_usd' in row, `rank ${row.rank} missing tccg_cost_typ_usd`);
     assert.ok('tccg_timeline_weeks_typ' in row, `rank ${row.rank} missing tccg_timeline_weeks_typ`);
-    assert.strictEqual(row.tccg_tower_height_ft, Math.round(96 * 3.281), `rank ${row.rank} tower height ft mismatch`);
+    assert.strictEqual(row.tccg_tower_height_ft, Math.round(144 * 3.281), `rank ${row.rank} tower height ft mismatch (3/8λ at 780 kHz)`);
     assert.ok(row.tccg_cost_typ_usd > 0, `rank ${row.rank} typical cost must be positive`);
   }
 });
@@ -8390,7 +8390,7 @@ test('rf_exposure_mpe_analysis MPE limits per §1.1310', async () => {
   const r = out.candidates[0].rf_exposure_mpe_analysis;
   assert.strictEqual(r.mpe_general_population_mw_cm2, 100, 'MPE must be 100 mW/cm² for 0.3–3 MHz general population');
   assert.strictEqual(r.mpe_general_population_e_vm, 614, 'E-field MPE must be 614 V/m');
-  assert.strictEqual(r.mpe_occupational_mw_cm2, 500, 'occupational MPE must be 500 mW/cm²');
+  assert.strictEqual(r.mpe_occupational_mw_cm2, 900, 'occupational MPE must be 900 mW/cm² (OET-65 Table 1, 0.3–3 MHz controlled)');
 });
 
 test('rf_exposure_mpe_analysis exclusion zone and EIRP', async () => {
@@ -12542,9 +12542,9 @@ test('am_rf_radiation_safety_and_compliance_guide present on KAZM candidate', as
 test('KAZM RF radiation exclusion zone and MPE limits', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_rf_radiation_safety_and_compliance_guide;
-  assert.strictEqual(g.e_limit_vm,       274,   'uncontrolled E-field limit should be 274 V/m');
-  assert.strictEqual(g.mpe_limit_mw_cm2, 20,    'uncontrolled MPE limit should be 20 mW/cm²');
-  assert.strictEqual(g.exclusion_zone_m, 2,     'KAZM 5 kW exclusion zone should be 2 m');
+  assert.strictEqual(g.e_limit_vm,       614,  'uncontrolled E-field limit should be 614 V/m (OET-65 flat, 0.3–1.34 MHz)');
+  assert.strictEqual(g.mpe_limit_mw_cm2, 100,  'uncontrolled MPE limit should be 100 mW/cm² (OET-65 Table 1)');
+  assert.strictEqual(g.exclusion_zone_m, 0.89, 'KAZM 5 kW exclusion zone should be 0.89 m at 614 V/m limit');
 });
 
 test('KAZM RF radiation evaluation type', async () => {
@@ -12571,7 +12571,7 @@ test('am_rf_radiation_safety_and_compliance_guide comparison table columns prese
     assert.ok('rfr_evaluation_type'      in row, 'rfr_evaluation_type missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.rfr_exclusion_zone_m,     2,                                    'rank-1 rfr_exclusion_zone_m should be 2');
+  assert.strictEqual(r0.rfr_exclusion_zone_m,     0.89,                                 'rank-1 rfr_exclusion_zone_m should be 0.89 m at 614 V/m OET-65 limit');
   assert.strictEqual(r0.rfr_total_compliance_low,  2000,                                 'rank-1 rfr_total_compliance_low should be $2,000');
   assert.strictEqual(r0.rfr_evaluation_type,       'computational_evaluation_required',  'rank-1 rfr_evaluation_type mismatch');
 });
@@ -13991,10 +13991,10 @@ it('am_tower_foundation_and_civil_engineering_guide is present on every candidat
   }
 });
 
-it('am_tower_foundation_and_civil_engineering_guide tower_height_ft is ~315.26 ft for KAZM (Class D, 780 kHz)', async () => {
+it('am_tower_foundation_and_civil_engineering_guide tower_height_ft is ~473.01 ft for KAZM (Class D, 780 kHz, 3/8λ)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_foundation_and_civil_engineering_guide;
-  assert.ok(Math.abs(g.tower_height_ft - 315.26) < 0.5, `tower_height_ft expected ~315.26, got ${g.tower_height_ft}`);
+  assert.ok(Math.abs(g.tower_height_ft - 473.01) < 0.5, `tower_height_ft expected ~473.01 (3/8λ), got ${g.tower_height_ft}`);
 });
 
 it('am_tower_foundation_and_civil_engineering_guide concrete_cuyd_low is positive and reasonable', async () => {
@@ -14014,7 +14014,7 @@ it('am_tower_foundation_and_civil_engineering_guide reference cites EIA/TIA-222-
 it('candidate_comparison_table tfciv columns match KAZM Class D expected values', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
-  assert.ok(Math.abs(r0.tfciv_tower_height_ft - 315.26) < 0.5, `tfciv_tower_height_ft expected ~315.26, got ${r0.tfciv_tower_height_ft}`);
+  assert.ok(Math.abs(r0.tfciv_tower_height_ft - 473.01) < 0.5, `tfciv_tower_height_ft expected ~473.01 (3/8λ design height), got ${r0.tfciv_tower_height_ft}`);
   assert.strictEqual(r0.tfciv_civil_foundation_low_usd, 25000, 'tfciv_civil_foundation_low_usd should be 25000');
   assert.ok(r0.tfciv_concrete_cuyd_low > 0, 'tfciv_concrete_cuyd_low must be positive');
 });
@@ -15962,16 +15962,14 @@ test('KAZM 5 kW: eval_required = true and GP exclusion radius physically reasona
     'OC exclusion must be smaller than GP exclusion (higher power limit)');
 });
 
-test('KAZM 780 kHz: FCC limits follow OET Bulletin 65 frequency-dependent formula', async () => {
+test('KAZM 780 kHz: FCC limits follow OET Bulletin 65 flat limits for lower AM band', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_rf_exposure_mpe_evaluation_guide;
-  // OET Bul 65 / §1.1310 Table 1: E_gp = 614/f(MHz), E_oc = 1842/f(MHz)
-  // At 780 kHz (0.780 MHz): E_gp ≈ 787 V/m, E_oc ≈ 2361 V/m
-  const f_mhz = KAZM.frequency_khz / 1000;
-  assert.ok(Math.abs(g.e_limit_gp_vm - 614 / f_mhz) < 2,
-    `GP limit must be ~${(614/f_mhz).toFixed(1)} V/m (614/f), got ${g.e_limit_gp_vm}`);
-  assert.ok(Math.abs(g.e_limit_oc_vm - 1842 / f_mhz) < 2,
-    `OC limit must be ~${(1842/f_mhz).toFixed(1)} V/m (1842/f), got ${g.e_limit_oc_vm}`);
+  // 47 CFR §1.1310 Table 1 / OET Bulletin 65: for 0.3–1.34 MHz, limits are FLAT:
+  //   GP (uncontrolled): 614 V/m; OC (controlled): 1842 V/m.
+  // 780 kHz is below the 1.34 MHz boundary, so both limits are flat values.
+  assert.strictEqual(g.e_limit_gp_vm, 614,  'GP E-field must be 614 V/m flat (0.3–1.34 MHz)');
+  assert.strictEqual(g.e_limit_oc_vm, 1842, 'OC E-field must be 1842 V/m flat (0.3–3 MHz)');
 });
 
 test('KAZM 780 kHz: field_table has 5 rows and E decreases with distance', async () => {
@@ -16474,15 +16472,14 @@ test('#93 KAZM < 5 kW: mpe_required=false, eval_type=CE', async () => {
   assert.strictEqual(mpe.eval_type, 'CE', 'eval_type must be CE for < 5 kW');
 });
 
-test('#93 MPE limits follow OET Bulletin 65 Table 1 formula at 780 kHz', async () => {
+test('#93 MPE limits follow OET Bulletin 65 Table 1 flat limits at 780 kHz', async () => {
   const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
   const mpe = out.candidates[0].am_rf_exposure_mpe_guide;
-  // Controlled: 1842/f(MHz) = 1842/0.780 ≈ 2362 V/m (OET Bulletin 65 Table 1)
-  assert.ok(Math.abs(mpe.e_limit_controlled_vm - 1842 / 0.780) < 5,
-    `e_limit_controlled_vm should be ~2362, got ${mpe.e_limit_controlled_vm}`);
-  // Uncontrolled: 614/f(MHz) = 614/0.780 ≈ 787 V/m (OET Bulletin 65 Table 1 — 1/3 of controlled)
-  assert.ok(Math.abs(mpe.e_limit_uncontrolled_vm - 614 / 0.780) < 5,
-    `e_limit_uncontrolled_vm should be ~787 V/m (614/0.780), got ${mpe.e_limit_uncontrolled_vm}`);
+  // 47 CFR §1.1310 Table 1 / OET Bulletin 65: 780 kHz is in the 0.3–1.34 MHz flat band.
+  //   Uncontrolled (GP): 614 V/m flat (not 614/f — that formula applies above 1.34 MHz)
+  //   Controlled (OC):   1842 V/m flat (0.3–3 MHz flat; 780 kHz < 3 MHz boundary)
+  assert.strictEqual(mpe.e_limit_controlled_vm,   1842, 'e_limit_controlled_vm must be 1842 V/m flat (0.3–3 MHz)');
+  assert.strictEqual(mpe.e_limit_uncontrolled_vm,  614, 'e_limit_uncontrolled_vm must be 614 V/m flat (0.3–1.34 MHz)');
 });
 
 test('#93 near-field radius ≈ λ/(2π) at 780 kHz', async () => {
@@ -17649,13 +17646,15 @@ test('#116 KAZM: FCC registration guide present with correct shape', async () =>
   assert.ok(Array.isArray(g.filing_deadlines) && g.filing_deadlines.length >= 4, 'must have ≥4 filing deadlines');
 });
 
-test('#116 high-frequency station (1600 kHz) does not require ASR; low-frequency (540 kHz) may', async () => {
+test('#116 high-frequency station (1600 kHz) requires ASR at 3/8λ design height; low-frequency (540 kHz) does too', async () => {
   const highFreq = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
   const lowFreq  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
   const gHigh = highFreq.candidates[0].am_fcc_registration_and_database_management_guide;
   const gLow  = lowFreq.candidates[0].am_fcc_registration_and_database_management_guide;
-  assert.strictEqual(gHigh.asr_required, false, '1600 kHz λ/4 ≈ 47 m — below 61 m threshold');
-  assert.strictEqual(gLow.asr_required,  true,  '540 kHz λ/4 ≈ 139 m — above 61 m threshold');
+  // At 3/8λ design height: 1600 kHz → 70.3 m > 61 m threshold → ASR required.
+  // (At λ/4 = 46.9 m it would be below threshold, but planning uses 3/8λ design height.)
+  assert.strictEqual(gHigh.asr_required, true,  '1600 kHz 3/8λ ≈ 70 m — above 61 m threshold, ASR required');
+  assert.strictEqual(gLow.asr_required,  true,  '540 kHz 3/8λ ≈ 208 m — above 61 m threshold');
 });
 
 test('#116 DA station has more da_certifications than NDA', async () => {
