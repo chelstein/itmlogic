@@ -11118,12 +11118,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // ITU-R P.372-16: atmospheric noise at 780 kHz, North American zone B (continental)
       const fa_atmospheric_dBuVm   = 53.0;   // ITU-R P.372-16 zone B, 780 kHz, daytime median
 
-      // Man-made noise estimate — heuristic from distance as urbanization proxy:
-      //   > 30 km from current site → rural/quiet zone
-      //   10–30 km → residential zone
-      //   < 10 km → near-urban/business zone
-      const dist_km = pt.distance_from_current_km ?? 25;
-      const noise_zone = dist_km > 30 ? 'RURAL' : (dist_km > 10 ? 'RESIDENTIAL' : 'NEAR_URBAN');
+      // Man-made noise estimate — use land_use_class (distance + conductivity proxy)
+      // as a more consistent urbanization signal than raw distance from current site.
+      const noise_zone = (land_use_class === 'SUBURBAN') ? 'NEAR_URBAN'
+                       : (land_use_class === 'SUBURBAN_RURAL') ? 'RESIDENTIAL' : 'RURAL';
       const fa_manmade_dBuVm = noise_zone === 'RURAL' ? 41.0
                              : noise_zone === 'RESIDENTIAL' ? 51.0
                              : 62.0;   // ITU-R P.372-16 Table 1 approximate MF values
@@ -11498,9 +11496,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const site_m2       = round2(circle_m2 * buffer_factor);
       const site_acres    = round2(site_m2 / 4046.86);   // 1 acre = 4046.86 m²
 
-      // Lease tier based on candidate distance from current site (proxy for urbanization)
-      const d_km = pt.distance_from_current_km ?? 0;
-      const lease_tier = d_km < 10 ? 'suburban' : 'rural';
+      // Lease tier uses land_use_class (distance + conductivity proxy) for urbanization.
+      const lease_tier = (land_use_class === 'SUBURBAN' || land_use_class === 'SUBURBAN_RURAL') ? 'suburban' : 'rural';
 
       const lease_annual_low_usd  = lease_tier === 'suburban' ? 24000 : 10000;
       const lease_annual_high_usd = lease_tier === 'suburban' ? 60000 : 25000;
@@ -11535,7 +11532,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_acquisition_low_usd:  acquisition_low_usd,
         total_acquisition_high_usd: acquisition_high_usd,
         reference: '47 CFR §73.49 (site enclosure / exclusion zone); ASTM E1527-21 (Phase I ESA); ALTA/NSPS Land Title Survey standard; §73.1125 (site access)',
-        note: `${radial_m} m radial at ${frequency_khz} kHz → ${site_acres} acres minimum site (incl. 20% buffer). Lease tier: ${lease_tier} (candidate ${round2(d_km)} km from current). Annual lease: $${lease_annual_low_usd.toLocaleString()}–$${lease_annual_high_usd.toLocaleString()}. Phase I ESA + ALTA survey + legal: $${acquisition_low_usd.toLocaleString()}–$${acquisition_high_usd.toLocaleString()} one-time. Broadcast attorney review of lease essential before signing.`
+        note: `${radial_m} m radial at ${frequency_khz} kHz → ${site_acres} acres minimum site (incl. 20% buffer). Lease tier: ${lease_tier} (land use: ${land_use_class}). Annual lease: $${lease_annual_low_usd.toLocaleString()}–$${lease_annual_high_usd.toLocaleString()}. Phase I ESA + ALTA survey + legal: $${acquisition_low_usd.toLocaleString()}–$${acquisition_high_usd.toLocaleString()} one-time. Broadcast attorney review of lease essential before signing.`
       };
     })(),
 
@@ -31861,30 +31858,28 @@ async function scoreCandidate(pt, ctx, warnings){
       // Pre-construction ambient noise floor survey determines if co-channel and
       // adjacent-channel interference will degrade coverage at the candidate site.
       // Relevant: §73.182(a), OET Bulletin 65, and ITU-R P.372 (radio noise).
-      const freq_khz   = frequency_khz ?? 1000;
-      const lat        = pt.lat ?? 38;
-      const lon        = pt.lon ?? -97;
-      const dist_km    = pt.distance_from_current_km ?? 10;
+      const freq_khz = frequency_khz ?? 1000;
 
-      // Urban/suburban noise environment proxy by latitude band and distance
-      // (shorter distance from current site → likely same noise environment)
-      const isUrbanLat    = (lat > 30 && lat < 45) && (lon > -100 && lon < -70);
-      const isNearHighway = dist_km < 15;
-
-      // ITU-R P.372 noise categories relevant to AM band (535–1705 kHz)
+      // Use land_use_class (already computed from distance + conductivity) as the
+      // noise environment proxy.  ITU-R P.372 Fig. 1 shows that urban/industrial
+      // noise dominates at AM frequencies in dense populated areas; rural quiet sites
+      // can be 20–30 dB cleaner than suburban locations at the same field strength.
       const noise_environment =
-        isUrbanLat && isNearHighway ? 'URBAN_INDUSTRIAL' :
-        isUrbanLat                  ? 'SUBURBAN'         :
-        isNearHighway               ? 'RURAL_HIGHWAY'    : 'RURAL_QUIET';
+        land_use_class === 'SUBURBAN'       ? 'URBAN_INDUSTRIAL' :
+        land_use_class === 'SUBURBAN_RURAL' ? 'SUBURBAN'         :
+        land_use_class === 'RURAL'          ? 'RURAL_HIGHWAY'    : 'RURAL_QUIET';
 
-      // Ambient noise floor estimates per ITU-R P.372 (dBμV/m at 1 kHz above carrier)
+      // Ambient noise floor estimates per ITU-R P.372 Fig. 1 (dBμV/m at 1 MHz reference)
       const NOISE_FLOOR_DB = {
         URBAN_INDUSTRIAL: 40,
         SUBURBAN:         28,
         RURAL_HIGHWAY:    22,
         RURAL_QUIET:      14,
       };
-      const ambient_noise_floor_dbuv = NOISE_FLOOR_DB[noise_environment];
+      // ITU-R P.372: atmospheric noise decreases ~10 dB/decade above 1 MHz in MF band.
+      // Lower AM channels (535–800 kHz) see +4 dB higher noise; upper AM (>1200 kHz) −4 dB.
+      const freq_correction_db = freq_khz < 800 ? 4 : freq_khz > 1200 ? -4 : 0;
+      const ambient_noise_floor_dbuv = NOISE_FLOOR_DB[noise_environment] + freq_correction_db;
 
       // Signal-to-noise margin at 0.5 mV/m contour (54 dBμV/m)
       const SNR_AT_CONTOUR_DB = round2(54 - ambient_noise_floor_dbuv);
@@ -31920,8 +31915,8 @@ async function scoreCandidate(pt, ctx, warnings){
           total_low_usd,
           total_high_usd,
         },
-        reference: '47 CFR §73.182(a); ITU-R P.372; OET Bulletin 65; FCC Part 15',
-        note: `Noise environment: ${noise_environment}. Ambient floor: ${ambient_noise_floor_dbuv} dBμV/m. SNR at 0.5 mV/m contour: ${SNR_AT_CONTOUR_DB} dB — ${adequate_snr ? 'ADEQUATE' : 'MARGINAL — mitigation may be required'}. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+        reference: '47 CFR §73.182(a); ITU-R P.372 (radio noise); OET Bulletin 65; FCC Part 15',
+        note: `Noise environment: ${noise_environment} (land use: ${land_use_class}). Ambient floor: ${ambient_noise_floor_dbuv} dBμV/m (${freq_correction_db >= 0 ? '+' : ''}${freq_correction_db} dB frequency correction at ${freq_khz} kHz). SNR at 0.5 mV/m contour: ${SNR_AT_CONTOUR_DB} dB — ${adequate_snr ? 'ADEQUATE' : 'MARGINAL — mitigation may be required'}. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 
@@ -32644,7 +32639,10 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     treaty_zone,
-    fuel_risk:               LABEL_NOT_EVALUATED,
+    fuel_risk: (() => {
+      const wfl = wildfireRiskLevel(pt.lat, pt.lon);
+      return wfl === 'VERY_HIGH' ? 'EXTREME' : wfl === 'HIGH' ? 'HIGH' : wfl === 'ELEVATED' ? 'MODERATE' : 'LOW';
+    })(),
     notes: buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km: pt.distance_from_current_km }),
     explanation: {
       score_breakdown: roundBreakdown(score_breakdown),
