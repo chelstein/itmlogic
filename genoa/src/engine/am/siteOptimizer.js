@@ -6260,8 +6260,9 @@ async function scoreCandidate(pt, ctx, warnings){
     // significantly by region, contractor, site conditions, and market.
     financial_feasibility_summary: (() => {
       const lambdaM_ff = 300000 / frequency_khz;
-      const qwM_ff    = round2(lambdaM_ff / 4);  // λ/4 tower height (Class D) / physics reference
-      const asrReq_ff = qwM_ff > 60.96;
+      const qwM_ff    = round2(lambdaM_ff / 4);  // λ/4 physics reference (kept for tower note display)
+      const designH_ff = round2(lambdaM_ff * (/^[AB]$/i.test(fcc_class) ? 0.625 : 0.375)); // class-aware design height
+      const asrReq_ff = designH_ff > 60.96;     // use design height for ASR decision per §17.7
       const isClear_ff = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const isDA_ff    = /^DA/i.test(pattern_mode);  // NDA starts with N, not DA
       const isLocal_ff = LOCAL_CHANNEL_KHZ.has(frequency_khz);
@@ -6286,8 +6287,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const towerHigh = isHighPow_ff ? 800000 : isMedPow_ff ? 300000 : 120000;
       const towerNote = isDA_ff
         ? `DA array (${pattern_mode}): multiple tower elements — multiply single-tower estimate by number of elements (typically 2–4).`
-        : asrReq_ff ? `${qwM_ff} m guyed monopole exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.`
-        : `${qwM_ff} m guyed monopole below ASR threshold; standard guyed tower with base insulator.`;
+        : asrReq_ff ? `${designH_ff} m guyed monopole exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.`
+        : `${designH_ff} m guyed monopole below ASR threshold; standard guyed tower with base insulator.`;
 
       // Ground system — §73.186 radial copper buried system (120 × 0.35λ standard)
       const nRadials    = isHighPow_ff ? 120 : isMedPow_ff ? 120 : isLocal_ff ? 60 : 90;
