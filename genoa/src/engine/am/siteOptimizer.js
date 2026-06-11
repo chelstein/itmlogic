@@ -10667,10 +10667,13 @@ async function scoreCandidate(pt, ctx, warnings){
       const sky_raw_dB  = tpo_dB + 120 - 20 * Math.log10(dist_to_kkob_km) - 40;
       const sky_uVm     = round2(Math.pow(10, sky_raw_dB / 20));  // µV/m at KKOB site
 
-      // FCC Class D secondary protection threshold on clear channel:
-      //   §73.182(j): skywave must not exceed 50 µV/m at dominant station's 0.5 mV/m contour.
-      //   (More precisely: 50 µV/m 50% skywave at critical distance)
-      const protection_threshold_uVm = 50;
+      // FCC Class D secondary protection toward the clear-channel dominant:
+      //   Class A stations are protected at night to their 0.5 mV/m-50% skywave contour
+      //   (§73.182(a)(1)); the co-channel D/U requirement is 26 dB (20:1, §73.182(r)),
+      //   i.e. interfering contributions are evaluated against ~25 µV/m at 10% time.
+      //   This guide's 50%-time screening model uses a 50 µV/m screening threshold —
+      //   roughly equivalent at the 50% percentile; a full NIF study is authoritative.
+      const protection_threshold_uVm = 50;  // screening value (50%-time model)
       const kkob_interference_compliant = sky_uVm <= protection_threshold_uVm;
 
       // Nighttime service contour:
@@ -25378,13 +25381,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // Skywave protection distances per §73.182 Table 1 (approximate screening values)
       // §73.182: clear-channel Class A protected to 0.5 mV/m groundwave daytime;
       // nighttime protected skywave contour depends on class
-      // FCC §73.182(a)(1): skywave field ≥ 50 µV/m (0.05 mV/m) at 50% of time, 50% of locations
-      // protected for Class A within its service area
+      // §73.182(a)(1): Class A protected at night to the 0.5 mV/m-50% skywave contour;
+      // other classes' nighttime protection is groundwave/NIF based
       const SKYWAVE_CONTOUR_MVM = {
-        A:   { field_mvm: 0.05,  label: '50 µV/m skywave (§73.182 Class A protected)' },
-        B:   { field_mvm: 0.05,  label: '50 µV/m skywave (§73.182 Class B)' },
-        C:   { field_mvm: 0.025, label: '25 µV/m skywave (§73.182 Class C)' },
-        D:   { field_mvm: 0.025, label: '25 µV/m skywave (§73.182 Class D secondary)' }
+        A:   { field_mvm: 0.5, label: '0.5 mV/m-50% skywave (§73.182(a)(1) Class A nighttime protected contour)' },
+        B:   { field_mvm: 2.0, label: '2.0 mV/m groundwave (§73.182 Class B nighttime protected contour)' },
+        C:   { field_mvm: 0.5, label: '0.5 mV/m groundwave (§73.182 Class C; daytime separation governs night on local channels)' },
+        D:   { field_mvm: 0.5, label: '0.5 mV/m daytime groundwave (§73.182 Class D; nighttime protection not prescribed)' }
       };
       const skywaveContour = SKYWAVE_CONTOUR_MVM[fcc_class] ?? SKYWAVE_CONTOUR_MVM.D;
 
