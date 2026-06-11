@@ -114,7 +114,11 @@ export function collectFieldCandidates(exhibit, evidence){
 
   // ---- ASR ID + tower height ----
   pushCandidate(F('asr_id'), { key: 'asr_id', value: asr.asr_number ?? asr.registration_number ?? si.asr_id ?? null, source_type: asr.asr_number || asr.registration_number ? SOURCE_TYPE.FCC_ASR : SOURCE_TYPE.OPERATOR_INPUT, fetched_at: asr.fetched_at || null });
-  pushCandidate(F('asr_height_agl_m'), { key: 'asr_height_agl_m', value: num(si.overall_height_m), unit: 'm', source_type: SOURCE_TYPE.OPERATOR_INPUT });
+  // Operator-entered tower height: 0 is a sentinel meaning "unknown".
+  // ASR (PRIMARY) outranks OPERATOR_INPUT in authority; when both exist the
+  // resolver picks the ASR value and marks the 0m entry as non-operative.
+  const siHeightAgl = num(si.overall_height_m);
+  pushCandidate(F('asr_height_agl_m'), { key: 'asr_height_agl_m', value: siHeightAgl, unit: 'm', source_type: SOURCE_TYPE.OPERATOR_INPUT });
   pushCandidate(F('asr_height_agl_m'), { key: 'asr_height_agl_m', value: num(asr.overall_height_m), unit: 'm', source_type: SOURCE_TYPE.FCC_ASR, source_label: 'FCC ASR registered height AGL', fetched_at: asr.fetched_at || null });
   pushCandidate(F('asr_height_amsl_m'), { key: 'asr_height_amsl_m', value: num(asr.overall_height_amsl_m), unit: 'm', source_type: SOURCE_TYPE.FCC_ASR, source_label: 'FCC ASR registered height AMSL', fetched_at: asr.fetched_at || null });
 
@@ -159,6 +163,13 @@ function deriveMathStatus(exhibit){
 }
 
 function deriveRuleStatus(exhibit){
+  // Check interference_study directly — filing_readiness is stamped BEFORE
+  // buildInterferenceStudy() runs (engine/index.js lines 928 vs 931), so
+  // filing_readiness.status may not reflect interference failures.
+  // buildAttestedExhibitValues runs after both, so we can check here.
+  const isr = exhibit.interference_study;
+  if (isr && isr.filing_qualifies === false) return RULE_STATUS.FAIL;
+
   const fr = exhibit.filing_readiness || null;
   if (!fr || !fr.status) return RULE_STATUS.NOT_RUN;
   const s = String(fr.status).toUpperCase();
@@ -187,6 +198,30 @@ export function buildAttestedExhibitValues(exhibit, evidence, options = {}){
   const resolutions = {};
   const warnings = [];
   const blockers = [];
+
+  // "NEW" facility sentinel — callsign or facility_id string "NEW" means the FCC
+  // has not yet assigned a callsign / facility_id (new-station applications).
+  // The identity is SOURCE_UNVERIFIED until the LMS application is accepted; add
+  // a blocker so filing_status reflects BLOCKED rather than silently showing VERIFIED.
+  {
+    const si = exhibit.station_inputs || {};
+    const evLms = (evidence || exhibit.evidence || {})?.fcc_lms?.license || {};
+    const rawCall = (si.call ?? si.callsign ?? evLms.call ?? '');
+    const rawFid  = (si.facility_id ?? evLms.facility_id ?? '');
+    const isNewCall = String(rawCall).trim().toUpperCase() === 'NEW';
+    const isNewFid  = String(rawFid).trim().toUpperCase() === 'NEW'
+                   || String(rawFid).trim() === '';
+    if (isNewCall){
+      blockers.push({ code: 'SOURCE_UNVERIFIED_CALLSIGN',  key: 'callsign',
+        message: 'Callsign is "NEW" — facility not yet assigned by FCC; identity SOURCE_UNVERIFIED.  Re-run after LMS application is accepted to resolve.',
+        severity: 'BLOCKER' });
+    }
+    if (isNewFid && isNewCall){
+      blockers.push({ code: 'SOURCE_UNVERIFIED_FACILITY_ID', key: 'facility_id',
+        message: 'facility_id is unassigned (new-station application) — identity SOURCE_UNVERIFIED.  Re-run after FCC issues a facility_id.',
+        severity: 'BLOCKER' });
+    }
+  }
   for (const [key, candidates] of Object.entries(fields)){
     const r = resolveOperativeValue(key, candidates, options);
     resolutions[key] = r;

@@ -91,10 +91,10 @@ export function buildTowerStudySection(exhibit){
       ['Fetched at',           faa.fetched_at         || '—']
     );
   } else if (asr?.faa_study_number){
-    divider('FAA OE/AAA — lookup deferred');
+    divider('FAA OE/AAA — determination missing');
     rows.push(
       ['Aeronautical Study #', asr.faa_study_number],
-      ['Status',               'No FAA OE record attached.  Set FAA_OE_SIDECAR_URL on the deploy (operator-managed proxy) and re-run the compute, or consult oeaaa.faa.gov directly for the determination + conditions.']
+      ['Status',               'FAA_OE_DETERMINATION_MISSING — The ASR record references an FAA aeronautical study number but no Form 7460-2 determination is attached.  Set FAA_OE_SIDECAR_URL on the deploy (operator-managed proxy) and re-run the compute, or consult oeaaa.faa.gov directly.  The Tower Study is NOT filing-grade without a resolved FAA determination.']
     );
   }
 
@@ -155,7 +155,7 @@ export function buildTowerStudySection(exhibit){
   if (faa?.available){
     summaryParts.push(`FAA OE study ${faa.study_number || ''} (${faa.determination || 'pending'})`);
   } else if (asr?.faa_study_number){
-    summaryParts.push(`FAA OE study ${asr.faa_study_number} referenced on the ASR but no determination is attached (set FAA_OE_SIDECAR_URL to enable lookup)`);
+    summaryParts.push(`FAA_OE_DETERMINATION_MISSING — study ${asr.faa_study_number} on ASR but no Form 7460-2 determination is attached (set FAA_OE_SIDECAR_URL to enable lookup); Tower Study is NOT filing-grade complete`);
   }
   if (cmpl?.applicable){
     summaryParts.push(`rules-derived ${styleLabel(cmpl.lighting.style)} (per ${(cmpl.lighting.cites?.[0]?.rule) || 'AC 70/7460-1L'})`);
