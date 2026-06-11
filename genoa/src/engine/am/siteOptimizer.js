@@ -7763,11 +7763,11 @@ async function scoreCandidate(pt, ctx, warnings){
       //   §73.183 — Class A dominant station nighttime protection (50 µV/m)
       //   §73.25–27 — Channel classification (clear/regional/local)
       //   §73.21 — Class A stations may operate up to 50 kW nights on clear channels
-      //   §73.22 — Class B/D stations severely restricted at night on clear channels
+      //   §73.21(b) — Class B/D stations severely restricted at night on clear channels
       //             (typically 1–2.5 kW max nighttime, or DA-N required)
       //
       // Class D stations on clear channels at night:
-      //   §73.22(b): Class D on clear channel → either:
+      //   §73.21(b)(2): Class D on clear channel → either:
       //   Option 1: Operate at ≤ 1 kW at night (no interference to dominant)
       //   Option 2: Operate DA-N with pattern that protects dominant at 0.1 mV/m contour
       //   Option 3: "Sunset to sunrise" (sign on after local sunset, off before local sunrise)
@@ -7798,7 +7798,7 @@ async function scoreCandidate(pt, ctx, warnings){
       } else if (isClearCh_sw && fcc_class === 'D') {
         night_power_limit_kw = Math.min(tpo_kw, 1.0);
         night_operation_type = 'LIMITED_1KW_OR_DAN';
-        nighttime_constraint = 'Class D on clear channel — §73.22(b): max 1 kW nights OR DA-N pattern required; may need Sunset-to-Sunrise authorization';
+        nighttime_constraint = 'Class D on clear channel — §73.21(b)(2): nighttime power restricted (or DA-N pattern required); may need Sunset-to-Sunrise authorization';
       } else if (isClearCh_sw && fcc_class === 'B') {
         night_power_limit_kw = Math.min(tpo_kw, 2.5);
         night_operation_type = 'LIMITED_2_5KW_OR_DAN';
@@ -7886,7 +7886,7 @@ async function scoreCandidate(pt, ctx, warnings){
         night_study_cost_high_usd,
         psa_eligible,
         psa_note,
-        reference: '47 CFR §73.182 (nighttime skywave); §73.183 (Class A protection); §73.21–27 (class power limits); §73.22(b) (Class D clear channel nights); §73.99 (PSA); §73.182 skywave interference analysis methodology',
+        reference: '47 CFR §73.182 (nighttime skywave); §73.183 (Class A protection); §73.21–27 (class power limits); §73.21(b)(2) (Class D nighttime restrictions); §73.99 (PSA); §73.182 skywave interference analysis methodology',
         note: `Class ${fcc_class} on ${frequency_khz} kHz (${isClearCh_sw ? 'clear' : isRegionalCh_sw ? 'regional' : 'local'} channel). Night limit: ${night_power_limit_kw} kW (${night_operation_type}). ${nighttime_constraint}`
       };
     })(),
@@ -11976,7 +11976,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.154(a): Proof of performance for DA stations:
       //   • 72 radials at 9° increments
       //   • Inverse-square-law field intensity (FI) measurements every 0.25–0.5 miles
-      //   • All measurements within the §73.22/§73.23 protected contours
+      //   • All measurements within the §73.182 protected contours
       //   • Requires licensed broadcast engineer
       //   • Results filed as exhibit to FCC Form 302-AM (license to cover)
       //
@@ -17474,7 +17474,7 @@ async function scoreCandidate(pt, ctx, warnings){
                          :                   'REGIONAL_CHANNEL';
 
       // Secondary status: Class D/C on a clear channel must not cause interference
-      // to Class A/B dominant stations (§73.21, §73.22)
+      // to Class A/B dominant stations (§73.21, §73.25)
       const is_secondary = (fcc_class === 'D' || fcc_class === 'C') && is_clear_ch_int;
 
       // Class D nighttime, where authorized, is less than 0.25 kW per §73.21(b)(2)
@@ -27619,7 +27619,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Determine nighttime obligations by class
       const NIGHTTIME_OBLIGATIONS = {
         A: { power_reduction_required: false, pattern_switch_required: false, night_operation: 'Full power; nighttime skywave protection as dominant Class A station', cfr: '§73.21' },
-        B: { power_reduction_required: true, pattern_switch_required: isDA_ntps, night_operation: 'Must reduce power and/or switch to DA-N; see licensed nighttime ERP in CP', cfr: '§73.22' },
+        B: { power_reduction_required: true, pattern_switch_required: isDA_ntps, night_operation: 'Must reduce power and/or switch to DA-N; see licensed nighttime ERP in CP', cfr: '§73.21(b)' },
         C: { power_reduction_required: false, pattern_switch_required: false, night_operation: 'Local channel; full power at all times; no nighttime protection required', cfr: '§73.23' },
         D: { power_reduction_required: isClearCh, pattern_switch_required: isDA_ntps && isClearCh, night_operation: isClearCh ? 'Secondary to Class A; nighttime power reduced or DA-N required to protect dominant station' : 'Regional operation; check licensed night authorization', cfr: '§73.24' }
       };
