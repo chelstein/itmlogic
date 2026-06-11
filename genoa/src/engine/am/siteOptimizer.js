@@ -6682,7 +6682,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Detuning requirements (DA arrays)
       const detuning = isDA_ts ? {
         required: true,
-        note: `DA array: any unused or parasitic towers within ${round2(qwM_ts * 2)} m of the active elements must be detuned per §73.150(c). Detuning coils (series inductance) at each parasitic base. Detuning verified by field measurements before proof of performance.`
+        note: `DA array: any unused or parasitic towers within ${round2(qwM_ts * 2)} m of the active elements must be detuned (47 CFR §1.30002–§1.30003 — construction near AM arrays; moment-method study). Detuning coils (series inductance) at each parasitic base. Detuning verified by field measurements before proof of performance.`
       } : {
         required: false,
         note: 'NDA: single-tower — detuning not required. Verify no adjacent metallic structures within λ/10 (≈' + round2(lambdaM_ts / 10) + ' m) of tower base that could re-radiate.'
@@ -6707,7 +6707,7 @@ async function scoreCandidate(pt, ctx, warnings){
         base_current_monitor_required: monitorRequired,
         base_current_monitor_note: monitorNote,
         detuning,
-        reference: '47 CFR §73.51 (direct method power); §73.69 (antenna monitors); §73.150(c) (detuning); §73.189(b)(4) (ground system); §73.190 (conductivity/certification); ARRL Antenna Handbook (ATU design); Andrew/Commscope heliax data',
+        reference: '47 CFR §73.51 (direct method power); §73.69 (antenna monitors); §1.30002–§1.30003 (detuning near AM arrays); §73.189(b)(4) (ground system); §73.190 (conductivity/certification); ARRL Antenna Handbook (ATU design); Andrew/Commscope heliax data',
         note: 'Transmission system design guide is a screening-grade engineering reference. All impedances, efficiencies, and current values are based on ideal monopole theory and the Terman/Belrose ground loss formula. Actual values require field measurements and full RF system design by a licensed broadcast engineer.'
       };
     })(),
@@ -12782,7 +12782,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   individual tower fences are not required if towers sit within a protective property fence.
       //   The rule specifies NO fence height — 8 ft (2.44 m) chain-link with anti-climb top is
       //   the industry/insurance standard used here.
-      // Detuning (§73.150(a)(5) and §73.1030): towers used for DA arrays must be detuned when
+      // Detuning (47 CFR §1.30002–§1.30003): nearby/parasitic towers must be detuned when
       //   the primary array is not operating. Detuning shack (ATU bypass, shorting switch) required.
       // Antenna current metering (§73.51 direct method): calibrated meter at each tower
       //   (instrument accuracy 2% per §73.1215); DA stations need antenna monitors (§73.69).
@@ -12850,7 +12850,7 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_maint_low_usd,
         annual_maint_high_usd,
         fence_required_by_regulation: true,
-        reference: '47 CFR §73.49 (AM tower fencing and protection); §73.61 (base current monitoring requirements); §73.150(a)(5) (DA detuning); §73.1030 (AM antenna operation); FCC OET Bulletin 65 §4 (RF exposure near AM towers); NFPA 70 (electrical safety for transmitter facilities); EIA/TIA 222-H (structural considerations)',
+        reference: '47 CFR §73.49 (AM tower fencing and protection); §73.51 (direct method power); §1.30002–§1.30003 (detuning near AM arrays); FCC OET Bulletin 65 §4 (RF exposure near AM towers); NFPA 70 (electrical safety for transmitter facilities); EIA/TIA 222-H (structural considerations)',
         note: `${frequency_khz} kHz, ${tpo_kw} kW: tower base voltage ${v_base_low_vrms}–${v_base_high_vrms} V RMS (R_base ${r_base_est_ohm_low}–${r_base_est_ohm_high} Ω). §73.49 locked enclosure required (height not specified by rule; ${fence_height_m} m industry standard), ~${fence_perimeter_ft} ft perimeter. General-public RF exclusion ≈ ${d_base_gp_m} m. Total RF safety capex: $${total_rf_safety_low_usd.toLocaleString()}–$${total_rf_safety_high_usd.toLocaleString()}.${is_da_base ? ' Detuning shack required for DA array (§73.150).' : ''}`
       };
     })(),
@@ -28016,7 +28016,7 @@ async function scoreCandidate(pt, ctx, warnings){
           recommended_std_kw: gen_std_kw
         },
         building_cost_usd:  { low: bldg_cost_low, high: bldg_cost_high },
-        reference:          'Industry standard AM transmitter building practice; NFPA 70; FCC §73.1030',
+        reference:          'Industry standard AM transmitter building practice; NFPA 70 (NEC)',
         note:               `${floor_area_m2}m² floor (${isDA ? 'DA incl. phasor room' : 'NDA'}). Heat: ${heat_watts}W → ${hvac_tons} AC tons. Generator: ${gen_std_kw} kW. Building: $${bldg_cost_low.toLocaleString()}–$${bldg_cost_high.toLocaleString()} (prefab + site).`
       };
     })(),
