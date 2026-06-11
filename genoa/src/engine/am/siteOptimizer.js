@@ -31734,8 +31734,8 @@ async function scoreCandidate(pt, ctx, warnings){
         conductivity_category === 'FAIR'      ? 'MODERATE' :
         conductivity_category === 'GOOD'      ? 'LOW' : 'NEGLIGIBLE';
 
-      // Radial efficiency — longer radials capture more of the near-field ground return
-      // 120 × λ/4 radials is the standard FCC-accepted design (§73.190(e))
+      // Radial reference dimensions — FCC standard is 120 × 0.35λ per §73.190 / NBS TN-24
+      // λ/4 shown here for comparison with tower electrical height
       const wavelength_m    = round2(300000 / freq_khz);
       const quarter_wave_m  = round2(wavelength_m / 4);
       const quarter_wave_ft = round2(quarter_wave_m * 3.28084);
@@ -32999,7 +32999,7 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
       id:    'CONSTRUCTION',
       label: 'Tower construction',
       weeks: '16–40',
-      description: 'Tower erection, ground system installation, transmitter installation, proof of performance (§73.62).',
+      description: 'Tower erection, ground system installation, transmitter installation, proof of performance (§73.154; DA: §73.62 pattern tolerances).',
       blocking: true
     }
   ];
