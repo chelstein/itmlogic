@@ -12804,12 +12804,12 @@ test('am_colocation_sharing_and_tower_lease_guide present on KAZM candidate', as
   assert.ok(g.colocation_10yr_high >= g.colocation_10yr_low, 'colocation_10yr_high must be >= low');
 });
 
-test('KAZM standalone tower cost (315 ft Class D)', async () => {
+test('KAZM standalone tower cost (473 ft Class D)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_colocation_sharing_and_tower_lease_guide;
-  assert.strictEqual(g.tower_height_ft,           315.26,  'KAZM tower_height_ft should be 315.26');
-  assert.strictEqual(g.standalone_tower_low_usd,  60000,   '200-400 ft tower standalone low should be $60,000');
-  assert.strictEqual(g.standalone_tower_high_usd, 180000,  '200-400 ft tower standalone high should be $180,000');
+  assert.strictEqual(g.tower_height_ft,           472.87,  'KAZM tower_height_ft should be 472.87');
+  assert.strictEqual(g.standalone_tower_low_usd,  150000,  '400-500 ft tower standalone low should be $150,000');
+  assert.strictEqual(g.standalone_tower_high_usd, 400000,  '400-500 ft tower standalone high should be $400,000');
 });
 
 test('KAZM colocation monthly and annual lease', async () => {
@@ -12835,7 +12835,7 @@ test('am_colocation_sharing_and_tower_lease_guide comparison table columns prese
     assert.ok('cot_10yr_low_usd'       in row, 'cot_10yr_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.cot_standalone_low_usd, 60000, 'rank-1 cot_standalone_low_usd should be $60,000');
+  assert.strictEqual(r0.cot_standalone_low_usd, 150000, 'rank-1 cot_standalone_low_usd should be $150,000');
   assert.strictEqual(r0.cot_annual_low_usd,      6000,  'rank-1 cot_annual_low_usd should be $6,000');
   assert.strictEqual(r0.cot_10yr_low_usd,        60000, 'rank-1 cot_10yr_low_usd should be $60,000');
 });
@@ -13012,9 +13012,9 @@ test('am_financial_feasibility_and_roi_guide comparison table columns present', 
     assert.ok('fin_payback_years_low'      in row, 'fin_payback_years_low missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.fin_total_capital_low_usd,  150000, 'rank-1 fin_total_capital_low should be $150,000');
-  assert.strictEqual(r0.fin_total_capital_high_usd, 510000, 'rank-1 fin_total_capital_high should be $510,000');
-  assert.strictEqual(r0.fin_payback_years_low,       0.3,   'rank-1 fin_payback_years_low should be 0.3');
+  assert.strictEqual(r0.fin_total_capital_low_usd,  240000, 'rank-1 fin_total_capital_low should be $240,000');
+  assert.strictEqual(r0.fin_total_capital_high_usd, 730000, 'rank-1 fin_total_capital_high should be $730,000');
+  assert.strictEqual(r0.fin_payback_years_low,       0.48,  'rank-1 fin_payback_years_low should be 0.48');
 });
 
 test('am_tower_guy_wire_and_anchor_system_guide present on KAZM candidate', async () => {
@@ -13025,11 +13025,11 @@ test('am_tower_guy_wire_and_anchor_system_guide present on KAZM candidate', asyn
   assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
 });
 
-test('KAZM guy wire system configuration (315 ft tower)', async () => {
+test('KAZM guy wire system configuration (473 ft tower)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
-  assert.strictEqual(g.tower_height_ft,       315.26, 'KAZM 780 kHz Class D tower should be 315.26 ft');
-  assert.strictEqual(g.num_guy_levels,        3,      '315 ft tower should have 3 guy levels');
+  assert.strictEqual(g.tower_height_ft,       472.87, 'KAZM 780 kHz Class D tower should be 472.87 ft');
+  assert.strictEqual(g.num_guy_levels,        3,      '473 ft tower should have 3 guy levels (< 500 ft threshold)');
   assert.strictEqual(g.num_anchors_per_level, 3,      'should have 3 anchors per level');
   assert.strictEqual(g.num_total_anchors,     9,      '3 levels × 3 = 9 total anchors');
 });
@@ -13037,17 +13037,17 @@ test('KAZM guy wire system configuration (315 ft tower)', async () => {
 test('KAZM guy wire cost components', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
-  assert.strictEqual(g.guy_wire_low_usd,  2837.34, 'guy_wire_low should be $2,837.34');
+  assert.strictEqual(g.guy_wire_low_usd,  4255.83, 'guy_wire_low should be $4,255.83');
   assert.strictEqual(g.anchor_low_usd,    18000,   'anchor_low = 9 × $2,000 = $18,000');
   assert.strictEqual(g.insulator_low_usd, 4500,    'insulator_low = 9 × $500 = $4,500');
-  assert.strictEqual(g.install_low_usd,   15763,   'install_low = 315.26 × 50 = $15,763');
+  assert.strictEqual(g.install_low_usd,   23643.5, 'install_low = 472.87 × 50 = $23,643.5');
 });
 
 test('KAZM guy wire system total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
-  assert.strictEqual(g.total_low_usd,  41100.34,  'total_low should be $41,100.34');
-  assert.strictEqual(g.total_high_usd, 127801.02, 'total_high should be $127,801.02');
+  assert.strictEqual(g.total_low_usd,  50399.33,  'total_low should be $50,399.33');
+  assert.strictEqual(g.total_high_usd, 155697.99, 'total_high should be $155,697.99');
 });
 
 test('am_tower_guy_wire_and_anchor_system_guide comparison table columns present', async () => {
@@ -13059,8 +13059,8 @@ test('am_tower_guy_wire_and_anchor_system_guide comparison table columns present
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.gwy_num_total_anchors, 9,         'rank-1 gwy_num_total_anchors should be 9');
-  assert.strictEqual(r0.gwy_total_low_usd,     41100.34,  'rank-1 gwy_total_low_usd should be $41,100.34');
-  assert.strictEqual(r0.gwy_tower_height_ft,   315.26,    'rank-1 gwy_tower_height_ft should be 315.26');
+  assert.strictEqual(r0.gwy_total_low_usd,     50399.33,  'rank-1 gwy_total_low_usd should be $50,399.33');
+  assert.strictEqual(r0.gwy_tower_height_ft,   472.87,    'rank-1 gwy_tower_height_ft should be 472.87');
 });
 
 test('am_transmission_loss_budget_guide present on KAZM candidate', async () => {
@@ -13074,7 +13074,7 @@ test('am_transmission_loss_budget_guide present on KAZM candidate', async () => 
 test('KAZM coax run and diameter', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmission_loss_budget_guide;
-  assert.strictEqual(g.coax_run_ft,    207.63,       'KAZM coax_run_ft should be 207.63');
+  assert.strictEqual(g.coax_run_ft,    286.43,       'KAZM coax_run_ft should be 286.43');
   assert.strictEqual(g.coax_diameter,  '1_5_8_inch', 'KAZM 5 kW should use 1-5/8 inch coax');
   assert.strictEqual(g.loss_per_100ft, 0.025,        '1-5/8 inch coax loss should be 0.025 dB/100ft');
 });
@@ -13082,18 +13082,18 @@ test('KAZM coax run and diameter', async () => {
 test('KAZM transmission loss components', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmission_loss_budget_guide;
-  assert.strictEqual(g.coax_loss_db,      0.05, 'coax_loss_db should be 0.05');
+  assert.strictEqual(g.coax_loss_db,      0.07, 'coax_loss_db should be 0.07');
   assert.strictEqual(g.atu_loss_db,        0.10, 'atu_loss_db should be 0.10');
   assert.strictEqual(g.connector_loss_db,  0.05, 'connector_loss_db should be 0.05');
-  assert.strictEqual(g.total_loss_db,      0.22, 'total_loss_db should be 0.22 dB');
+  assert.strictEqual(g.total_loss_db,      0.24, 'total_loss_db should be 0.24 dB');
 });
 
 test('KAZM power at antenna and system cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmission_loss_budget_guide;
-  assert.strictEqual(g.power_fraction_at_antenna, 0.9506, 'power_fraction should be 0.9506');
-  assert.strictEqual(g.power_at_antenna_kw,        4.75,  'power_at_antenna_kw should be 4.75');
-  assert.strictEqual(g.total_low_usd,              3529.71, 'total_low should be $3,529.71');
+  assert.strictEqual(g.power_fraction_at_antenna, 0.9462, 'power_fraction should be 0.9462');
+  assert.strictEqual(g.power_at_antenna_kw,        4.73,  'power_at_antenna_kw should be 4.73');
+  assert.strictEqual(g.total_low_usd,              4869.31, 'total_low should be $4,869.31');
 });
 
 test('am_transmission_loss_budget_guide comparison table columns present', async () => {
@@ -13104,9 +13104,9 @@ test('am_transmission_loss_budget_guide comparison table columns present', async
     assert.ok('txl_coax_run_ft'   in row, 'txl_coax_run_ft missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.txl_total_loss_db, 0.22,    'rank-1 txl_total_loss_db should be 0.22');
-  assert.strictEqual(r0.txl_total_low_usd, 3529.71, 'rank-1 txl_total_low_usd should be $3,529.71');
-  assert.strictEqual(r0.txl_coax_run_ft,   207.63,  'rank-1 txl_coax_run_ft should be 207.63');
+  assert.strictEqual(r0.txl_total_loss_db, 0.24,    'rank-1 txl_total_loss_db should be 0.24');
+  assert.strictEqual(r0.txl_total_low_usd, 4869.31, 'rank-1 txl_total_low_usd should be $4,869.31');
+  assert.strictEqual(r0.txl_coax_run_ft,   286.43,  'rank-1 txl_coax_run_ft should be 286.43');
 });
 
 test('am_grounding_and_lightning_protection_guide present on KAZM candidate', async () => {
@@ -13194,7 +13194,7 @@ test('am_fcc_asr_tower_registration_guide comparison table columns present', asy
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.asr_requires_asr,    true,   'rank-1 asr_requires_asr should be true');
   assert.strictEqual(r0.asr_total_low_usd,   5130,   'rank-1 asr_total_low_usd should be 5130');
-  assert.strictEqual(r0.asr_tower_height_ft, 315.26, 'rank-1 asr_tower_height_ft should be 315.26');
+  assert.strictEqual(r0.asr_tower_height_ft, 472.87, 'rank-1 asr_tower_height_ft should be 472.87');
 });
 
 test('am_site_access_and_road_construction_guide present on KAZM candidate', async () => {
@@ -14088,7 +14088,7 @@ it('candidate_comparison_table faa columns are correct for KAZM Class D', async 
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.faa_notice_required, true, 'faa_notice_required should be true');
-  assert.ok(Math.abs(r0.faa_tower_height_ft - 315.26) < 0.5, `faa_tower_height_ft expected ~315.26, got ${r0.faa_tower_height_ft}`);
+  assert.ok(Math.abs(r0.faa_tower_height_ft - 472.87) < 0.5, `faa_tower_height_ft expected ~472.87, got ${r0.faa_tower_height_ft}`);
   assert.strictEqual(r0.faa_study_cost_low_usd, 3500, 'faa_study_cost_low_usd should be 3500');
 });
 
@@ -14440,10 +14440,10 @@ it('am_antenna_tower_lighting_and_marking_guide lighting_required is true for KA
   assert.strictEqual(g.lighting_required, true, 'KAZM 315 ft tower must require lighting (> 200 ft)');
 });
 
-it('am_antenna_tower_lighting_and_marking_guide paint_bands is 8 for KAZM (ceil(315/100)*2)', async () => {
+it('am_antenna_tower_lighting_and_marking_guide paint_bands is 10 for KAZM (ceil(473/100)*2)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_antenna_tower_lighting_and_marking_guide;
-  assert.strictEqual(g.paint_bands, 8, `paint_bands should be 8 for 315 ft tower`);
+  assert.strictEqual(g.paint_bands, 10, `paint_bands should be 10 for 473 ft tower`);
 });
 
 it('am_antenna_tower_lighting_and_marking_guide reference cites §17.21 and AC 70/7460-1M', async () => {

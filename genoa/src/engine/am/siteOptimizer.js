@@ -4533,8 +4533,9 @@ async function scoreCandidate(pt, ctx, warnings){
     // high regulatory risk still gets flagged for early mitigation planning.
     regulatory_risk_score: (() => {
       const lambdaM_r = 300000 / frequency_khz;
-      const qwM_r     = lambdaM_r / 4;
-      const asrRequired = qwM_r > 60.96;
+      const isHighClass_r = /^[AB]/i.test(fcc_class);
+      const planH_r = lambdaM_r * (isHighClass_r ? 0.625 : 0.375);  // 5/8λ A/B, 3/8λ C/D
+      const asrRequired = planH_r > 60.96;
       const risks = [];
       let total = 0;
 
@@ -4543,7 +4544,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total += 40;
       }
       if (asrRequired){
-        risks.push({ factor: 'ASR_REQUIRED', points: 15, note: `λ/4=${Math.round(qwM_r)} m > 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction; adds 8–16 weeks` });
+        risks.push({ factor: 'ASR_REQUIRED', points: 15, note: `Tower height (${Math.round(planH_r)} m) > 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction; adds 8–16 weeks` });
         total += 15;
       }
       if (sigma_msm < 2){
@@ -5008,22 +5009,24 @@ async function scoreCandidate(pt, ctx, warnings){
       });
 
       // Gate 3: §17.7 ASR registration
-      // WARN when λ/4 > 60.96m (standard antenna definitely exceeds threshold).
-      // WARN when λ/4 ≤ 60.96m but λ/2 > 60.96m (final height determines applicability).
-      // PASS when even λ/2 < 60.96m (very high frequency — both standard heights clear threshold).
+      // WARN when class-appropriate design height > 60.96m (certain — 3/8λ C/D, 5/8λ A/B).
+      // WARN when design height ≤ 60.96m but max practical height (5/8λ) > 60.96m (possible).
+      // PASS when even 5/8λ < 60.96m (extremely high frequency — practically never in AM band).
       const lambdaM_g = 300000 / frequency_khz;
-      const qwM_g = lambdaM_g / 4;
-      const hwM_g = lambdaM_g / 2;
-      const asrCertain  = qwM_g > 60.96;
+      const isHighClass_g = /^[AB]/i.test(fcc_class);
+      const qwM_g  = lambdaM_g / 4;   // λ/4 physics reference
+      const planH_g = lambdaM_g * (isHighClass_g ? 0.625 : 0.375);  // design height
+      const hwM_g  = lambdaM_g * 0.625;  // 5/8λ practical maximum
+      const asrCertain  = planH_g > 60.96;
       const asrPossible = !asrCertain && hwM_g > 60.96;
       const asrStatus   = (asrCertain || asrPossible) ? WARN : PASS;
       gates.push({
         id: 'ASR_REGISTRATION', label: '§17.7 ASR tower registration',
         status: asrStatus,
-        value: `λ/4 ≈ ${Math.round(qwM_g)} m, λ/2 ≈ ${Math.round(hwM_g)} m (threshold 60.96 m)`,
+        value: `λ/4 ≈ ${Math.round(qwM_g)} m, design ≈ ${Math.round(planH_g)} m (threshold 60.96 m)`,
         rule: '47 CFR §17.7',
         note: asrCertain
-          ? `FCC Form 854 + FAA aeronautical study (7460-1) required before construction (λ/4 exceeds 200 ft).`
+          ? `FCC Form 854 + FAA aeronautical study (7460-1) required before construction (design height ${Math.round(planH_g)} m exceeds 200 ft).`
           : asrPossible
           ? `Final tower height determines ASR applicability — if > 60.96 m (200 ft), FCC Form 854 + FAA Form 7460-1 required.`
           : null
@@ -5243,8 +5246,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Each item carries a status (REQUIRED / CONDITIONAL / INFORMATIONAL), the responsible
       // party, LMS form/exhibit code, and rule cite.  This is a screening-grade checklist —
       // consult FCC communications counsel before filing.
-      const qwM_fl     = (300000 / frequency_khz) / 4;
-      const asrNeeded  = qwM_fl > 60.96;
+      const lambdaM_fl  = 300000 / frequency_khz;
+      const isHighClass_fl = /^[AB]/i.test(fcc_class);
+      const towerH_fl   = lambdaM_fl * (isHighClass_fl ? 0.625 : 0.375);
+      const asrNeeded  = towerH_fl > 60.96;
       const hasTreaty  = !!treaty_zone;
       const isCC_fl    = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const chanClass_fl = frequencyChannelClass(frequency_khz);
@@ -5321,8 +5326,8 @@ async function scoreCandidate(pt, ctx, warnings){
           rule:        '47 CFR §17.7',
           responsible: 'Tower owner / communications counsel',
           note:        asrNeeded
-            ? `λ/4 ≈ ${round2(qwM_fl)} m exceeds 200 ft (60.96 m) §17.7 threshold. Form 854 + FAA Form 7460-1 required before construction. FAA review can take 45–90 days.`
-            : `Tower height (${round2(qwM_fl)} m) is at or below §17.7 threshold. ASR may not be required, but verify actual proposed height.`
+            ? `Tower height (${round2(towerH_fl)} m) exceeds 200 ft (60.96 m) §17.7 threshold. Form 854 + FAA Form 7460-1 required before construction. FAA review can take 45–90 days.`
+            : `Tower height (${round2(towerH_fl)} m) is at or below §17.7 threshold. ASR may not be required, but verify actual proposed height.`
         },
         {
           id:          'LMS_NIGHTTIME_NIF',
@@ -5648,10 +5653,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // Structured due-diligence checklist for AM transmitter site land/lease acquisition.
       // Covers zoning, title, environmental, tower setback, utility, and lease terms.
       // ALL items are REQUIRED before signing a lease or purchase agreement.
-      const qwM_sa = round2((300000 / frequency_khz) / 4);
-      const minParcelRadius_m = round2(qwM_sa * 1.1);  // radial system + 10% buffer
+      const lambdaM_sa     = 300000 / frequency_khz;
+      const radialLen_sa   = round2(lambdaM_sa * 0.35);  // 0.35λ standard radial per §73.186/NBS TN-24
+      const isHighClass_sa = /^[AB]/i.test(fcc_class);
+      const towerH_sa      = round2(isHighClass_sa ? lambdaM_sa * 0.625 : lambdaM_sa * 0.375);
+      const minParcelRadius_m = round2(radialLen_sa * 1.1);  // radial extent + 10% buffer
       const minParcelArea_ha  = round2(Math.PI * (minParcelRadius_m / 100) * (minParcelRadius_m / 100));
-      const asrRequired_sa    = qwM_sa > 60.96;
+      const asrRequired_sa    = towerH_sa > 60.96;
       const hasTreaty_sa      = !!treaty_zone;
 
       const items = [
@@ -5677,8 +5685,8 @@ async function scoreCandidate(pt, ctx, warnings){
           id:        'PARCEL_SIZE_ADEQUACY',
           category:  'Physical Requirements',
           priority:  'CRITICAL',
-          action:    `Verify parcel is large enough for ${qwM_sa}-m radial system (min ~${minParcelRadius_m} m radius from tower base, ~${minParcelArea_ha} ha)`,
-          what_to_check: `Ground system requires at least ${qwM_sa} m of unobstructed radial run in all directions. Map all fence lines, structures, roads, and easements within ${minParcelRadius_m} m of proposed tower base.`,
+          action:    `Verify parcel is large enough for ${radialLen_sa}-m radial system (min ~${minParcelRadius_m} m radius from tower base, ~${minParcelArea_ha} ha)`,
+          what_to_check: `Ground system requires at least ${radialLen_sa} m of unobstructed radial run in all directions (0.35λ per §73.186). Map all fence lines, structures, roads, and easements within ${minParcelRadius_m} m of proposed tower base.`,
           timeline_weeks: [1, 2],
           notes:     'Smaller parcel may be workable with truncated radials but will reduce antenna efficiency — document in §73.190 engineering.'
         },
@@ -5696,7 +5704,7 @@ async function scoreCandidate(pt, ctx, warnings){
           category:  'Environmental',
           priority:  'HIGH',
           action:    'Initiate NHPA §106 historic properties review with State Historic Preservation Office (SHPO)',
-          what_to_check: `Check APE (Area of Potential Effect) within ${round2(qwM_sa * 2)} m of proposed tower. Run SHPO consultation if any historic properties or archaeological sites within APE.`,
+          what_to_check: `Check APE (Area of Potential Effect) within ${round2(towerH_sa * 2)} m of proposed tower. Run SHPO consultation if any historic properties or archaeological sites within APE.`,
           timeline_weeks: [4, 16],
           notes:     'FCC requires §106 sign-off before CP issuance. Start this early — SHPO reviews can take 3–6 months for complex sites.'
         },
@@ -5731,8 +5739,8 @@ async function scoreCandidate(pt, ctx, warnings){
           id:        'SETBACKS_GUYWIRES',
           category:  'Physical Requirements',
           priority:  'HIGH',
-          action:    `Verify guy wire anchors can be placed at ${round2(qwM_sa * 0.8)}–${qwM_sa} m from tower base without encroaching on parcel boundaries`,
-          what_to_check: `Standard guyed λ/4 monopole (${qwM_sa} m) uses 3 sets of guys at ~${round2(qwM_sa * 0.4)} m, ~${round2(qwM_sa * 0.7)} m, ~${round2(qwM_sa * 0.9)} m from base. Each anchor requires 5–10 m clearance from property line.`,
+          action:    `Verify guy wire anchors can be placed at ${round2(towerH_sa * 0.8)}–${towerH_sa} m from tower base without encroaching on parcel boundaries`,
+          what_to_check: `Standard guyed 3/8λ monopole (${towerH_sa} m) uses 3–4 sets of guys at ~${round2(towerH_sa * 0.4)} m, ~${round2(towerH_sa * 0.7)} m, ~${round2(towerH_sa * 0.9)} m from base. Each anchor requires 5–10 m clearance from property line.`,
           timeline_weeks: [1, 2],
           notes:     'If parcel is too narrow for guys, a self-supporting tower (+40–60% cost premium) may be required. DA arrays multiply land requirements by number of elements.'
         },
@@ -5741,7 +5749,7 @@ async function scoreCandidate(pt, ctx, warnings){
           category:  'FAA & ASR',
           priority:  asrRequired_sa ? 'CRITICAL' : 'MEDIUM',
           action:    asrRequired_sa
-            ? `File FAA Form 7460-1 aeronautical study before construction — λ/4 tower (${qwM_sa} m) exceeds §17.7 200-ft threshold`
+            ? `File FAA Form 7460-1 aeronautical study before construction — tower height (${towerH_sa} m) exceeds §17.7 200-ft threshold`
             : `Review FAA Part 77 surfaces for airport proximity even if tower < 200 ft`,
           what_to_check: 'Identify all airports within 20 km. Check FAA Part 77 obstruction evaluation area (OEA) boundaries. Use FAA OE/AAA online tool to pre-screen.',
           timeline_weeks: asrRequired_sa ? [6, 16] : [2, 4],
@@ -5769,7 +5777,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       return {
         frequency_khz, fcc_class, lat: pt.lat, lon: pt.lon,
-        quarter_wave_m: qwM_sa,
+        radial_length_m: radialLen_sa,
+        design_tower_height_m: towerH_sa,
         min_parcel_radius_m: minParcelRadius_m,
         min_parcel_area_ha: minParcelArea_ha,
         asr_required: asrRequired_sa,
@@ -6031,8 +6040,10 @@ async function scoreCandidate(pt, ctx, warnings){
     // No GIS database lookup performed — the operator must verify each item with
     // the appropriate federal/state agency.
     environmental_risk_matrix: (() => {
-      const qwM_env   = round2((300000 / frequency_khz) / 4);
-      const asrReq    = qwM_env > 60.96;
+      const lambdaM_env  = 300000 / frequency_khz;
+      const isHighClass_env = /^[AB]/i.test(fcc_class);
+      const towerH_env = round2(isHighClass_env ? lambdaM_env * 0.625 : lambdaM_env * 0.375);
+      const asrReq    = towerH_env > 60.96;
       const nearBorder = treaty_zone != null;
       const isHighPow_env = tpo_kw >= 25;
 
@@ -6086,7 +6097,7 @@ async function scoreCandidate(pt, ctx, warnings){
           cfr:         '47 CFR §1.1311(a)(4)',
           risk_level:  'HIGH',
           description: 'NHPA §106 Section 106 review — Area of Potential Effect (APE) for above-ground and archaeological resources',
-          verification: `Consult State Historic Preservation Office (SHPO). Map APE within ${round2(qwM_env * 2)} m of proposed tower. Search National Register (nrhp.focus.nps.gov) for listed properties within APE.`,
+          verification: `Consult State Historic Preservation Office (SHPO). Map APE within ${round2(towerH_env * 2)} m of proposed tower. Search National Register (nrhp.focus.nps.gov) for listed properties within APE.`,
           timeline_weeks: [4, 20],
           action_if_triggered: 'SHPO consultation required. If National Register-eligible properties in APE: formal Section 106 consultation and Memorandum of Agreement (MOA) may be required. High risk of delay (3–12 months).',
           data_sources: ['SHPO (state-specific)', 'NPS NRHP Focus nrhp.focus.nps.gov', 'ACHP achp.gov']
@@ -6132,7 +6143,7 @@ async function scoreCandidate(pt, ctx, warnings){
           cfr:         '47 CFR §1.1311(a)(8)',
           risk_level:  asrReq ? 'ELEVATED' : 'LOW',
           description: 'National Scenic Byways, All-American Roads, and visual resource impact of structure',
-          verification: `${asrReq ? `λ/4 tower (${qwM_env} m) is a significant visual element.` : ''} Check site proximity to National Scenic Byway corridors (fhwa.dot.gov/byways). Prepare visual impact analysis if within designated corridor viewshed.`,
+          verification: `${asrReq ? `Tower height (${towerH_env} m) is a significant visual element.` : ''} Check site proximity to National Scenic Byway corridors (fhwa.dot.gov/byways). Prepare visual impact analysis if within designated corridor viewshed.`,
           timeline_weeks: [1, 4],
           action_if_triggered: 'Visual impact analysis (photosimulation or wireframe) required if tower visible from designated scenic byway. Alternative siting or stealth design may be required.',
           data_sources: ['FHWA Scenic Byways fhwa.dot.gov/byways', 'USFS Visual Quality Objective']
@@ -6217,7 +6228,7 @@ async function scoreCandidate(pt, ctx, warnings){
         lat: pt.lat,
         lon: pt.lon,
         tpo_kw,
-        quarter_wave_m: qwM_env,
+        design_tower_height_m: towerH_env,
         asr_required: asrReq,
         overall_nepa_risk: overallRisk,
         high_risk_count: highCount,
@@ -7261,9 +7272,11 @@ async function scoreCandidate(pt, ctx, warnings){
     tower_structural_assessment_guide: (() => {
       const ASR_M_ts   = 60.96;  // §17.7 ASR threshold (200 ft)
       const lambda_ts  = 300000 / frequency_khz;   // wavelength m
-      const qwave_ts   = round2(lambda_ts / 4);     // λ/4 height (typical AM tower)
-      const hwave_ts   = round2(lambda_ts / 2);     // λ/2 maximum practical height
-      const asrReq_ts  = qwave_ts > ASR_M_ts;
+      const qwave_ts   = round2(lambda_ts / 4);     // λ/4 physics reference only
+      const isHighClass_ts = /^[AB]/i.test(fcc_class);
+      const tower_h_ts = round2(isHighClass_ts ? lambda_ts * 0.625 : lambda_ts * 0.375);  // design height: 5/8λ A/B, 3/8λ C/D
+      const hwave_ts   = round2(lambda_ts * 0.625); // 5/8λ practical maximum for any class
+      const asrReq_ts  = tower_h_ts > ASR_M_ts;
 
       // TIA-222-H Wind/Ice zones based on candidate latitude (approximate, CONUS).
       // Zone I: Gulf Coast / Southern (lat < 35°) — high wind, low ice
@@ -7293,21 +7306,21 @@ async function scoreCandidate(pt, ctx, warnings){
         types.push({
           type: 'GUYED_MAST',
           suitable: true,
-          typical_height_range_m: `${qwave_ts}–${hwave_ts}`,
+          typical_height_range_m: `${tower_h_ts}–${hwave_ts}`,
           notes: 'Most common AM tower type. Lower material cost, larger guy radius footprint (≈70–80% of tower height). Base-insulated series-fed monopole configuration. Requires substantial guy wire anchor area.',
           max_recommended_tpo_kw: 50
         });
         types.push({
           type: 'SELF_SUPPORTING_LATTICE',
           suitable: tpo_kw <= 10,
-          typical_height_range_m: `${qwave_ts}–${round2(qwave_ts * 1.2)}`,
+          typical_height_range_m: `${tower_h_ts}–${round2(tower_h_ts * 1.2)}`,
           notes: 'Higher per-foot cost than guyed mast. Smaller footprint — no guy anchors. Suitable for urban/constrained sites where guy radius is impractical. Structural weight limits practical height at lower frequencies.',
           max_recommended_tpo_kw: 10
         });
         types.push({
           type: 'MONOPOLE_TUBULAR',
           suitable: tpo_kw <= 5,
-          typical_height_range_m: `${round2(qwave_ts * 0.7)}–${qwave_ts}`,
+          typical_height_range_m: `${round2(tower_h_ts * 0.7)}–${tower_h_ts}`,
           notes: 'Tapered tubular steel monopole. Smallest footprint. Limited to lower heights and powers. Architectural option for urban/commercial locations. Higher cost per unit height than guyed mast.',
           max_recommended_tpo_kw: 5
         });
@@ -7316,13 +7329,13 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // FAA marking and lighting requirements (per §17.21–§17.50 and AC 70/7460-1M)
       const faaRequirements = (() => {
-        const h = qwave_ts;  // use λ/4 as representative tower height
+        const h = tower_h_ts;  // class-appropriate design height (3/8λ C/D, 5/8λ A/B)
         if (h <= 60.96) {
           return {
             marking_required: false,
             lighting_required: false,
             type: 'NONE',
-            note: `Tower height (λ/4 = ${qwave_ts} m) is at or below the 60.96 m (200 ft) threshold. FAA marking/lighting not required unless within 3 nm of an airport or in controlled airspace. Verify with FAA Form 7460-1 regardless.`
+            note: `Tower height (${tower_h_ts} m) is at or below the 60.96 m (200 ft) threshold. FAA marking/lighting not required unless within 3 nm of an airport or in controlled airspace. Verify with FAA Form 7460-1 regardless.`
           };
         }
         if (h <= 152.4) {
@@ -7332,7 +7345,7 @@ async function scoreCandidate(pt, ctx, warnings){
             type: 'MEDIUM_INTENSITY',
             paint: 'Aviation orange/white alternating bands (§17.23)',
             lights: 'Medium-intensity white flashing (L-864/L-865) day/night + red steady-burning night (L-810)',
-            note: `Tower height ${qwave_ts}–${hwave_ts} m (200–500 ft): medium-intensity marking/lighting required (§17.21 Table 1). 7 aviation-orange/white bands, 2 m minimum band width.`
+            note: `Tower height ${tower_h_ts}–${hwave_ts} m (200–500 ft): medium-intensity marking/lighting required (§17.21 Table 1). 7 aviation-orange/white bands, 2 m minimum band width.`
           };
         }
         return {
@@ -7364,11 +7377,12 @@ async function scoreCandidate(pt, ctx, warnings){
         candidate_lon:       round2(lon_ts),
         wavelength_m:        round2(lambda_ts),
         quarter_wave_height_m: qwave_ts,
-        half_wave_height_m:    hwave_ts,
+        design_tower_height_m: tower_h_ts,
+        max_practical_height_m: hwave_ts,
         asr_registration_required: asrReq_ts,
         asr_note: asrReq_ts
-          ? `λ/4 = ${qwave_ts} m exceeds 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 + FAA Form 7460-1 required before construction.`
-          : `λ/4 = ${qwave_ts} m is below 60.96 m threshold at quarter-wave. Confirm final tower height; if below 200 ft and not near an airport, ASR may not be required.`,
+          ? `Design tower height (${tower_h_ts} m) exceeds 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 + FAA Form 7460-1 required before construction.`
+          : `Design tower height (${tower_h_ts} m) is below 60.96 m threshold. Confirm final tower height; if below 200 ft and not near an airport, ASR may not be required.`,
         wind_ice_zone:      windIceZone,
         wind_ice_zone_data: zd,
         tower_types: towerTypes,
@@ -7617,8 +7631,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_pp   = /^DA/i.test(pattern_mode);
       const isLocal_pp = LOCAL_CHANNEL_KHZ.has(frequency_khz);
       const lambda_pp = round2(300000 / frequency_khz);
-      const qwave_pp  = round2(lambda_pp / 4);
-      const asrReq_pp = qwave_pp > 60.96;
+      const qwave_pp  = round2(lambda_pp / 4);  // λ/4 physics reference
+      const isHighClass_pp = /^[AB]/i.test(fcc_class);
+      const towerH_pp = round2(isHighClass_pp ? lambda_pp * 0.625 : lambda_pp * 0.375);
+      const asrReq_pp = towerH_pp > 60.96;
 
       // §73.154 traversal requirements
       // NDA: 8 radials at 45° intervals extending to the lesser of 16 km or the
@@ -7665,7 +7681,7 @@ async function scoreCandidate(pt, ctx, warnings){
         required:       mpe_required,
         rule:           '47 CFR §1.1310 / OET Bulletin 65',
         measurement_method: 'Calibrated broadband or narrowband field meter (e.g., Narda, ETS-Lindgren)',
-        exclusion_zone_m:    round2(qwave_pp * 0.10),  // ~10% of λ/4 as rough MPE boundary estimate
+        exclusion_zone_m:    round2(towerH_pp * 0.10),  // ~10% of tower height as rough MPE boundary
         note: mpe_required
           ? `TPO = ${tpo_kw} kW ≥ 5 kW threshold. RF exposure (MPE) evaluation required. Measure field strength at accessible locations within and around the antenna exclusion zone. Post MPE warning signs at exclusion zone perimeter. Submit MPE evaluation with Form 302-AM.`
           : `TPO = ${tpo_kw} kW < 5 kW. MPE evaluation simplified — confirm compliance with occupational (controlled) limits at base of antenna. General public (uncontrolled) limits apply at fence/accessible areas.`
@@ -12903,7 +12919,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_ltg = frequency_khz / 1000;
       const lambda_m_ltg = 299.792458 / freq_mhz_ltg;
       const isHighClass_ltg = /^[AB]/i.test(fcc_class);
-      const tower_height_m_ltg   = round2(isHighClass_ltg ? lambda_m_ltg / 2 : lambda_m_ltg / 4);
+      const tower_height_m_ltg   = round2(isHighClass_ltg ? lambda_m_ltg * 0.625 : lambda_m_ltg * 0.375);
       const tower_height_ft_ltg  = round2(tower_height_m_ltg * 3.28084);
       const lighting_required = tower_height_ft_ltg > 200;
       const lighting_category = tower_height_ft_ltg >= 500
@@ -13101,7 +13117,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_sec = frequency_khz / 1000;
       const lambda_m_sec = 299.792458 / freq_mhz_sec;
       const isHighClass_sec = /^[AB]/i.test(fcc_class);
-      const tower_height_m_sec = round2(isHighClass_sec ? lambda_m_sec / 2 : lambda_m_sec / 4);
+      const tower_height_m_sec = round2(isHighClass_sec ? lambda_m_sec * 0.625 : lambda_m_sec * 0.375);
       const tower_height_ft_sec = round2(tower_height_m_sec * 3.28084);
       // Guy anchor radius: typically 70–80% of tower height for guyed AM monopoles
       const guy_radius_ft_low  = round2(tower_height_ft_sec * 0.70);
@@ -13197,7 +13213,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_ins = frequency_khz / 1000;
       const lambda_m_ins = 299.792458 / freq_mhz_ins;
       const isHighClass_ins = /^[AB]/i.test(fcc_class);
-      const tower_height_m_ins = round2(isHighClass_ins ? lambda_m_ins / 2 : lambda_m_ins / 4);
+      const tower_height_m_ins = round2(isHighClass_ins ? lambda_m_ins * 0.625 : lambda_m_ins * 0.375);
       const tower_height_ft_ins = round2(tower_height_m_ins * 3.28084);
       // Tower replacement cost: ~$800–$1,500 per foot for guyed AM monopole (Rohn/Valmont grade)
       const tower_replacement_cost_per_ft_low  = 800;
@@ -13303,7 +13319,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_z = frequency_khz / 1000;
       const lambda_m_z = 299.792458 / freq_mhz_z;
       const isHighClass_z = /^[AB]/i.test(fcc_class);
-      const tower_height_m_z = round2(isHighClass_z ? lambda_m_z / 2 : lambda_m_z / 4);
+      const tower_height_m_z = round2(isHighClass_z ? lambda_m_z * 0.625 : lambda_m_z * 0.375);
       const tower_height_ft_z = round2(tower_height_m_z * 3.28084);
       // Setback requirement: 1.0× tower height (most common), 1.5× in some jurisdictions
       const setback_factor_typical = 1.0;
@@ -13399,7 +13415,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const freq_mhz_faa = frequency_khz / 1000;
       const lambda_m_faa = 299.792458 / freq_mhz_faa;
       const isHighClass_faa = /^[AB]/i.test(fcc_class);
-      const tower_height_m_faa = round2(isHighClass_faa ? lambda_m_faa / 2 : lambda_m_faa / 4);
+      const tower_height_m_faa = round2(isHighClass_faa ? lambda_m_faa * 0.625 : lambda_m_faa * 0.375);
       const tower_height_ft_faa = round2(tower_height_m_faa * 3.28084);
       const faa_notice_threshold_ft = 200;
       const notice_required = tower_height_ft_faa > faa_notice_threshold_ft;
@@ -14437,7 +14453,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const asr_threshold_m  = 60.96;   // 47 CFR §17.7 height trigger
       const asr_threshold_ft = 200;
@@ -14483,7 +14499,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const ground_ring_ft  = round2(Math.PI * 30); // ~30 ft radius buried copper ring
       const ground_ring_low_usd  = round2(ground_ring_ft * 20);
@@ -14520,7 +14536,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const coax_run_ft     = round2(tower_height_m * 3.28084 * 0.5 + 50);
       const coax_diameter   = tpo_kw >= 50 ? '3_inch' : tpo_kw >= 5 ? '1_5_8_inch' : '7_8_inch';
       const loss_per_100ft  = coax_diameter === '3_inch' ? 0.018 : coax_diameter === '1_5_8_inch' ? 0.025 : 0.04;
@@ -14560,7 +14576,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const num_guy_levels  = tower_height_ft > 500 ? 4 : 3;
       const num_anchors_per_level = 3;
@@ -14595,7 +14611,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_ft = round2((is_class_cd ? wavelength_m / 4 : wavelength_m / 2) * 3.28084);
+      const tower_height_ft = round2((is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625) * 3.28084);
       let tower_cap_low, tower_cap_high;
       if      (tower_height_ft <= 200) { tower_cap_low = 20000;  tower_cap_high = 60000; }
       else if (tower_height_ft <= 400) { tower_cap_low = 60000;  tower_cap_high = 180000; }
@@ -14738,7 +14754,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       let standalone_tower_low_usd, standalone_tower_high_usd;
       if (tower_height_ft <= 200) {
@@ -14842,7 +14858,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const speed_of_light_m_per_s = 299792458;
       const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
       const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const needs_faa_notice = tower_height_ft > 200;
       const needs_asr        = needs_faa_notice;
