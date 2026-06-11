@@ -28052,10 +28052,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   θ_deg = 360 × h_m / λ_m = 360 × h_m × frequency_khz / 300,000
       //   (using λ = 300,000 / frequency_khz metres)
       //
-      // Radiation resistance (approximate closed-form, Sommerfeld monopole):
-      //   R_r ≈ 197.4 × (1 − cos θ_rad)² + 40 × θ_rad² × sin(θ_rad)
-      //   Simplification from the FCC field-strength tables.  Valid for
-      //   0° < θ < 180°.  At θ=90° (quarter-wave), R_r ≈ 36.5Ω.
+      // Radiation resistance (λ/4 monopole over perfect ground):
+      //   R_r = 36.6 Ω at θ=90° — well-established result (Terman 1955, p.895;
+      //   Laport 1952, Ch.3; ARRL Handbook). Terman rounds to 36.5 Ω; both cited.
+      //   This guide evaluates at λ/4 only; R_r is a known constant here.
       //
       // Ground loss resistance (typical ranges per FCC guidance):
       //   R_loss ≈ 1–2Ω  : 120 quarter-wave radials (well-engineered)
