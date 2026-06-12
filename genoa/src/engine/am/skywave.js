@@ -164,7 +164,8 @@ function readFactor(entry){
 
 /**
  * Great-circle distance (km) between two lat/lon points using the
- * spherical-earth haversine.  Matches §73.208 / contour engine's
+ * spherical-earth haversine.  §73.208 is the FM reference-point rule;
+ * AM uses the same FCC spherical-earth convention / contour engine's
  * convention to keep skywave-distance and contour-distance
  * consistent across the exhibit.
  *
