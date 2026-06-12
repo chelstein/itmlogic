@@ -4302,7 +4302,7 @@ const DEMO_RESULT = {
         eligibility: 'RESTRICTED',
         nif_complexity: 'VERY_HIGH',
         protection_class: 'Clear channel — Class A dominant (§73.25)',
-        key_constraint: '780 kHz is a §73.25 clear channel. Increasing TPO from 5→8.5 kW increases skywave NIF complexity significantly.',
+        key_constraint: '780 kHz is a §73.25 clear channel. Class D at ceiling (5 kW per §73.21(e)); DA-N nighttime pattern required for COL compliance adds full azimuthal skywave NIF complexity — §73.182 NIF must not materially increase interference to WBBM Class A dominant contours.',
         nighttime_power_max_kw: 0.5,
         nif_study_required: true,
         rule: '47 CFR §73.182 / §73.25'
@@ -4340,7 +4340,7 @@ const DEMO_RESULT = {
         protected_contour_25uvm_est_km: 120.21, groundwave_05mvm_est_km: 28.4,
         advisory_items: [
           'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WBBM\'s 0.5 mV/m and 25 µV/m contours.',
-          'Increasing TPO from 5→8.5 kW significantly increases skywave NIF complexity — must re-study full azimuthal skywave exposure at the higher power level.'
+          'DA-N nighttime pattern for COL coverage compliance (DA-N required per §73.150) adds full azimuthal skywave NIF complexity at all pattern angles — must study full azimuthal skywave exposure at each DA bearing per §73.182 OET-72 methodology.'
         ],
         key_risk: 'Secondary on §73.25 clear channel — power increase amplifies NIF burden on all bearings', treaty_factor: null, rule: '47 CFR §73.25 / §73.182'
       },
