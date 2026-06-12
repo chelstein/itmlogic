@@ -3359,18 +3359,18 @@ const DEMO_RESULT = {
           { id: 'BENTONITE_BACKFILL', label: 'Bentonite clay soil injection', sigma_impact: 'DIRECT', applicable: false, cost_per_km2: 35000, max_improvement_pct: 200, description: 'Sodium bentonite expanded 15× in water; injected around radials.', prerequisites: ['Sandy soil', 'Available water source'], standard: 'IEEE 80-2013' },
           { id: 'CARBON_GROUND_ROD', label: 'Carbon/graphite ground enhancement', sigma_impact: 'DIRECT', applicable: false, cost_per_km2: 22000, max_improvement_pct: 120, description: 'ERITECH ERICO compound; highly conductive carbon matrix bonds to soil.', prerequisites: ['Ground rods accessible'], standard: 'IEEE 80' },
           { id: 'COPPER_MESH', label: 'Copper mesh ground plane (short radials)', sigma_impact: 'EFFECTIVE', applicable: true, cost_per_km2: 45000, max_improvement_pct: 80, description: 'Dense copper mesh buried at 0.15m around tower base.', prerequisites: ['Clear site within 50m'], standard: 'FCC §73.150(b)(2)' },
-          { id: 'SALTWATER_PROXIMITY', label: 'Site selection near saltwater / high-sigma terrain', sigma_impact: 'SITE_DEPENDENT', applicable: true, cost_per_km2: 0, max_improvement_pct: 400, description: 'Best sigma improvement via site relocation to coastal/agricultural bottomland.', prerequisites: ['Available land near water'], standard: 'FCC §73.183 conductivity maps' }
+          { id: 'SALTWATER_PROXIMITY', label: 'Site selection near saltwater / high-sigma terrain', sigma_impact: 'SITE_DEPENDENT', applicable: true, cost_per_km2: 0, max_improvement_pct: 400, description: 'Best sigma improvement via site relocation to coastal/agricultural bottomland.', prerequisites: ['Available land near water'], standard: 'FCC §73.182 (conductivity maps) / §73.184' }
         ],
         applicable_techniques: [
           { id: 'RADIAL_EXTENSION', label: 'Extended radial count and length', sigma_impact: 'INDIRECT', applicable: true, cost_per_km2: 12000, max_improvement_pct: 15, description: 'Increasing radials from 60 to 120 reduces ground loss ~40%.', prerequisites: [], standard: '§73.150' },
           { id: 'COPPER_MESH', label: 'Copper mesh ground plane (short radials)', sigma_impact: 'EFFECTIVE', applicable: true, cost_per_km2: 45000, max_improvement_pct: 80, description: 'Dense copper mesh (#10 AWG, 1m grid) buried at 0.15m around tower base.', prerequisites: [], standard: 'FCC §73.150(b)(2)' },
-          { id: 'SALTWATER_PROXIMITY', label: 'Site selection near saltwater / high-sigma terrain', sigma_impact: 'SITE_DEPENDENT', applicable: true, cost_per_km2: 0, max_improvement_pct: 400, description: 'Best sigma improvement via site relocation.', prerequisites: [], standard: 'FCC §73.183' }
+          { id: 'SALTWATER_PROXIMITY', label: 'Site selection near saltwater / high-sigma terrain', sigma_impact: 'SITE_DEPENDENT', applicable: true, cost_per_km2: 0, max_improvement_pct: 400, description: 'Best sigma improvement via site relocation.', prerequisites: [], standard: 'FCC §73.184' }
         ],
         n_all_techniques: 5, n_applicable_techniques: 3,
         sigma_after_improvement_msm: 9, coverage_gain_pct: 0,
         treatment_area_km2: 0.07,
         improvement_budget_usd: { low: 0, high: 0, note: 'No improvement needed — sigma already preferred.' },
-        reference: '47 CFR §73.150; §73.183; IEEE Std 80-2013; Terman (1950) Radio Engineers Handbook; Belrose (1966) IRE; ERITECH GCP-35',
+        reference: '47 CFR §73.150; §73.184; IEEE Std 80-2013; Terman (1950) Radio Engineers Handbook; Belrose (1966) IRE; ERITECH GCP-35',
         note: 'Baseline σ=9 mS/m (preferred — no improvement needed). Est. σ after improvement: 9 mS/m (+0% coverage).'
       },
       frequency_spectrum_coordination: {
@@ -3627,12 +3627,12 @@ const DEMO_RESULT = {
         propagation_notes: [
           'Terrain class: Flat / coastal (Δh ≈ 15m)',
           'Estimated terrain correction: +0 dB excess path loss',
-          'Smooth-earth FCC groundwave curves (§73.183) applicable with minor terrain correction',
+          'Smooth-earth FCC groundwave curves (§73.184) applicable with minor terrain correction',
           'Ground conductivity σ=9 mS/m; permittivity ε=25',
           'Polarization: vertical (AM §73.150); climate: continental_temperate'
         ],
-        fcc_method: '§73.182 groundwave curves; §73.183 terrain correction; ITM (Longley-Rice) for mountainous terrain',
-        reference: '47 CFR §73.182; §73.183; FCC OET Supplement B (ITM v7.0); Longley-Rice (NTIA Report 82-100); Hufford (1995)',
+        fcc_method: '§73.182 groundwave curves; §73.184 terrain correction; ITM (Longley-Rice) for mountainous terrain',
+        reference: '47 CFR §73.182; §73.184; FCC OET Supplement B (ITM v7.0); Longley-Rice (NTIA Report 82-100); Hufford (1995)',
         note: 'ITM terrain path loss analysis for 780 kHz at 5 kW. Flat terrain — smooth-earth FCC curves apply directly.'
       },
       antenna_height_optimization: {
@@ -4378,12 +4378,12 @@ const DEMO_RESULT = {
           { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
-          { item: 'NIF_STUDY', label: '§73.182 NIF skywave study at 8.5 kW (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 40000 },
+          { item: 'NIF_STUDY', label: '§73.182 NIF skywave study at 5 kW (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 40000 },
           { item: 'DA_ENGINEERING', label: 'FULL DA STUDY DAY+NIGHT pattern modeling & §73.150 filing', cost_low_usd: 18000, cost_high_usd: 40000 },
           { item: 'RF_EXPOSURE_STUDY', label: 'RF MPE evaluation at upgraded power (OET Bulletin 65)', cost_low_usd: 2500, cost_high_usd: 5000 },
           { item: 'FCC_COUNSEL', label: 'Communications counsel (FCC filing oversight)', cost_low_usd: 10000, cost_high_usd: 22000 }
         ],
-        note: 'Soft-cost estimate only. NIF and DA costs elevated by power upgrade to 8.5 kW. 2024 USD.'
+        note: 'Soft-cost estimate only. NIF and DA costs elevated by full DA study requirement (COL coverage gap + clear-channel nighttime pattern). 2024 USD.'
       },
       signal_propagation_profile: {
         frequency_khz: 780, tpo_kw: 5, sigma_msm: 10,
