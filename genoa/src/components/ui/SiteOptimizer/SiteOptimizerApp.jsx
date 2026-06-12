@@ -1051,7 +1051,7 @@ const DEMO_RESULT = {
         rule: '47 CFR §73.25 / §73.182'
       },
       ground_system_design_specification: {
-        frequency_khz: 780, sigma_msm: 8, soil_resistivity_ohm_m: 125, quarter_wave_m: 96.2,
+        frequency_khz: 780, sigma_msm: 8, soil_resistivity_ohm_m: 125, quarter_wave_m: 96.15,
         ideal_radial_length_m: 96.2, practical_radial_length_m: 96.2, min_radial_length_m: 48.1,
         standard_design: {
           n_radials: 120, radial_length_m: 96.2, wire_gauge: '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)',
@@ -1107,7 +1107,7 @@ const DEMO_RESULT = {
         note: 'Attenuation computed from skin-effect formula (A_cond×√f + A_diel×f) at 0.780 MHz, 60 m assumed run.'
       },
       antenna_base_impedance: {
-        frequency_khz: 780, sigma_msm: 5, quarter_wave_m: 96.2, N_radials: 120,
+        frequency_khz: 780, sigma_msm: 5, quarter_wave_m: 96.15, N_radials: 120,
         quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 7.8, R_total_ohm: 44.4, efficiency_standard_pct: 82.4, R_g_extended_ohm: 3.4, efficiency_extended_pct: 91.5 },
         five_eighths_wave: { R_r_ohm: 49.8, X_base_j: 45, note: 'Matching network required to cancel +j45 Ω reactance' },
         base_reactance_table: [
@@ -1217,7 +1217,7 @@ const DEMO_RESULT = {
       },
       site_acquisition_checklist: {
         frequency_khz: 780, fcc_class: 'D', lat: 34.91, lon: -111.79,
-        quarter_wave_m: 96.2, min_parcel_radius_m: 105.8, min_parcel_area_ha: 3.52,
+        quarter_wave_m: 96.15, min_parcel_radius_m: 105.8, min_parcel_area_ha: 3.52,
         asr_required: true, treaty_zone_present: false,
         critical_count: 4, high_count: 5, total_items: 11,
         items: [
@@ -1255,7 +1255,7 @@ const DEMO_RESULT = {
         note: 'Screening-grade interference self-profile. No actual station database lookup performed. Full §73.182 analysis by licensed broadcast engineer required using FCC LMS/AM Query data before any CP filing.'
       },
       colocation_compatibility_score: {
-        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, quarter_wave_m: 96.2, blanket_1000mvm_km: 0.31,
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, quarter_wave_m: 96.15, blanket_1000mvm_km: 0.31,
         best_host_type: 'AM_SITE', best_host_score: 85, best_host_tier: 'GOOD',
         diplexing_always_required: true,
         host_scores: [
@@ -1280,7 +1280,7 @@ const DEMO_RESULT = {
       },
       environmental_risk_matrix: {
         frequency_khz: 780, fcc_class: 'D', lat: 34.91, lon: -111.79,
-        tpo_kw: 5, quarter_wave_m: 96.2, asr_required: true,
+        tpo_kw: 5, quarter_wave_m: 96.15, asr_required: true,
         overall_nepa_risk: 'ELEVATED', high_risk_count: 1, elevated_risk_count: 2,
         unknown_count: 7, low_risk_count: 3,
         ea_timeline_weeks_worst_case: 24,
@@ -1305,7 +1305,7 @@ const DEMO_RESULT = {
       },
       financial_feasibility_summary: {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, pattern_mode: 'NDA',
-        quarter_wave_m: 96.2, min_parcel_area_ha: 3.52,
+        quarter_wave_m: 96.15, min_parcel_area_ha: 3.52,
         total_buy_low_usd: 435000, total_buy_high_usd: 1580000,
         total_lease_yr1_low_usd: 341000, total_lease_yr1_high_usd: 1009000,
         annual_lease_low_usd: 6000, annual_lease_high_usd: 24000,
@@ -1331,7 +1331,7 @@ const DEMO_RESULT = {
       },
       antenna_pattern_optimization_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'DA-D', tpo_kw: 5,
-        is_directional: true, quarter_wave_m: 96.2, wavelength_m: 384.6,
+        is_directional: true, quarter_wave_m: 96.15, wavelength_m: 384.62,
         col_bearing_deg: 212, dist_to_col_km: 3.8,
         col_required_field_mvm: 5.0, field_at_col_nda_mvm: 4.1, col_field_deficit_mvm: 0.9,
         da_recommended: 'STRONGLY_RECOMMENDED',
@@ -1372,7 +1372,7 @@ const DEMO_RESULT = {
       },
       transmission_system_design_guide: {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, pattern_mode: 'NDA',
-        quarter_wave_m: 96.2, wavelength_m: 384.6, estimated_line_length_m: 107,
+        quarter_wave_m: 96.15, wavelength_m: 384.62, estimated_line_length_m: 107,
         antenna_radiation_resistance_ohm: 36.6, estimated_ground_loss_ohm: 6.88,
         estimated_base_impedance_ohm: 43.48, antenna_efficiency_pct: 84.18,
         base_current_ideal_a: 11.68,
@@ -1411,15 +1411,19 @@ const DEMO_RESULT = {
         note: 'Operational monitoring requirements are a post-licensing compliance reference. Actual obligations depend on the specific license conditions granted by the FCC.'
       },
       transmitter_facility_design_guide: {
-        tpo_kw: 5, transmitter_efficiency_pct: 28, ac_power_draw_kw: 17.86, total_facility_load_kw: 22.86,
-        service_amps_240v: 95, recommended_service_size_a: 100,
-        heat_dissipated_kw: 12.86, heat_dissipated_btu_hr: 43882, hvac_required_tons: 3.66,
+        // Transmitter efficiency: modern solid-state 5 kW AM transmitters run ~74–75%.
+        // Nautel NX5: ~75% at rated power (published spec sheet). GatesAir FAX-5: ~74%.
+        // Old value of 28% was incorrect; all dependent calculations corrected.
+        tpo_kw: 5, transmitter_efficiency_pct: 74, ac_power_draw_kw: 6.76, total_facility_load_kw: 9.0,
+        _efficiency_source: 'Nautel NX5 published spec ~75%; GatesAir FAX-5 ~74%. Using 74% midpoint.',
+        service_amps_240v: 38, recommended_service_size_a: 60,
+        heat_dissipated_kw: 1.76, heat_dissipated_btu_hr: 6005, hvac_required_tons: 1.2,
         fencing: { required: true, rule: '47 CFR §73.49', minimum_height_ft: 8, material: 'Chain-link or equivalent — must prevent unauthorized access', warning_signs: 'High voltage warning signs at each entrance and at intervals not exceeding 100 feet', lock_required: 'Deadbolt or padlock; key held by licensed operator', access_gate_count: 1, estimated_perimeter_ft: 80, note: '§73.49: locked enclosure required for all AM transmitting systems > 250 W.' },
-        standby_generator: { recommended: true, rating_kw: 28.58, fuel_type: 'diesel', fuel_tank_gallons: 1029, runtime_hours_72hr_load: 72, fuel_storage_requirement: 'AST_SECONDARY_CONTAINMENT', note: 'Not FCC-mandated but required for EAS §11.35 compliance continuity during utility outages.' },
-        building_specs: { type: 'CONCRETE_BLOCK_OR_PREFAB', min_floor_area_sf: 120, min_ceiling_height_ft: 10, hvac_required: true, hvac_tons: 3.66, electrical_panel: '100A main breaker panel', grounding: 'Single-point ground bus to tower base per IEEE 1100', rf_shielding: 'STANDARD', exterior_finish: 'Non-combustible; meet local building code fire rating', security: '§73.49 lock + exterior motion-activated lighting recommended' },
+        standby_generator: { recommended: true, rating_kw: 12, fuel_type: 'diesel', fuel_tank_gallons: 100, runtime_hours_72hr_load: 72, fuel_storage_requirement: 'AST_SECONDARY_CONTAINMENT', note: 'Not FCC-mandated but required for EAS §11.35 compliance continuity during utility outages. At 9 kW facility load, 12 kW diesel generator at ~0.6 gal/hr runs 72 hr on ~44 gal; 100-gal tank provides margin.' },
+        building_specs: { type: 'CONCRETE_BLOCK_OR_PREFAB', min_floor_area_sf: 120, min_ceiling_height_ft: 10, hvac_required: true, hvac_tons: 1.2, electrical_panel: '60A main breaker panel', grounding: 'Single-point ground bus to tower base per IEEE 1100', rf_shielding: 'STANDARD', exterior_finish: 'Non-combustible; meet local building code fire rating', security: '§73.49 lock + exterior motion-activated lighting recommended' },
         construction_cost_estimate_usd: { low: 83580, high: 177160 },
         reference: '47 CFR §73.49; §11.35; NEC Article 250; IEEE 1100; NFPA 110',
-        note: 'Facility design guide is a screening-grade estimate. Actual requirements depend on transmitter model efficiency and local utility voltage.'
+        note: 'Facility design guide is a screening-grade estimate based on solid-state 5 kW AM transmitter at 74% efficiency (Nautel NX5 ~75%, GatesAir FAX-5 ~74%). AC draw = 5/0.74 = 6.76 kW transmitter + ~2.24 kW facility = 9 kW total. Actual requirements depend on specific transmitter model and local utility voltage.'
       },
       soil_conductivity_improvement_guide: {
         sigma_msm_current: 2, soil_class_current: 'FAIR', soil_resistivity_ohm_m: 500,
@@ -1645,9 +1649,9 @@ const DEMO_RESULT = {
       tower_structural_assessment_guide: {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
         candidate_lat: 34.86, candidate_lon: -111.82,
-        wavelength_m: 384.6, quarter_wave_height_m: 96.2, half_wave_height_m: 192.3,
+        wavelength_m: 384.62, quarter_wave_height_m: 96.15, half_wave_height_m: 192.31,
         asr_registration_required: true,
-        asr_note: 'λ/4 = 96.2 m exceeds 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 + FAA Form 7460-1 required before construction.',
+        asr_note: 'λ/4 = 96.15 m exceeds 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 + FAA Form 7460-1 required before construction.',
         wind_ice_zone: 'ZONE_II_MODERATE',
         wind_ice_zone_data: { label: 'Zone II — Moderate Wind + Ice', wind_speed_mph: 90, ice_thickness_in: 1.0, note: 'Combined wind-on-ice design controls. Standard structural design applies. Guyed towers common.' },
         tower_types: [
@@ -1675,12 +1679,12 @@ const DEMO_RESULT = {
         sigma_msm: 9, soil_resistivity_ohm_m: 111.11,
         soil_conductivity_class: 'GOOD',
         soil_note: 'Good conductivity. Standard 120-radial system (λ/4) achieves near-ideal efficiency. FCC M3 zone meets §73.190 screening threshold.',
-        wavelength_m: 384.6, optimal_radial_length_m: 96.2, minimum_radial_length_m: 48.1,
+        wavelength_m: 384.62, optimal_radial_length_m: 96.15, minimum_radial_length_m: 48.1,
         burial_depth_recommended: '5–10 cm',
         conductor_specification: '#10 AWG copper-clad steel or solid copper',
         scenarios: [
-          { label: 'Standard (120 radials)', radial_count: 120, radial_length_m: 96.2, ground_loss_ohm: 1.53, antenna_efficiency_pct: 96.0, effective_tpo_kw: 4.8, suitable_for: 'Preferred for all AM stations. Required for §73.190 certification without soil survey waiver.' },
-          { label: 'Reduced (60 radials)', radial_count: 60, radial_length_m: 96.2, ground_loss_ohm: 3.06, antenna_efficiency_pct: 92.3, effective_tpo_kw: 4.6, suitable_for: 'Acceptable for temporary operations or land-constrained sites. §73.190 soil survey waiver application may be required.' },
+          { label: 'Standard (120 radials)', radial_count: 120, radial_length_m: 96.15, ground_loss_ohm: 1.53, antenna_efficiency_pct: 96.0, effective_tpo_kw: 4.8, suitable_for: 'Preferred for all AM stations. Required for §73.190 certification without soil survey waiver.' },
+          { label: 'Reduced (60 radials)', radial_count: 60, radial_length_m: 96.15, ground_loss_ohm: 3.06, antenna_efficiency_pct: 92.3, effective_tpo_kw: 4.6, suitable_for: 'Acceptable for temporary operations or land-constrained sites. §73.190 soil survey waiver application may be required.' },
           { label: 'Urban-constrained (30 radials)', radial_count: 30, radial_length_m: 48.1, ground_loss_ohm: 6.11, antenna_efficiency_pct: 85.7, effective_tpo_kw: 4.3, suitable_for: 'Absolute minimum for urban/rooftop sites. Significant efficiency reduction. §73.190 variance required.' }
         ],
         staging_phase1: { radial_count: 60, description: 'Phase 1 (60 radials): minimum viable system for initial operation while Phase 2 radials are installed in stages.' },
@@ -1874,7 +1878,7 @@ const DEMO_RESULT = {
         note: '780 kHz Class D (NDA) — current 5 kW TPO. Daytime upgrade to 10 kW available (§73.21 Class D ceiling) — groundwave coverage radius grows ~41% (√ERP scaling). Nighttime ceiling: 1 kW (Class D secondary; DA-N antenna + §73.182 skywave analysis required for night upgrade).'
       },
       am_coverage_optimization_by_tower_height_guide: {
-        frequency_khz: 780, wavelength_m: 384.6,
+        frequency_khz: 780, wavelength_m: 384.62,
         lambda_eighth_m: 48,  lambda_eighth_ft: 157,
         lambda_quarter_m: 96, lambda_quarter_ft: 315,
         lambda_half_m: 192,   lambda_half_ft: 630,
@@ -2396,7 +2400,7 @@ const DEMO_RESULT = {
         n_patterns: 1,
         n_points_per_pattern: 2,
         n_monitoring_points: 2,
-        wavelength_m: 384.6,
+        wavelength_m: 384.62,
         min_distance_m: 192,
         typical_monitoring_distance_m: 577,
         max_useful_distance_m: 1923,
@@ -4149,7 +4153,7 @@ const DEMO_RESULT = {
         note: 'Attenuation computed from skin-effect formula (A_cond×√f + A_diel×f) at 0.780 MHz, 60 m assumed run.'
       },
       antenna_base_impedance: {
-        frequency_khz: 780, sigma_msm: 6, quarter_wave_m: 96.2, N_radials: 120,
+        frequency_khz: 780, sigma_msm: 6, quarter_wave_m: 96.15, N_radials: 120,
         quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 6.5, R_total_ohm: 43.1, efficiency_standard_pct: 84.9, R_g_extended_ohm: 2.9, efficiency_extended_pct: 92.7 },
         five_eighths_wave: { R_r_ohm: 49.8, X_base_j: 45, note: 'Matching network required to cancel +j45 Ω reactance' },
         base_reactance_table: [
@@ -4343,7 +4347,7 @@ const DEMO_RESULT = {
         note: 'Attenuation computed from skin-effect formula at 0.780 MHz, 60 m assumed run. 8.5 kW TPO (power upgrade scenario).'
       },
       antenna_base_impedance: {
-        frequency_khz: 780, sigma_msm: 4, quarter_wave_m: 96.2, N_radials: 120,
+        frequency_khz: 780, sigma_msm: 4, quarter_wave_m: 96.15, N_radials: 120,
         quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 9.7, R_total_ohm: 46.3, efficiency_standard_pct: 79.0, R_g_extended_ohm: 4.3, efficiency_extended_pct: 89.5 },
         five_eighths_wave: { R_r_ohm: 49.8, X_base_j: 45, note: 'Matching network required to cancel +j45 Ω reactance' },
         base_reactance_table: [
@@ -4513,7 +4517,7 @@ const DEMO_RESULT = {
         note: 'Attenuation computed from skin-effect formula at 0.780 MHz, 60 m assumed run.'
       },
       antenna_base_impedance: {
-        frequency_khz: 780, sigma_msm: 3, quarter_wave_m: 96.2, N_radials: 120,
+        frequency_khz: 780, sigma_msm: 3, quarter_wave_m: 96.15, N_radials: 120,
         quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 12.9, R_total_ohm: 49.5, efficiency_standard_pct: 73.9, R_g_extended_ohm: 5.7, efficiency_extended_pct: 86.5 },
         five_eighths_wave: { R_r_ohm: 49.8, X_base_j: 45, note: 'Matching network required to cancel +j45 Ω reactance' },
         base_reactance_table: [
