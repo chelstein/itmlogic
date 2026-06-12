@@ -1206,7 +1206,7 @@ const DEMO_RESULT = {
           { id: 'GROUND_RESISTANCE', label: 'Antenna base resistance (§73.190)', rule: '47 CFR §73.190', instrument: 'RF bridge or vector impedance meter at antenna base', notes: 'Measure input impedance and radiation resistance at 780 kHz. Ground system must show R_ground ≤ design spec.' },
           { id: 'FI_RADIAL_NDA', label: 'Pattern proof — all authorized radials', rule: '47 CFR §73.154', instrument: 'Calibrated FCC field-intensity meter with λ/4 whip', notes: 'DA pattern: measure all azimuthal radials specified in authorized DA pattern, plus 8 orthogonal radials for verification. §73.154 requires submission of measured DA pattern vs. theoretical §73.150 authorization.' },
           { id: 'INVERSE_DISTANCE_FIELD', label: 'Inverse-distance field (IDF) at 1 km', rule: '47 CFR §73.154(b)', instrument: 'Derived from FI traverse measurements', notes: 'For each radial, plot field × distance vs. distance to extract IDF at 1 km.' },
-          { id: 'MPE_NEAR_FIELD', label: 'RF exposure near-field boundary verification (OET-65)', rule: '47 CFR §1.1310 / OET Bulletin 65', instrument: 'Broadband RF field meter calibrated at MF', notes: 'Verify that the general-population MPE is not exceeded beyond the 61 m near-field boundary.' },
+          { id: 'MPE_NEAR_FIELD', label: 'RF exposure near-field boundary verification (OET-65)', rule: '47 CFR §1.1310 / OET Bulletin 65', instrument: 'Broadband RF field meter calibrated at MF', notes: 'Verify that the general-population MPE is not exceeded beyond the 61.22 m near-field boundary (λ/2π at 780 kHz).' },
           { id: 'ANTENNA_EFFICIENCY', label: 'Antenna radiation efficiency calculation (§73.190)', rule: '47 CFR §73.190', instrument: 'Derived from IDF + base impedance measurements', notes: 'Efficiency η = R_r / (R_r + R_g). For 120-radial system: target η ≥ 85%.' },
           { id: 'MONITOR_POINT', label: 'DA monitor point measurement (§73.158 / §73.62)', rule: '47 CFR §73.158 / §73.62', instrument: 'Calibrated FI meter at FCC-specified monitor point location', notes: 'Clear channel Class D with DA-N pattern: the authorized DA monitor point must be measured at reference field.' }
         ],
@@ -1549,7 +1549,7 @@ const DEMO_RESULT = {
           { n_elements: 4, config_label: '4-Element T or L Array', spacing_lambdas: 0.25, spacing_m: 96.15, spacing_ft: 315.5, amplitude_ratios: [0.5, 1.0, 1.0, 0.5], phase_deg: [90, 0, 0, -90], max_gain_dbd: 5.5, null_depth_theoretical_db: '30–45', null_depth_practical_db: '25–42', suppression_achievable_db: '25–42', property_footprint_m: 338.45, property_footprint_ft: 1110.4, use_case: 'Co-channel threats at 2+ azimuths simultaneously.', mutual_coupling_note: 'Full 4×4 mutual impedance matrix; professional design required' }
         ],
         suppression_requirement_db: 28.3,
-        suppression_note: '§73.37 / §73.182: suppression ratio of ≥28.3 dB toward co-channel protected contours (NIF D/U standard for Class D on regional channel).',
+        suppression_note: '§73.37 / §73.182: suppression ratio of ≥28.3 dB toward co-channel protected contours (NIF D/U standard for Class D on clear channel; 780 kHz is §73.25 clear channel, not regional).',
         n_hrp_radials: 72, hrp_increment_deg: 5,
         form_301am_exhibits: [
           { exhibit: 'Schedule B (Antenna)', description: 'Tower heights (degrees electrical), self-impedance values', required: true },
@@ -1585,8 +1585,8 @@ const DEMO_RESULT = {
         mpe_requirements: {
           required: true, rule: '47 CFR §1.1310 / OET Bulletin 65',
           measurement_method: 'Calibrated broadband or narrowband field meter',
-          exclusion_zone_m: 9.62,
-          note: 'TPO = 5 kW ≥ 5 kW threshold. RF exposure (MPE) evaluation required. Measure field strength at accessible locations within and around the antenna exclusion zone.'
+          exclusion_zone_m: 0.81,
+          note: 'TPO = 5 kW ≥ 5 kW threshold. RF exposure (MPE) evaluation required. Far-field: 0.81 m at 100 mW/cm²; however, 0.81 m << near-field boundary (61.22 m), so OET-65 §3.B near-field analysis governs. Measure field strength at accessible locations within and around the fence perimeter.'
         },
         antenna_proof_exhibits: [
           '§73.150 / §73.154: Directional antenna proof report including all 72-radial FI traversals, element phases/ratios, and comparison to licensed pattern',
@@ -3196,11 +3196,16 @@ const DEMO_RESULT = {
       },
       rf_exposure_compliance_guide: {
         frequency_mhz: 0.78, tpo_kw: 5, mpe_evaluation_required: true, mpe_threshold_kw: 5,
-        mpe_limit_gp_mwcm2: 100, mpe_limit_occ_mwcm2: 500,
-        exclusion_radius_gp_m: 38.73, exclusion_radius_occ_m: 17.32,
+        // §1.1310 Table 1 at 780 kHz: 0.3–1.34 MHz uncontrolled = 100 mW/cm², E=614 V/m.
+        // 0.3–3 MHz controlled = 100 mW/cm², E=614 V/m. Both limits equal at this frequency.
+        // Far-field exclusion: R = sqrt(EIRP_W/(4π×S_W_m2)) = sqrt(8200/(4π×1000)) = 0.81 m.
+        // Near-field boundary (λ/2π = 61.22 m) > 0.81 m → OET-65 §3.B near-field analysis governs.
+        mpe_limit_gp_mwcm2: 100, mpe_limit_occ_mwcm2: 100,
+        exclusion_radius_gp_m: 0.81, exclusion_radius_occ_m: 0.81,
+        near_field_boundary_m: 61.22, near_field_analysis_required: true,
         exposure_zones: [
-          { id: 'CONTROLLED', label: 'Controlled (Occupational) Zone', cfr: '47 CFR §1.1310 Table 1', mpe_limit_mwcm2: 500, mpe_limit_vm: 1374.77, exclusion_radius_m: 17.32, who_is_exposed: 'Station employees and contractors aware of and able to exercise control over their exposure', marking_required: 'RF Caution signs; personnel dosimeter recommended', averaging_time_min: 6 },
-          { id: 'UNCONTROLLED', label: 'Uncontrolled (General Population) Zone', cfr: '47 CFR §1.1310 Table 1', mpe_limit_mwcm2: 100, mpe_limit_vm: 614.43, exclusion_radius_m: 38.73, who_is_exposed: 'General public, including bystanders without RF training', marking_required: 'RF Warning signs at fence perimeter; barrier required if within exclusion zone', averaging_time_min: 30 }
+          { id: 'CONTROLLED', label: 'Controlled (Occupational) Zone', cfr: '47 CFR §1.1310 Table 1', mpe_limit_mwcm2: 100, mpe_limit_vm: 614, exclusion_radius_m: 0.81, who_is_exposed: 'Station employees and contractors aware of and able to exercise control over their exposure', marking_required: 'RF Caution signs; personnel dosimeter recommended', averaging_time_min: 6 },
+          { id: 'UNCONTROLLED', label: 'Uncontrolled (General Population) Zone', cfr: '47 CFR §1.1310 Table 1', mpe_limit_mwcm2: 100, mpe_limit_vm: 614, exclusion_radius_m: 0.81, who_is_exposed: 'General public, including bystanders without RF training', marking_required: 'RF Warning signs at fence perimeter; barrier required if within exclusion zone', averaging_time_min: 30 }
         ],
         n_exposure_zones: 2,
         evaluation_triggers: [
@@ -3219,7 +3224,7 @@ const DEMO_RESULT = {
         n_compliance_steps: 5, total_compliance_days: 4.5,
         applicable_bulletin: 'OET Bulletin 65, Edition 97-01 (August 1997)',
         reference: '47 CFR §1.1310; 47 CFR §1.1307; OET Bulletin 65 (Ed. 97-01); IEEE C95.1-2005; ANSI Z535.2',
-        note: 'AM 0.78 MHz, 5 kW ERP. MPE eval required. Uncontrolled exclusion zone: 38.73m; controlled: 17.32m.'
+        note: 'AM 0.78 MHz, 5 kW ERP. MPE eval required. §1.1310 Table 1 at 780 kHz: both controlled and uncontrolled MPE = 100 mW/cm², E = 614 V/m. Far-field exclusion zone: 0.81 m (both zones). Near-field boundary λ/2π = 61.22 m governs per OET-65 §3.B; fence under §73.49.'
       },
       tower_structural_analysis_guide: {
         tower_height_m: 144.23, tower_height_ft: 473.21, tower_weight_class: 'MEDIUM', asr_required: true,
