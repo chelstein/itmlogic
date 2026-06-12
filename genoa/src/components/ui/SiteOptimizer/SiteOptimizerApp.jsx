@@ -681,7 +681,7 @@ const DEMO_RESULT = {
       "Screening of 234 grid candidates within 50 km of KAZM's current site (34.8600°N, 111.8200°W) identified 58 PROMISING candidate(s) and 142 candidates requiring engineering review.",
       "The top-ranked site (6.2 km NE) achieves 97% COL coverage, 34 km daytime reach at 5 kW TPO on 780 kHz. Regulatory risk: MODERATE.",
       "Conductivity data uses the FCC M3 zone table (15-zone fallback). Deploying the AM_m3.tif GeoTIFF raster will improve ranking precision and bring conductivity sub-scores to filing-grade accuracy.",
-      "At 780 kHz, all standard antenna heights (λ/4 = 96.2 m) exceed the §17.7 200-ft (60.96 m) ASR threshold — every candidate requires FCC Form 854 registration and FAA aeronautical study before construction.",
+      "At 780 kHz, all standard antenna heights (λ/4 = 96.15 m) exceed the §17.7 200-ft (60.96 m) ASR threshold — every candidate requires FCC Form 854 registration and FAA aeronautical study before construction.",
       "As a clear_channel channel station (780 kHz Class D), a §73.182 nighttime NIF study is required at any selected site before Form 301-AM can be filed. Clear-channel NIF is complex — budget 4–12 weeks of consulting time."
     ],
     caveats: [
@@ -1157,7 +1157,7 @@ const DEMO_RESULT = {
           { id: 'LMS_BLANKET_POP', form: 'Form 301-AM — Exhibit D', exhibit: 'Blanket interference (§73.24(g)) population study', status: 'REQUIRED', rule: '47 CFR §73.24(g)', responsible: 'Licensed broadcast engineer', note: '1000 mV/m contour population must be <1% of service-area population. Current screen: 0.4%.' },
           { id: 'LMS_MPE_STUDY', form: 'Form 301-AM — Exhibit E', exhibit: 'RF exposure (MPE) evaluation (OET Bulletin 65 / §1.1307)', status: 'REQUIRED', rule: '47 CFR §1.1307', responsible: 'Licensed broadcast engineer', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz. Fence distance and restricted-zone perimeter must be documented.' },
           { id: 'LMS_NEPA', form: 'Form 301-AM — NEPA Checklist', exhibit: 'NEPA environmental review (§1.1306)', status: 'REQUIRED', rule: '47 CFR §1.1306 / §1.1307', responsible: 'Environmental consultant + counsel', note: 'Complete 13-item §1.1306 checklist. File EA if any trigger applies.' },
-          { id: 'LMS_ASR_FORM_854', form: 'FCC Form 854 (ASR)', exhibit: 'Antenna Structure Registration', status: 'REQUIRED', rule: '47 CFR §17.7', responsible: 'Tower owner / communications counsel', note: 'λ/4 ≈ 96.2 m exceeds 200 ft (60.96 m) §17.7 threshold. Form 854 + FAA Form 7460-1 required before construction. FAA review can take 45–90 days.' },
+          { id: 'LMS_ASR_FORM_854', form: 'FCC Form 854 (ASR)', exhibit: 'Antenna Structure Registration', status: 'REQUIRED', rule: '47 CFR §17.7', responsible: 'Tower owner / communications counsel', note: 'λ/4 = 96.15 m exceeds 200 ft (60.96 m) §17.7 threshold. Form 854 + FAA Form 7460-1 required before construction. FAA review can take 45–90 days.' },
           { id: 'LMS_NIGHTTIME_NIF', form: 'Form 301-AM — Exhibit F / NIF Study', exhibit: '§73.182 nighttime interference field (NIF) study', status: 'REQUIRED', rule: '47 CFR §73.182', responsible: 'Licensed broadcast engineer (skywave)', note: 'Clear channel Class D — full §73.182 NIF required at 1° azimuthal resolution (OET-72). New site must not increase interference to dominant Class A protected contours.' },
           { id: 'LMS_DA_PATTERN', form: 'Form 301-AM — Exhibit G / §73.150(a) pattern table', exhibit: 'Directional antenna (DA) horizontal pattern', status: 'REQUIRED', rule: '47 CFR §73.150', responsible: 'Licensed broadcast engineer (antenna)', note: '§73.150(a): horizontal pattern in 5° increments (72 tabulated values, 0°–355°). DA pattern must be modeled with moment-method software; physical proof required after construction.' },
           { id: 'LMS_TREATY_COORD', form: 'FCC IB coordination letter', exhibit: 'International treaty coordination', status: 'INFORMATIONAL', rule: 'US/MX AM Agreement (1986); US/CA LOU (1991)', responsible: 'FCC International Bureau + counsel', note: 'No treaty zone detected at screening. Verify actual site coordinates against NAFTA coordination zone boundaries if site moves.' },
@@ -1715,7 +1715,7 @@ const DEMO_RESULT = {
         items: [
           { id: 'col_coverage', label: 'Principal community 5 mV/m coverage', rule: '47 CFR §73.24(i)', status: 'PASS', note: '97% of principal community receives ≥5 mV/m (floor: 80%).', required_action: null },
           { id: 'blanket_pop', label: 'Blanket population (1000 mV/m contour)', rule: '47 CFR §73.24(g)', status: 'PASS', note: 'Estimated blanket population 0.5% ≤ 1% ceiling.', required_action: null },
-          { id: 'asr_registration', label: 'ASR tower registration (§17.7)', rule: '47 CFR §17.7 / FCC Form 854', status: 'WARN', note: 'λ/4 = 96.2 m at 780 kHz exceeds the 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 and FAA Form 7460-1 required before construction.', required_action: 'File FAA Form 7460-1 and obtain FAA determination before filing Form 854 with FCC. Marking/lighting per FAA determination (§17.21–§17.50).' },
+          { id: 'asr_registration', label: 'ASR tower registration (§17.7)', rule: '47 CFR §17.7 / FCC Form 854', status: 'WARN', note: 'λ/4 = 96.15 m at 780 kHz exceeds the 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 and FAA Form 7460-1 required before construction.', required_action: 'File FAA Form 7460-1 and obtain FAA determination before filing Form 854 with FCC. Marking/lighting per FAA determination (§17.21–§17.50).' },
           { id: 'mpe_evaluation', label: 'RF exposure MPE evaluation', rule: '47 CFR §1.1310 / OET Bulletin 65', status: 'WARN', note: 'TPO = 5 kW ≥ 5 kW threshold. Routine MPE evaluation required before license grant.', required_action: 'Compute uncontrolled MPE limit distance from antenna base; fence or post exclusion zone signage per OET-65 guidance.' },
           { id: 'nif_study', label: 'Nighttime interference-free (NIF) contour study', rule: '47 CFR §73.182', status: 'WARN', note: 'Regional channel: §73.182 nighttime interference screening required. Demonstrate no increase in inter-station skywave interference.', required_action: 'Commission §73.182 NIF study from consulting engineer before Form 301-AM filing.' },
           { id: 'treaty_zone', label: 'International treaty coordination', rule: '1941/1986 US/MX, 1941 US/CA NARBA', status: 'PASS', note: 'Candidate site is outside treaty coordination zones at screening grade. No treaty coordination required.', required_action: null },
@@ -1803,7 +1803,7 @@ const DEMO_RESULT = {
         note: '780 kHz 5 kW facility (modern solid-state): total load ~8.00–9.25 kW; estimated annual electricity $7,008–$12,965 at 2024 commercial rates (DOE EIA avg $0.10–$0.16/kWh commercial). Tube-to-solid-state upgrade saves ~$6,100/yr; payback ≈ 3 yr on a $18,000 transmitter. Efficiency 65–75% per Nautel/GatesAir published datasheets.'
       },
       antenna_base_impedance_and_atu_design_guide: {
-        frequency_khz: 780, f_hz: 780000, lambda_m: 384.6, lambda_quarter_m: 96, tpo_kw: 5, pattern_mode: 'NDA',
+        frequency_khz: 780, f_hz: 780000, lambda_m: 384.62, lambda_quarter_m: 96.15, tpo_kw: 5, pattern_mode: 'NDA',
         feedline_impedance_ohm: 50, rr_ohm: 36.6, rg_low_ohm: 2.0, rg_high_ohm: 5.0, rcond_ohm: 0.4,
         r_base_low_ohm: 39.0, r_base_high_ohm: 42.0, r_base_typ_ohm: 40.5,
         q_network: 0.484, xl_shunt_ohm: 103.3, xc_series_ohm: 19.6,
@@ -1815,7 +1815,7 @@ const DEMO_RESULT = {
         n_atu_networks: 'one (NDA — single tower)', is_directional: false,
         atu_network_type: 'L-network (shunt inductor / series capacitor)',
         reference: '47 CFR §73.190 (ground system/detuning); §73.62 (base current monitoring); §73.154 (proof); ITU-R BS.346-1; IEEE Std 100',
-        note: '780 kHz λ/4 monopole (96 m): base impedance ~39–42 Ω (Rr=36.6 Ω + Rg=2–5 Ω). ATU: L-network; shunt L ≈ 21.06 μH, series C ≈ 10,402 pF; -3 dB BW ≈ 1610 kHz. Efficiency ≈ 90.4%. Base current at 5 kW: ≈ 11.12 A. Guy wire detuning coils required within 96 m (§73.190).'
+        note: '780 kHz λ/4 monopole (96.15 m): base impedance ~39–42 Ω (Rr=36.6 Ω + Rg=2–5 Ω). ATU: L-network; shunt L ≈ 21.06 μH, series C ≈ 10,402 pF; -3 dB BW ≈ 1610 kHz. Efficiency ≈ 90.4%. Base current at 5 kW: ≈ 11.12 A. Guy wire detuning coils required within 96.15 m (§73.190).'
       },
       station_total_project_cost_pro_forma_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
@@ -1879,10 +1879,10 @@ const DEMO_RESULT = {
       },
       am_coverage_optimization_by_tower_height_guide: {
         frequency_khz: 780, wavelength_m: 384.62,
-        lambda_eighth_m: 48,  lambda_eighth_ft: 157,
-        lambda_quarter_m: 96, lambda_quarter_ft: 315,
-        lambda_half_m: 192,   lambda_half_ft: 630,
-        five_eighth_m: 240,   five_eighth_ft: 787,
+        lambda_eighth_m: 48.08,  lambda_eighth_ft: 157.7,
+        lambda_quarter_m: 96.15, lambda_quarter_ft: 315.5,
+        lambda_half_m: 192.31,   lambda_half_ft: 630.9,
+        five_eighth_m: 240.39,   five_eighth_ft: 788.7,
         current_height_m: 96, current_height_ft: 315, current_elec_deg: 90,
         optimal_height_m: 240, optimal_height_ft: 787,
         height_increase_m: 144,
@@ -2001,7 +2001,7 @@ const DEMO_RESULT = {
       },
       antenna_tuning_unit_commissioning_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
-        is_da: false, n_towers: 1, lambda_quarter_m: 96,
+        is_da: false, n_towers: 1, lambda_quarter_m: 96.15,
         base_resistance_ohm_typical: 36, ground_series_r_typical_ohm: 3,
         antenna_efficiency_pct: 92, base_current_rms_a: 11.79, tpo_kw: 5,
         atu_cost_per_tower_usd_typ: 12000, phasor_cost_usd: 0,
@@ -2019,7 +2019,7 @@ const DEMO_RESULT = {
         current_tolerance_cfr: '47 CFR §73.1560(a)', da_tolerance_cfr: null,
         frequency_tolerance_hz: 20, frequency_tolerance_cfr: '47 CFR §73.1545',
         reference: '47 CFR §73.1560 (operating power tolerance); §73.61 (base current monitoring); §73.1545 (frequency tolerance); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
-        note: 'NDA 780 kHz, λ/4=96m. Base resistance ~36Ω; base current ~11.79A rms at 5 kW. ATU cost: $7,800–$19,200 (typ. $12,000). Commissioning: 2–5 days. Antenna efficiency: ~92% with 120-radial system.'
+        note: 'NDA 780 kHz, λ/4=96.15 m. Base resistance ~36Ω; base current ~11.79A rms at 5 kW. ATU cost: $7,800–$19,200 (typ. $12,000). Commissioning: 2–5 days. Antenna efficiency: ~92% with 120-radial system.'
       },
       tower_construction_contract_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -2055,19 +2055,19 @@ const DEMO_RESULT = {
       ground_radial_installation_cost_guide: {
         frequency_khz: 780, fcc_class: 'D',
         pattern_mode: 'NDA', is_da: false, n_towers: 1,
-        wavelength_m: 385, lambda_quarter_m: 96, lambda_half_m: 192,
-        n_radials: 120, radial_length_m: 96, total_wire_length_m: 11520,
+        wavelength_m: 384.62, lambda_quarter_m: 96.15, lambda_half_m: 192.31,
+        n_radials: 120, radial_length_m: 96.15, total_wire_length_m: 11538,
         copper_cost_per_m: 0.95, trench_cost_per_m: 3.5,
         ground_ring_cost_usd: 3500, bonding_testing_cost_usd: 2000,
         engineering_supervision_cost_usd: 3500, equipment_rental_cost_usd: 4000,
-        per_tower_wire_cost_usd: 10944, per_tower_trench_cost_usd: 40320, per_tower_fixed_cost_usd: 13000,
-        per_tower_total_cost_usd: 64264,
-        total_estimated_cost_usd: { low: 48198, typical: 64264, high: 96396 },
+        per_tower_wire_cost_usd: 10961, per_tower_trench_cost_usd: 40383, per_tower_fixed_cost_usd: 13000,
+        per_tower_total_cost_usd: 64344,
+        total_estimated_cost_usd: { low: 48265, typical: 64344, high: 96516 },
         half_wave_upgrade_cost_usd: 51264,
         copper_lbs_total: 114,
         fcc_minimum_radials: 120, radial_cfr: '47 CFR §73.190',
         reference: '47 CFR §73.190 (AM ground system); FCC AM Engineering Handbook; Terman (1943) radial ground system efficiency; ARRL Antenna Book (copper wire specifications)',
-        note: '780 kHz, λ/4=96m. Standard ground system: 120 radials × 96m = 11,520m total wire. Estimated cost: $48,198–$96,396 (typ. $64,264). Half-wave upgrade adds ~$51,264.'
+        note: '780 kHz, λ/4=96.15 m. Standard ground system: 120 radials × 96.15 m = 11,538 m total wire. Estimated cost: $48,265–$96,516 (typ. $64,344). Half-wave upgrade adds ~$51,264.'
       },
       frequency_coordination_with_adjacent_stations_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -2180,8 +2180,8 @@ const DEMO_RESULT = {
       antenna_rfi_from_nearby_equipment_guide: {
         frequency_khz: 780, fcc_class: 'D',
         frequency_sensitivity: 'HIGH',
-        wavelength_m: 385,
-        lambda_quarter_m: 96,
+        wavelength_m: 384.62,
+        lambda_quarter_m: 96.15,
         part15_limit_uv_m: 30,
         part15_test_distance_m: 30,
         n_rfi_source_categories: 6,
@@ -2210,7 +2210,7 @@ const DEMO_RESULT = {
         data_center_clearance_m: 400,
         fcc_enforcement_pathway: '§15.5(b) harmful interference complaint to FCC Enforcement Bureau',
         reference: '47 CFR §15.5(b); §15.107; §15.109; §15.109(f); ITU-R P.372-15 (radio noise); FCC Enforcement Advisory EA-2016-01',
-        note: 'AM 780 kHz (HIGH RFI sensitivity, λ/4=96m). Part 15 limit: 30 µV/m at 30m. 6 RFI source categories assessed (3 HIGH severity). Pre-construction spectrum survey required. Power line clearance ≥500m; solar inverter clearance ≥300m.'
+        note: 'AM 780 kHz (HIGH RFI sensitivity, λ/4=96.15 m). Part 15 limit: 30 µV/m at 30m. 6 RFI source categories assessed (3 HIGH severity). Pre-construction spectrum survey required. Power line clearance ≥500m; solar inverter clearance ≥300m.'
       },
       neighboring_landowner_notification_guide: {
         frequency_khz: 780, fcc_class: 'D',
