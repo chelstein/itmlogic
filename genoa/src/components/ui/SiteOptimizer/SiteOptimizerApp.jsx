@@ -575,7 +575,7 @@ const DEMO_RESULT = {
   candidate_count_by_status: {
     PROMISING: 58, REVIEW_REQUIRED: 142, NON_COMPLIANT: 34
   },
-  top_candidates_summary: 'Rank 1 scores 91.3 (PROMISING), 6 km NE of current site, σ=8 mS/m (EXCELLENT). COL field 18.4 mV/m (≥§73.24(i) 5 mV/m floor). est. 125K served @0.5 mV/m. vs current site: score +28.9, reach +5.6 km. top 4 σ quality: 3×EXCELLENT, 1×FAIR. shortlist statuses: 2 PROMISING, 1 RECOVERABLE_WITH_POWER_INCREASE, 1 NON_COMPLIANT (out of 234 evaluated).',
+  top_candidates_summary: 'Rank 1 scores 91.3 (PROMISING), 6 km NE of current site, σ=8 mS/m (EXCELLENT). COL field 18.4 mV/m (≥§73.24(i) 5 mV/m floor). est. 125K served @0.5 mV/m. vs current site: score +28.9, reach +5.6 km. top 4 σ quality: 3×EXCELLENT, 1×FAIR. shortlist statuses: 2 PROMISING, 1 FEASIBLE_WITH_DA_PATTERN_ONLY (COL gap; power increase not available at Class D 5 kW ceiling), 1 NON_COMPLIANT (out of 234 evaluated).',
   candidate_shortlist: [
     {
       rank: 1, lat: 34.91, lon: -111.79, status_category: 'PROMISING',
@@ -590,10 +590,10 @@ const DEMO_RESULT = {
       recommended_next_step: 'Advance to full §73.182 NIF study and parcel investigation.'
     },
     {
-      rank: 3, lat: 34.95, lon: -111.92, status_category: 'RECOVERABLE_WITH_POWER_INCREASE',
+      rank: 3, lat: 34.95, lon: -111.92, status_category: 'FEASIBLE_WITH_DA_PATTERN_ONLY',
       score_with_band: 'score 71.8 [49.8–93.8]',
-      summary: 'Rank 3 @ 12.5 km NW: COL coverage 78% (below 80% floor), σ=10 mS/m (EXCELLENT), reach 28 km. Increase TPO to ≥8.5 kW to achieve §73.24(i) compliance, then advance to NIF study.',
-      recommended_next_step: 'Increase TPO to ≥8.5 kW to achieve §73.24(i) compliance, then advance to NIF study.'
+      summary: 'Rank 3 @ 12.5 km NW: COL coverage 78% (below 80% floor), σ=10 mS/m (EXCELLENT), reach 28 km. 8.5 kW needed to close gap but exceeds Class D ceiling (5 kW per §73.21(e)). DA pattern (§73.150) toward COL bearing is the only compliant path.',
+      recommended_next_step: 'Commission DA-D pattern study (§73.150) toward COL bearing — DA is the only compliant path to close the 2% COL coverage gap at 5 kW Class D ceiling.'
     }
   ],
   geographic_diversity_analysis: {
@@ -613,13 +613,13 @@ const DEMO_RESULT = {
     note: 'Quadrant analysis based on bearing from current site.'
   },
   candidate_set_recommendation: {
-    overall_guidance: '2 candidates are ready to advance immediately. Rank 3 requires TPO increase before advancing. Initiate NIF studies at Rank 1 and Rank 2 in parallel to minimize timeline.',
+    overall_guidance: '2 candidates are ready to advance immediately. Rank 3 requires DA pattern study (§73.150) before advancing — TPO increase not available at Class D ceiling (5 kW per §73.21(e)). Initiate NIF studies at Rank 1 and Rank 2 in parallel to minimize timeline.',
     primary_recommended_rank: 1,
     n_advance_ready: 2, n_need_remedy: 1, n_hold: 1,
     candidates: [
       { rank: 1, status: 'PROMISING', score: 91.3, col_pct: 97, gate_verdict: 'CONDITIONAL', gate_fail_count: 0, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'NE', action: 'Advance to full §73.182 NIF study + parcel investigation. Commission soil resistivity survey. DA-N study required for nighttime operation.', priority: 'ADVANCE_IMMEDIATELY' },
       { rank: 2, status: 'PROMISING', score: 84.0, col_pct: 91, gate_verdict: 'CONDITIONAL', gate_fail_count: 0, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'SE', action: 'Advance to full §73.182 NIF study + parcel investigation. Commission soil resistivity survey. DA-N study required for nighttime operation.', priority: 'ADVANCE_IMMEDIATELY' },
-      { rank: 3, status: 'RECOVERABLE_WITH_POWER_INCREASE', score: 71.8, col_pct: 78, gate_verdict: 'CONDITIONAL', gate_fail_count: 1, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'NW', action: 'Increase TPO to ≥8.5 kW to achieve §73.24(i) compliance, then advance to NIF study.', priority: 'HOLD_PENDING_REMEDY' },
+      { rank: 3, status: 'FEASIBLE_WITH_DA_PATTERN_ONLY', score: 71.8, col_pct: 78, gate_verdict: 'CONDITIONAL', gate_fail_count: 1, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'NW', action: 'Commission DA-D pattern study (§73.150) to close 2% COL coverage gap — TPO increase not available at Class D ceiling (5 kW per §73.21(e)).', priority: 'HOLD_PENDING_DA_STUDY' },
       { rank: 4, status: 'NON_COMPLIANT', score: 58.5, col_pct: 62, gate_verdict: 'NON_VIABLE_AS_IS', gate_fail_count: 1, cost_tier: 'VERY_HIGH', skywave_advisory: 'CRITICAL', quadrant: 'SW', action: 'Hold — 1 gate failure(s) require engineering remediation before advancing. Commission DA or power-increase study.', priority: 'HOLD' }
     ],
     note: 'This recommendation is a SCREENING-GRADE advisory based on automated scoring. A licensed broadcast engineer and FCC counsel must review before any site commitment or filing.'
@@ -2379,7 +2379,7 @@ const DEMO_RESULT = {
           { id: 'EAS_RACK', label: 'EAS encoder/decoder + rack', space_sqft: 4, note: '19" rack, 2U–4U; requires broadband connection for IPAWS CAP' },
           { id: 'TRANSFER_SW', label: 'Automatic transfer switch (ATS)', space_sqft: 4, note: 'For generator changeover; must be inside or in adjacent weatherproof enclosure' },
           { id: 'CONTROL', label: 'Control console / metering panel', space_sqft: 6, note: 'Base current metering, modulation monitoring, remote control interface' },
-          { id: 'HVAC', label: 'HVAC system', space_sqft: 0, note: '2 tons cooling required; mini-split preferred for unattended sites' },
+          { id: 'HVAC', label: 'HVAC system', space_sqft: 0, note: '~1 ton cooling required (1.76 kW TX heat + solar gain ≈ 0.86 tons; round to 1-ton unit); mini-split preferred for unattended sites' },
           { id: 'WORKBENCH', label: 'Work/maintenance area', space_sqft: 20, note: '5×4 ft minimum for service work on transmitter and ATU' }
         ],
         n_equipment_items: 7,
@@ -4229,7 +4229,7 @@ const DEMO_RESULT = {
         ranking_rationale: 'Conductivity wins offset lower coverage; §73.24(i) COL coverage 78% is below 80% floor — 8.5 kW needed to close gap but EXCEEDS Class D ceiling (5 kW per §73.21(e)); DA pattern toward COL bearing is the only compliant path.'
       },
       status_labels: ['NON-COMPLIANT', 'ENGINEER REVIEW REQUIRED'],
-      status_category: 'RECOVERABLE_WITH_POWER_INCREASE',
+      status_category: 'FEASIBLE_WITH_DA_PATTERN_ONLY',
       blanket_pop_risk: 'OK', col_coverage_gap_pct: 0.02, population_delta_vs_baseline: -1500,
       regulatory_compliance_summary: {
         col_coverage: { status: 'FAIL',  value: 0.78, threshold: 0.80, rule: '47 CFR §73.24(i)' },
@@ -4586,7 +4586,7 @@ const DEMO_COLOCATION_RESULT = {
   n_candidates_returned:  6,
   candidate_count_by_status: {
     PROMISING: 71, REVIEW_REQUIRED: 178, NON_COMPLIANT: 42,
-    RECOVERABLE_WITH_DA: 18, RECOVERABLE_WITH_POWER_INCREASE: 3
+    RECOVERABLE_WITH_DA: 18, FEASIBLE_WITH_DA_PATTERN_ONLY: 3
   },
   candidates: [
     ...DEMO_RESULT.candidates,
