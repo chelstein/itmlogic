@@ -33306,13 +33306,16 @@ function buildProtectionRequirements({ fcc_class, frequency_khz, channel_class }
     ? 'Full §73.182 NIF study required — new site must not increase nighttime interference to Class A dominant station contours.'
     : 'Standard §73.182 nighttime interference screening required; NIF study format recommended.';
 
-  // Adjacent-channel protection ratios (§73.182 Table 1 typical values).
+  // Adjacent-channel protection ratios (§73.182 Table 1 daytime groundwave values).
+  // 1st adjacent (±10 kHz): 6 dB D/U required at reference contour — per §73.182(r) Table 1.
+  // 2nd adjacent (±20 kHz): 0 dB D/U (1:1) — generally no separation constraint for
+  //   daytime groundwave (§73.182 Table 1); nighttime skywave uses different values.
   const adjacent_channel_advisory = {
-    minus_10khz: { protection_db: 6, note: '1st adjacent lower: 6 dB D/U (§73.182 Table 1)' },
-    plus_10khz:  { protection_db: 6, note: '1st adjacent upper: 6 dB D/U' },
-    minus_20khz: { protection_db: 14, note: '2nd adjacent lower: 14 dB D/U' },
-    plus_20khz:  { protection_db: 14, note: '2nd adjacent upper: 14 dB D/U' },
-    note: 'D/U ratios are at the undesired station\'s 0.5 mV/m skywave or 5 mV/m groundwave contour (§73.182 Table 1). Exact values depend on class and time of operation.'
+    minus_10khz: { protection_db: 6, note: '1st adjacent lower: 6 dB D/U (§73.182 Table 1 daytime groundwave)' },
+    plus_10khz:  { protection_db: 6, note: '1st adjacent upper: 6 dB D/U (§73.182 Table 1 daytime groundwave)' },
+    minus_20khz: { protection_db: 0, note: '2nd adjacent lower: 0 dB D/U (1:1) — generally no daytime groundwave constraint (§73.182 Table 1)' },
+    plus_20khz:  { protection_db: 0, note: '2nd adjacent upper: 0 dB D/U (1:1) — generally no daytime groundwave constraint (§73.182 Table 1)' },
+    note: 'D/U ratios are at the undesired station\'s 0.5 mV/m skywave or 5 mV/m groundwave contour (§73.182 Table 1 daytime groundwave). Nighttime skywave NIF analysis uses different ratios. Exact values depend on class and time of operation.'
   };
 
   return {

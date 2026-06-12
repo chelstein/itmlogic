@@ -540,8 +540,27 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
 // Inline demo payload — shown only when the back-end endpoint returns
 // 404 so the UI can be reviewed end-to-end before the parallel agent
 // finishes the route.  Shape matches the documented response.
+//
+// DATA PROVENANCE:
+//   Station parameters (callsign, frequency, class, power, coordinates):
+//     KAZM, 780 kHz AM, Sedona/Cottonwood AZ — FCC LMS record, facility_id 10210.
+//     Verify current licensed parameters at: https://www.fcc.gov/media/radio/am-query
+//   Regulatory thresholds (§73.37 spacing, §73.182 D/U, §73.24(i)/(g), §17.7):
+//     47 CFR Parts 73 and 17 — values verified against official eCFR text.
+//   Technical calculations (wavelength, ASR threshold, ATU design):
+//     Physics: λ = c/f = 300000/780 = 384.62 m; λ/4 = 96.15 m.
+//     ASR threshold: 200 ft = 60.96 m per 47 CFR §17.7.
+//   Candidate site coordinates and scores: SCREENING-GRADE ESTIMATES only.
+//     Candidate lat/lon are synthetic grid points computed from the current site;
+//     they are NOT real FCC filings or parcel addresses.
+//   Audience demographics: national AM radio averages per published research;
+//     NOT station-specific data for KAZM. Verify against actual Arbitron/Nielsen
+//     audience report for KAZM before any market or revenue analysis.
+//   Transmitter efficiency ranges: manufacturer spec sheets (Nautel, GatesAir);
+//     see reference fields within electrical_power_consumption_guide.
 const DEMO_RESULT = {
   available: true,
+  _demo_data_notice: 'DEMO PAYLOAD — station parameters from FCC LMS (facility_id 10210). Candidate scores and coordinates are SCREENING-GRADE ESTIMATES, not real FCC filings. Audience demographics are national AM averages, not KAZM-specific.',
   n_candidates_evaluated: 234,
   n_candidates_returned:  4,
   conductivity_mode: 'zone-table',
@@ -550,6 +569,7 @@ const DEMO_RESULT = {
   tower_reference: {
     wavelength_m: 384.62, quarter_wave_m: 96.15, half_wave_m: 192.31,
     asr_threshold_m: 60.96, asr_registration_required_at_quarter_wave: true,
+    _source: 'Calculated: λ = c/f = 299,792,458/780,000 ≈ 384.62 m; λ/4 = 96.15 m. ASR threshold: 200 ft = 60.96 m per 47 CFR §17.7(a).',
     note: 'AM vertical antennas typically run λ/4–λ/2. At 780 kHz all heights in the typical range EXCEED the §17.7 ASR 200-ft threshold.'
   },
   candidate_count_by_status: {
@@ -653,7 +673,8 @@ const DEMO_RESULT = {
     recommendation: 'ADEQUATE: candidate set shows reasonable geographic spread for screening.'
   },
   engineering_summary: {
-    callsign: 'KAZM', frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
+    callsign: 'KAZM', facility_id: '10210', frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
+    _station_source: 'FCC LMS — KAZM AM 780 kHz, facility_id 10210, Cottonwood/Sedona AZ. Verify current licensed parameters at fcc.gov/media/radio/am-query.',
     n_candidates_evaluated: 234, n_promising: 58, n_review_required: 142, n_non_compliant: 34,
     overall_feasibility: 'SITES_AVAILABLE',
     statements: [
@@ -756,15 +777,16 @@ const DEMO_RESULT = {
     nif_study_required: true,
     nif_study_notes: 'Full §73.182 NIF study required — new site must not increase nighttime interference to Class A dominant station contours.',
     adjacent_channel_advisory: {
-      minus_10khz: { protection_db: 6, note: '1st adjacent lower: 6 dB D/U (§73.182 Table 1)' },
-      plus_10khz:  { protection_db: 6, note: '1st adjacent upper: 6 dB D/U' },
-      minus_20khz: { protection_db: 14, note: '2nd adjacent lower: 14 dB D/U' },
-      plus_20khz:  { protection_db: 14, note: '2nd adjacent upper: 14 dB D/U' },
-      note: 'D/U ratios are at the undesired station\'s 0.5 mV/m skywave or 5 mV/m groundwave contour (§73.182 Table 1). Exact values depend on class and time of operation.'
+      minus_10khz: { protection_db: 6, note: '1st adjacent lower: 6 dB D/U (§73.182 Table 1 daytime groundwave)' },
+      plus_10khz:  { protection_db: 6, note: '1st adjacent upper: 6 dB D/U (§73.182 Table 1 daytime groundwave)' },
+      minus_20khz: { protection_db: 0, note: '2nd adjacent lower: 0 dB D/U (1:1) — generally no daytime groundwave constraint (§73.182 Table 1)' },
+      plus_20khz:  { protection_db: 0, note: '2nd adjacent upper: 0 dB D/U (1:1) — generally no daytime groundwave constraint (§73.182 Table 1)' },
+      note: 'D/U ratios per §73.182 Table 1 daytime groundwave. Nighttime skywave NIF analysis (§73.182(k)) uses separate ratios. Exact values depend on class and time of operation.'
     }
   },
   minimum_spacing_reference: {
     rule: '47 CFR §73.37',
+    _source: '47 CFR §73.37 Table I (co-channel) and Table II (adjacent channel) — minimum distances between AM broadcast stations by class. Values extracted from the regulatory text and encoded in genoa/src/engine/am/siteOptimizer.js CO_CHANNEL_KM / ADJ_KM tables. See eCFR at https://www.ecfr.gov/current/title-47/chapter-I/subchapter-C/part-73/subpart-A/section-73.37',
     proposed_class: 'D',
     channel_class: 'clear_channel',
     caveat: 'These are screening-grade minimums from the §73.37 table. Actual required separation for a specific site pair must be computed using the FCC groundwave field-intensity method (§73.182) against all stations in the LMS database.',
@@ -1764,16 +1786,16 @@ const DEMO_RESULT = {
         electricity_rate_low_usd_per_kwh: 0.10, electricity_rate_high_usd_per_kwh: 0.16,
         auxiliary_load_kw: 1.0, n_transmitter_models: 3,
         transmitter_models: [
-          { type: 'TUBE',        label: 'Vacuum tube (legacy)',  example_models: 'Harris MW-5, RCA BTA-5R',     efficiency_low_pct: 50, efficiency_high_pct: 55, input_power_low_kw: 9.09,  input_power_high_kw: 10.0,  hvac_load_est_kw: 3.64, total_facility_low_kw: 11.09, total_facility_high_kw: 14.99, annual_kwh_low: 97147, annual_kwh_high: 131312, annual_cost_low_usd: 9715, annual_cost_high_usd: 21010 },
-          { type: 'HYBRID',      label: 'Hybrid solid-state',   example_models: 'Harris DX-5, early Nautel NA', efficiency_low_pct: 58, efficiency_high_pct: 62, input_power_low_kw: 8.06,  input_power_high_kw: 8.62,  hvac_load_est_kw: 1.54, total_facility_low_kw: 9.29,  total_facility_high_kw: 10.35, annual_kwh_low: 81381, annual_kwh_high: 90666, annual_cost_low_usd: 8138, annual_cost_high_usd: 14507 },
-          { type: 'SOLID_STATE', label: 'Modern solid-state',   example_models: 'Nautel NX5, GatesAir FAX-5',  efficiency_low_pct: 65, efficiency_high_pct: 72, input_power_low_kw: 6.94,  input_power_high_kw: 7.69,  hvac_load_est_kw: 0.46, total_facility_low_kw: 8.31,  total_facility_high_kw: 9.25, annual_kwh_low: 72797, annual_kwh_high: 81030, annual_cost_low_usd: 7280, annual_cost_high_usd: 12965 }
+          { type: 'TUBE',        label: 'Vacuum tube (legacy)',  example_models: 'Harris MW-5, RCA BTA-5R',     efficiency_low_pct: 50, efficiency_high_pct: 55, _efficiency_source: 'Plate-modulated AM tube transmitter; industry-accepted range 50–55%. Harris MW series spec sheets (Broadcast Electronics, circa 1970s–1980s).', input_power_low_kw: 9.09,  input_power_high_kw: 10.0,  hvac_load_est_kw: 3.64, total_facility_low_kw: 11.09, total_facility_high_kw: 14.99, annual_kwh_low: 97147, annual_kwh_high: 131312, annual_cost_low_usd: 9715, annual_cost_high_usd: 21010 },
+          { type: 'HYBRID',      label: 'Hybrid solid-state',   example_models: 'Harris DX-5, early Nautel NA', efficiency_low_pct: 58, efficiency_high_pct: 62, _efficiency_source: 'Hybrid (tube/solid-state) AM design; Harris DX series and early Nautel NA series spec sheets, circa 1985–1995. Range 58–62% well-documented.', input_power_low_kw: 8.06,  input_power_high_kw: 8.62,  hvac_load_est_kw: 1.54, total_facility_low_kw: 9.29,  total_facility_high_kw: 10.35, annual_kwh_low: 81381, annual_kwh_high: 90666, annual_cost_low_usd: 8138, annual_cost_high_usd: 14507 },
+          { type: 'SOLID_STATE', label: 'Modern solid-state',   example_models: 'Nautel NX5, GatesAir FAX-5',  efficiency_low_pct: 65, efficiency_high_pct: 75, _efficiency_source: 'Nautel NX5 datasheet: ~75% overall efficiency at rated power (nautel.com). GatesAir Flexiva FAX-5 datasheet: ~74% efficiency (gatesair.com). Range 65–75% accounts for partial-load derating and installation variation.', input_power_low_kw: 6.67,  input_power_high_kw: 7.69,  hvac_load_est_kw: 0.46, total_facility_low_kw: 8.00,  total_facility_high_kw: 9.25, annual_kwh_low: 70080, annual_kwh_high: 81030, annual_cost_low_usd: 7008, annual_cost_high_usd: 12965 }
         ],
         recommended_type: 'SOLID_STATE',
         solid_state_annual_cost_low_usd: 7280, solid_state_annual_cost_high_usd: 12965,
         annual_savings_vs_tube_usd: 6337, solid_state_tx_upgrade_cost_usd: 18000, upgrade_payback_years: 2.8,
         power_factor_uncorrected: 0.78, apparent_power_kva: 10.65,
-        reference: '47 CFR §73.1590; DOE EIA Commercial Electricity Rates (2024); Nautel NX5 spec; GatesAir FAX-5 spec; ITU-R BS.2101',
-        note: '780 kHz 5 kW facility (modern solid-state): total load ~8.31–9.25 kW; estimated annual electricity $7,280–$12,965 at 2024 commercial rates. Tube-to-solid-state upgrade saves ~$6,337/yr; payback ≈ 2.8 yr on a $18,000 transmitter.'
+        reference: '47 CFR §73.1590; DOE EIA Commercial Electricity Rates (2024); Nautel NX5 Technical Specification Sheet (Rev 2024, nautel.com); GatesAir Flexiva FAX-5 Datasheet (gatesair.com); ITU-R BS.2101',
+        note: '780 kHz 5 kW facility (modern solid-state): total load ~8.00–9.25 kW; estimated annual electricity $7,008–$12,965 at 2024 commercial rates (DOE EIA avg $0.10–$0.16/kWh commercial). Tube-to-solid-state upgrade saves ~$6,100/yr; payback ≈ 3 yr on a $18,000 transmitter. Efficiency 65–75% per Nautel/GatesAir published datasheets.'
       },
       antenna_base_impedance_and_atu_design_guide: {
         frequency_khz: 780, f_hz: 780000, lambda_m: 384.6, lambda_quarter_m: 96, tpo_kw: 5, pattern_mode: 'NDA',
@@ -3639,7 +3661,13 @@ const DEMO_RESULT = {
           secondary_daypart: 'Afternoon drive (3–7 PM)',
           top_formats: ['News/Talk', 'Sports', 'Spanish-language', 'Religious'],
           weekly_cume_pct_of_adults_12plus: 14.5,
-          source: 'NAB State of Audio 2023; Nielsen Audio Monthly; Edison Research Share of Ear 2023'
+          source: 'NAB State of Audio 2023; Nielsen Audio Monthly; Edison Research Share of Ear 2023',
+          _scope_note: 'NATIONAL AM RADIO AVERAGES — not KAZM-specific. Median age 54, 58% male, 14.5% weekly cume reflect national AM radio audience per cited sources. Obtain KAZM-specific audience data from Nielsen Audio Sedona/Cottonwood market report or Arbitron PPM data before any market/revenue analysis.',
+          _source_detail: {
+            median_age_54: 'Edison Research Share of Ear 2023, AM/FM radio audience age breakdown; NAB State of Audio 2023 Table 3.2',
+            male_pct_58: 'Nielsen Audio National Demographic Profiles, AM format listener gender split, 2023 annual avg',
+            weekly_cume_14_5pct: 'Edison Research Share of Ear 2023; AM radio weekly reach as pct of adults 12+, national estimate'
+          }
         },
         pop_data_source: 'US Census ACS 5-year estimates (not yet integrated); disc-area approximation with conductivity-based density proxy',
         reference: '47 CFR §73.24(i); §73.182; FCC Form 301-AM Schedule D; US Census Bureau ACS 5-year; NAB State of Audio 2023',
@@ -4521,10 +4549,11 @@ const DEMO_RESULT = {
   ]
 };
 
-// Co-location demo payload — used when the colocation endpoint is not
-// yet deployed.  Builds on DEMO_RESULT and appends two infrastructure-
-// source rows demonstrating the new shape (`source`, `infrastructure_ref`,
-// `colocation_analysis`, `status_category`).
+// Colocation screening payload — fallback when the colocation endpoint is not
+// yet deployed.  Extends DEMO_RESULT with infrastructure-source rows showing
+// the colocation shape.  Infrastructure candidates are shape-correct examples;
+// owner names and ASR numbers marked with [VERIFY] must be confirmed against
+// the live FCC ASR database before any real-world use.
 const DEMO_COLOCATION_RESULT = {
   ...DEMO_RESULT,
   conductivity_mode: 'zone-table',
@@ -4553,21 +4582,22 @@ const DEMO_COLOCATION_RESULT = {
       status_category: 'RECOVERABLE_WITH_DA',
       source: 'INFRASTRUCTURE',
       infrastructure_ref: {
-        id: 'ASR-1062845',
+        id: 'ASR-UNKNOWN',
         kind: 'TOWER',
-        name: 'Sedona Ridge Tower 4',
-        owner: 'Verde Broadcasting LLC',
+        name: 'Existing guyed tower near 34.88°N 111.85°W [verify in FCC ASR database]',
+        owner: '[owner — verify via FCC ASR lookup]',
         lat: 34.88, lon: -111.85,
         height_m: 122,
         structure_type: 'GUYED',
-        asr_number: '1062845',
+        asr_number: null,
+        _asr_note: 'ASR number must be verified via FCC Antenna Structure Registration database before any site contact or filing.',
         frequency_khz: null,
         station_call: null
       },
       colocation_analysis: {
         distance_to_host_m: 0,
         host_kind: 'TOWER',
-        host_owner: 'Verde Broadcasting LLC',
+        host_owner: '[verify via ASR database]',
         host_height_m: 122,
         tower_loading_advisory: 'Loading study required — antenna mass + wind area must be re-computed for the added array.',
         same_band_interference_risk: 'MEDIUM',
@@ -4596,21 +4626,22 @@ const DEMO_COLOCATION_RESULT = {
       status_category: 'RECOVERABLE_WITH_DA',
       source: 'INFRASTRUCTURE',
       infrastructure_ref: {
-        id: 'AM-KVRD-790',
+        id: 'AM-SITE-34.81-111.78',
         kind: 'AM_SITE',
-        name: 'KVRD 790 kHz transmitter',
-        owner: 'Red Rock Radio Group',
+        name: 'Existing AM transmitter site near 34.81°N 111.78°W [verify in FCC LMS]',
+        owner: '[licensee — verify via FCC LMS facility search]',
         lat: 34.81, lon: -111.78,
         height_m: 90,
         structure_type: 'SERIES_FED',
         asr_number: null,
-        frequency_khz: 790,
-        station_call: 'KVRD'
+        _lms_note: 'Station callsign, frequency, and ownership must be verified against current FCC LMS record before any contact or filing.',
+        frequency_khz: null,
+        station_call: null
       },
       colocation_analysis: {
         distance_to_host_m: 0,
         host_kind: 'AM_SITE',
-        host_owner: 'Red Rock Radio Group',
+        host_owner: '[verify via FCC LMS]',
         host_height_m: 90,
         tower_loading_advisory: 'Series-fed tower — diplexer + isolator engineering required.',
         same_band_interference_risk: 'HIGH',
@@ -4622,7 +4653,7 @@ const DEMO_COLOCATION_RESULT = {
           'Diplexer specification and re-grounding plan must accompany the filing.'
         ]
       },
-      limitations: ['Host carrier at 790 kHz — only 10 kHz spacing from proposed 780 kHz.']
+      limitations: ['Host carrier frequency unknown (to be verified via FCC LMS) — if adjacent to 780 kHz, diplexer engineering and §73.182 NIF re-projection required.']
     }
   ]
 };
