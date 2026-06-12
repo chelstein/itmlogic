@@ -26216,7 +26216,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
     emergency_power_backup_guide: (() => {
       // FCC §11.35: EAS equipment must remain operational during commercial power failure
-      // NFPA 110: emergency generator standards; FCC §73.1530: auxiliary transmitter
+      // NFPA 110: emergency generator standards; §73.1675: AM auxiliary transmitters
       // §11.35(a): all EAS equipment must operate during power outages
 
       // Transmitter power draw estimate
@@ -26285,7 +26285,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Compliance checklist
       const compliance_checklist = [
         { item: '§11.35(a) EAS equipment on backup power',           required: true,  status: 'REQUIRED' },
-        { item: '§73.1530 auxiliary transmitter authorization',       required: false, status: 'OPTIONAL' },
+        { item: '§73.1675 AM auxiliary transmitter (encouraged, not required)', required: false, status: 'OPTIONAL' },
         { item: 'NFPA 110 generator installation standard',          required: false, status: 'RECOMMENDED' },
         { item: 'Local fire code — fuel storage permit',             required: dieselFuelNeeded_gal > 60, status: dieselFuelNeeded_gal > 60 ? 'REQUIRED' : 'NOT_REQUIRED' },
         { item: 'Monthly genset test run (30 min at ≥30% load)',    required: false, status: 'RECOMMENDED' },
@@ -26321,7 +26321,7 @@ async function scoreCandidate(pt, ctx, warnings){
         compliance_checklist,
         n_checklist_items:          compliance_checklist.length,
         total_capex_est_usd:        totalCapEx_usd,
-        reference: '47 CFR §11.35; §73.1530; NFPA 110 (2021 ed.); NEC Article 700; NESC §230; NFPA 30 fuel storage',
+        reference: '47 CFR §11.35; §73.1675 (AM auxiliary transmitters); NFPA 110 (2021 ed.); NEC Article 700; NESC §230; NFPA 30 fuel storage',
         note: `Emergency power for ${tpo_kw} kW TPO at ${frequency_khz} kHz. Total facility load: ${totalLoad_kw} kW; recommended generator: ${recommendedGenKw} kW. Estimated capital cost: $${totalCapEx_usd.toLocaleString()}.`
       };
     })(),
