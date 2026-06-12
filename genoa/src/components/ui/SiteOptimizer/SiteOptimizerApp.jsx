@@ -1496,15 +1496,15 @@ const DEMO_RESULT = {
           { exhibit: 'Exhibit A (Technical)', description: 'Proposed FM translator coordinates, antenna height, ERP, FM channel', required: true },
           { exhibit: 'Exhibit B (Interference)', description: '§73.207 spacing analysis showing no conflicts with co/adj-channel FM', required: true },
           { exhibit: 'Exhibit C (LPFM)', description: '§74.1204 LPFM protection showing minimum separation met (LPFM spacing per §73.807)', required: true },
-          { exhibit: 'Exhibit D (AM Contour)', description: 'FM 60 dBu contour within AM 2 mV/m daytime contour or 25 mi of AM transmitter', required: true },
+          { exhibit: 'Exhibit D (AM Contour)', description: 'FM 60 dBu contour within GREATER of AM 2 mV/m daytime groundwave contour OR 40 km (25 mi) of AM transmitter per §74.1231(i)', required: true },
           { exhibit: 'Exhibit E (Eligibility)', description: 'Certification of continuous AM operation since October 1, 2015', required: true },
           { exhibit: 'Environmental Certification', description: 'NEPA §1.1307 environmental assessment or negative declaration', required: true }
         ],
         audience_gain_note: 'A 250 W FM translator at 34.8600, -111.8200 would provide a ≈12.5 km 60 dBu coverage radius, potentially reaching an additional FM audience not served by the AM signal.',
         filing_form: 'FCC Form 349 (Translator / Booster Station Application)',
         docket: 'MB Docket No. 13-249 (FCC 15-142)',
-        reference: '47 CFR §74.1201; §74.1235(b); §74.1204; §73.207; §73.313; MB Docket 13-249',
-        note: 'FM translator opportunity is a screening-grade assessment. Actual channel availability requires a full §73.207 spacing analysis using FCC LMS data.'
+        reference: '47 CFR §74.1201(g) (eligibility); §74.1231(i) (fill-in area: GREATER of 2 mV/m daytime contour OR 40 km radius); §74.1235(b) (250 W ERP max); §74.1204 (LPFM protection); §73.207 (FM spacing); §73.313 (FM propagation); MB Docket 13-249',
+        note: 'FM translator opportunity is a screening-grade assessment. Actual channel availability requires a full §73.207 spacing analysis using FCC LMS data. Fill-in area is GREATER of the AM 2 mV/m daytime groundwave contour OR a 40 km (25-mile) radius per §74.1231(i).'
       },
       da_array_design_guide: {
         applicable: true, pattern_mode: 'DA-D', da_mode_type: 'DA-D',
