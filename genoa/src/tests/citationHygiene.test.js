@@ -323,3 +323,38 @@ test('CFR-AUDIT — AM engine/UI never cite the FM application-processing rule �
   assert.equal(offenders.length, 0,
     `AM-context files cite FM rule §73.3573 (use §73.3571): ${offenders.join(', ')}`);
 });
+
+test('CFR-AUDIT — AM engine/UI DA pattern sections never cite FM-only §73.316 as the rule (only as clarifying FM note)', () => {
+  // §73.316 is the FM transmitting antenna systems rule.  AM DA patterns are governed by §73.150.
+  // AM engine/SiteOptimizer files may mention §73.316 ONLY in comments that explicitly
+  // note "§73.316 is FM" — not as the operative cited rule in rule: '...' fields or
+  // note/description strings that direct the user to file under §73.316.
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  // Allow §73.316 only when it is followed immediately by a phrase making clear it is FM-only
+  // (e.g., "§73.316 is FM", "§73.316 (FM)", "not §73.316 which applies to FM").
+  // Ban any occurrence that appears as the operative rule without such a qualifier.
+  const FM_ONLY_QUALIFIER = /§73\.316\s*(is FM|governs FM|\(FM\)|not AM|applies to FM| — FM|\/§73\.150|which applies to FM)/;
+  const BARE_316 = /§73\.316(?!\s*(is FM|governs FM|\(FM\)|not AM|applies to FM| — FM|\/§73\.150|which applies to FM))/;
+  const offenders = files.filter(rel => {
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    if (!BARE_316.test(src)) return false;
+    // Check each line — allow comment lines that explain FM context
+    const lines = src.split('\n');
+    return lines.some((line, i) => {
+      if (!BARE_316.test(line)) return false;
+      // Permit comment lines that contain "§73.316 is FM / not AM" anywhere on the line
+      if (/§73\.316.*(?:is FM|governs FM|\(FM\)|not AM|applies to FM|FM —|FM,|FM\/|\/§73\.150)/.test(line)) return false;
+      if (/(?:is FM|governs FM|not AM|applies to FM|FM —|FM,|FM\/|§73\.316.*FM).*§73\.316/.test(line)) return false;
+      return true;
+    });
+  });
+  assert.equal(offenders.length, 0,
+    `AM-context files cite FM DA rule §73.316 as operative rule (use §73.150): ${offenders.join(', ')}`);
+});

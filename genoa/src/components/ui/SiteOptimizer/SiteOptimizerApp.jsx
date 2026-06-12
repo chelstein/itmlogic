@@ -1003,14 +1003,14 @@ const DEMO_RESULT = {
         ],
         key_constraints: [
           'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
-          '§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).',
+          '§73.150(a): horizontal pattern filed in 5° increments (72 tabulated values, 0°–355°).',
           'Typical AM DA array: 2–4 tower elements; ground system must be extended to all towers.'
         ],
         pattern_radials_required: 72,
         additional_engineering_weeks_min: 8,
         additional_engineering_weeks_max: 16,
         note: 'Commission a DA N NIGHTTIME ONLY study before filing. DA engineering adds 8–16 weeks; budget for multiple antenna modeling iterations.',
-        rule: '47 CFR §73.150 / §73.316'
+        rule: '47 CFR §73.150'
       },
       skywave_protection_advisory: {
         advisory_level: 'HIGH',
@@ -1068,7 +1068,7 @@ const DEMO_RESULT = {
           { id: 'RF_EXPOSURE_MPE', label: '§1.1307 RF exposure (MPE) evaluation', status: 'WARN', value: 'Near-field boundary λ/(2π) ≈ 61 m', rule: '47 CFR §1.1307 / OET Bulletin 65', note: 'OET-65 near-field evaluation required — fence at ≥61 m from antenna base.' },
           { id: 'TREATY_COORDINATION', label: 'International treaty zone', status: 'PASS', value: 'None detected', rule: 'US/MX AM Agreement (1986)', note: null },
           { id: 'NIGHTTIME_NIF', label: '§73.182 nighttime NIF study', status: 'WARN', value: 'Required at any new site', rule: '47 CFR §73.182', note: 'NIF study must demonstrate no increase in nighttime interference from authorized site.' },
-          { id: 'DA_PATTERN', label: '§73.316 directional antenna pattern', status: 'WARN', value: 'DA-N study recommended (clear channel secondary)', rule: '47 CFR §73.150 / §73.316', note: 'Clear channel secondary status requires DA-N nighttime directional pattern.' }
+          { id: 'DA_PATTERN', label: '§73.150 directional antenna pattern (AM)', status: 'WARN', value: 'DA-N study recommended (clear channel secondary)', rule: '47 CFR §73.150', note: 'Clear channel secondary status requires DA-N nighttime directional pattern.' }
         ]
       },
       transmission_line_analysis: {
@@ -1106,7 +1106,7 @@ const DEMO_RESULT = {
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
-          { item: 'DA_ENGINEERING', label: 'DA-N pattern modeling & §73.316 filing', cost_low_usd: 12000, cost_high_usd: 30000 },
+          { item: 'DA_ENGINEERING', label: 'DA-N pattern modeling & §73.150 filing', cost_low_usd: 12000, cost_high_usd: 30000 },
           { item: 'RF_EXPOSURE_STUDY', label: 'RF MPE evaluation (OET Bulletin 65)', cost_low_usd: 2000, cost_high_usd: 4000 },
           { item: 'FCC_COUNSEL', label: 'Communications counsel (FCC filing oversight)', cost_low_usd: 8000, cost_high_usd: 20000 }
         ],
@@ -1181,7 +1181,7 @@ const DEMO_RESULT = {
         measurements: [
           { id: 'BASE_CURRENT', label: 'Antenna base current reading', rule: '47 CFR §73.154(a)', instrument: 'Thermocouple ammeter at antenna base', notes: 'Read base current at licensed TPO. Record as reference for monitor-point calibration.' },
           { id: 'GROUND_RESISTANCE', label: 'Antenna base resistance (§73.190)', rule: '47 CFR §73.190', instrument: 'RF bridge or vector impedance meter at antenna base', notes: 'Measure input impedance and radiation resistance at 780 kHz. Ground system must show R_ground ≤ design spec.' },
-          { id: 'FI_RADIAL_NDA', label: 'Pattern proof — all authorized radials', rule: '47 CFR §73.154', instrument: 'Calibrated FCC field-intensity meter with λ/4 whip', notes: 'DA pattern: measure all azimuthal radials specified in authorized DA pattern, plus 8 orthogonal radials for verification. §73.316 requires submission of measured pattern vs. theoretical.' },
+          { id: 'FI_RADIAL_NDA', label: 'Pattern proof — all authorized radials', rule: '47 CFR §73.154', instrument: 'Calibrated FCC field-intensity meter with λ/4 whip', notes: 'DA pattern: measure all azimuthal radials specified in authorized DA pattern, plus 8 orthogonal radials for verification. §73.154 requires submission of measured DA pattern vs. theoretical §73.150 authorization.' },
           { id: 'INVERSE_DISTANCE_FIELD', label: 'Inverse-distance field (IDF) at 1 km', rule: '47 CFR §73.154(b)', instrument: 'Derived from FI traverse measurements', notes: 'For each radial, plot field × distance vs. distance to extract IDF at 1 km.' },
           { id: 'MPE_NEAR_FIELD', label: 'RF exposure near-field boundary verification (OET-65)', rule: '47 CFR §1.1310 / OET Bulletin 65', instrument: 'Broadband RF field meter calibrated at MF', notes: 'Verify that the general-population MPE is not exceeded beyond the 61 m near-field boundary.' },
           { id: 'ANTENNA_EFFICIENCY', label: 'Antenna radiation efficiency calculation (§73.190)', rule: '47 CFR §73.190', instrument: 'Derived from IDF + base impedance measurements', notes: 'Efficiency η = R_r / (R_r + R_g). For 120-radial system: target η ≥ 85%.' },
@@ -1189,7 +1189,7 @@ const DEMO_RESULT = {
         ],
         nda_radial_plan: null,
         filing_trigger: 'FCC Form 302-AM (license to cover) must be filed within 3 years of CP grant date (§73.3536; §73.3598). Proof measurements must be complete before 302-AM is submitted.',
-        reference: '47 CFR §73.154 (proof of performance); §73.190 (antenna efficiency); §73.316 (DA pattern measurements); OET Bulletin 65.',
+        reference: '47 CFR §73.154 (proof of performance); §73.190 (antenna efficiency); §73.150(a) (DA pattern measurements); OET Bulletin 65.',
         note: 'This is a screening-grade proof guide. Actual proof methodology must be coordinated with the licensed broadcast engineer of record and FCC counsel before construction.'
       },
       site_acquisition_checklist: {
@@ -1319,16 +1319,16 @@ const DEMO_RESULT = {
           { spacing_label: 'λ/2', spacing_m: 192.3, spacing_deg: 180, pattern_type: 'FIGURE_EIGHT', gain_over_nda_db: 4.8, note: 'Figure-8 pattern; two nulls; gain toward COL; high suppression at 90°/270°' }
         ],
         hrp_compliance_checklist: [
-          { id: 'HRP_TABLE', item: 'Horizontal radiation pattern table at 10° increments (0°–350°)', required: true, note: '§73.316(b)(1): full 36-radial measured pattern required for all DA stations' },
-          { id: 'HRP_CONTOUR', item: 'Effective field (mV/m at 1 km) for each radial tabulated', required: true, note: '§73.316(b)(2): EF at 1 km computed from measured base currents and pattern' },
-          { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: true, note: '§73.316: D/U at interfered-with protected contour must meet §73.207 limits' },
+          { id: 'HRP_TABLE', item: 'Horizontal radiation pattern table at 5° increments (0°–355°)', required: true, note: '§73.150(a): full 72-radial measured pattern at 5° increments required for all AM DA stations' },
+          { id: 'HRP_CONTOUR', item: 'Effective field (mV/m at 1 km) for each radial tabulated', required: true, note: '§73.150 / §73.189: inverse-distance field (EF at 1 km) computed from base currents and §73.150 pattern' },
+          { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: true, note: '§73.37 / §73.182: D/U at interfered-with protected contour must meet AM class-separation standards' },
           { id: 'DA_LICENSE_STATUS', item: 'DA pattern must be approved via FCC Form 302-AM (license to cover)', required: true, note: '§73.3533: proof-of-performance measurements required before DA operation authorized' },
           { id: 'MONITOR_POINT', item: 'FCC-specified monitor points during DA operation', required: true, note: '§73.61/§73.62: clear-channel DA stations require FCC-specified monitoring' },
           { id: 'COL_MIN_FIELD', item: 'COL minimum field: 5.0 mV/m at 3.8 km toward 212°', required: true, note: '§73.24(i): 5 mV/m groundwave field must reach community of license. NDA estimate: 4.1 mV/m.' },
           { id: 'NIGHTTIME_DA', item: 'DA-N (nighttime) pattern separate from DA-D (daytime)', required: true, note: '§73.150(b): separate pattern authorizations for DA-D and DA-N; skywave NIF for DA-N' }
         ],
         n_checklist_required: 7,
-        reference: '47 CFR §73.150; §73.152; §73.316; §73.24(i); §73.207/§73.215',
+        reference: '47 CFR §73.150; §73.152; §73.24(i); §73.37; §73.182',
         note: 'Pattern optimization guidance is screening-grade. Actual DA element positions, current ratios, and phasing must be determined by a licensed broadcast engineer using full §73.182 analysis and field measurements per §73.154.'
       },
       propagation_confidence_interval: {
@@ -1520,20 +1520,20 @@ const DEMO_RESULT = {
           { n_elements: 4, config_label: '4-Element T or L Array', spacing_lambdas: 0.25, spacing_m: 96.15, spacing_ft: 315.5, amplitude_ratios: [0.5, 1.0, 1.0, 0.5], phase_deg: [90, 0, 0, -90], max_gain_dbd: 5.5, null_depth_theoretical_db: '30–45', null_depth_practical_db: '25–42', suppression_achievable_db: '25–42', property_footprint_m: 338.45, property_footprint_ft: 1110.4, use_case: 'Co-channel threats at 2+ azimuths simultaneously.', mutual_coupling_note: 'Full 4×4 mutual impedance matrix; professional design required' }
         ],
         suppression_requirement_db: 28.3,
-        suppression_note: '§73.316/§73.207: suppression ratio of ≥28.3 dB toward interfered-with co-channel protected contours.',
-        n_hrp_radials: 36, hrp_increment_deg: 10,
+        suppression_note: '§73.37 / §73.182: suppression ratio of ≥28.3 dB toward co-channel protected contours (NIF D/U standard for Class D on regional channel).',
+        n_hrp_radials: 72, hrp_increment_deg: 5,
         form_301am_exhibits: [
           { exhibit: 'Schedule B (Antenna)', description: 'Tower heights (degrees electrical), self-impedance values', required: true },
           { exhibit: 'Schedule C (Transmitter)', description: 'Transmitter make/model, authorized TPO', required: true },
           { exhibit: 'Exhibit E (Pattern Plots)', description: 'Theoretical HRP and NDA pattern plots (0°–360°, linear field scale)', required: true },
-          { exhibit: 'Exhibit F (HRP Table)', description: 'HRP table at 10° increments, EF at 1 km', required: true },
+          { exhibit: 'Exhibit F (HRP Table)', description: 'HRP table at 5° increments (72 radials per §73.150(a)), EF at 1 km', required: true },
           { exhibit: 'Exhibit G (Phasing Data)', description: 'Base current ratios (I_n/I_1), phase angles, and monitor parameters', required: true },
           { exhibit: 'Exhibit H (Suppression)', description: 'Suppression ratios toward co-channel protected stations', required: true },
           { exhibit: 'Exhibit I (Mutual Z)', description: 'Self- and mutual-impedance matrix (2-element: not required)', required: false },
           { exhibit: 'Form 302-AM (License)', description: 'License to cover: proof-of-performance measurements per §73.154', required: true }
         ],
         base_current_monitoring: { check_interval_hours: 3, current_ratio_tolerance_pct: 5, phase_tolerance_deg: 3, monitor_method: 'Antenna monitor with base current sample loops on each element', fcc_specified_monitor_points: false, reference: '§73.61' },
-        reference: '47 CFR §73.150; §73.152; §73.316; §73.207; §73.61; §73.182',
+        reference: '47 CFR §73.150; §73.152; §73.37; §73.61; §73.182',
         note: 'DA array element positions, amplitude ratios, and phase angles are screening-grade estimates. Actual design requires a licensed broadcast engineer and full §73.182 NIF analysis.'
       },
       proof_of_performance_requirements: {
@@ -1560,7 +1560,7 @@ const DEMO_RESULT = {
           note: 'TPO = 5 kW ≥ 5 kW threshold. RF exposure (MPE) evaluation required. Measure field strength at accessible locations within and around the antenna exclusion zone.'
         },
         antenna_proof_exhibits: [
-          '§73.150/§73.316: Directional antenna proof report including all 72-radial FI traversals, element phases/ratios, and comparison to licensed pattern',
+          '§73.150 / §73.154: Directional antenna proof report including all 72-radial FI traversals, element phases/ratios, and comparison to licensed pattern',
           'Ground system description and base current measurement data (§73.190)',
           'RF exposure (MPE) evaluation — required at this TPO',
           'Antenna monitoring point data (two or more monitoring points per §73.158)',
@@ -1692,14 +1692,14 @@ const DEMO_RESULT = {
           { id: 'mpe_evaluation', label: 'RF exposure MPE evaluation', rule: '47 CFR §1.1310 / OET Bulletin 65', status: 'WARN', note: 'TPO = 5 kW ≥ 5 kW threshold. Routine MPE evaluation required before license grant.', required_action: 'Compute uncontrolled MPE limit distance from antenna base; fence or post exclusion zone signage per OET-65 guidance.' },
           { id: 'nif_study', label: 'Nighttime interference-free (NIF) contour study', rule: '47 CFR §73.182', status: 'WARN', note: 'Regional channel: §73.182 nighttime interference screening required. Demonstrate no increase in inter-station skywave interference.', required_action: 'Commission §73.182 NIF study from consulting engineer before Form 301-AM filing.' },
           { id: 'treaty_zone', label: 'International treaty coordination', rule: '1941/1986 US/MX, 1941 US/CA NARBA', status: 'PASS', note: 'Candidate site is outside treaty coordination zones at screening grade. No treaty coordination required.', required_action: null },
-          { id: 'da_pattern', label: 'Directional antenna (DA) pattern requirements', rule: '47 CFR §73.316 / §73.150', status: 'WARN', note: 'Pattern mode DA-D: §73.316 requires HRP table (36 radials at 10° increments) and suppression ratios filed with Form 301-AM.', required_action: 'Engage AM DA design engineer. Prepare §73.316 HRP table and §73.150 DA proof schedule. Budget 16–52 weeks for pattern design.' },
+          { id: 'da_pattern', label: 'Directional antenna (DA) pattern requirements', rule: '47 CFR §73.150', status: 'WARN', note: 'Pattern mode DA-D: §73.150 requires HRP table (72 radials at 5° increments) and suppression ratios filed with Form 301-AM.', required_action: 'Engage AM DA design engineer. Prepare §73.150 HRP table and DA proof schedule per §73.154. Budget 16–52 weeks for pattern design.' },
           { id: 'ground_system', label: 'Ground system conductivity & §73.190 certification', rule: '47 CFR §73.190', status: 'WARN', note: 'Zone-table conductivity σ = 9 mS/m (FCC M3 zone map). Soil survey required before §73.190 ground system certification.', required_action: 'Engage licensed broadcast engineer for Wenner four-electrode soil resistivity survey.' },
           { id: 'nepa_screening', label: 'NEPA §1.1306 desktop environmental screening', rule: '47 CFR §1.1306 / §1.1307', status: 'WARN', note: 'NEPA §1.1306 desktop environmental screening is required for all new transmitter site applications.', required_action: 'Complete §1.1306 environmental checklist. If any trigger is present, prepare an EA before Form 301-AM filing.' },
           { id: 'nhpa_106', label: 'NHPA §106 historic/cultural resource consultation', rule: '47 CFR §1.1307(a)(4) / 36 CFR Part 800', status: 'WARN', note: 'All new tower construction requires NHPA §106 SHPO consultation for archaeological and architectural survey.', required_action: 'Submit tower proposal to SHPO for §106 review. Allow 90–180 days for SHPO response.' },
           { id: 'form_301_am', label: 'FCC Form 301-AM application completeness', rule: '47 CFR §73.3533 / LMS', status: 'NOT_EVALUATED', note: 'Form 301-AM completeness depends on final engineering package, NIF study, and NEPA/NHPA outcomes.', required_action: 'Prepare complete engineering filing package with licensed broadcast consultant before filing.' },
           { id: 'construction_deadline', label: 'CP construction completion and Form 302-AM deadline', rule: '47 CFR §73.3536', status: 'NOT_EVALUATED', note: 'CP not yet granted — construction deadline not applicable at screening stage.', required_action: 'Develop construction schedule immediately upon CP grant to avoid missing §73.3598 CP expiration deadline.' }
         ],
-        reference: '47 CFR §73.24(g)(j); §73.182; §73.316; §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3536; OET Bulletin 65',
+        reference: '47 CFR §73.24(g)(i); §73.182; §73.150; §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3536; OET Bulletin 65',
         note: 'regulatory_compliance_checklist is a screening-grade pre-filing assessment only. All WARN and NOT_EVALUATED items require professional engineering study, legal review, or additional data collection before Form 301-AM can be filed.'
       },
       licensing_timeline_estimate: {
@@ -1711,7 +1711,7 @@ const DEMO_RESULT = {
         treaty_zone_present: false, asr_required: true,
         phases: [
           { phase: 'PRE_APPLICATION', label: 'Pre-application (site study, engineering, NEPA/NHPA)', weeks_low: 26, weeks_high: 52, key_tasks: ['Conductivity survey (§73.190) and site evaluation', 'DA array design and §73.182 NIF analysis', 'NEPA §1.1306 desktop environmental review', 'NHPA §106 SHPO consultation', 'FAA Form 7460-1 aeronautical study + FCC ASR Form 854'] },
-          { phase: 'APPLICATION_FILING', label: 'Application preparation and LMS Form 301-AM filing', weeks_low: 4, weeks_high: 12, key_tasks: ['Finalize engineering exhibits (coverage, blanket pop, MPE)', 'DA pattern exhibits per §73.316 (36-radial HRP, suppression ratios)', 'FCC filing attorney review and LMS Form 301-AM submission'] },
+          { phase: 'APPLICATION_FILING', label: 'Application preparation and LMS Form 301-AM filing', weeks_low: 4, weeks_high: 12, key_tasks: ['Finalize engineering exhibits (coverage, blanket pop, MPE)', 'DA pattern exhibits per §73.150 (72-radial HRP at 5° increments, suppression ratios)', 'FCC filing attorney review and LMS Form 301-AM submission'] },
           { phase: 'FCC_PROCESSING', label: 'FCC processing, comment period, and CP grant', weeks_low: 26, weeks_high: 78, key_tasks: ['FCC public notice / comment period (30 days)', 'Clear-channel coordination — FCC Media Bureau field analysis', 'Petitions to deny / objections review', 'Construction Permit (CP) grant'] },
           { phase: 'CONSTRUCTION', label: 'Construction and equipment installation', weeks_low: 20, weeks_high: 36, key_tasks: ['Tower erection with FAA marking/lighting (ASR required)', 'Ground radial system installation', 'DA array element installation and initial phasing'] },
           { phase: 'LICENSE_TO_COVER', label: 'Proof of performance and Form 302-AM', weeks_low: 8, weeks_high: 16, key_tasks: ['DA proof (72-radial FI traversals per §73.154)', 'Base current measurements and antenna efficiency verification', 'File FCC Form 302-AM (license to cover)'] }
@@ -2332,7 +2332,7 @@ const DEMO_RESULT = {
         major_change_radius_miles: 2,
         processing_time_estimate: { nda_optimistic_months: 3, nda_conservative_months: 9, da_optimistic_months: 9, da_conservative_months: 18 },
         relocation_note: 'File FCC Form 301-AM via LMS. 9 required exhibits including interference analysis, contour map, FAA determination, and ASR number. $325 filing fee. NDA station. Processing: 3–9 months. CP valid for 3 years; 6-month extension available.',
-        reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3539; §73.3580; §73.316; §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
+        reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3539; §73.3580; §73.150; §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
         note: 'Form 301-AM via FCC LMS. 9 required exhibits. Filing fee: $325. CP term: 3 years + 6-month extension. Processing: 3–9 months. Public notice triggers 30-day petition window for major changes.'
       },
       transmitter_building_design_guide: {
@@ -3854,7 +3854,7 @@ const DEMO_RESULT = {
           { id: 'fcc_engineering',  label: 'FCC Engineering Study',           weeks_optimistic: 6,  weeks_conservative: 16,  milestones: [
             { id: 'spacing_study',  task: '§73.37 spacing analysis (all channels)', days: 10, rule: '§73.37' },
             { id: 'nif_study',      task: '§73.182 NIF study (clear channel)',       days: 30, rule: '§73.182' },
-            { id: 'da_pattern',     task: 'Non-directional antenna design',           days: 7,  rule: '§73.316' },
+            { id: 'da_pattern',     task: 'Non-directional antenna design',           days: 7,  rule: '§73.183' },
             { id: 'coverage_map',   task: '§73.183 coverage map',                     days: 7,  rule: '§73.183' },
             { id: 'env_assessment', task: 'Environmental assessment (§1.1301)',        days: 14, rule: '§1.1301' },
             { id: 'asr_filing',     task: 'ASR registration (FCC Form 854)',           days: 7,  rule: '§17.7' }
@@ -3912,13 +3912,13 @@ const DEMO_RESULT = {
           { factor: 'Conductivity gradient',mode: 'STATIC',   applicability: 'Mixed terrain path loss',   du_assumption: 'σ = 9 mS/m at candidate; may differ along propagation paths' }
         ],
         mitigation_strategies: [
-          { id: 'da_nulling',     strategy: 'Directional Antenna (DA) null toward interferer', applicable: true, impact_db: '20–35 dB null depth achievable', rule: '§73.316', note: 'Most effective single mitigation; requires §73.316 directional antenna authorization.' },
+          { id: 'da_nulling',     strategy: 'Directional Antenna (DA) null toward interferer', applicable: true, impact_db: '20–35 dB null depth achievable', rule: '§73.150', note: 'Most effective single mitigation; requires §73.150 directional antenna authorization.' },
           { id: 'power_reduction',strategy: 'Nighttime power reduction',                       applicable: true, impact_db: '3–10 dB reduction in undesired signal at victim', rule: '§73.21/§73.25', note: 'Reduces interference but also reduces desired coverage.' },
           { id: 'site_selection', strategy: 'Site relocation away from interfered-with contour',applicable: true, impact_db: 'Variable — depends on distance improvement', rule: '§73.37', note: 'Optimizer primary function: find sites with improved D/U margins.' },
           { id: 'iboc_reduction', strategy: 'IBOC nighttime digital power reduction',          applicable: true, impact_db: '6–10 dB reduction in IBOC hash', rule: '§73.404(c)', note: 'Reduces IBOC sideband interference without affecting analog coverage.' }
         ],
         n_applicable_mitigations: 4,
-        reference: '47 CFR §73.182; §73.207; §73.37; §73.404(c); FCC OET Bulletin 69',
+        reference: '47 CFR §73.182; §73.37; §73.404(c); FCC OET Bulletin 69',
         note: 'D/U budget framework for co-channel interference assessment at 780 kHz. Required co-channel spacing: 402 km for Class D. NIF study: FULL_CLEAR_CHANNEL_NIF.'
       },
       iboc_hd_radio_analysis: {
@@ -4085,11 +4085,11 @@ const DEMO_RESULT = {
         ],
         key_constraints: [
           'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
-          '§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).',
+          '§73.150(a): horizontal pattern filed in 5° increments (72 tabulated values, 0°–355°).',
           'Typical AM DA array: 2–4 tower elements; ground system must be extended to all towers.'
         ],
         pattern_radials_required: 72, additional_engineering_weeks_min: 8, additional_engineering_weeks_max: 16,
-        note: 'Commission a DA N NIGHTTIME ONLY study before filing.', rule: '47 CFR §73.150 / §73.316'
+        note: 'Commission a DA N NIGHTTIME ONLY study before filing.', rule: '47 CFR §73.150'
       },
       skywave_protection_advisory: {
         advisory_level: 'HIGH', nif_required: true,
@@ -4136,7 +4136,7 @@ const DEMO_RESULT = {
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
-          { item: 'DA_ENGINEERING', label: 'DA-N pattern modeling & §73.316 filing', cost_low_usd: 12000, cost_high_usd: 30000 },
+          { item: 'DA_ENGINEERING', label: 'DA-N pattern modeling & §73.150 filing', cost_low_usd: 12000, cost_high_usd: 30000 },
           { item: 'RF_EXPOSURE_STUDY', label: 'RF MPE evaluation (OET Bulletin 65)', cost_low_usd: 2000, cost_high_usd: 4000 },
           { item: 'FCC_COUNSEL', label: 'Communications counsel (FCC filing oversight)', cost_low_usd: 8000, cost_high_usd: 20000 }
         ],
@@ -4278,11 +4278,11 @@ const DEMO_RESULT = {
         key_constraints: [
           'Maximize ERP toward COL centroid bearing (§73.24(i) ≥80% coverage goal).',
           'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
-          '§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).',
+          '§73.150(a): horizontal pattern filed in 5° increments (72 tabulated values, 0°–355°).',
           'Typical AM DA array: 2–4 tower elements; ground system must be extended to all towers.'
         ],
         pattern_radials_required: 72, additional_engineering_weeks_min: 16, additional_engineering_weeks_max: 32,
-        note: 'Commission a FULL DA STUDY DAY NIGHT before filing. Adds 16–32 weeks to engineering timeline.', rule: '47 CFR §73.150 / §73.316'
+        note: 'Commission a FULL DA STUDY DAY NIGHT before filing. Adds 16–32 weeks to engineering timeline.', rule: '47 CFR §73.150'
       },
       skywave_protection_advisory: {
         advisory_level: 'HIGH', nif_required: true,
@@ -4329,7 +4329,7 @@ const DEMO_RESULT = {
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study at 8.5 kW (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 40000 },
-          { item: 'DA_ENGINEERING', label: 'FULL DA STUDY DAY+NIGHT pattern modeling & §73.316 filing', cost_low_usd: 18000, cost_high_usd: 40000 },
+          { item: 'DA_ENGINEERING', label: 'FULL DA STUDY DAY+NIGHT pattern modeling & §73.150 filing', cost_low_usd: 18000, cost_high_usd: 40000 },
           { item: 'RF_EXPOSURE_STUDY', label: 'RF MPE evaluation at upgraded power (OET Bulletin 65)', cost_low_usd: 2500, cost_high_usd: 5000 },
           { item: 'FCC_COUNSEL', label: 'Communications counsel (FCC filing oversight)', cost_low_usd: 10000, cost_high_usd: 22000 }
         ],
@@ -4446,10 +4446,10 @@ const DEMO_RESULT = {
           'Null 1000 mV/m contour away from populated areas (§73.24(g) ≤1% blanket limit).',
           'Reduce power toward US-MX border for binational coordination.',
           'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
-          '§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).'
+          '§73.150(a): horizontal pattern filed in 5° increments (72 tabulated values, 0°–355°).'
         ],
         pattern_radials_required: 72, additional_engineering_weeks_min: 16, additional_engineering_weeks_max: 32,
-        note: 'Commission a FULL DA STUDY DAY NIGHT before filing. Multiple competing constraints — expect 16–32 weeks additional DA engineering.', rule: '47 CFR §73.150 / §73.316'
+        note: 'Commission a FULL DA STUDY DAY NIGHT before filing. Multiple competing constraints — expect 16–32 weeks additional DA engineering.', rule: '47 CFR §73.150'
       },
       skywave_protection_advisory: {
         advisory_level: 'CRITICAL', nif_required: true,

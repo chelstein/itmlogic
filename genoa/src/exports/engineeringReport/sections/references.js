@@ -18,29 +18,62 @@ export function buildReferencesSection(exhibit){
   const oet = exhibit?.oet65;
   const ba  = exhibit?.build_attestation;
 
+  const svc  = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  const isAm = svc === 'AM' || svc === 'AX';
+
   const refs = [];
   let n = 1;
   const cite = (label, detail) => refs.push({ n: n++, label, detail });
 
-  // ── 47 CFR rules — always cited
-  cite('47 CFR §73.207',
-       'Minimum-distance separation requirements (Class-by-Class table).  Source: Code of Federal Regulations, Title 47, Part 73 (current edition).');
+  // ── 47 CFR rules — service-specific
   cite('47 CFR §73.208',
        'Reference points and distance computations.  Great-circle distances per the Karney 2013 WGS-84 geodesic implementation.');
-  cite('47 CFR §73.211',
-       'Power and antenna height requirements (Class-by-Class).');
-  cite('47 CFR §73.215',
-       'Contour-protection alternative to minimum-distance separation.');
-  cite('47 CFR §73.313',
-       'HAAT (Height Above Average Terrain) computation methodology.');
-  cite('47 CFR §73.316',
-       'FM transmitting antenna systems; directional antenna pattern requirements.');
-  cite('47 CFR §73.333',
-       'Engineering charts and related formulas.  F(50,50) and F(50,10) propagation charts; primary basis for service / interfering contour distances.');
 
-  if (exhibit?.regulatory_compliance?.section_73_207?.evaluated){
+  if (isAm) {
+    // AM-specific rule set — Subpart A (Stations in the Standard Broadcast Band)
+    cite('47 CFR §73.21',
+         'AM station classes (A, B, C, D) — power and antenna-height limits by class.');
+    cite('47 CFR §73.24(i)',
+         'AM principal-community coverage requirement: 5 mV/m groundwave daytime contour must encompass the city of license.');
+    cite('47 CFR §73.37',
+         'AM minimum-distance (co-channel / adjacent-channel) separation requirements.');
+    cite('47 CFR §73.99',
+         'AM Presunrise Service Authorization (PSRA) and Postsunset Service Authorization (PSSA).');
+    cite('47 CFR §73.150',
+         'AM transmitting antenna systems; DA horizontal radiation pattern requirements (72 radials at 5° increments).');
+    cite('47 CFR §73.182',
+         'Engineering standards of allocation for AM; nighttime interference / RSS aggregation (NIF study).');
+    cite('47 CFR §73.183',
+         'AM groundwave signals; field-strength calculation methodology.');
+    cite('47 CFR §73.184',
+         'AM groundwave field-strength graphs; §73.184 Figure M3 conductivity-zone basis.');
+    cite('47 CFR §73.187',
+         'AM limitation on daytime radiation; international protection of Class A 0.1 mV/m contours.');
+    cite('47 CFR §73.190',
+         'AM engineering charts and related formulas; Figure M3 ground conductivity map.');
+  } else {
+    // FM / LPFM rule set
+    cite('47 CFR §73.207',
+         'Minimum-distance separation requirements (Class-by-Class table).  Source: Code of Federal Regulations, Title 47, Part 73 (current edition).');
+    cite('47 CFR §73.211',
+         'Power and antenna height requirements (Class-by-Class).');
+    cite('47 CFR §73.215',
+         'Contour-protection alternative to minimum-distance separation.');
+    cite('47 CFR §73.313',
+         'HAAT (Height Above Average Terrain) computation methodology.');
+    cite('47 CFR §73.316',
+         'FM transmitting antenna systems; directional antenna pattern requirements.');
+    cite('47 CFR §73.333',
+         'Engineering charts and related formulas.  F(50,50) and F(50,10) propagation charts; primary basis for service / interfering contour distances.');
+  }
+
+  if (!isAm && exhibit?.regulatory_compliance?.section_73_207?.evaluated){
     cite('FCC Form 301-FM',
          'Application for Construction Permit for Commercial Broadcast Station — FM service.  Section III (Engineering Data) field schema referenced by Genoa\'s LMS filing-package generator.');
+  }
+  if (isAm && exhibit?.regulatory_compliance?.am_form_301?.evaluated){
+    cite('FCC Form 301-AM',
+         'Application for Construction Permit for Commercial Broadcast Station — AM service.  Section III (Engineering Data) field schema referenced by Genoa\'s LMS filing-package generator.');
   }
 
   if (oet){
@@ -52,10 +85,15 @@ export function buildReferencesSection(exhibit){
 
   // ── Datasets — cited only if attached
   if (mv.dataset){
-    cite(`FCC propagation charts — ${mv.dataset}`,
-         `Curve table dataset (SHA256 ${(mv.dataset_meta_sha256 || '').slice(0, 16)}…) digitized from §73.333 Figures 1A–1B (F(50,50)) and 1A2–1B2 (F(50,10)).  Bit-exact replay verified against FCC distance.json reference samples.`);
+    if (isAm){
+      cite(`FCC groundwave field-strength curves — ${mv.dataset}`,
+           `Curve table dataset (SHA256 ${(mv.dataset_meta_sha256 || '').slice(0, 16)}…) digitized from §73.184 Figure M3 groundwave conductivity-distance grids.  Bit-exact replay verified against FCC distance.json reference samples.`);
+    } else {
+      cite(`FCC propagation charts — ${mv.dataset}`,
+           `Curve table dataset (SHA256 ${(mv.dataset_meta_sha256 || '').slice(0, 16)}…) digitized from §73.333 Figures 1A–1B (F(50,50)) and 1A2–1B2 (F(50,10)).  Bit-exact replay verified against FCC distance.json reference samples.`);
+    }
   }
-  if (t.available && t.dem){
+  if (!isAm && t.available && t.dem){
     cite(`${t.dem.source || 'DEM'} ${t.dem.dataset || ''}`.trim(),
          `Digital elevation model used for §73.313 per-radial HAAT.  Method: ${t.method || 'fcc-hd-radials'}.  Sampled along ${(t.profiles || []).length || 8} cardinal radials.`);
   }

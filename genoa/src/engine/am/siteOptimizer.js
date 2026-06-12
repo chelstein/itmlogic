@@ -11024,8 +11024,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // Translator power limits:
       //   §74.1235(a): FM translators are limited to 250 watts ERP.
       //   §74.1236: FM translator must not cause interference to full-service FM stations.
-      //   §74.1237: Translator may be located anywhere within the AM station's primary
-      //     service area (0.5 mV/m groundwave contour for daytime service).
+      //   §74.1201(g)/§74.1231(i): FM translator rebroadcasting an AM station must have its
+      //     60 dBµV/m service contour within the GREATER of the AM station's 2 mV/m daytime
+      //     groundwave contour OR a 40 km (25-mile) radius from the AM transmitter site.
       //
       // FM frequency selection for translator:
       //   Translator must operate on an FM channel (88.1–107.9 MHz) with no interference
