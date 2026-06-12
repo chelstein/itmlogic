@@ -9926,7 +9926,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div>
               <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
-                Silent Station & Construction (§73.1740 / §73.3534)
+                Silent Station & Construction (§73.1740 / §73.1635)
               </h4>
               <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>

@@ -17918,7 +17918,7 @@ async function scoreCandidate(pt, ctx, warnings){
         engineering_cost_high_usd,
         fcc_filing_fee_usd,
         note: `${filing_type} relocation via ${fcc_form}: CP processing ${cp_processing_months_low}–${cp_processing_months_high} months; post-grant construction ${post_cp_months_low}–${post_cp_months_high} months; total ${total_months_low}–${total_months_high} months decision-to-on-air. CP valid ${cp_validity_years} yrs per §73.3598(a); construction margin ${construction_margin_months_low}–${construction_margin_months_high} months → expiration risk: ${cp_expiration_risk}.`,
-        reference: '47 CFR §73.3533 (application for CP); §73.3564 (acceptance of applications); §73.3598 (CP expiration — 3 years); §73.3535 (dismissal of applications); FCC Form 301-AM',
+        reference: '47 CFR §73.3533 (application for CP); §73.3564 (acceptance of applications); §73.3598 (CP expiration — 3 years); §73.3568 (dismissal of applications); FCC Form 301-AM',
       };
     })(),
 
@@ -23405,7 +23405,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const READINESS_ACTIONS = [
         { priority: 1, action: 'File full-power CP at best available site', rationale: 'A granted CP establishes the station\'s preferred future site; a repack would grandfather existing authorizations', cfr: '§73.3533' },
         { priority: 2, action: 'Obtain FM translator while windows open', rationale: 'An FM translator creates a secondary FM asset that survives AM band changes', cfr: '§74.1201; FCC 15-14' },
-        { priority: 3, action: 'Update FCC LMS records with accurate site data', rationale: 'Inaccurate records weaken interference protection claims in any FCC proceeding', cfr: '§73.3527; §73.3529' },
+        { priority: 3, action: 'Update FCC LMS records with accurate site data', rationale: 'Inaccurate records weaken interference protection claims in any FCC proceeding', cfr: '§73.3526; §73.3527' },
         { priority: 4, action: 'Comment in MB 13-249 proceedings if affected', rationale: 'Participation in FCC rulemaking is the primary mechanism to protect small-market AM interests', cfr: '§1.415 (rulemaking comments)' },
         { priority: 5, action: 'Evaluate digital (HD Radio / DRM) compatibility', rationale: 'FCC has authorized AM digital broadcasting; early conversion may provide spectrum flexibility', cfr: '§73.404; NRSC-5-D standard' }
       ];

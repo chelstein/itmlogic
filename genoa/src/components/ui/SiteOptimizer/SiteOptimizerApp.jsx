@@ -1188,7 +1188,7 @@ const DEMO_RESULT = {
           { id: 'MONITOR_POINT', label: 'DA monitor point measurement (§73.158 / §73.62)', rule: '47 CFR §73.158 / §73.62', instrument: 'Calibrated FI meter at FCC-specified monitor point location', notes: 'Clear channel Class D with DA-N pattern: the authorized DA monitor point must be measured at reference field.' }
         ],
         nda_radial_plan: null,
-        filing_trigger: 'FCC Form 302-AM (license to cover) must be filed within 3 years of CP grant date (§73.3534). Proof measurements must be complete before 302-AM is submitted.',
+        filing_trigger: 'FCC Form 302-AM (license to cover) must be filed within 3 years of CP grant date (§73.3536; §73.3598). Proof measurements must be complete before 302-AM is submitted.',
         reference: '47 CFR §73.154 (proof of performance); §73.190 (antenna efficiency); §73.316 (DA pattern measurements); OET Bulletin 65.',
         note: 'This is a screening-grade proof guide. Actual proof methodology must be coordinated with the licensed broadcast engineer of record and FCC counsel before construction.'
       },
@@ -1697,9 +1697,9 @@ const DEMO_RESULT = {
           { id: 'nepa_screening', label: 'NEPA §1.1306 desktop environmental screening', rule: '47 CFR §1.1306 / §1.1307', status: 'WARN', note: 'NEPA §1.1306 desktop environmental screening is required for all new transmitter site applications.', required_action: 'Complete §1.1306 environmental checklist. If any trigger is present, prepare an EA before Form 301-AM filing.' },
           { id: 'nhpa_106', label: 'NHPA §106 historic/cultural resource consultation', rule: '47 CFR §1.1307(a)(4) / 36 CFR Part 800', status: 'WARN', note: 'All new tower construction requires NHPA §106 SHPO consultation for archaeological and architectural survey.', required_action: 'Submit tower proposal to SHPO for §106 review. Allow 90–180 days for SHPO response.' },
           { id: 'form_301_am', label: 'FCC Form 301-AM application completeness', rule: '47 CFR §73.3533 / LMS', status: 'NOT_EVALUATED', note: 'Form 301-AM completeness depends on final engineering package, NIF study, and NEPA/NHPA outcomes.', required_action: 'Prepare complete engineering filing package with licensed broadcast consultant before filing.' },
-          { id: 'construction_deadline', label: 'CP construction completion and Form 302-AM deadline', rule: '47 CFR §73.3534', status: 'NOT_EVALUATED', note: 'CP not yet granted — construction deadline not applicable at screening stage.', required_action: 'Develop construction schedule immediately upon CP grant to avoid §73.3534 extension requirement.' }
+          { id: 'construction_deadline', label: 'CP construction completion and Form 302-AM deadline', rule: '47 CFR §73.3536', status: 'NOT_EVALUATED', note: 'CP not yet granted — construction deadline not applicable at screening stage.', required_action: 'Develop construction schedule immediately upon CP grant to avoid missing §73.3598 CP expiration deadline.' }
         ],
-        reference: '47 CFR §73.24(g)(j); §73.182; §73.316; §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3534; OET Bulletin 65',
+        reference: '47 CFR §73.24(g)(j); §73.182; §73.316; §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3536; OET Bulletin 65',
         note: 'regulatory_compliance_checklist is a screening-grade pre-filing assessment only. All WARN and NOT_EVALUATED items require professional engineering study, legal review, or additional data collection before Form 301-AM can be filed.'
       },
       licensing_timeline_estimate: {
@@ -1716,7 +1716,7 @@ const DEMO_RESULT = {
           { phase: 'CONSTRUCTION', label: 'Construction and equipment installation', weeks_low: 20, weeks_high: 36, key_tasks: ['Tower erection with FAA marking/lighting (ASR required)', 'Ground radial system installation', 'DA array element installation and initial phasing'] },
           { phase: 'LICENSE_TO_COVER', label: 'Proof of performance and Form 302-AM', weeks_low: 8, weeks_high: 16, key_tasks: ['DA proof (72-radial FI traversals per §73.154)', 'Base current measurements and antenna efficiency verification', 'File FCC Form 302-AM (license to cover)'] }
         ],
-        reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
+        reference: '47 CFR §73.3520; §73.3533; §73.3536; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
       fcc_form_301_exhibit_checklist_guide: {
@@ -1925,7 +1925,7 @@ const DEMO_RESULT = {
           { type: 'ENGINEER', service: 'FCC Form 301-AM Technical Exhibits', required: true, cost_low_usd: 3500, cost_typical_usd: 5500, cost_high_usd: 8500, notes: 'Radiation pattern computation, coverage contour map, interference analysis exhibits' },
           { type: 'ENGINEER', service: 'Interference Study (Adjacent/Co-channel)', required: false, cost_low_usd: 3000, cost_typical_usd: 5500, cost_high_usd: 9000, notes: 'Optional but common: D/U ratio analysis vs. protected contours, sky-wave interference, §73.182 compliance verification' }
         ],
-        reference: '47 CFR §73.3533; §73.3534; §73.154; §73.182; FCC Form 301-AM; NABOB Engineering Manual',
+        reference: '47 CFR §73.3533; §73.3536; §73.154; §73.182; FCC Form 301-AM; NABOB Engineering Manual',
         note: 'Cost estimates reflect 2024 market rates for experienced broadcast communications attorneys and licensed RF engineers. NDA proof is less costly than full DA proof (72-radial FI traversal). Attorney fees vary by firm size and market.'
       },
       zoning_and_land_use_compliance_guide: {
@@ -2253,7 +2253,7 @@ const DEMO_RESULT = {
         am_translator_authorized: true,
         n_legal_alternatives: 5,
         legal_alternatives: [
-          { id: 'RELOCATION', label: 'Main transmitter relocation (this optimizer)', cfr: '§73.3533; §73.3534', authorized: true, note: 'Move transmitter to better site for coverage improvement — requires FCC CP and construction' },
+          { id: 'RELOCATION', label: 'Main transmitter relocation (this optimizer)', cfr: '§73.3533; §73.3536', authorized: true, note: 'Move transmitter to better site for coverage improvement — requires FCC CP and construction' },
           { id: 'AM_TRANSLATOR', label: 'AM-to-FM translator', cfr: '§74.1201; MB 13-249', authorized: true, note: 'FCC authorized AM-to-FM translator service; 250W ERP FM fill-in translator within AM contour' },
           { id: 'IBOC_HD', label: 'AM HD Radio (IBOC digital sidebands)', cfr: '§73.404 (IBOC); MB Docket 99-325', authorized: true, note: 'Digital audio sidebands on AM carrier; improves quality and perceived coverage; requires separate FCC authorization' },
           { id: 'PART15_CC', label: 'Part 15 carrier current (in-building only)', cfr: '§15.221', authorized: true, note: 'Unlicensed; power limit 100 mW; effective only inside the building connected to the power line; not practical for area coverage' },
@@ -2321,8 +2321,8 @@ const DEMO_RESULT = {
           { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $325 filing fee electronically', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
           { step: 2, action: 'FCC issues public notice (PNOH)', detail: 'FCC Public Notice of Hearing or Application — 30-day window for petitions to deny (major modifications)', timeline: '30-day public comment period', cfr: '§73.3580' },
           { step: 3, action: 'FCC engineering review', detail: 'FCC Media Bureau AM engineers review technical exhibits, interference analysis, and DA proof if applicable', timeline: '3–18 months (NDA faster; DA longer)', cfr: '§73.3533' },
-          { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3534; §73.3526(e)(1)' },
-          { step: 5, action: 'Construct and file Form 302-AM (license to cover)', detail: 'After construction and proof-of-performance, file Form 302-AM with proof exhibits for license to cover', timeline: '3-year CP term; file 302-AM before CP expiration', cfr: '§73.3539; §73.3534(b)' }
+          { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3533; §73.3526(e)(1)' },
+          { step: 5, action: 'Construct and file Form 302-AM (license to cover)', detail: 'After construction and proof-of-performance, file Form 302-AM with proof exhibits for license to cover', timeline: '3-year CP term per §73.3598; file 302-AM before CP expiration', cfr: '§73.3536; §73.3598' }
         ],
         n_processing_steps: 5,
         cp_term_years: 3,
@@ -2332,7 +2332,7 @@ const DEMO_RESULT = {
         major_change_radius_miles: 2,
         processing_time_estimate: { nda_optimistic_months: 3, nda_conservative_months: 9, da_optimistic_months: 9, da_conservative_months: 18 },
         relocation_note: 'File FCC Form 301-AM via LMS. 9 required exhibits including interference analysis, contour map, FAA determination, and ASR number. $325 filing fee. NDA station. Processing: 3–9 months. CP valid for 3 years; 6-month extension available.',
-        reference: '47 CFR §73.3533; §73.3534; §73.3539; §73.3580; §73.316; §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
+        reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3539; §73.3580; §73.316; §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
         note: 'Form 301-AM via FCC LMS. 9 required exhibits. Filing fee: $325. CP term: 3 years + 6-month extension. Processing: 3–9 months. Public notice triggers 30-day petition window for major changes.'
       },
       transmitter_building_design_guide: {
@@ -2790,7 +2790,7 @@ const DEMO_RESULT = {
         readiness_actions: [
           { priority: 1, action: 'File full-power CP at best available site', rationale: 'Granted CP establishes preferred future site; repack would grandfather existing authorizations', cfr: '§73.3533' },
           { priority: 2, action: 'Obtain FM translator while windows open', rationale: 'FM translator creates secondary FM asset surviving AM band changes', cfr: '§74.1201; FCC 15-14' },
-          { priority: 3, action: 'Update FCC LMS records with accurate site data', rationale: 'Inaccurate records weaken interference protection claims', cfr: '§73.3527; §73.3529' },
+          { priority: 3, action: 'Update FCC LMS records with accurate site data', rationale: 'Inaccurate records weaken interference protection claims', cfr: '§73.3526; §73.3527' },
           { priority: 4, action: 'Comment in MB 13-249 proceedings if affected', rationale: 'Participation in FCC rulemaking protects small-market AM interests', cfr: '§1.415' },
           { priority: 5, action: 'Evaluate digital (HD Radio / DRM) compatibility', rationale: 'Early conversion may provide spectrum flexibility', cfr: '§73.404; NRSC-5-D' }
         ],
@@ -3014,11 +3014,11 @@ const DEMO_RESULT = {
           max_silent_weeks: 52,
           initial_sta_form: 'FCC Form 2100',
           sta_options: [
-            { id: 'INITIAL_STA', label: 'Initial 30-day STA (§73.3534(b))', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 290, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days' },
+            { id: 'INITIAL_STA', label: 'Initial 30-day STA (§73.1635)', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 290, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days' },
             { id: 'RENEWAL_STA', label: 'STA renewal (each 6-month extension)', form: 'STA renewal request (informal letter acceptable)', fee_usd: 290, duration_weeks: 26, notes: 'FCC will grant up to 12 months total absent extraordinary circumstances' },
             { id: 'REDUCED_POWER', label: 'Reduced power STA (interim operation during construction)', form: 'FCC Form 2100', fee_usd: 290, duration_weeks: null, notes: 'Allows partial operation during construction; must protect co-channel/adjacent allocations' }
           ],
-          filing_requirement: 'STA required for silent period > 30 days; file FCC Form 2100 citing §73.3534(b)',
+          filing_requirement: 'STA required for silent period > 30 days; file FCC Form 2100 citing §73.1635',
           cancellation_risk: 'CP or license may be cancelled after 12 months of silence per §73.1740(a)'
         },
         construction_timeline: {
@@ -3041,7 +3041,7 @@ const DEMO_RESULT = {
           { id: 'INTERIM_CP', label: 'File for interim CP on existing site as backup', notes: 'If new site falls through, interim authority to modify existing site preserves continuity. Dual-track approach.' }
         ],
         n_mitigation_strategies: 4,
-        reference: '47 CFR §73.1740; §73.1750; §73.3534; §1.65; FCC Form 2100; FCC Form 319 (legacy); §73.154',
+        reference: '47 CFR §73.1740; §73.1750; §73.1635; §1.65; FCC Form 2100; FCC Form 319 (legacy); §73.154',
         note: 'Construction: 15–62 wks (typical 32 wks). Max silent: 52 wks. License risk: MODERATE.'
       },
       am_propagation_variability_guide: {
