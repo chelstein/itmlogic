@@ -988,8 +988,8 @@ const DEMO_RESULT = {
       antenna_height_options: {
         frequency_khz: 780, full_wavelength_m: 384.62, reference_tpo_kw: 5,
         options: [
-          { id: '5_8_LAMBDA', label: '5/8 λ (optimum)', electrical_deg: 225, height_m: 240.39, height_ft: 788, gain_vs_qw_db: 1.7, erp_vs_tpo_ratio: 1.48, estimated_erp_kw: 7.4, asr_required: true, pros: '~1.7 dB ERP gain over λ/4; maximum groundwave efficiency.', cons: 'Taller physical structure; always triggers §17.7 ASR + FAA study.' },
-          { id: 'QUARTER_WAVE', label: 'λ/4 (standard)', electrical_deg: 90, height_m: 96.15, height_ft: 315, gain_vs_qw_db: 0.0, erp_vs_tpo_ratio: 1.0, estimated_erp_kw: 5.0, asr_required: true, pros: 'Industry standard; FCC groundwave curves calibrated to λ/4 reference.', cons: 'Not maximum efficiency. Exceeds ASR threshold (200 ft = 60.96 m).' },
+          { id: '5_8_LAMBDA', label: '5/8 λ (optimum)', electrical_deg: 225, height_m: 240.39, height_ft: 788.7, gain_vs_qw_db: 1.7, erp_vs_tpo_ratio: 1.48, estimated_erp_kw: 7.4, asr_required: true, pros: '~1.7 dB ERP gain over λ/4; maximum groundwave efficiency.', cons: 'Taller physical structure; always triggers §17.7 ASR + FAA study.' },
+          { id: 'QUARTER_WAVE', label: 'λ/4 (standard)', electrical_deg: 90, height_m: 96.15, height_ft: 315.5, gain_vs_qw_db: 0.0, erp_vs_tpo_ratio: 1.0, estimated_erp_kw: 5.0, asr_required: true, pros: 'Industry standard; FCC groundwave curves calibrated to λ/4 reference.', cons: 'Not maximum efficiency. Exceeds ASR threshold (200 ft = 60.96 m).' },
           { id: '0_19_LAMBDA', label: '0.19 λ (compact)', electrical_deg: 68, height_m: 73.08, height_ft: 240, gain_vs_qw_db: -3.0, erp_vs_tpo_ratio: 0.5, estimated_erp_kw: 2.5, asr_required: true, pros: 'Lower steel cost. Useful for DA-in, series-capacitor base tuning.', cons: '~3 dB ERP penalty vs. λ/4; requires larger ground system.' }
         ],
         note: 'Efficiency figures are engineering approximations from FCC R-4 table.'
@@ -1885,8 +1885,8 @@ const DEMO_RESULT = {
         lambda_quarter_m: 96.15, lambda_quarter_ft: 315.5,
         lambda_half_m: 192.31,   lambda_half_ft: 630.9,
         five_eighth_m: 240.39,   five_eighth_ft: 788.7,
-        current_height_m: 96, current_height_ft: 315, current_elec_deg: 90,
-        optimal_height_m: 240, optimal_height_ft: 787,
+        current_height_m: 96.15, current_height_ft: 315.5, current_elec_deg: 90,
+        optimal_height_m: 240.39, optimal_height_ft: 788.7,
         height_increase_m: 144,
         max_field_gain_rel: 1.16, max_coverage_gain_pct: 16,
         asr_required: true, faa_lighting_required: true,
@@ -1959,8 +1959,8 @@ const DEMO_RESULT = {
       },
       zoning_and_land_use_compliance_guide: {
         frequency_khz: 780, fcc_class: 'D',
-        tower_height_m: 96, tower_height_ft: 315,
-        setback_m_required: 96, setback_ft_required: 315,
+        tower_height_m: 96.15, tower_height_ft: 315.5,
+        setback_m_required: 96.15, setback_ft_required: 315.5,
         permit_weeks_low_rural: 8, permit_weeks_high_rural: 24,
         permit_weeks_low_residential: 16, permit_weeks_high_residential: 52,
         preferred_zoning_type: 'AGRICULTURAL',
@@ -1985,11 +1985,11 @@ const DEMO_RESULT = {
         fcc_env_review_cfr: '47 CFR §1.1307',
         nhpa_section_106_required: true, tribal_consultation_required: true,
         reference: 'TCA §332(c)(7); 47 CFR §1.1307 (environmental review); NHPA §106; ESA §7; CWA §404; FCC-ACHP-NCSHPO Programmatic Agreement; FEMA National Flood Insurance Program',
-        note: 'Tower: 315ft (96m), setback ≥315ft (fall zone). Preferred zone: agricultural/industrial. Permit timeline: 8–24 wks (rural) or 16–52 wks (residential). TCA §332(c)(7) does NOT preempt local zoning for AM broadcast towers. 6 federal environmental review triggers. NHPA §106 tribal consultation required.'
+        note: 'Tower: 315.5ft (96.15m), setback ≥315.5ft (fall zone). Preferred zone: agricultural/industrial. Permit timeline: 8–24 wks (rural) or 16–52 wks (residential). TCA §332(c)(7) does NOT preempt local zoning for AM broadcast towers. 6 federal environmental review triggers. NHPA §106 tribal consultation required.'
       },
       faa_obstruction_marking_guide: {
         frequency_khz: 780, fcc_class: 'D',
-        tower_height_m: 96, tower_height_ft: 315,
+        tower_height_m: 96.15, tower_height_ft: 315.5,
         asr_required_by_height: true, asr_height_threshold_m: 60.96, asr_height_threshold_ft: 200,
         faa_lighting_tier: 'L-810_RED_STEADY',
         n_paint_bands: 7, painting_required: true,
