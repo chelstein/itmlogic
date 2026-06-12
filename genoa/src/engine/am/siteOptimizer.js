@@ -10011,8 +10011,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //     and 0.1 mV/m (nighttime service) using the FCC groundwave curves.
       //   §73.184: FCC groundwave field strength curves (M3 curves, ITU-R P.368-9).
       //     Curves are tabulated by frequency (MHz) and ground conductivity (mS/m).
-      //   §73.24(b)–(c): Minimum field strength requirements at community of license:
-      //     Class D: 2 mV/m minimum daytime; 0.5 mV/m minimum nighttime.
+      //   §73.182: Minimum usable field strength at community of license (primary service area):
+      //     2 mV/m daytime is the primary service area boundary per §73.182 engineering standards.
       //   §73.37: Co-channel and adjacent-channel separation rules use the 0.5 mV/m
       //     contour for daytime and 0.1 mV/m contour for nighttime interference calculations.
       //
@@ -10081,8 +10081,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const field_at_col_dist_mvm = round2(0.5 * contour_05mvm_radius_km / Math.max(reach_scale_km ?? 20, 5));
       const field_at_col_dist_km  = round2(reach_scale_km ?? 20);
 
-      // §73.24(b) minimum field at community of license:
-      const col_minimum_mvm          = 2.0;   // Class D daytime minimum
+      // §73.182 minimum usable field at community of license:
+      const col_minimum_mvm          = 2.0;   // 2 mV/m primary service area boundary (§73.182)
       const col_field_compliant       = field_at_col_dist_mvm >= col_minimum_mvm;
 
       // Study cost:
@@ -10103,7 +10103,7 @@ async function scoreCandidate(pt, ctx, warnings){
         col_field_compliant,
         study_cost_low_usd,
         study_cost_high_usd,
-        reference: '47 CFR §73.183 (groundwave service contours); §73.184 (M3 groundwave curves, ITU-R P.368-9); §73.24(b) (Class D min field strength 2 mV/m daytime); §73.37 (0.5 mV/m co-channel separation); ITU-R P.368-9 Annex 1 tables',
+        reference: '47 CFR §73.183 (groundwave service contours); §73.184 (M3 groundwave curves, ITU-R P.368-9); §73.182 (2 mV/m primary service area boundary — AM engineering standards); §73.37 (0.5 mV/m co-channel separation); ITU-R P.368-9 Annex 1 tables',
         note: `Screening-grade M3 estimate (±30%) at ${condMsm} mS/m, ${tpo_kw} kW. 0.5 mV/m contour: ~${contour_05mvm_radius_km} km. 0.1 mV/m contour: ~${contour_01mvm_radius_km} km. Formal §73.183 study required for FCC filing: $${study_cost_low_usd.toLocaleString()}–$${study_cost_high_usd.toLocaleString()}.`
       };
     })(),

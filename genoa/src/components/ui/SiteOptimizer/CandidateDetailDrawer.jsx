@@ -3836,7 +3836,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <b>COL field ({fmtF(g.field_at_col_dist_km)} km):</b>
                   <span style={{ color: compColor, fontWeight: 600 }}>{fmtF(g.field_at_col_dist_mvm, 2)} mV/m</span>
                 </div>
-                <div><b>§73.24(b) min (2 mV/m):</b> <span style={{ color: compColor }}>{g.col_field_compliant ? '✓ MET' : '✗ FAILS'}</span></div>
+                <div><b>§73.182 min (2 mV/m):</b> <span style={{ color: compColor }}>{g.col_field_compliant ? '✓ MET' : '✗ FAILS'}</span></div>
                 <div style={{ gridColumn: '1/-1' }}><b>Formal §73.183 study cost:</b> ${fmt(g.study_cost_low_usd)}–${fmt(g.study_cost_high_usd)}</div>
                 <div style={{ gridColumn: '1/-1', fontSize: 10, color: '#b45309' }}>Screening estimate ±30%. Formal M3 study required for FCC filing.</div>
               </div>
