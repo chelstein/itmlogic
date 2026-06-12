@@ -7143,7 +7143,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fail_count: counts.FAIL,
         not_evaluated_count: counts.NOT_EVALUATED,
         items: items_rc,
-        reference: '47 CFR §73.24(g)(j); §73.182; §73.150 (AM DA); §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3598; OET Bulletin 65',
+        reference: '47 CFR §73.24(g)/(i); §73.182; §73.150 (AM DA); §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3598; OET Bulletin 65',
         note: 'regulatory_compliance_checklist is a screening-grade pre-filing assessment only. All WARN and NOT_EVALUATED items require professional engineering study, legal review, or additional data collection before Form 301-AM can be filed. Consult a licensed broadcast consultant and FCC communications attorney before filing.'
       };
     })(),
@@ -12932,8 +12932,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // Nighttime: skywave from ionospheric D-layer reflection; clear-channel stations can reach 1000+ km.
       // Class D secondary stations: nighttime operation restricted by dominant station protection.
       // 47 CFR §73.182: AM protection ratios for skywave; §73.185: interfering signal computation (daytime/groundwave).
-      // FCC field strength thresholds: 0.5 mV/m daytime (principal city coverage),
-      //   0.1 mV/m for rural/fringe areas; 0.025 mV/m (25 µV/m) nighttime skywave protected.
+      // FCC field strength thresholds: 5 mV/m daytime (principal community coverage §73.24(i)),
+      //   0.5 mV/m (primary service area / §73.182 protected contour), 0.1 mV/m rural/fringe;
+      //   0.025 mV/m (25 µV/m) nighttime skywave protected.
       const erp_kw_cov = round2(tpo_kw * 0.85);
       // Groundwave coverage radius: empirical approximation from FCC AM coverage tables
       // For σ ≈ 2 mS/m (Southwest), 0.5 mV/m contour ~15–40 km for 1–5 kW
@@ -22014,7 +22015,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // The COL appears on the FCC license and determines the station's call sign area and local service obligations.
       //
       // When a COL change is triggered:
-      //   - If the new transmitter site causes the new principal community contour (0.5 mV/m daytime)
+      //   - If the new transmitter site causes the new principal community contour (5 mV/m daytime per §73.24(i))
       //     to no longer encompass the licensed COL, the FCC may find that the station effectively
       //     changed its COL without authorization — this constitutes a significant issue
       //   - Under §73.3571(b): FCC allows minor change applications (no auction) if the proposed

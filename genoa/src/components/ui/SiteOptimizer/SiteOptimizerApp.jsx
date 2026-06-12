@@ -2054,8 +2054,8 @@ const DEMO_RESULT = {
         n_du_ratio_pairs: 4,
         du_protection_ratios: [
           { offset_khz: 0,  label: 'Co-channel',      du_ratio_db: 20, field_ratio: 10.0, cfr: '§73.182' },
-          { offset_khz: 10, label: 'First adjacent',  du_ratio_db: 6,  field_ratio: 2.0,  cfr: '§73.207' },
-          { offset_khz: 20, label: 'Second adjacent', du_ratio_db: 0,  field_ratio: 1.0,  cfr: '§73.207' },
+          { offset_khz: 10, label: 'First adjacent',  du_ratio_db: 6,  field_ratio: 2.0,  cfr: '§73.182(r) / §73.37(a)' },
+          { offset_khz: 20, label: 'Second adjacent', du_ratio_db: 0,  field_ratio: 1.0,  cfr: '§73.182(r)' },
           { offset_khz: 30, label: 'Third adjacent',  du_ratio_db: -6, field_ratio: 0.5,  cfr: 'Engineering practice' }
         ],
         co_channel_du_ratio_db: 20,
@@ -2068,14 +2068,14 @@ const DEMO_RESULT = {
         n_coordination_steps: 5,
         coordination_steps: [
           { step: 1, action: 'Co-channel station inventory within 1500 km', detail: 'Pull all co-channel AM stations from FCC LMS; compute daytime 0.5 mV/m and 2 mV/m contour intersections with proposed site coordinates', tool: 'FCC LMS / AM Query tool', cfr: '§73.182' },
-          { step: 2, action: 'Adjacent-channel station inventory within 500 km', detail: 'Pull all ±10 kHz and ±20 kHz channel stations from LMS; apply §73.207 minimum separation table; flag any potential short-spacing', tool: 'FCC LMS', cfr: '§73.207' },
-          { step: 3, action: 'D/U interference analysis for short-spaced stations', detail: 'For any station within §73.207 minimum separation distance, compute ITM/Longley-Rice predicted field strengths and D/U ratios at protected contours; document compliance or interference', tool: 'FCC AM interference calculator / ITM', cfr: '§73.209; §73.182' },
+          { step: 2, action: 'Adjacent-channel station inventory within 500 km', detail: 'Pull all ±10 kHz and ±20 kHz channel stations from LMS; apply §73.37 minimum separation table; flag any potential short-spacing', tool: 'FCC LMS', cfr: '§73.37' },
+          { step: 3, action: 'D/U interference analysis for short-spaced stations', detail: 'For any station within §73.37 minimum separation distance, compute ITM/Longley-Rice predicted field strengths and D/U ratios at protected contours; document compliance or interference', tool: 'FCC AM interference calculator / ITM', cfr: '§73.37; §73.182' },
           { step: 4, action: 'Night-time skywave analysis (clear channel)', detail: '780 kHz is a CLEAR CHANNEL; night-time skywave from Class A dominant (e.g., WBBM/Chicago) must be protected; Class D secondary stations must not increase interference to dominant station\'s 0.5 mV/m contour', tool: 'FCC skywave prediction model', cfr: '§73.182(a); §73.24(b)' },
-          { step: 5, action: 'Coordination agreement with affected stations (if needed)', detail: 'If interference analysis shows potential impact, negotiate engineering agreement with affected station; document agreement as exhibit to FCC Form 301-AM', tool: 'Direct station-to-station contact', cfr: '§73.209; §73.525' }
+          { step: 5, action: 'Coordination agreement with affected stations (if needed)', detail: 'If interference analysis shows potential impact, negotiate engineering agreement with affected station; document agreement as exhibit to FCC Form 301-AM', tool: 'Direct station-to-station contact', cfr: '§73.37(b); §73.525' }
         ],
         interference_analysis_required: true,
         form_exhibit_required: true,
-        reference: '47 CFR §73.182 (dominant station protection); §73.207 (minimum separation); §73.209 (short-spacing); §73.24(b) (clear channels); §73.525 (engineering agreements); ITU-R BS.560',
+        reference: '47 CFR §73.182 (dominant station protection); §73.37 (minimum separation); §73.37(b) (short-spacing); §73.24(b) (clear channels); §73.525 (engineering agreements); ITU-R BS.560',
         note: '780 kHz CLEAR channel, Class D (SECONDARY on clear channel — must protect Class A dominant). D/U ratios: co-channel ≥20 dB, 1st-adj ≥6 dB, 2nd-adj ≥0 dB. 5 coordination steps required. Night-time: secondary status; must not increase Class A interference.'
       },
       remote_control_authority_guide: {
@@ -2974,7 +2974,7 @@ const DEMO_RESULT = {
           'Use FCC AM Query (query.fcc.gov) or LMS to find adjacent-channel stations within interference range',
           'If site change creates new adjacent-channel conflict, FCC may require directional antenna or reduced power to protect'
         ],
-        reference: '47 CFR §73.182(b) Table 1; §73.207; FCC AM Query (query.fcc.gov); ITU AM Bandwidth Spec',
+        reference: '47 CFR §73.182(b) Table 1; §73.37; FCC AM Query (query.fcc.gov); ITU AM Bandwidth Spec',
         note: '780 kHz Class D. Adj-10 D/U: 20 dB. Adj-20 D/U: 6 dB. 4 adjacent channels to check.'
       },
       main_studio_rule_guide: {
@@ -3087,7 +3087,7 @@ const DEMO_RESULT = {
         primary_service_area_km2: 23990.2,
         translator_opportunity: { authorized: true, cfr: '47 CFR §74.1201; FCC AMTA 2020 proceeding', max_erp_w: 250, fm_band: '88.1–107.9 MHz', coverage_note: 'FM translator can extend effective coverage into areas with poor AM reception (buildings, urban canyons)', application_form: 'FCC Form 349', filing_fee_usd: 655, application_window: 'FCC AM Translator Window (periodic; last 2021)', band_stacking: 'FM translator must protect all co-channel and adjacent FM stations per §74.1204' },
         reference: '47 CFR §73.24; §73.182; §73.187; §74.1201; FCC AMTA 2020; FCC Form 349',
-        note: 'Class D at 780 kHz. Primary 0.5 mV/m reach: 87.4 km (23990.2 km²). COL min: 2 mV/m day. FM translator (250W) authorized under AMTA.'
+        note: 'Class D at 780 kHz. Primary 0.5 mV/m reach: 87.4 km (23990.2 km²). COL min: 5 mV/m day (§73.24(i)). FM translator (250W) authorized under AMTA.'
       },
       license_renewal_compliance_guide: {
         fcc_class: 'D', frequency_khz: 780,
@@ -3095,11 +3095,11 @@ const DEMO_RESULT = {
         license_term_years: 8, renewal_form: 'FCC Form 303-S', renewal_filing_fee_usd: 345,
         opif_requirements: [
           { id: 'LICENSE', label: 'FCC License and authorizations', update_freq: 'As issued', cfr: '§73.3526(e)(1)', required: true },
-          { id: 'OWNERSHIP_REPORTS', label: 'FCC Form 323 Ownership Reports', update_freq: 'Biennial (every 2 years in even years)', cfr: '§73.3526(e)(4)', required: true },
+          { id: 'OWNERSHIP_REPORTS', label: 'FCC Form 323 Ownership Reports', update_freq: 'Biennial (every 2 years in even years)', cfr: '§73.3526(e)(3)', required: true },
           { id: 'POLITICAL_FILE', label: 'Political broadcasting records', update_freq: 'Within 1 business day of request', cfr: '§73.3526(e)(6)', required: true },
           { id: 'EEO_ANNUAL', label: 'EEO Annual Public File Report', update_freq: 'Annually, 1 year after renewal window opens', cfr: '§73.2080(c)(6)', required: true },
           { id: 'QUARTERLY_ISSUES', label: 'Issues & Programs Lists', update_freq: 'Quarterly (Jan 10, Apr 10, Jul 10, Oct 10)', cfr: '§73.3526(e)(11)(i)', required: true },
-          { id: 'CONTOUR_MAPS', label: 'Station contour maps', update_freq: 'On change of coverage area', cfr: '§73.3526(e)(3)', required: true },
+          { id: 'CONTOUR_MAPS', label: 'Station contour maps', update_freq: 'On change of coverage area', cfr: '§73.3526(e)(4)', required: true },
           { id: 'CONSTRUCTION_PERMIT', label: 'Construction permit (if CP pending)', update_freq: 'As issued', cfr: '§73.3526(e)(2)', required: false }
         ],
         n_opif_required: 6,
@@ -3343,8 +3343,8 @@ const DEMO_RESULT = {
         channel_relationships: [
           { id: 'CO_CHANNEL', label: 'Co-channel (0 kHz separation)', cfr: '47 CFR §73.182', du_daytime_db: 20, du_nighttime_db: 0, min_spacing_km: 402, class_applies: 'ALL', notes: 'D/U ≥ 20 dB day; ≥ 0 dB night.' },
           { id: 'FIRST_ADJ', label: 'First adjacent (±10 kHz)', cfr: '47 CFR §73.184', du_daytime_db: 6, du_nighttime_db: -6, min_spacing_km: 322, class_applies: 'ALL', notes: 'D/U ≥ 6 dB during daytime.' },
-          { id: 'SECOND_ADJ', label: 'Second adjacent (±20 kHz)', cfr: '47 CFR §73.209', du_daytime_db: 0, du_nighttime_db: -12, min_spacing_km: 161, class_applies: 'ALL', notes: 'D/U ≥ 0 dB day.' },
-          { id: 'THIRD_ADJ', label: 'Third adjacent (±30 kHz)', cfr: '47 CFR §73.213', du_daytime_db: -6, du_nighttime_db: -18, min_spacing_km: 80, class_applies: 'ALL', notes: 'D/U ≥ -6 dB day.' },
+          { id: 'SECOND_ADJ', label: 'Second adjacent (±20 kHz)', cfr: '47 CFR §73.182(r)', du_daytime_db: 0, du_nighttime_db: -12, min_spacing_km: 161, class_applies: 'ALL', notes: 'D/U ≥ 0 dB day.' },
+          { id: 'THIRD_ADJ', label: 'Third adjacent (±30 kHz)', cfr: '47 CFR §73.182(r)', du_daytime_db: -6, du_nighttime_db: -18, min_spacing_km: 80, class_applies: 'ALL', notes: 'D/U ≥ -6 dB day.' },
           { id: 'IBOC_SIDEBAND', label: 'IBOC/HD Radio sideband (±15 kHz)', cfr: '47 CFR §73.404', du_daytime_db: -10, du_nighttime_db: -10, min_spacing_km: 160, class_applies: 'HD_AUTHORIZED', notes: 'HD Radio digital sidebands at ±15 kHz.' }
         ],
         n_relationships: 5,
@@ -3354,8 +3354,8 @@ const DEMO_RESULT = {
         coordination_items: [
           { item: 'Co-channel station database search', cfr: '§73.182', required: true, tool: 'FCC LMS API or REC Networks AMQUERY' },
           { item: 'First adjacent station search (±10 kHz)', cfr: '§73.184', required: true, tool: 'FCC LMS API' },
-          { item: 'Second adjacent station search (±20 kHz)', cfr: '§73.209', required: true, tool: 'FCC LMS API' },
-          { item: 'Third adjacent station search (±30 kHz)', cfr: '§73.213', required: true, tool: 'FCC LMS API' },
+          { item: 'Second adjacent station search (±20 kHz)', cfr: '§73.182(r)', required: true, tool: 'FCC LMS API' },
+          { item: 'Third adjacent station search (±30 kHz)', cfr: '§73.182(r)', required: true, tool: 'FCC LMS API' },
           { item: 'IBOC interference study', cfr: '§73.404', required: false, tool: 'iBiquity/xperi modeling software' },
           { item: 'NIF study (clear channel)', cfr: '§73.182', required: false, tool: 'FCC groundwave/skywave propagation software' },
           { item: 'Treaty protection analysis (Canada/Mexico)', cfr: '§73.1650', required: true, tool: 'FCC treaty database; AMQUERY' }

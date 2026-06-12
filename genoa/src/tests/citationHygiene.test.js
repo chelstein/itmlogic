@@ -358,3 +358,33 @@ test('CFR-AUDIT — AM engine/UI DA pattern sections never cite FM-only §73.316
   assert.equal(offenders.length, 0,
     `AM-context files cite FM DA rule §73.316 as operative rule (use §73.150): ${offenders.join(', ')}`);
 });
+
+test('CFR-AUDIT — AM engine/UI never cite FM-only §73.209 or §73.213 as operative AM channel rules', () => {
+  // §73.209 = FM 2nd-adjacent channel protection rule (FM only)
+  // §73.213 = FM 3rd-adjacent channel protection rule (FM only)
+  // AM adjacent-channel D/U requirements are in §73.182(r) / §73.37(a).
+  // These sections may appear only in comments explicitly noting "is FM" / "not AM".
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  const BARE_FM_ADJ = /§73\.(209|213)(?!.*(?:is FM|FM 2nd|FM 3rd|\(FM\)|not AM|applies to FM|FM —|FM rule))/;
+  const offenders = files.filter(rel => {
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    if (!BARE_FM_ADJ.test(src)) return false;
+    const lines = src.split('\n');
+    return lines.some(line => {
+      if (!BARE_FM_ADJ.test(line)) return false;
+      // Allow lines that explicitly state FM-only context
+      if (/§73\.(209|213).*(?:is FM|FM 2nd|FM 3rd|\(FM\)|not AM|applies to FM|FM —|FM rule)/.test(line)) return false;
+      if (/(?:is FM|FM 2nd|FM 3rd|not AM|applies to FM).*§73\.(209|213)/.test(line)) return false;
+      return true;
+    });
+  });
+  assert.equal(offenders.length, 0,
+    `AM-context files cite FM channel rules §73.209/§73.213 as operative AM rules (use §73.182(r)/§73.37): ${offenders.join(', ')}`);
+});
