@@ -22794,13 +22794,13 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     broadcast_content_compliance_guide: (() => {
-      // §73.3999: Indecency and obscenity — FCC prohibits indecent content between 6 AM and 10 PM
-      // §73.4005: Obscene content — prohibited at all times
+      // §73.3999: Indecency — FCC prohibits indecent content between 6 AM and 10 PM (safe harbor 10 PM–6 AM)
+      // 18 U.S.C. §1464: Obscenity — prohibited at all times; no safe harbor for obscene content
       // §73.1206: Telephone conversation broadcasts — must get consent before recording/airing a call
       // §73.1207: Rebroadcasting — must get consent of originating station; program duplication limit (§73.3556)
       // §73.1211: Lotteries — lottery information may be broadcast only for authorized lotteries
       // §73.1217: Broadcast hoaxes — FCC may impose forfeitures for hoaxes that cause harm
-      // §73.1210: Joint sales agreements (JSA) / Local marketing agreements (LMA) — attribution rules
+      // §73.3555: Multiple ownership — includes attribution rules for JSA/LMA arrangements
       //
       // Relocation relevance: when a station relocates and potentially changes format or ownership,
       // content compliance is a key due diligence area, especially in license renewal context.
@@ -22847,7 +22847,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'TELEPHONE_PROC',     label: 'Telephone consent procedure for all on-air calls', cfr: '§73.1206', priority: 'HIGH' },
         { id: 'COMPLAINT_LOG',      label: 'Log all content complaints received; retain for 2 years', cfr: '§73.3526(e)(7)', priority: 'MEDIUM' },
         { id: 'HOAX_POLICY',        label: 'Written policy prohibiting broadcast hoaxes', cfr: '§73.1217', priority: 'MEDIUM' },
-        { id: 'JSA_LMA_REVIEW',     label: 'Review any JSA/LMA for attribution compliance under ownership rules', cfr: '§73.1210; §73.3555', priority: 'MEDIUM' },
+        { id: 'JSA_LMA_REVIEW',     label: 'Review any JSA/LMA for attribution compliance under ownership rules', cfr: '§73.3555', priority: 'MEDIUM' },
         { id: 'SPONSORSHIP_LOG',    label: 'Document all paid/sponsored programming (sponsorship ID)', cfr: '§73.1212', priority: 'HIGH' }
       ];
 
@@ -22863,7 +22863,7 @@ async function scoreCandidate(pt, ctx, warnings){
         high_priority_elements: high_priority,
         max_forfeiture_indecency_usd: INDECENCY_RULES.max_forfeiture_per_incident_usd,
         relocation_note: 'Content compliance is evaluated during license renewal; ensure a clean complaint record during the 2-year period before renewal to support the relocation and license continuation.',
-        reference: '47 CFR §73.1206; §73.1207; §73.1210; §73.1212; §73.1217; §73.3526; §73.3555; §73.3999; §73.4005; §73.1211; FCC Enforcement Bureau indecency forfeiture policy',
+        reference: '47 CFR §73.1206; §73.1207; §73.1211; §73.1212; §73.1217; §73.3526; §73.3555; §73.3999; 18 U.S.C. §1464 (obscenity); FCC Enforcement Bureau indecency forfeiture policy',
         note: `Content compliance: ${COMPLIANCE_ELEMENTS.length} program elements required, ${high_priority} HIGH priority. Indecency safe harbor: 10 PM–6 AM. Max forfeiture: $${INDECENCY_RULES.max_forfeiture_per_incident_usd.toLocaleString()} per incident.`
       };
     })(),
