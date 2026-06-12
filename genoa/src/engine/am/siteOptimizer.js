@@ -9638,7 +9638,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //     local sunrise and the last two hours before local sunset — may permit an
       //     intermediate power level for Class D stations when a specific critical-hours
       //     authorization is granted.
-      //   §73.1680 (Emergency operation): Stations must have operational procedures for
+      //   §73.1350 (Transmission system operation): Stations must have operational procedures for
       //     power reduction transitions.
       //   §73.1201: Station identification requirements (hourly, near the hour).
       //   Night power for Class D on clear channels is typically 0 W (silent) unless the
@@ -22372,7 +22372,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - AM sites typically need 200A 240V single-phase minimum (for ≤25 kW TPO stations)
       //
       // §11.35(a): EAS equipment must remain operational during commercial power outages
-      // §73.1680: Backup transmitter obligation (FCC encourages but doesn't mandate backup power for >10 days silence)
+      // §73.1675: AM auxiliary transmitters — FCC encourages but doesn't mandate backup power
       // §73.1545 / §73.1215: Carrier frequency tolerance (±20 Hz, §73.1545) and modulation monitoring (§73.1215) must continue — requires continuous power
       //
       // Utility extension costs (rural AM sites far from utility lines):
@@ -22441,9 +22441,9 @@ async function scoreCandidate(pt, ctx, warnings){
           high: UTILITY_EXTENSION_COSTS.underground_per_mile_usd.high + UTILITY_EXTENSION_COSTS.service_entrance_usd.high + UTILITY_EXTENSION_COSTS.transformer_grounding_usd.high
         },
         generator_costs: GENERATOR_COSTS,
-        backup_power_cfr: '§11.35(a) (EAS); §73.1680 (backup transmitter); §73.1215 (monitoring)',
+        backup_power_cfr: '§11.35(a) (EAS); §73.1675 (AM auxiliary transmitters); §73.1215 (monitoring)',
         relocation_note: `${tpo_kw_num} kW TPO → ${transmitter_draw_kw} kW transmitter draw + ${hvac_kw} kW HVAC + ${ancillary_kw} kW ancillary = ${total_site_kw} kW total. Requires ${required_service_amps}A / 240V utility service (${required_utility_service_kw} kW). Recommend ${generator_kw_recommended} kW diesel generator with ATS for EAS continuity.`,
-        reference: '47 CFR §11.35(a); §73.1680; §73.1215; NFPA 110; NEC Article 700/702; utility service handbook',
+        reference: '47 CFR §11.35(a); §73.1675 (AM auxiliary transmitters); §73.1215; NFPA 110; NEC Article 700/702; utility service handbook',
         note: `Utility power: ${total_site_kw} kW total load → ${required_service_amps}A / ${required_utility_service_kw} kW service. Generator: ${generator_kw_recommended} kW recommended. Estimated utility extension cost: $${UTILITY_EXTENSION_COSTS.total_typical_rural_usd.toLocaleString()} typical.`
       };
     })(),
@@ -22943,7 +22943,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     transmitter_redundancy_guide: (() => {
-      // §73.1680: Auxiliary transmitters — FCC does NOT require AM stations to have backup transmitters,
+      // §73.1675: Auxiliary transmitters for AM — FCC does NOT require AM stations to have backup transmitters,
       // but industry best practice strongly recommends it, especially for:
       //   - Stations in rural areas with long repair lead times
       //   - Emergency Alert System (EAS) participants (§11.35: EAS participants must maintain equipment)
@@ -22954,7 +22954,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Transmission line routing changes; backup transmitter may need re-cabling
       //   - If new site has a different tower (new antenna + feedline), backup transmitter must be compatible
       //
-      // §73.1680: Auxiliary (backup) transmitter must meet the same technical standards as the main;
+      // §73.1675: Auxiliary (backup) transmitter must meet the same technical standards as the main;
       //   if used during primary outage, no separate notification to FCC required for < 30 days.
       //   Beyond 30 days on backup: must file STA (§73.1635) if operating below licensed power.
 
@@ -22996,7 +22996,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fuel_type: 'Diesel (preferred for extended outage reliability)',
         run_time_hours_per_tank: 24,
         automatic_transfer_switch: true,
-        cfr_reference: '§73.1680; NFPA 110 (emergency power systems)'
+        cfr_reference: '§73.1675 (AM auxiliary transmitters); NFPA 110 (emergency power systems)'
       };
 
       // Cost estimate for full redundancy
@@ -23010,7 +23010,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       return {
         frequency_khz, fcc_class, tpo_kw,
-        backup_required_by_fcc: false, // §73.1680 does not mandate backup transmitter
+        backup_required_by_fcc: false, // §73.1675 encourages but does not mandate backup transmitter
         backup_strongly_recommended: true,
         emergency_operation: EMERGENCY_OPERATION,
         backup_sizing_options: SIZING_OPTIONS,
