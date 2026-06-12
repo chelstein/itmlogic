@@ -3142,7 +3142,7 @@ const DEMO_RESULT = {
         compliance_calendar: [
           { month_before_expiry: 4, action: 'Begin renewal application preparation; confirm OPIF is complete', cfr: '§73.3539' },
           { month_before_expiry: 4, action: 'Publish first newspaper notice of renewal or begin on-air announcements', cfr: '§73.3580' },
-          { month_before_expiry: 3, action: 'File Form 303-S with FCC (4 months before license expiry)', cfr: '§73.3539' },
+          { month_before_expiry: 4, action: 'File Form 303-S with FCC (due no later than the 1st day of the 4th full calendar month before license expiry per §73.3539)', cfr: '§73.3539' },
           { month_before_expiry: 0, action: 'License expiry — operate under pending status if renewal not yet granted', cfr: '§73.3539(d)' }
         ],
         n_calendar_actions: 4,
