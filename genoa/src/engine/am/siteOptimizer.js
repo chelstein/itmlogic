@@ -22130,7 +22130,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'INTERFERENCE',     label: 'Interference analysis', cfr: '§73.182', required: true, note: 'Must show no new objectionable interference to all co-channel and adjacent-channel stations' },
         { id: 'DA_PATTERN',       label: 'DA horizontal radiation pattern table', cfr: '§73.150(a)', required: isDA_lm, note: 'Normalized relative field values at 5° increments (72 radials, 0°–355°) per §73.150(a) / Form 301-AM; day and night patterns separately' },
         { id: 'ANTENNA_EFF',      label: 'Antenna efficiency and ground system data', cfr: '§73.190; §73.24', required: true, note: 'Ground system parameters; predicted efficiency factor used in power/contour calculations' },
-        { id: 'TOWER_HEIGHT',     label: 'Tower height (AGL/AMSL) and structural data', cfr: '§17.7 (ASR trigger: 60.96 m AGL); §73.685 (licensed height)', required: true, note: 'Height of antenna structure above ground level (for ASR) and above mean sea level (for RCAMSL)' },
+        { id: 'TOWER_HEIGHT',     label: 'Tower height (AGL/AMSL) and structural data', cfr: '§17.7 (ASR trigger: 60.96 m AGL); §73.45 (AM antenna system authorization)', required: true, note: 'Height of antenna structure above ground level (for ASR) and above mean sea level (for RCAMSL)' },
         { id: 'FAA_CLEARANCE',    label: 'FAA Form 7460-1 or FAA determination', cfr: '§17.7; §17.23', required: true, note: 'Required for any structure > 61m AGL; FAA determination must be attached to LMS filing' },
         { id: 'ENVIRONMENTAL',    label: 'EA or categorical exclusion finding', cfr: '§1.1301–§1.1319', required: true, note: 'Most AM tower relocations qualify for categorical exclusion; full EA required if in floodplain, wetland, etc.' },
         { id: 'ASR_NUMBER',       label: 'FCC ASR registration number', cfr: '§17.7', required: true, note: 'Tower > 60.96m AGL must be registered in FCC Antenna Structure Registration system before CP grant' },
@@ -22558,7 +22558,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Regulatory considerations:
       //   - §73.49: Antenna towers must be enclosed within an effective locked fence
       //   - Ground lease must include fence line and buffer area within leased parcel
-      //   - §73.685: Licensed RCAMSL/HAAT — authorized antenna height must match the leased tower height
+      //   - §73.45: AM antenna system authorization — authorized antenna height must match the leased tower height
       //     (§73.1560 covers operating power limits — not antenna height)
       //   - Interference protection radius: Site must maintain protection ratios under §73.182
       //   - FAA considerations: If tower exceeds 61m AGL (200 ft), requires FAA study (§17.7)
@@ -22593,7 +22593,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Key lease provisions that must be negotiated
       const KEY_PROVISIONS = [
-        { id: 'QUIET_ENJOYMENT', label: 'Quiet enjoyment covenant', priority: 'CRITICAL', note: 'Protects broadcaster from landlord interference with tower or radial ground system during lease term', cfr: '§73.49; §73.685' },
+        { id: 'QUIET_ENJOYMENT', label: 'Quiet enjoyment covenant', priority: 'CRITICAL', note: 'Protects broadcaster from landlord interference with tower or radial ground system during lease term', cfr: '§73.49; §73.45' },
         { id: 'ASSIGNMENT',      label: 'Assignment and sublease rights', priority: 'CRITICAL', note: 'Lease must be freely assignable to FCC permittees and successors-in-interest without landlord consent', cfr: '§73.3533' },
         { id: 'CONDEMNATION',    label: 'Condemnation proceeds', priority: 'HIGH', note: 'In the event of eminent domain taking, broadcaster receives share of condemnation award proportionate to lease value' },
         { id: 'FAA_ZONING',     label: 'Landlord cooperation for FAA/zoning filings', priority: 'HIGH', note: 'Landlord must sign as property owner on FAA Form 7460-1 and local CUP applications' },
@@ -22627,7 +22627,7 @@ async function scoreCandidate(pt, ctx, warnings){
         option_to_purchase_recommended: true,
         option_to_purchase_note: 'Negotiate right of first refusal or option to purchase the site at fair market value. AM transmitter sites are difficult to replicate once lost.',
         relocation_note: `New transmitter site lease must cover: tower base, ${ground_radial_radius_m}m radial ground system, guy wire anchors (${guy_radius_m}m radius), transmitter building, and all-weather access road. Minimum site area: ~${min_site_area_acres} acres. Lease term: ${LEASE_TERM.recommended_years} years minimum.`,
-        reference: '47 CFR §73.49; §73.685 (licensed height/RCAMSL); §73.3533; §73.182; §17.7; §1.1307; FAA Form 7460-1; local zoning/CUP requirements',
+        reference: '47 CFR §73.49; §73.45 (AM antenna system authorization); §73.3533; §73.182; §17.7; §1.1307; FAA Form 7460-1; local zoning/CUP requirements',
         note: `Ground lease: ${LEASE_TERM.recommended_years}-year recommended term, 2×10-year renewals. Minimum site area ~${min_site_area_acres} acres (${min_site_radius_m}m radius). ${KEY_PROVISIONS.length} key provisions; ${critical_provisions} CRITICAL. Option to purchase recommended.`
       };
     })(),
@@ -29121,7 +29121,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   (a) Frequency and mode of operation match the CP authorization.
       //   (b) Equipment ID (transmitter), antenna system details.
       //   (c) Radiation pattern and base currents (DA only): ±3°, ±5% tolerance per §73.154.
-      //   (d) HAAT/RCAMSL computed from final site survey (§73.685).
+      //   (d) HAAT/RCAMSL computed from final site survey (§73.45 / Form 302-AM Exhibit).
       //   (e) FAA notification (if tower ≥ 200 ft AGL) within 5 business days of completion.
       //   (f) RF exposure compliance statement per OET Bulletin 65.
       //   (g) Emergency Alert System operability certification per §11.35.
@@ -29129,8 +29129,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const ltc_requirements = [
         { id: 'FREQ_MODE',      required: true,    label: 'Frequency/mode matches CP authorization',           cfr: '§73.3536' },
         { id: 'EQUIP_ID',       required: true,    label: 'Transmitter equipment ID (FCC Part 73 certified)',  cfr: '§73.1660' },
-        { id: 'ANTENNA_SYS',    required: true,    label: 'Antenna system parameters (HAAT, RCAMSL, pattern)', cfr: '§73.685' },
-        { id: 'SITE_SURVEY',    required: true,    label: 'Licensed site coordinates verified by survey',      cfr: '§73.685' },
+        { id: 'ANTENNA_SYS',    required: true,    label: 'Antenna system parameters (HAAT, RCAMSL, pattern)', cfr: '§73.45' },
+        { id: 'SITE_SURVEY',    required: true,    label: 'Licensed site coordinates verified by survey',      cfr: '§73.45' },
         { id: 'FAA_NOTICE',     required: true,    label: 'FAA Form 7460-2 filed within 5 days of completion', cfr: '§17.7; 14 CFR §77.9' },
         { id: 'RF_EXPOSURE',    required: true,    label: 'OET Bulletin 65 RF exposure compliance statement',  cfr: '§1.1310' },
         { id: 'EAS_CERT',       required: true,    label: 'EAS equipment operability certification',           cfr: '§11.35' },

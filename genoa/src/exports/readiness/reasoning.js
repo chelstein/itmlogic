@@ -270,7 +270,7 @@ function gen_tower_height(exhibit) {
       title: 'Tower Overall Height AGL',
       conclusion,
       evidence:   evidenceItems,
-      rule:       '47 CFR §73.685 / FAA 14 CFR §77',
+      rule:       '47 CFR §17.7 / FAA 14 CFR §77',
       required:   'Must be positive; structures >200 ft AGL require FAA Notice',
       result,
       source:     sourcePath,
