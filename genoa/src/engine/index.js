@@ -871,7 +871,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     }
   }
 
-  // §73.24(g)/(j) and international border — run BEFORE warnings are frozen
+  // §73.24(g)/(i) and international border — run BEFORE warnings are frozen
   // so failures raise blockers that score in filing_readiness.  Previously
   // these ran after readiness() was computed, making them invisible to the
   // badge and score (G-001, G-002, G-007 audit fixes).
