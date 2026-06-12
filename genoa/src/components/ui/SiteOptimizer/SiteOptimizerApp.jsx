@@ -1468,11 +1468,13 @@ const DEMO_RESULT = {
         fcc_class: 'D', frequency_khz: 780, channel_class: 'clear_channel',
         spacing_risk_tier: 'VERY_HIGH',
         spacing_risk_note: 'Secondary Class D on clear channel 780 kHz: must maintain enormous spacing from the dominant Class A and from other co-channel secondaries. Each clear-channel domestic secondary assignment is individually negotiated.',
+        // §73.37 Table I/II minimum separations (km) for Class D applicant.
+        // Source: minimum_spacing_reference block (siteOptimizer.js CO_CHANNEL_KM / ADJ_KM tables).
         spacing_table: [
-          { to_class: 'A', cc_km: 1610, fa_km: 402, sa_km: 178, from_class: 'D', co_channel_freq: 780 },
-          { to_class: 'B', cc_km:  402, fa_km: 322, sa_km: 177, from_class: 'D', co_channel_freq: 780 },
-          { to_class: 'C', cc_km:  322, fa_km: 161, sa_km:  97, from_class: 'D', co_channel_freq: 780 },
-          { to_class: 'D', cc_km:  402, fa_km: 322, sa_km: 177, from_class: 'D', co_channel_freq: 780 }
+          { to_class: 'A', cc_km: 1037, fa_km: 805, sa_km: 402, from_class: 'D', co_channel_freq: 780 },
+          { to_class: 'B', cc_km:  953, fa_km: 724, sa_km: 354, from_class: 'D', co_channel_freq: 780 },
+          { to_class: 'C', cc_km:  724, fa_km: 402, sa_km: 177, from_class: 'D', co_channel_freq: 780 },
+          { to_class: 'D', cc_km:  953, fa_km: 724, sa_km: 354, from_class: 'D', co_channel_freq: 780 }
         ],
         verification_checklist: [
           { id: 'cc_query', item: 'Co-channel (780 kHz) station database query', action: 'Query FCC LMS for all AM stations authorized on this frequency. Apply §73.37 Table 1 spacings to each.', data_source: 'FCC LMS AM Query or BIA/Kelsey AM database', required: true },
@@ -2980,13 +2982,15 @@ const DEMO_RESULT = {
       },
       adjacent_channel_protection_guide: {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
-        adjacent_10khz: { required_du_db: 20, lower_channel_khz: 770, upper_channel_khz: 790, sideband_rolloff_db: 20, cfr: '§73.182(b) Table 1' },
-        adjacent_20khz: { required_du_db: 6,  lower_channel_khz: 760, upper_channel_khz: 800, sideband_rolloff_db: 40, cfr: '§73.182(b) Table 1' },
+        // §73.182 Table 1 daytime groundwave D/U ratios. Per siteOptimizer.js adjacent_channel_advisory:
+        // 1st adj (±10 kHz): 6 dB; 2nd adj (±20 kHz): 0 dB (1:1, generally no daytime constraint).
+        adjacent_10khz: { required_du_db: 6,  lower_channel_khz: 770, upper_channel_khz: 790, sideband_rolloff_db: 20, cfr: '§73.182 Table 1 (daytime groundwave)' },
+        adjacent_20khz: { required_du_db: 0,  lower_channel_khz: 760, upper_channel_khz: 800, sideband_rolloff_db: 40, cfr: '§73.182 Table 1 (daytime groundwave)' },
         adjacent_channels: [
-          { id: 'ADJ10_LOW',  frequency_khz: 770, separation_khz: 10, direction: 'LOWER', du_db_required: 20 },
-          { id: 'ADJ10_HIGH', frequency_khz: 790, separation_khz: 10, direction: 'UPPER', du_db_required: 20 },
-          { id: 'ADJ20_LOW',  frequency_khz: 760, separation_khz: 20, direction: 'LOWER', du_db_required: 6  },
-          { id: 'ADJ20_HIGH', frequency_khz: 800, separation_khz: 20, direction: 'UPPER', du_db_required: 6  }
+          { id: 'ADJ10_LOW',  frequency_khz: 770, separation_khz: 10, direction: 'LOWER', du_db_required: 6 },
+          { id: 'ADJ10_HIGH', frequency_khz: 790, separation_khz: 10, direction: 'UPPER', du_db_required: 6 },
+          { id: 'ADJ20_LOW',  frequency_khz: 760, separation_khz: 20, direction: 'LOWER', du_db_required: 0 },
+          { id: 'ADJ20_HIGH', frequency_khz: 800, separation_khz: 20, direction: 'UPPER', du_db_required: 0 }
         ],
         n_adjacent_channels_checked: 4,
         candidate_primary_reach_km: 87.4,
@@ -2999,13 +3003,13 @@ const DEMO_RESULT = {
         assessment_notes: [
           'Check §73.182 Table 1 for exact D/U ratios applicable to your class-pair combination',
           'Your 0.5 mV/m reach from this candidate: 87.4 km — adjacent stations within ~131.1 km may need interference analysis',
-          'First adjacent (±10 kHz, 20 dB D/U required): check 770 kHz and 790 kHz licensees',
-          'Second adjacent (±20 kHz, 6 dB D/U required): check 760 kHz and 800 kHz licensees',
+          'First adjacent (±10 kHz, 6 dB D/U required per §73.182 Table 1 daytime GW): check 770 kHz and 790 kHz licensees',
+          'Second adjacent (±20 kHz, 0 dB D/U — generally no daytime groundwave constraint per §73.182 Table 1): check 760 kHz and 800 kHz licensees',
           'Use FCC AM Query (query.fcc.gov) or LMS to find adjacent-channel stations within interference range',
           'If site change creates new adjacent-channel conflict, FCC may require directional antenna or reduced power to protect'
         ],
         reference: '47 CFR §73.182(b) Table 1; §73.37; FCC AM Query (query.fcc.gov); ITU AM Bandwidth Spec',
-        note: '780 kHz Class D. Adj-10 D/U: 20 dB. Adj-20 D/U: 6 dB. 4 adjacent channels to check.'
+        note: '780 kHz Class D. Adj-10 D/U: 6 dB (§73.182 Table 1 daytime GW). Adj-20 D/U: 0 dB (no daytime constraint). 4 adjacent channels to check.'
       },
       main_studio_rule_guide: {
         frequency_khz: 780, fcc_class: 'D',
