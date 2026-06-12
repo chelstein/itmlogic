@@ -3085,8 +3085,8 @@ const DEMO_RESULT = {
         n_coverage_zones: 3,
         primary_service_radius_km: 87.4,
         primary_service_area_km2: 23990.2,
-        translator_opportunity: { authorized: true, cfr: '47 CFR §74.1200; FCC AMTA 2020 proceeding', max_erp_w: 250, fm_band: '88.1–107.9 MHz', coverage_note: 'FM translator can extend effective coverage into areas with poor AM reception (buildings, urban canyons)', application_form: 'FCC Form 349', filing_fee_usd: 655, application_window: 'FCC AM Translator Window (periodic; last 2021)', band_stacking: 'FM translator must protect all co-channel and adjacent FM stations per §74.1204' },
-        reference: '47 CFR §73.24; §73.182; §73.187; §74.1200; FCC AMTA 2020; FCC Form 349',
+        translator_opportunity: { authorized: true, cfr: '47 CFR §74.1201; FCC AMTA 2020 proceeding', max_erp_w: 250, fm_band: '88.1–107.9 MHz', coverage_note: 'FM translator can extend effective coverage into areas with poor AM reception (buildings, urban canyons)', application_form: 'FCC Form 349', filing_fee_usd: 655, application_window: 'FCC AM Translator Window (periodic; last 2021)', band_stacking: 'FM translator must protect all co-channel and adjacent FM stations per §74.1204' },
+        reference: '47 CFR §73.24; §73.182; §73.187; §74.1201; FCC AMTA 2020; FCC Form 349',
         note: 'Class D at 780 kHz. Primary 0.5 mV/m reach: 87.4 km (23990.2 km²). COL min: 2 mV/m day. FM translator (250W) authorized under AMTA.'
       },
       license_renewal_compliance_guide: {

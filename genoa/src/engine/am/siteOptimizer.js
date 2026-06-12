@@ -18478,7 +18478,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Models the FM translator and AM booster strategy for extending reach
       // of the candidate AM relocation site.
       //
-      // FM Translator overview (47 CFR §74.1200–§74.1204):
+      // FM Translator overview (47 CFR §74.1201–§74.1204):
       //   - FM translators rebroadcast AM station programming on FM band
       //   - AM stations may use translators under §74.1201(g) (AM-to-FM rule)
       //   - FCC issued ~8,000+ AM-to-FM translator authorizations since 2013
@@ -18590,7 +18590,7 @@ async function scoreCandidate(pt, ctx, warnings){
         is_clear_channel:                  is_clear_ch_tr,
         is_local_channel:                  is_local_ch_tr,
         is_da:                             isDA_tr,
-        reference: '47 CFR §74.1200–§74.1263; FCC AM Revitalization Order (MB Docket 13-249, 2016); FCC Form 350/314/315/316; FCC Fact Sheet: AM Radio Revitalization (2015)',
+        reference: '47 CFR §74.1201–§74.1263; FCC AM Revitalization Order (MB Docket 13-249, 2016); FCC Form 350/314/315/316; FCC Fact Sheet: AM Radio Revitalization (2015)',
         note: `FM translator eligible (AM Revitalization): yes. Recommended: ${recommended_translator_erp_w}W ERP (${recommended_tier.coverage_radius_km} km). ` +
               `Total translator cost: $${translator_total_cost_low.toLocaleString()}–$${translator_total_cost_high.toLocaleString()}. ` +
               `Translator operable during AM silence: yes.`
@@ -29554,7 +29554,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Maximum ERP 250 W for AM-authorized translators in most cases
       const TRANSLATOR_OPPORTUNITY = {
         authorized: true,
-        cfr: '47 CFR §74.1200; FCC AMTA 2020 proceeding',
+        cfr: '47 CFR §74.1201; FCC AMTA 2020 proceeding',
         max_erp_w: 250,
         fm_band: '88.1–107.9 MHz',
         coverage_note: 'FM translator can extend effective coverage into areas with poor AM reception (buildings, urban canyons)',
@@ -29574,7 +29574,7 @@ async function scoreCandidate(pt, ctx, warnings){
         primary_service_area_km2: COVERAGE_ZONES[0].area_km2,
         reach_pct_change_vs_current_site: reach_pct_change,
         translator_opportunity: TRANSLATOR_OPPORTUNITY,
-        reference: '47 CFR §73.24; §73.182; §73.187; §74.1200; FCC AMTA 2020; FCC Form 349',
+        reference: '47 CFR §73.24; §73.182; §73.187; §74.1201; FCC AMTA 2020; FCC Form 349',
         note: `Class ${fcc_class} at ${frequency_khz} kHz. Primary 0.5 mV/m reach: ${primary_reach_km} km (${COVERAGE_ZONES[0].area_km2} km²). COL min: ${myThreshold.day_mvm} mV/m day.${reach_pct_change != null ? ` Reach change vs current site: ${reach_pct_change > 0 ? '+' : ''}${reach_pct_change}%.` : ''} FM translator (250W) authorized under AMTA.`
       };
     })(),
@@ -33594,15 +33594,15 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
   });
 
   // HAAT calculation — required for all AM tower site submissions.
-  // Height Above Average Terrain must be computed over 50 radials at 3.2 km intervals
-  // per §73.684 procedure even though §73.684 is primarily FM; AM engineers use the
-  // same metric for comparative analysis and NIF study inputs.
+  // Height Above Average Terrain must be computed over radials per the FCC terrain-profile method.
+  // §73.313(a) defines the FM 8-radial / 16 km terrain-profile procedure; AM engineers apply the
+  // same methodology for comparative analysis and NIF study inputs (no separate AM HAAT CFR rule).
   items.push({
     id: 'HAAT_CALCULATION',
-    description: 'Compute Height Above Average Terrain (HAAT) over 50 radials at 3.2 km intervals',
+    description: 'Compute Height Above Average Terrain (HAAT) over radials using FCC terrain-profile method',
     status: 'REQUIRED',
-    rule: '47 CFR §73.684 procedure (AM engineering practice)',
-    note: 'HAAT is required as input to NIF study and §73.182 interference calculations; compute using USGS DEM data over 50 radials (360° / 7.2° spacing) at 3.2 km to 16 km from the proposed site.'
+    rule: '47 CFR §73.313(a) terrain-profile procedure (FM method applied as AM engineering practice)',
+    note: 'HAAT is required as input to NIF study and §73.182 interference calculations; compute using USGS DEM data over 8 radials (45° spacing) at 3.2 km to 16 km from the proposed site per §73.313(a).'
   });
 
   // License modification / construction permit notice.
