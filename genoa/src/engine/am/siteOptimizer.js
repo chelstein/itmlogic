@@ -9634,10 +9634,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //     Class D stations on clear channels must commence reduced (nighttime) power at
       //     local sunset and may not resume daytime power until local sunrise.  The
       //     actual UTC transition times vary by date and site latitude/longitude.
-      //   §73.187: "Critical Hours" operation — defined as the first two hours after
-      //     local sunrise and the last two hours before local sunset — may permit an
-      //     intermediate power level for Class D stations when a specific critical-hours
-      //     authorization is granted.
+      //   §73.187: Limitation on daytime radiation — restricts daytime signal of non-dominant
+      //     Class B/D stations on clear channels to protect the dominant Class A station.
+      //     "Critical hours" (the sunrise/sunset transition window) is governed under the
+      //     §73.99 PSRA/PSSA framework and station-specific FCC authorizations.
       //   §73.1350 (Transmission system operation): Stations must have operational procedures for
       //     power reduction transitions.
       //   §73.1201: Station identification requirements (hourly, near the hour).
@@ -9733,7 +9733,7 @@ async function scoreCandidate(pt, ctx, warnings){
         automation_cost_high:     automation_high,
         power_relay_cost_low:     relay_cost_low,
         power_relay_cost_high:    relay_cost_high,
-        reference: '47 CFR §73.99 (PSRA/PSSA); §73.187 (critical hours); §73.1201 (station identification); §73.1800 (station log); USNO solar tables (for LMS-compliant exact UTC)',
+        reference: '47 CFR §73.99 (PSRA/PSSA); §73.187 (daytime radiation limitation); §73.1201 (station identification); §73.1800 (station log); USNO solar tables (for LMS-compliant exact UTC)',
         note: `${isClearCh ? 'Clear channel — Class D must go SILENT at sunset (§73.99).' : `Non-clear — night power ≈ ${night_power_kw} kW (${100 - power_reduction_pct}% of day TPO).`} Summer: ${summer.day_length_h}h day, sunset ${summer.sunset_utc}. Winter: ${winter.day_length_h}h day, sunset ${winter.sunset_utc}.`
       };
     })(),
@@ -10225,9 +10225,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // Regulatory basis:
       //   47 CFR §73.1400: Transmission system monitoring and remote control requires
       //     unobstructed site access for unattended operation inspections.
-      //   47 CFR §73.1870: Emergency operation provisions.  Class A/B stations in critical
-      //     areas effectively need standby power to maintain operations.  Best practice
-      //     for all classes.  FCC inspectors verify standby power capability.
+      //   47 CFR §73.1615: Emergency reduced-power operation provisions.  Stations may operate
+      //     below licensed power without prior FCC approval for up to 10 days; notify FCC
+      //     within 24 hours if extended.  Reliable primary power prevents triggering §73.1615.
       //   47 CFR §73.1560(b): Power reductions > 10% must be reported; STA required
       //     if power is reduced for > 30 days — underscores need for reliable primary power.
       //   NFPA 110 (2021): Emergency and standby power systems.  Level 1 systems must
@@ -10352,7 +10352,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_infra_high_usd,
         annual_recurring_low_usd,
         annual_recurring_high_usd,
-        reference: '47 CFR §73.1400 (remote control / transmission system monitoring); §73.1870 (emergency operation); §73.1560(b) (power reduction STA); NFPA 110 (2021) §7.2 (generator sizing, 25% headroom, Level 1 ≤10 s transfer); EIA-840 utility extension cost estimates; USDA RUS (rural utility service) construction standards',
+        reference: '47 CFR §73.1400 (remote control / transmission system monitoring); §73.1615 (emergency reduced-power operation); §73.1560(b) (power reduction STA); NFPA 110 (2021) §7.2 (generator sizing, 25% headroom, Level 1 ≤10 s transfer); EIA-840 utility extension cost estimates; USDA RUS (rural utility service) construction standards',
         note: `${generator_kw} kW standby generator (NFPA 110 Level 1) required for ${tpo_kw} kW station: TX ${ac_input_kw} kW + HVAC ${hvac_load_kw} kW + base ${site_base_kw} kW = ${total_load_kw} kW × 1.25 headroom = ${generator_load_kw} kW. Road: ${road_access_type.replace(/_/g, ' ')}. Total one-time infrastructure: $${total_infra_low_usd.toLocaleString()}–$${total_infra_high_usd.toLocaleString()}.`
       };
     })(),
@@ -11299,7 +11299,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Must remain in file for 2 years after broadcast date.
       //
       // License renewal relevance:
-      //   §73.3555 / §73.3526: FCC reviews OPF completeness during renewal.
+      //   §73.3526 / §73.3539: FCC reviews OPF completeness during renewal (§73.3539 renewal application process).
       //   Missing quarterly reports or late political file entries trigger §73.3526(e) violation risk.
       //   Consistent OPF maintenance is a "character" indicator evaluated in §309(d) renewal standard.
       //
