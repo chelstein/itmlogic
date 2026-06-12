@@ -964,7 +964,7 @@ const DEMO_RESULT = {
         total_low_usd: 164000, total_high_usd: 404000,
         range_label: '$164k–$404k (2024 USD, screening only)',
         breakdown: {
-          tower_steel:   { low: 5000,   high: 15000,  note: 'Guyed λ/4 monopole at 96 m' },
+          tower_steel:   { low: 5000,   high: 15000,  note: 'Guyed λ/4 monopole at 96.15 m' },
           ground_system: { low: 80000,  high: 120000, note: '120-radial copper; σ=8 mS/m soil factor' },
           faa_lighting:  { low: 20000,  high: 60000,  note: 'ASR threshold exceeded (47 CFR §17.7)' },
           civil_work:    { low: 50000,  high: 150000, note: 'Grading, access road, fence, foundation' }
@@ -1116,7 +1116,7 @@ const DEMO_RESULT = {
           { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
         ],
         matching_network_complexity: 'LOW — λ/4 tower presents near-unity VSWR to 50 Ω transmitter output; base ATU rarely required beyond coarse trimming.',
-        design_note: 'Standard 120-radial ground system at 96 m length achieves ~82% radiation efficiency at σ=5 mS/m. Extending to 180 radials (144 m) gains ~9 pts efficiency.'
+        design_note: 'Standard 120-radial ground system at 96.15 m length achieves ~82% radiation efficiency at σ=5 mS/m. Extending to 180 radials (144 m) gains ~9 pts efficiency.'
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
@@ -1125,7 +1125,7 @@ const DEMO_RESULT = {
         line_items: [
           { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
@@ -1221,7 +1221,7 @@ const DEMO_RESULT = {
         asr_required: true, treaty_zone_present: false,
         critical_count: 4, high_count: 5, total_items: 11,
         items: [
-          { id: 'ZONING_VERIFICATION', category: 'Zoning & Land Use', priority: 'CRITICAL', action: 'Verify county/municipal zoning classification permits telecommunications tower and broadcast facility', what_to_check: 'Contact Yavapai County planning; AM towers may require conditional use permit.', timeline_weeks: [2, 6], notes: 'AM tower at 96 m may exceed local height limits — confirm variance process.' },
+          { id: 'ZONING_VERIFICATION', category: 'Zoning & Land Use', priority: 'CRITICAL', action: 'Verify county/municipal zoning classification permits telecommunications tower and broadcast facility', what_to_check: 'Contact Yavapai County planning; AM towers may require conditional use permit.', timeline_weeks: [2, 6], notes: 'AM tower at 96.15 m may exceed local height limits — confirm variance process.' },
           { id: 'TITLE_SEARCH', category: 'Title & Encumbrances', priority: 'CRITICAL', action: 'Commission title search and title insurance for parcel', what_to_check: 'Easements, deed restrictions, mineral rights. Buried utility easements in ground system area must be documented.', timeline_weeks: [2, 4], notes: null },
           { id: 'PARCEL_SIZE_ADEQUACY', category: 'Physical Requirements', priority: 'CRITICAL', action: 'Verify parcel ≥ 3.52 ha for 96.15-m radial system (min ~106 m radius)', what_to_check: 'Map all fence lines and structures within 106 m of proposed tower base.', timeline_weeks: [1, 2], notes: null },
           { id: 'ASR_COORD_AIRPORT', category: 'FAA & ASR', priority: 'CRITICAL', action: 'File FAA Form 7460-1 aeronautical study — λ/4 tower (96.15 m) exceeds §17.7 200-ft threshold', what_to_check: 'Identify airports within 20 km. Pre-screen at FAA OE/AAA online tool.', timeline_weeks: [6, 16], notes: 'FAA review can take 45–90 days.' },
@@ -1229,7 +1229,7 @@ const DEMO_RESULT = {
           { id: 'NHPA_SECTION_106', category: 'Environmental', priority: 'HIGH', action: 'Initiate NHPA §106 historic properties review with Arizona SHPO', what_to_check: 'APE within 192 m of proposed tower. Run SHPO consultation if historic properties within APE.', timeline_weeks: [4, 16], notes: null },
           { id: 'UTILITY_ACCESS', category: 'Utilities & Infrastructure', priority: 'HIGH', action: 'Confirm electrical service availability (3-phase preferred)', what_to_check: 'Identify nearest transformer. Estimate service extension cost.', timeline_weeks: [2, 4], notes: null },
           { id: 'LEASE_TERM', category: 'Lease & Legal', priority: 'HIGH', action: 'Negotiate minimum 20-year lease with renewal options; include FCC CP approval contingency', what_to_check: 'CP grant typically 1–3 years. Lease must survive filing delay.', timeline_weeks: [4, 12], notes: null },
-          { id: 'SETBACKS_GUYWIRES', category: 'Physical Requirements', priority: 'HIGH', action: 'Verify guy wire anchors can be placed at 77–96 m from tower base', what_to_check: 'Standard guyed λ/4 monopole uses 3 guy sets. Each anchor needs 5–10 m clearance from property line.', timeline_weeks: [1, 2], notes: null },
+          { id: 'SETBACKS_GUYWIRES', category: 'Physical Requirements', priority: 'HIGH', action: 'Verify guy wire anchors can be placed at 77–96.15 m from tower base', what_to_check: 'Standard guyed λ/4 monopole uses 3 guy sets. Each anchor needs 5–10 m clearance from property line.', timeline_weeks: [1, 2], notes: null },
           { id: 'ACCESS_ROAD', category: 'Utilities & Infrastructure', priority: 'MEDIUM', action: 'Verify legal access road and easement — crane truck access required', what_to_check: 'Confirm all-weather road ≥4 m wide to tower base.', timeline_weeks: [1, 3], notes: null },
           { id: 'TREATY_SETBACK', category: 'Regulatory', priority: 'INFORMATIONAL', action: 'Verify site is outside international treaty coordination zone', what_to_check: 'No treaty zone detected at screening. Verify final coordinates.', timeline_weeks: [1, 2], notes: null }
         ],
@@ -1892,21 +1892,21 @@ const DEMO_RESULT = {
         asr_required: true, faa_lighting_required: true,
         n_height_milestones: 5,
         height_milestones: [
-          { label: 'λ/8  (45°)',  height_m: 48,  height_ft: 157, elec_deg: 45,  rr_ohm: 10.5, field_gain_rel: 0.71, notes: 'Short; requires large inductive loading coil; low efficiency; typical of land-locked urban sites' },
-          { label: 'λ/4  (90°)',  height_m: 96,  height_ft: 315, elec_deg: 90,  rr_ohm: 36.6, field_gain_rel: 1.00, notes: 'Standard reference height; excellent efficiency; used by most Class D/C stations' },
-          { label: '3λ/8 (135°)', height_m: 144, height_ft: 472, elec_deg: 135, rr_ohm: 55.0, field_gain_rel: 1.10, notes: 'Medium height; field gain +10% over λ/4; requires FAA lighting study above 200 ft (§17.23)' },
-          { label: 'λ/2  (180°)', height_m: 192, height_ft: 630, elec_deg: 180, rr_ohm: 74.0, field_gain_rel: 1.14, notes: 'Half-wave; peak at 5λ/8 approaching; FAA ASR required (>60.96 m / 200 ft per §17.7); major tower project' },
-          { label: '5λ/8 (225°)', height_m: 240, height_ft: 787, elec_deg: 225, rr_ohm: 37.0, field_gain_rel: 1.16, notes: 'Near-optimal field strength; Rr returns to ~37 Ω; most efficient coverage per watt; rarely practical for Class D' }
+          { label: 'λ/8  (45°)',  height_m: 48.08,  height_ft: 157.7, elec_deg: 45,  rr_ohm: 10.5, field_gain_rel: 0.71, notes: 'Short; requires large inductive loading coil; low efficiency; typical of land-locked urban sites' },
+          { label: 'λ/4  (90°)',  height_m: 96.15,  height_ft: 315.5, elec_deg: 90,  rr_ohm: 36.6, field_gain_rel: 1.00, notes: 'Standard reference height; excellent efficiency; used by most Class D/C stations' },
+          { label: '3λ/8 (135°)', height_m: 144.23, height_ft: 473.2, elec_deg: 135, rr_ohm: 55.0, field_gain_rel: 1.10, notes: 'Medium height; field gain +10% over λ/4; requires FAA lighting study above 200 ft (§17.23)' },
+          { label: 'λ/2  (180°)', height_m: 192.31, height_ft: 630.9, elec_deg: 180, rr_ohm: 74.0, field_gain_rel: 1.14, notes: 'Half-wave; peak at 5λ/8 approaching; FAA ASR required (>60.96 m / 200 ft per §17.7); major tower project' },
+          { label: '5λ/8 (225°)', height_m: 240.39, height_ft: 788.7, elec_deg: 225, rr_ohm: 37.0, field_gain_rel: 1.16, notes: 'Near-optimal field strength; Rr returns to ~37 Ω; most efficient coverage per watt; rarely practical for Class D' }
         ],
         coverage_estimates: [
-          { label: 'λ/8  (45°)',  height_m: 48,  height_ft: 157, field_gain_rel: 0.71, coverage_radius_ratio: 0.71, coverage_gain_pct: -29, rr_ohm: 10.5 },
-          { label: 'λ/4  (90°)',  height_m: 96,  height_ft: 315, field_gain_rel: 1.00, coverage_radius_ratio: 1.00, coverage_gain_pct: 0,   rr_ohm: 36.6 },
-          { label: '3λ/8 (135°)', height_m: 144, height_ft: 472, field_gain_rel: 1.10, coverage_radius_ratio: 1.10, coverage_gain_pct: 10,  rr_ohm: 55.0 },
-          { label: 'λ/2  (180°)', height_m: 192, height_ft: 630, field_gain_rel: 1.14, coverage_radius_ratio: 1.14, coverage_gain_pct: 14,  rr_ohm: 74.0 },
-          { label: '5λ/8 (225°)', height_m: 240, height_ft: 787, field_gain_rel: 1.16, coverage_radius_ratio: 1.16, coverage_gain_pct: 16,  rr_ohm: 37.0 }
+          { label: 'λ/8  (45°)',  height_m: 48.08,  height_ft: 157.7, field_gain_rel: 0.71, coverage_radius_ratio: 0.71, coverage_gain_pct: -29, rr_ohm: 10.5 },
+          { label: 'λ/4  (90°)',  height_m: 96.15,  height_ft: 315.5, field_gain_rel: 1.00, coverage_radius_ratio: 1.00, coverage_gain_pct: 0,   rr_ohm: 36.6 },
+          { label: '3λ/8 (135°)', height_m: 144.23, height_ft: 473.2, field_gain_rel: 1.10, coverage_radius_ratio: 1.10, coverage_gain_pct: 10,  rr_ohm: 55.0 },
+          { label: 'λ/2  (180°)', height_m: 192.31, height_ft: 630.9, field_gain_rel: 1.14, coverage_radius_ratio: 1.14, coverage_gain_pct: 14,  rr_ohm: 74.0 },
+          { label: '5λ/8 (225°)', height_m: 240.39, height_ft: 788.7, field_gain_rel: 1.16, coverage_radius_ratio: 1.16, coverage_gain_pct: 16,  rr_ohm: 37.0 }
         ],
         reference: '47 CFR §73.160 (antenna height); §17.7 (ASR); §17.23 (FAA marking); ITU-R BS.346-1 (antenna gain vs height)',
-        note: 'For 780 kHz (λ=385 m): current tower 315 ft (λ/4, 90°) achieves baseline field strength. Increasing to 5λ/8 (787 ft) yields +16% field gain. Towers above 200 ft require FAA ASR registration (§17.7) and painting/lighting per §17.23.'
+        note: 'For 780 kHz (λ=384.62 m): current tower 315.5 ft (λ/4 = 96.15 m, 90°) achieves baseline field strength. Increasing to 5λ/8 (788.7 ft = 240.39 m) yields +16% field gain. Towers above 200 ft require FAA ASR registration (§17.7) and painting/lighting per §17.23.'
       },
       spectrum_monitoring_and_frequency_drift_guide: {
         frequency_khz: 780, freq_hz: 780000, tolerance_hz: 20, tolerance_ppm: 25.64,
@@ -4183,7 +4183,7 @@ const DEMO_RESULT = {
         line_items: [
           { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
@@ -4377,7 +4377,7 @@ const DEMO_RESULT = {
         line_items: [
           { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study at 8.5 kW (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 40000 },
@@ -4547,7 +4547,7 @@ const DEMO_RESULT = {
         line_items: [
           { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 45000 },
