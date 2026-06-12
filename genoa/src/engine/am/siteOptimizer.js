@@ -23436,7 +23436,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
     interference_complaint_resolution_guide: (() => {
       // §73.88 (AM co-channel), §73.182 (AM interference calculations), §73.3587 (informal complaints), §1.106 (petitions)
-      // (§73.814 is an LPFM rule — Subpart G — not an FM/AM interference complaint process rule.)
+      // (LPFM Subpart G rules such as §73.811 are not applicable to AM/FM interference complaints.)
       // AM stations are secondary to their protected contours only; interference "by-right" to other stations
       // is a function of whether the complaining station is within a protected service area.
       // Relocation can trigger NEW interference complaints from neighbors OR resolve existing ones.
@@ -24079,7 +24079,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Environmental ongoing — §1.1307 annual certification
       const environmental_compliance = {
-        rule:      '47 CFR §1.1307 / §1.97',
+        rule:      '47 CFR §1.1307 / §1.1310',
         rf_annual: mpeReq_om ? 'Annual RF exposure self-certification required. Repeat MPE evaluation if TPO or antenna configuration changes.' : 'RF exposure simplified evaluation on license renewal.',
         nepa_ongoing: 'Report any changes in construction or operations that might trigger previously unevaluated environmental impacts.',
         environmental_record: 'Maintain on-site environmental records for NEPA compliance history.',
