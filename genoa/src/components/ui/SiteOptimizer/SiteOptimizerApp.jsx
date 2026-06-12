@@ -575,7 +575,7 @@ const DEMO_RESULT = {
   candidate_count_by_status: {
     PROMISING: 58, REVIEW_REQUIRED: 142, NON_COMPLIANT: 34
   },
-  top_candidates_summary: 'Rank 1 scores 91.3 (PROMISING), 6 km NE of current site, σ=8 mS/m (EXCELLENT). COL field 18.4 mV/m (≥§73.24(i) 5 mV/m floor). est. 125K served @0.5 mV/m. vs current site: score +28.9, reach +5.6 km. top 4 σ quality: 3×EXCELLENT, 1×FAIR. statuses: 3 PROMISING, 1 REVIEW_REQUIRED (out of 234 evaluated).',
+  top_candidates_summary: 'Rank 1 scores 91.3 (PROMISING), 6 km NE of current site, σ=8 mS/m (EXCELLENT). COL field 18.4 mV/m (≥§73.24(i) 5 mV/m floor). est. 125K served @0.5 mV/m. vs current site: score +28.9, reach +5.6 km. top 4 σ quality: 3×EXCELLENT, 1×FAIR. shortlist statuses: 2 PROMISING, 1 RECOVERABLE_WITH_POWER_INCREASE, 1 NON_COMPLIANT (out of 234 evaluated).',
   candidate_shortlist: [
     {
       rank: 1, lat: 34.91, lon: -111.79, status_category: 'PROMISING',
@@ -613,13 +613,13 @@ const DEMO_RESULT = {
     note: 'Quadrant analysis based on bearing from current site.'
   },
   candidate_set_recommendation: {
-    overall_guidance: '3 candidates are ready to advance. Initiate NIF studies at Rank 1 and Rank 2 in parallel to minimize timeline.',
+    overall_guidance: '2 candidates are ready to advance immediately. Rank 3 requires TPO increase before advancing. Initiate NIF studies at Rank 1 and Rank 2 in parallel to minimize timeline.',
     primary_recommended_rank: 1,
-    n_advance_ready: 3, n_need_remedy: 0, n_hold: 1,
+    n_advance_ready: 2, n_need_remedy: 1, n_hold: 1,
     candidates: [
       { rank: 1, status: 'PROMISING', score: 91.3, col_pct: 97, gate_verdict: 'CONDITIONAL', gate_fail_count: 0, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'NE', action: 'Advance to full §73.182 NIF study + parcel investigation. Commission soil resistivity survey. DA-N study required for nighttime operation.', priority: 'ADVANCE_IMMEDIATELY' },
       { rank: 2, status: 'PROMISING', score: 84.0, col_pct: 91, gate_verdict: 'CONDITIONAL', gate_fail_count: 0, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'SE', action: 'Advance to full §73.182 NIF study + parcel investigation. Commission soil resistivity survey. DA-N study required for nighttime operation.', priority: 'ADVANCE_IMMEDIATELY' },
-      { rank: 3, status: 'PROMISING', score: 78.2, col_pct: 78, gate_verdict: 'CONDITIONAL', gate_fail_count: 0, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'NW', action: 'Advance to NIF study + parcel investigation.', priority: 'ADVANCE_IMMEDIATELY' },
+      { rank: 3, status: 'RECOVERABLE_WITH_POWER_INCREASE', score: 71.8, col_pct: 78, gate_verdict: 'CONDITIONAL', gate_fail_count: 1, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'NW', action: 'Increase TPO to ≥8.5 kW to achieve §73.24(i) compliance, then advance to NIF study.', priority: 'HOLD_PENDING_REMEDY' },
       { rank: 4, status: 'NON_COMPLIANT', score: 58.5, col_pct: 62, gate_verdict: 'NON_VIABLE_AS_IS', gate_fail_count: 1, cost_tier: 'VERY_HIGH', skywave_advisory: 'CRITICAL', quadrant: 'SW', action: 'Hold — 1 gate failure(s) require engineering remediation before advancing. Commission DA or power-increase study.', priority: 'HOLD' }
     ],
     note: 'This recommendation is a SCREENING-GRADE advisory based on automated scoring. A licensed broadcast engineer and FCC counsel must review before any site commitment or filing.'
@@ -929,11 +929,12 @@ const DEMO_RESULT = {
         evaluation_required: true,
         rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
         frequency_mhz: 0.78,
-        near_field_boundary_m: 61.12,
-        mpe_limit_mw_cm2: 0.0020,
-        far_field_exclusion_m: 44.7,
-        recommended_fence_distance_m: 61.12,
-        note: 'At 5 kW, near-field boundary (λ/2π) dominates. Fence at ≥62 m from base of antenna.'
+        near_field_boundary_m: 61.22,
+        mpe_limit_mw_cm2: 100.0,
+        _mpe_source: '§1.1310 Table 1 uncontrolled, 0.3–1.34 MHz: 100 mW/cm². At 780 kHz both controlled and uncontrolled limits are 100 mW/cm².',
+        far_field_exclusion_m: 0.81,
+        recommended_fence_distance_m: 61.22,
+        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
       },
       power_efficiency_metrics: {
         tpo_kw: 5,
@@ -1198,7 +1199,7 @@ const DEMO_RESULT = {
       },
       technical_proof_guide: {
         frequency_khz: 780, fcc_class: 'D', antenna_mode: 'DA', is_local_channel: false,
-        quarter_wave_m: 96.2, near_field_boundary_m: 61, n_proof_radials: 72,
+        quarter_wave_m: 96.15, near_field_boundary_m: 61.22, n_proof_radials: 72,
         estimated_field_days: [3, 5],
         measurements: [
           { id: 'BASE_CURRENT', label: 'Antenna base current reading', rule: '47 CFR §73.154(a)', instrument: 'Thermocouple ammeter at antenna base', notes: 'Read base current at licensed TPO. Record as reference for monitor-point calibration.' },
@@ -1888,7 +1889,7 @@ const DEMO_RESULT = {
           { label: 'λ/8  (45°)',  height_m: 48,  height_ft: 157, elec_deg: 45,  rr_ohm: 10.5, field_gain_rel: 0.71, notes: 'Short; requires large inductive loading coil; low efficiency; typical of land-locked urban sites' },
           { label: 'λ/4  (90°)',  height_m: 96,  height_ft: 315, elec_deg: 90,  rr_ohm: 36.6, field_gain_rel: 1.00, notes: 'Standard reference height; excellent efficiency; used by most Class D/C stations' },
           { label: '3λ/8 (135°)', height_m: 144, height_ft: 472, elec_deg: 135, rr_ohm: 55.0, field_gain_rel: 1.10, notes: 'Medium height; field gain +10% over λ/4; requires FAA lighting study above 200 ft (§17.23)' },
-          { label: 'λ/2  (180°)', height_m: 192, height_ft: 630, elec_deg: 180, rr_ohm: 74.0, field_gain_rel: 1.14, notes: 'Half-wave; peak at 5λ/8 approaching; FAA ASR required (>61 m per §17.7); major tower project' },
+          { label: 'λ/2  (180°)', height_m: 192, height_ft: 630, elec_deg: 180, rr_ohm: 74.0, field_gain_rel: 1.14, notes: 'Half-wave; peak at 5λ/8 approaching; FAA ASR required (>60.96 m / 200 ft per §17.7); major tower project' },
           { label: '5λ/8 (225°)', height_m: 240, height_ft: 787, elec_deg: 225, rr_ohm: 37.0, field_gain_rel: 1.16, notes: 'Near-optimal field strength; Rr returns to ~37 Ω; most efficient coverage per watt; rarely practical for Class D' }
         ],
         coverage_estimates: [
@@ -3734,9 +3735,14 @@ const DEMO_RESULT = {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
         evaluation_required: true, evaluation_threshold_kw: 5,
         compliance_status: 'EVALUATION_REQUIRED',
-        mpe_general_population_mw_cm2: 100, mpe_general_population_e_vm: 614, mpe_general_population_h_am: 163,
-        mpe_occupational_mw_cm2: 500,
-        eirp_w: 8200, exclusion_radius_m: 8.1, exclusion_radius_ft: 26.6, occupational_exclusion_m: 3.6,
+        // §1.1310 Table 1 at 780 kHz (0.3–1.34 MHz): S = 100 mW/cm², E = 614 V/m, H = 1.63 A/m (uncontrolled).
+        // Controlled (0.3–3 MHz): S = 100 mW/cm² — same limit. Source: oet65.js mpeLimits()/mpeFieldLimits().
+        // Far-field R = sqrt(EIRP_W / (4π × S_W_m2)) = sqrt(8200 / (4π × 1000)) = 0.81 m.
+        // NOTE: 0.81 m << λ/(2π) = 61.22 m near-field boundary → near-field analysis required per OET-65 §3.B.
+        mpe_general_population_mw_cm2: 100, mpe_general_population_e_vm: 614, mpe_general_population_h_am: 1.63,
+        mpe_occupational_mw_cm2: 100,
+        eirp_w: 8200, exclusion_radius_m: 0.81, exclusion_radius_ft: 2.66, occupational_exclusion_m: 0.81,
+        near_field_boundary_m: 61.22, near_field_analysis_required: true,
         filing_exhibits: [
           { id: 'mpe_calc',  exhibit: 'MPE calculation worksheet',             rule: '§1.1310',     note: 'Show EIRP, distance, and power density at fence line vs MPE limit.' },
           { id: 'excl_zone', exhibit: 'Exclusion zone diagram (in site plan)', rule: 'OET Bul 65 §3.3', note: 'Identify controlled/uncontrolled exposure zones on scaled site plan.' },
@@ -3745,13 +3751,13 @@ const DEMO_RESULT = {
         n_filing_exhibits: 3,
         monitoring_requirement: 'RF monitor at fence perimeter recommended; portable RF survey at commissioning',
         reference: '47 CFR §1.1310; §1.1307(b); §73.49; FCC OET Bulletin 65 (Ed. 97-01); IEEE C95.1-2019',
-        note: 'RF exposure: EVALUATION_REQUIRED. ERP 5 kW ≥ 5 kW threshold. Exclusion zone: ≥ 8.1 m radius.'
+        note: 'RF exposure: EVALUATION_REQUIRED. ERP 5 kW ≥ evaluation threshold. §1.1310 MPE: 100 mW/cm² (780 kHz, general population and controlled). Far-field calculation: exclusion zone ≥ 0.81 m; however, 0.81 m is inside the near-field boundary (λ/2π = 61.22 m), so near-field analysis per OET-65 §3.B is required. §73.49 fence encloses antenna base.'
       },
       tower_lighting_marking_guide: {
         fcc_class: 'D', frequency_khz: 780,
         tower_height_estimate_m: 144.23, tower_height_estimate_ft: 473.15,
         tower_height_basis: '3/8λ typical AM tower height estimate',
-        asr_required: true, asr_threshold_m: 61,
+        asr_required: true, asr_threshold_m: 60.96,
         faa_lighting_tier: 'Medium obstruction',
         faa_lighting_required: 'L-864 red medium-intensity flashing + L-810 red steady-burning',
         faa_marking_required: 'Aviation orange/white paint bands',
@@ -3772,7 +3778,7 @@ const DEMO_RESULT = {
         ],
         n_maintenance_items: 5,
         reference: '47 CFR §17.7; §17.21; §17.23; §17.47; §17.56; §73.1213; FAA AC 70/7460-1M',
-        note: 'Estimated tower height: 144.23 m (473 ft) at 3/8λ. ASR REQUIRED (> 61m). FAA tier: Medium obstruction.'
+        note: 'Estimated tower height: 144.23 m (473 ft) at 3/8λ. ASR REQUIRED (> 60.96 m / 200 ft per §17.7). FAA tier: Medium obstruction.'
       },
       eas_acp_compliance_guide: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
@@ -4080,11 +4086,12 @@ const DEMO_RESULT = {
         evaluation_required: true,
         rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
         frequency_mhz: 0.78,
-        near_field_boundary_m: 61.12,
-        mpe_limit_mw_cm2: 0.0020,
-        far_field_exclusion_m: 44.7,
-        recommended_fence_distance_m: 61.12,
-        note: 'At 5 kW, near-field boundary (λ/2π) dominates. Fence at ≥62 m from base of antenna.'
+        near_field_boundary_m: 61.22,
+        mpe_limit_mw_cm2: 100.0,
+        _mpe_source: '§1.1310 Table 1 uncontrolled, 0.3–1.34 MHz: 100 mW/cm². At 780 kHz both controlled and uncontrolled limits are 100 mW/cm².',
+        far_field_exclusion_m: 0.81,
+        recommended_fence_distance_m: 61.22,
+        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
       },
       power_efficiency_metrics: {
         tpo_kw: 5,
@@ -4262,11 +4269,12 @@ const DEMO_RESULT = {
         evaluation_required: true,
         rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
         frequency_mhz: 0.78,
-        near_field_boundary_m: 61.12,
-        mpe_limit_mw_cm2: 0.0020,
-        far_field_exclusion_m: 44.7,
-        recommended_fence_distance_m: 61.12,
-        note: 'At 5 kW, near-field boundary (λ/2π) dominates. Fence at ≥62 m from base of antenna.'
+        near_field_boundary_m: 61.22,
+        mpe_limit_mw_cm2: 100.0,
+        _mpe_source: '§1.1310 Table 1 uncontrolled, 0.3–1.34 MHz: 100 mW/cm². At 780 kHz both controlled and uncontrolled limits are 100 mW/cm².',
+        far_field_exclusion_m: 0.81,
+        recommended_fence_distance_m: 61.22,
+        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
       },
       power_efficiency_metrics: {
         tpo_kw: 5,
@@ -4426,11 +4434,12 @@ const DEMO_RESULT = {
         evaluation_required: true,
         rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
         frequency_mhz: 0.78,
-        near_field_boundary_m: 61.12,
-        mpe_limit_mw_cm2: 0.0020,
-        far_field_exclusion_m: 44.7,
-        recommended_fence_distance_m: 61.12,
-        note: 'At 5 kW, near-field boundary (λ/2π) dominates. Fence at ≥62 m from base of antenna.'
+        near_field_boundary_m: 61.22,
+        mpe_limit_mw_cm2: 100.0,
+        _mpe_source: '§1.1310 Table 1 uncontrolled, 0.3–1.34 MHz: 100 mW/cm². At 780 kHz both controlled and uncontrolled limits are 100 mW/cm².',
+        far_field_exclusion_m: 0.81,
+        recommended_fence_distance_m: 61.22,
+        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
       },
       power_efficiency_metrics: {
         tpo_kw: 5,
