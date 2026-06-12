@@ -13,7 +13,7 @@
 //
 // REGULATORY
 //   - 47 CFR §73.99   — pre-sunrise / post-sunset authority
-//   - 47 CFR §73.1209 — day/night-mode service hours
+//   - 47 CFR §73.1209 — time references = local time (§73.1209(b) DST adjustment)
 
 import express from 'express';
 import { sidecars } from '../services/sidecars.js';

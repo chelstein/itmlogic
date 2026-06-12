@@ -249,7 +249,7 @@ export function buildMonthlySchedule(sidecarPayload){
 
 export const PSRA_PSSA_PROVENANCE = Object.freeze({
   module:        'src/engine/am/psraPssa.js',
-  regulation:    '47 CFR §73.99 (Pre-Sunrise / Post-Sunset Authority) + §73.1209 (day/night-mode service hours)',
+  regulation:    '47 CFR §73.99 (Pre-Sunrise / Post-Sunset Authority) + §73.1209 (time references = local time; §73.1209(b) DST adjustment)',
   modeled: [
     'PSRA window (6 AM local → local sunrise), applicable test',
     'PSSA window (local sunset → 6 PM local), applicable test',
