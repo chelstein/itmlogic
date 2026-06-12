@@ -15601,7 +15601,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_auxiliary_transmitter_and_backup_power_guide: (() => {
-      // §73.1660: Auxiliary transmitters encouraged; §73.1680: technical standards.
+      // §73.1675: Auxiliary transmitters for AM stations; §73.1660: transmitter acceptability (type acceptance); §73.1680: emergency antennas (temporary use after main/aux damage).
       // FCC does not mandate backup power for AM, but generators are industry standard.
       // Generator must power transmitter, HVAC, lighting, and control systems.
 
@@ -15661,7 +15661,7 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_maint_high_usd,
         total_backup_low_usd,
         total_backup_high_usd,
-        reference: '47 CFR §73.1660 (auxiliary transmitter); §73.1680 (transmitter standards); NFPA 110 (emergency/standby power); IEEE 446 (backup power sizing)',
+        reference: '47 CFR §73.1675 (AM auxiliary transmitters); §73.1660 (transmitter acceptability); NFPA 110 (emergency/standby power); IEEE 446 (backup power sizing)',
         note: `${tpo_kw} kW Class ${fcc_class}: tx draw ${tx_dc_kw} kW + building ${building_load_kw} kW = ${total_load_kw} kW total; ${generator_kw} kW generator $${generator_cost_low_usd.toLocaleString()}–$${generator_cost_high_usd.toLocaleString()} + ATS/UPS; total backup $${total_backup_low_usd.toLocaleString()}–$${total_backup_high_usd.toLocaleString()}; annual maint $${annual_maint_low_usd.toLocaleString()}–$${annual_maint_high_usd.toLocaleString()}`
       };
     })(),
@@ -21932,19 +21932,21 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     signal_booster_prohibited_guide: (() => {
-      // §73.1660: AM broadcast booster stations — the FCC does NOT authorize AM broadcast boosters
+      // AM broadcast booster stations — the FCC does NOT authorize AM broadcast boosters
       // (also called "translators" in common usage). AM stations have no translator or booster authority
       // equivalent to what FM stations have under §74.1201 (FM translator) or §74.1231 (FM booster).
+      // There is no Part 73 authorization for AM boosters; operation without authorization violates §301.
       //
       // What is prohibited:
       //   - Unauthorized AM booster: a device that receives an AM station's signal and retransmits it
-      //     at higher power on the same frequency at another location — PROHIBITED by §73.1660
+      //     at higher power on the same frequency at another location — prohibited by absence of Part 73
+      //     authorization (§301 of the Communications Act requires a license for any transmission)
       //   - Part 15 unintentional radiators: consumer devices (switching power supplies, LED dimmers,
       //     computer equipment) that inadvertently radiate on AM frequencies may cause interference
       //     to the AM station's own ground wave field near the tower — not the station's fault but
       //     the station must document and report if it causes interference to others (§15.5)
-      //   - Carrier current systems: §73.1680 does not authorize rebroadcasting on AM via carrier current
-      //     without a separate Part 15 or Part 73 authorization
+      //   - Carrier current systems: no Part 73 authorization exists for AM rebroadcasting via carrier
+      //     current without a separate Part 15 or Part 73 authorization
       //   - LPAM (Low Power AM): §73.14 — there are no LPAM broadcast authorizations; the only legally
       //     operating "low power AM" services are Part 15 carrier current systems or small AM stations
       //
@@ -21994,9 +21996,9 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         best_legal_option: 'RELOCATION',
         part15_limit_uv_m: 250, // µV/m at 30m for AM band (§15.209)
-        relocation_note: 'AM broadcast boosters are NOT authorized (§73.1660). The legally correct approach to coverage improvement is transmitter relocation (this optimizer), an AM-to-FM translator (§74.1201), or AM HD Radio. Unauthorized AM repeater devices can result in $10,000–$25,000 FCC forfeitures.',
-        reference: '47 CFR §73.1660; §73.404 (IBOC general); §74.1201; §15.209; §15.221; §15.5; §301; §503(b); MB Docket 99-325 (AM IBOC authorization); MB 13-249 (AM revitalization)',
-        note: `AM boosters: PROHIBITED (§73.1660). ${n_legal_alternatives} legal alternatives available. Best option: transmitter relocation. AM-to-FM translator also authorized. Unauthorized booster forfeiture: $10k–$25k (§503b).`
+        relocation_note: 'AM broadcast boosters are NOT authorized (no Part 73 authorization exists; §301 Communications Act requires a license). The legally correct approach to coverage improvement is transmitter relocation (this optimizer), an AM-to-FM translator (§74.1201), or AM HD Radio. Unauthorized AM repeater devices can result in $10,000–$25,000 FCC forfeitures.',
+        reference: '47 CFR §73.404 (AM IBOC general); §74.1201 (FM translator); §15.209; §15.221; §15.5; §301 Communications Act (license required); §503(b); MB Docket 99-325 (AM IBOC authorization); MB 13-249 (AM revitalization)',
+        note: `AM boosters: NOT AUTHORIZED (§301 Communications Act — no Part 73 authorization exists). ${n_legal_alternatives} legal alternatives available. Best option: transmitter relocation. AM-to-FM translator also authorized (§74.1201). Unauthorized booster forfeiture: $10k–$25k (§503b).`
       };
     })(),
 
