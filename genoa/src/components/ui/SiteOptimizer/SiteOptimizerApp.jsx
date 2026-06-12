@@ -3381,7 +3381,7 @@ const DEMO_RESULT = {
         is_clear_channel: true, is_local_channel: false,
         channel_relationships: [
           { id: 'CO_CHANNEL', label: 'Co-channel (0 kHz separation)', cfr: '47 CFR §73.182', du_daytime_db: 20, du_nighttime_db: 0, min_spacing_km: 724, class_applies: 'ALL', notes: 'D/U ≥ 20 dB day; ≥ 0 dB night. Min spacing shown is D vs C (most permissive class pair per §73.37 Table I).' },
-          { id: 'FIRST_ADJ', label: 'First adjacent (±10 kHz)', cfr: '47 CFR §73.184', du_daytime_db: 6, du_nighttime_db: -6, min_spacing_km: 402, class_applies: 'ALL', notes: 'D/U ≥ 6 dB during daytime. Min spacing shown is D vs C per §73.37 Table II.' },
+          { id: 'FIRST_ADJ', label: 'First adjacent (±10 kHz)', cfr: '47 CFR §73.182', du_daytime_db: 6, du_nighttime_db: -6, min_spacing_km: 402, class_applies: 'ALL', notes: 'D/U ≥ 6 dB during daytime. Min spacing shown is D vs C per §73.37 Table II.' },
           { id: 'SECOND_ADJ', label: 'Second adjacent (±20 kHz)', cfr: '47 CFR §73.182(r)', du_daytime_db: 0, du_nighttime_db: -12, min_spacing_km: 177, class_applies: 'ALL', notes: 'D/U ≥ 0 dB day. Min spacing shown is D vs C per §73.37 Table II.' },
           { id: 'THIRD_ADJ', label: 'Third adjacent (±30 kHz)', cfr: '47 CFR §73.182(r)', du_daytime_db: -6, du_nighttime_db: -18, min_spacing_km: 80, class_applies: 'ALL', notes: 'D/U ≥ -6 dB day.' },
           { id: 'IBOC_SIDEBAND', label: 'IBOC/HD Radio sideband (±15 kHz)', cfr: '47 CFR §73.404', du_daytime_db: -10, du_nighttime_db: -10, min_spacing_km: 160, class_applies: 'HD_AUTHORIZED', notes: 'HD Radio digital sidebands at ±15 kHz.' }
@@ -3392,7 +3392,7 @@ const DEMO_RESULT = {
         coordination_zone_km: 724,
         coordination_items: [
           { item: 'Co-channel station database search', cfr: '§73.182', required: true, tool: 'FCC LMS API or REC Networks AMQUERY' },
-          { item: 'First adjacent station search (±10 kHz)', cfr: '§73.184', required: true, tool: 'FCC LMS API' },
+          { item: 'First adjacent station search (±10 kHz)', cfr: '§73.182', required: true, tool: 'FCC LMS API' },
           { item: 'Second adjacent station search (±20 kHz)', cfr: '§73.182(r)', required: true, tool: 'FCC LMS API' },
           { item: 'Third adjacent station search (±30 kHz)', cfr: '§73.182(r)', required: true, tool: 'FCC LMS API' },
           { item: 'IBOC interference study', cfr: '§73.404', required: false, tool: 'iBiquity/xperi modeling software' },
@@ -3401,7 +3401,7 @@ const DEMO_RESULT = {
         ],
         n_coordination_items: 7, n_required_items: 5,
         coordination_timeline: { database_search_days: 3, propagation_study_days: 5, expert_review_days: 5, total_days: 13, note: 'Engineering study must be filed with Form 301-AM as Exhibit C (Interference Analysis)' },
-        reference: '47 CFR §73.182; §73.37; §73.184; §73.404; §73.1650; FCC AM Allocation Engineering Data; REC Networks AMQUERY',
+        reference: '47 CFR §73.182; §73.37; §73.404; §73.1650; FCC AM Allocation Engineering Data; REC Networks AMQUERY',
         note: 'CLEAR channel at 780 kHz (§73.25). Co-channel zone minimum: 724 km (D vs C per §73.37 Table I). NIF study: required (§73.182).'
       },
       stl_network_link_guide: {
@@ -3535,7 +3535,7 @@ const DEMO_RESULT = {
         ],
         access_requirements: [
           { item: 'Permanent access road easement', required: true, width_m: 5, notes: 'FCC requires reliable access to transmitter site per §73.49' },
-          { item: 'Ground radial field easement', required: true, width_m: 57.69, notes: 'Radials extend ~57.69m; need easement or ownership' },
+          { item: 'Ground radial field easement', required: true, width_m: 96.15, notes: 'Radials extend ~96.15 m (λ/4 at 780 kHz); need easement or ownership' },
           { item: 'Utility easement (power + telco)', required: true, width_m: 10, notes: 'Electrical service + STL/IP link easement' },
           { item: 'Fencing easement (§73.49 RF barrier)', required: true, width_m: 2, notes: 'FCC §73.49 requires locked fencing around tower base' }
         ],
@@ -3710,8 +3710,8 @@ const DEMO_RESULT = {
           acceptance_criterion: 'S/N ≥ 50 dB for acceptable AM service; noise floor ≤ −40 dBm/Hz at operating frequency'
         },
         fcc_complaint_process: [
-          { step: 1, action: 'Document interference with spectrum analyzer screenshots and field strength measurements', rule: '§73.184(a)' },
-          { step: 2, action: 'Notify power company / BPL operator in writing; allow 30 days to resolve', rule: '§73.184(b)', note: 'FCC requires good-faith effort before complaint.' },
+          { step: 1, action: 'Document interference with spectrum analyzer screenshots and field strength measurements', rule: '§73.1030' },
+          { step: 2, action: 'Notify power company / BPL operator in writing; allow 30 days to resolve', rule: '§73.1030; §15.615', note: 'FCC requires good-faith effort before complaint.' },
           { step: 3, action: 'File FCC Form 2000D (Part 15 interference complaint) if unresolved', rule: '§15.5(c)', note: 'Include measurement data, correspondence, and site coordinates.' },
           { step: 4, action: 'FCC investigates; may issue Notice of Apparent Liability to Part 15 operator', rule: '§15.5(c)' }
         ],
@@ -3722,7 +3722,7 @@ const DEMO_RESULT = {
           { id: 'site_survey',   strategy: 'Pre-purchase noise floor survey (IEEE 1560)',  applicable: true, cost_est: '$1,500–$5,000', effectiveness: 'DIAGNOSTIC' }
         ],
         n_applicable_mitigations: 3,
-        reference: '47 CFR §73.184; §15.5; §15.615; IEEE Std 1560; ITU-R CISPR 22; FCC BPL Order (ET Docket 03-104)',
+        reference: '47 CFR §73.1030; §15.5; §15.615; IEEE Std 1560; ITU-R CISPR 22; FCC BPL Order (ET Docket 03-104)',
         note: 'AM 780 kHz in AM broadcast band (535–1705 kHz). BPL exclusion zone: 1 km per §15.615(c). Minimum recommended distance from power lines: 300m.'
       },
       station_relocation_cost_estimator: {
@@ -3731,7 +3731,7 @@ const DEMO_RESULT = {
         line_items: [
           { id: 'land',        category: 'Land / site acquisition',              low: 50000,  high: 250000, note: 'Highly variable; rural option ~$25K; suburban can exceed $500K.' },
           { id: 'tower',       category: 'Tower (new self-supporting)',           low: 253684, high: 507369, note: '144m tower at 3/8λ (473 ft). Guy-wired 30% less.' },
-          { id: 'radials',     category: 'Ground radial system (120 × 0.4λ)',    low: 34155,  high: 62388,  note: '18,462 m #8 AWG copper + installation labor.' },
+          { id: 'radials',     category: 'Ground radial system (120 × λ/4 = 96.15 m)', low: 21347,  high: 38993,  note: '11,538 m #8 AWG copper + installation labor (120 radials × 96.15 m = λ/4 at 780 kHz).' },
           { id: 'building',    category: 'Transmitter building',                  low: 60000,  high: 200000, note: 'Modular pre-fab low; custom masonry high.' },
           { id: 'transmitter', category: 'Transmitter equipment',                 low: 20000,  high: 55000,  note: '5 kW NDA AM transmitter; new unit.' },
           { id: 'phasor_atu',  category: 'Antenna tuning unit (ATU)',             low: 5000,   high: 12000,  note: 'Non-directional ATU.' },
@@ -3739,13 +3739,13 @@ const DEMO_RESULT = {
           { id: 'fcc_fees',    category: 'FCC filing fees',                       low: 6465,   high: 6465,   note: 'FCC Schedule of Application Fees — major change CP application fee.' },
           { id: 'engineering', category: 'Engineering + proof-of-performance',    low: 25000,  high: 75000,  note: 'Spacing, NIF, §73.154 proof, FCC forms.' },
           { id: 'env_legal',   category: 'Environmental + legal + zoning',        low: 15000,  high: 60000,  note: 'NEPA §106, zoning CUP, FCC counsel.' },
-          { id: 'contingency', category: 'Contingency (15–20%)',                  low: 71913,  high: 247234, note: 'Reserve for scope changes, cost escalation, permit delays.' }
+          { id: 'contingency', category: 'Contingency (15–20%)',                  low: 69674,  high: 242565, note: 'Reserve for scope changes, cost escalation, permit delays.' }
         ],
         n_line_items: 11,
-        subtotal_low: 477304, subtotal_high: 1236222,
-        total_low: 549217, total_high: 1483456, total_midpoint: 1016337,
+        subtotal_low: 464496, subtotal_high: 1212827,
+        total_low: 534170, total_high: 1455392, total_midpoint: 994781,
         reference: 'Budget model based on FCC Schedule of Application Fees, engineering industry cost data, and RSMeans construction cost indices (2024).',
-        note: 'Total estimated relocation cost: $549,217 – $1,483,456 (midpoint ~$1,016,337). Estimates are screening-grade; actual costs vary significantly with site conditions.'
+        note: 'Total estimated relocation cost: $534,170 – $1,455,392 (midpoint ~$994,781). Estimates are screening-grade; actual costs vary significantly with site conditions.'
       },
       rf_exposure_mpe_analysis: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
