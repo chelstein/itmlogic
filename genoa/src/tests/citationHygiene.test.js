@@ -388,3 +388,37 @@ test('CFR-AUDIT — AM engine/UI never cite FM-only §73.209 or §73.213 as oper
   assert.equal(offenders.length, 0,
     `AM-context files cite FM channel rules §73.209/§73.213 as operative AM rules (use §73.182(r)/§73.37): ${offenders.join(', ')}`);
 });
+
+// ── CFR-AUDIT: §73.24(i) vs §73.24j label drift ─────────────────────
+
+test('CFR-AUDIT — AM engine/UI never use the bare shorthand "§73.24j" (should be §73.24(i))', () => {
+  // The rule for AM principal community coverage is §73.24(i).
+  // §73.24(j) is the general public-interest standard (not the coverage rule).
+  // The file section_73_24j.js is a legacy-named file that IMPLEMENTS §73.24(i).
+  // Any label/note/cite string using the bare "§73.24j" form (without the
+  // parenthesized (i)) is a citation error.  Allow only the legacy filename
+  // reference in comments.
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  // Ban §73.24j in rendered strings; allow only in comments that reference the legacy filename
+  const BARE_24J = /§73\.24j/;
+  const offenders = files.filter(rel => {
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    if (!BARE_24J.test(src)) return false;
+    const lines = src.split('\n');
+    return lines.some(line => {
+      if (!BARE_24J.test(line)) return false;
+      // Allow comment lines that reference the legacy file / legacy label
+      if (/^\s*\/\//.test(line) && /legacy|section_73_24j|file.name|filename/.test(line)) return false;
+      return true;
+    });
+  });
+  assert.equal(offenders.length, 0,
+    `AM-context files use bare "§73.24j" shorthand (use §73.24(i)): ${offenders.join(', ')}`);
+});

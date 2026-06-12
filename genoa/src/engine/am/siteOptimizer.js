@@ -6877,7 +6877,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const goalMeta = [
         {
           goal:       'maximize_col_coverage',
-          label:      'COL coverage (§73.24j)',
+          label:      'COL coverage (§73.24(i))',
           raw_metric: coverage_pct,
           raw_unit:   'fraction 0–1',
           formula:    'coverage_pct × 100 → clamp 0–100',
@@ -7477,7 +7477,7 @@ async function scoreCandidate(pt, ctx, warnings){
         ? 'POLYGON' : col_centroid ? 'CENTROID_ONLY' : 'NO_COL_DATA';
       const data_quality_note = {
         POLYGON:        'CoL GeoJSON polygon supplied — intersection analysis available. §73.24(i) compliance can be assessed with high spatial resolution.',
-        CENTROID_ONLY:  'CoL centroid point supplied but no polygon. Coverage assessed as disc-proxy (§73.24j compliance treated as binary at centroid distance). Polygon recommended for accurate analysis.',
+        CENTROID_ONLY:  'CoL centroid point supplied but no polygon. Coverage assessed as disc-proxy (§73.24(i) compliance treated as binary at centroid distance). Polygon recommended for accurate analysis.',
         NO_COL_DATA:    'No CoL data supplied — distance proxy uses candidate-to-current-site distance. Commission GeoJSON polygon of principal community for §73.24(i) analysis.'
       }[data_quality];
 
@@ -24955,7 +24955,7 @@ async function scoreCandidate(pt, ctx, warnings){
     coverage_service_area_map_spec: (() => {
       // Compute groundwave contour distances using the FCC M3 propagation curves.
       const contourDefs = [
-        { id: 'col_min',    mvm: 5.0,    label: 'COL Minimum Service (§73.24j)',       color: '#22c55e', fill_opacity: 0.12, stroke_width: 2,   priority: 1 },
+        { id: 'col_min',    mvm: 5.0,    label: 'COL Minimum Service (§73.24(i))',     color: '#22c55e', fill_opacity: 0.12, stroke_width: 2,   priority: 1 },
         { id: 'standard',   mvm: 2.0,    label: 'Standard Service (2 mV/m)',           color: '#3b82f6', fill_opacity: 0.08, stroke_width: 1.5, priority: 2 },
         { id: 'primary',    mvm: 0.5,    label: 'Primary Service / Protection (§73.182)', color: '#6366f1', fill_opacity: 0.05, stroke_width: 1,   priority: 3 },
         { id: 'blanket',    mvm: 1000.0, label: 'Blanket (§73.24g / 1000 mV/m)',        color: '#ef4444', fill_opacity: 0.20, stroke_width: 2,   priority: 0 }

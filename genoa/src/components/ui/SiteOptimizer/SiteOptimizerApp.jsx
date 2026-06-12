@@ -3958,7 +3958,7 @@ const DEMO_RESULT = {
         frequency_khz: 780, tpo_kw: 5, sigma_msm: 9,
         n_contours: 4,
         contours: [
-          { id: 'col_min',  mvm: 5.0,    label: 'COL Minimum Service (§73.24j)',          color: '#22c55e', fill_opacity: 0.12, stroke_width: 2,   priority: 1, center_lat: 34.8606, center_lon: -111.8206, radius_km: 18.4,  radius_m: 18400,  geojson_type: 'circle', n_sides: 64 },
+          { id: 'col_min',  mvm: 5.0,    label: 'COL Minimum Service (§73.24(i))',        color: '#22c55e', fill_opacity: 0.12, stroke_width: 2,   priority: 1, center_lat: 34.8606, center_lon: -111.8206, radius_km: 18.4,  radius_m: 18400,  geojson_type: 'circle', n_sides: 64 },
           { id: 'standard', mvm: 2.0,    label: 'Standard Service (2 mV/m)',              color: '#3b82f6', fill_opacity: 0.08, stroke_width: 1.5, priority: 2, center_lat: 34.8606, center_lon: -111.8206, radius_km: 42.3,  radius_m: 42300,  geojson_type: 'circle', n_sides: 64 },
           { id: 'primary',  mvm: 0.5,    label: 'Primary Service / Protection (§73.182)', color: '#6366f1', fill_opacity: 0.05, stroke_width: 1,   priority: 3, center_lat: 34.8606, center_lon: -111.8206, radius_km: 115.2, radius_m: 115200, geojson_type: 'circle', n_sides: 64 },
           { id: 'blanket',  mvm: 1000.0, label: 'Blanket (§73.24g / 1000 mV/m)',          color: '#ef4444', fill_opacity: 0.20, stroke_width: 2,   priority: 0, center_lat: 34.8606, center_lon: -111.8206, radius_km: 0.42,  radius_m: 420,    geojson_type: 'circle', n_sides: 64 }
@@ -3990,7 +3990,7 @@ const DEMO_RESULT = {
         active_goals_count: 3,
         total_weighted_pts: 86.6,
         goal_details: [
-          { goal: 'maximize_col_coverage', label: 'COL coverage (§73.24j)', enabled: true, weight: 35, raw_metric: 0.97, raw_unit: 'fraction 0–1', formula: 'coverage_pct × 100 → clamp 0–100', sub_score: 97.0, weighted_pts: 49.0, data_source: '10-km disc proxy (no polygon supplied)', limiting_factor: null },
+          { goal: 'maximize_col_coverage', label: 'COL coverage (§73.24(i))', enabled: true, weight: 35, raw_metric: 0.97, raw_unit: 'fraction 0–1', formula: 'coverage_pct × 100 → clamp 0–100', sub_score: 97.0, weighted_pts: 49.0, data_source: '10-km disc proxy (no polygon supplied)', limiting_factor: null },
           { goal: 'maximize_population', label: 'Population reach', enabled: true, weight: 28, raw_metric: 36.8, raw_unit: 'km (0.5 mV/m radius)', formula: '(reach / reach_scale)² × 100 → clamp 0–100', sub_score: 72.4, weighted_pts: 28.8, data_source: 'FCC groundwave curve (σ, ERP, freq)', limiting_factor: null },
           { goal: 'minimize_blanket_population', label: 'Blanket Pop.', enabled: false, weight: 0, raw_metric: 0.5, raw_unit: '% of metro within 1 mV/m', formula: '100 − 50×blanket_pct → clamp 0–100', sub_score: 75.0, weighted_pts: 0, data_source: 'FCC groundwave curve (1 mV/m contour)', limiting_factor: 'Goal not enabled — weight = 0' },
           { goal: 'prefer_high_conductivity', label: 'Conductivity', enabled: true, weight: 7, raw_metric: 9.0, raw_unit: 'mS/m', formula: 'sqrt(σ / 8) × 100 → clamp 0–100', sub_score: 100.0, weighted_pts: 10.0, data_source: 'FCC conductivity zone map', limiting_factor: null },

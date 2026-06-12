@@ -12674,7 +12674,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const fmtN = n => n != null ? n.toLocaleString() : '—';
           return (
             <div>
-              <div className="rack-eyebrow mb-1">Population Demographics Overlay (§73.24j · Census ACS)</div>
+              <div className="rack-eyebrow mb-1">Population Demographics Overlay (§73.24(i) · Census ACS)</div>
               <div className="rack-panel p-3 mb-3">
                 <div className="text-xs text-blue-200 mb-2">
                   Coverage population estimates at {p.frequency_khz} kHz, {p.tpo_kw} kW, σ={p.sigma_msm} mS/m.
@@ -13722,7 +13722,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const srcColor  = s => s === 'POLYGON' ? 'text-emerald-400' : s === 'CENTROID_ONLY' ? 'text-blue-300' : 'text-amber-400';
           return (
             <div>
-              <div className="rack-eyebrow mb-1">Community of License Profile (§73.24j)</div>
+              <div className="rack-eyebrow mb-1">Community of License Profile (§73.24(i))</div>
               {/* Geo tier chip */}
               <div className="flex flex-wrap gap-1.5 mb-2">
                 <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${tierBg(cp.geographic_tier)} ${tierColor(cp.geographic_tier)}`}>
