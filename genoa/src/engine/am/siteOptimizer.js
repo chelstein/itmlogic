@@ -12957,7 +12957,7 @@ async function scoreCandidate(pt, ctx, warnings){
         is_directional: isDA_cov,
         nighttime_restriction,
         fcc_class_used: fcc_class,
-        reference: '47 CFR §73.182 (AM service protection ratios — skywave); 47 CFR §73.185 (computation of interfering signal); 47 CFR §73.14 (definitions: dominant/secondary); FCC AM groundwave/skywave coverage tables (§73.190); ITU-R P.1147 (AM groundwave propagation)',
+        reference: '47 CFR §73.182 (AM service protection ratios — skywave); 47 CFR §73.185 (computation of interfering signal); 47 CFR §73.14 (AM broadcast definitions); §73.25–§73.27 (channel designations; clear/regional/local); FCC AM groundwave/skywave coverage tables (§73.190); ITU-R P.1147 (AM groundwave propagation)',
         note: `${frequency_khz} kHz Class ${fcc_class} ${isDA_cov ? 'DA' : 'NDA'}: daytime 0.5 mV/m radius ~${daytime_05mvpm_radius_km} km (~${daytime_coverage_area_km2.toLocaleString()} km²). Nighttime skywave reach ~${nighttime_skywave_radius_km} km${is_clear_channel_cov ? ' (clear channel dominant)' : ''}. Class D: ${nighttime_restriction}.`
       };
     })(),
@@ -23578,7 +23578,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // FM translator 60 dBu service radius at 250W
       // At 250W ERP, 60 dBu coverage radius is approximately 3–6 km (varies with HAAT)
-      // §73.333 Fig. M1/F(50,50): for 250W, median 60 dBu radius ≈ 4–5 km
+      // §73.333 Figure 1 (F(50,50) curves): for 250W, median 60 dBu radius ≈ 4–5 km
       const haat_m_tr = 30; // assumed typical translator HAAT
       const haat_factor_tr = Math.pow(haat_m_tr / 30, 0.3);
       const fm_60dbu_radius_km = round2(Math.min(am_2mvm_radius_km, 4.5 * haat_factor_tr));
