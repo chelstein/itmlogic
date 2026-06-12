@@ -22005,7 +22005,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     community_of_license_change_guide: (() => {
-      // §73.3573: An AM station relocation may or may not change the community of license (COL).
+      // §73.3571: An AM station relocation may or may not change the community of license (COL).
       // The COL is the community for which the station is licensed and which the station is required to serve.
       // The COL appears on the FCC license and determines the station's call sign area and local service obligations.
       //
@@ -22013,9 +22013,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - If the new transmitter site causes the new principal community contour (0.5 mV/m daytime)
       //     to no longer encompass the licensed COL, the FCC may find that the station effectively
       //     changed its COL without authorization — this constitutes a significant issue
-      //   - Under §73.3573(f): FCC allows minor change applications (no auction) if the proposed
+      //   - Under §73.3571(b): FCC allows minor change applications (no auction) if the proposed
       //     change in principal community service is not a "substantial change" per FCC criteria
-      //   - Under §73.3573(g): A "major change" (including certain COL changes) requires a comparative
+      //   - Under §73.3571(b): A "major change" (including certain COL changes) requires a comparative
       //     hearing or auction if there are competing applications
       //
       // FCC COL change criteria (as applied in AM cases):
@@ -22036,7 +22036,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - FCC may require the station to return to prior COL service or apply formally for COL change
       //   - A COL change application that faces competition becomes an auction — expensive and uncertain
       //
-      // §73.3573(f)(3): Minor COL changes (no auction needed): moving transmitter site within the same
+      // §73.3571(b): Minor COL changes (no auction needed): moving transmitter site within the same
       //   market area if community coverage is maintained; FCC has discretion to allow
 
       const colCentroid = ctx.col_centroid; // {lat, lon} of community of license centroid
@@ -22055,17 +22055,17 @@ async function scoreCandidate(pt, ctx, warnings){
       }
 
       const COL_CHANGE_RISKS = [
-        { risk: 'Principal community contour failure', cfr: '§73.24(h); §73.3573', description: '0.5 mV/m daytime contour must encompass COL city limits or community center', severity: 'CRITICAL' },
-        { risk: 'Unauthorized COL change', cfr: '§73.3573(f)', description: 'Relocating without maintaining COL service may constitute an unauthorized COL change', severity: 'HIGH' },
+        { risk: 'Principal community contour failure', cfr: '§73.24(h); §73.3571', description: '0.5 mV/m daytime contour must encompass COL city limits or community center', severity: 'CRITICAL' },
+        { risk: 'Unauthorized COL change', cfr: '§73.3571(b)', description: 'Relocating without maintaining COL service may constitute an unauthorized COL change', severity: 'HIGH' },
         { risk: 'Forfeiture exposure', cfr: '§503(b)', description: 'FCC NAL for unauthorized COL change; typically $4,000–$20,000 per §503(b) guidelines', severity: 'HIGH' },
-        { risk: 'Auction exposure', cfr: '§73.3573(g)', description: 'A major COL change that draws competing applications may trigger spectrum auction', severity: 'MEDIUM' }
+        { risk: 'Auction exposure', cfr: '§73.3571(b)', description: 'A major COL change that draws competing applications may trigger spectrum auction', severity: 'MEDIUM' }
       ];
 
       const COL_PRESERVATION_STRATEGIES = [
         { priority: 1, action: 'Verify 0.5 mV/m contour over COL at each candidate site', detail: 'Run FCC curves (§73.190) to confirm daytime 0.5 mV/m contour includes COL city limits or community center', cfr: '§73.24(h)' },
-        { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that COL is within 0.5 mV/m daytime contour', cfr: '§73.3533; §73.3573' },
+        { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that COL is within 0.5 mV/m daytime contour', cfr: '§73.3533; §73.3571' },
         { priority: 3, action: 'Consider directional antenna to maintain COL service', detail: 'If NDA relocation degrades COL service, a DA pattern with a stronger lobe toward COL may preserve service', cfr: '§73.150; §73.24(h)' },
-        { priority: 4, action: 'If COL change is unavoidable, file formal COL change request', detail: 'File a major change Form 301-AM with an explicit COL change request; coordinate with FCC communications counsel', cfr: '§73.3573(f)' }
+        { priority: 4, action: 'If COL change is unavoidable, file formal COL change request', detail: 'File a major change Form 301-AM with an explicit COL change request; coordinate with FCC communications counsel', cfr: '§73.3571(b)' }
       ];
 
       return {
@@ -22083,7 +22083,7 @@ async function scoreCandidate(pt, ctx, warnings){
         relocation_note: distance_from_col_km != null
           ? `Candidate is ${distance_from_col_km} km from COL centroid. COL change risk: ${col_change_risk}. ${triggers_col_change ? 'Distance may compromise 0.5 mV/m COL coverage — verify contours. Formal COL change application may be required.' : 'COL coverage likely preserved — verify with FCC contour computation before filing.'}`
           : 'COL centroid not available — verify 0.5 mV/m daytime contour over COL city limits for each candidate before filing Form 301-AM.',
-        reference: '47 CFR §73.24(h); §73.3573; §73.3573(f)(3); §73.190; §503(b); FCC AM processing policies',
+        reference: '47 CFR §73.24(h); §73.3571; §73.3571(b); §73.190; §503(b); FCC AM processing policies',
         note: `COL change: ${distance_from_col_km != null ? `${distance_from_col_km} km from COL, risk ${col_change_risk}` : 'COL distance unknown'}. Must verify 0.5 mV/m daytime contour covers COL per §73.24(h). ${triggers_col_change ? 'COL change likely — formal application required.' : 'COL coverage expected — confirm with FCC curves.'}`
       };
     })(),
@@ -22585,7 +22585,7 @@ async function scoreCandidate(pt, ctx, warnings){
         renewal_options: 2,
         renewal_option_years: 10,
         total_max_years: 45,
-        rationale: 'AM license term is 8 years (§73.3574). Lease should span at least 3 license terms to avoid mid-license lease expiration. Two 10-year renewal options provide flexibility.'
+        rationale: 'AM license term is 8 years (47 U.S.C. §307(c)(1)). Lease should span at least 3 license terms to avoid mid-license lease expiration. Two 10-year renewal options provide flexibility.'
       };
 
       // Rent estimates by land type
@@ -33134,7 +33134,7 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
       id:    'FCC_PROCESSING',
       label: 'FCC processing — major modification',
       weeks: '12–26',
-      description: `FCC Media Bureau processing for AM major modification (§73.3573). Current average processing time 3–6 months. Clear-channel or contested applications may take longer.`,
+      description: `FCC Media Bureau processing for AM major modification (§73.3571). Current average processing time 3–6 months. Clear-channel or contested applications may take longer.`,
       blocking: true
     },
     {
