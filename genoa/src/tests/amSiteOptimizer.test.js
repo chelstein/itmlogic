@@ -6032,7 +6032,7 @@ test('antenna_tuning_unit_commissioning_guide NDA ATU cost and commissioning', a
   assert.ok(g.total_atu_cost_usd.typical > 0, 'ATU cost must be positive');
   assert.ok(g.total_atu_cost_usd.high > g.total_atu_cost_usd.typical, 'high must exceed typical');
   assert.strictEqual(g.n_commissioning_steps, 5, 'must have 5 commissioning steps');
-  assert.strictEqual(g.current_tolerance_pct, 5, '§73.155(a) requires ±5% current tolerance');
+  assert.strictEqual(g.current_tolerance_pct, 5, '§73.62(b) requires ±5% current tolerance');
   assert.strictEqual(g.phase_tolerance_deg, null, 'NDA has null phase tolerance');
 });
 
@@ -6043,8 +6043,8 @@ test('antenna_tuning_unit_commissioning_guide DA phasor requirements', async () 
   assert.strictEqual(g.is_da, true, 'DA pattern must produce is_da=true');
   assert.strictEqual(g.n_towers, 2, 'DA has 2 towers minimum');
   assert.ok(g.phasor_cost_usd > 0, 'DA must have phasor cost');
-  assert.strictEqual(g.phase_tolerance_deg, 3, '§73.155(d): DA phase tolerance ±3°');
-  assert.strictEqual(g.ratio_tolerance_pct, 5, '§73.155(d): DA ratio tolerance ±5%');
+  assert.strictEqual(g.phase_tolerance_deg, 3, '§73.62(b): DA phase tolerance ±3°');
+  assert.strictEqual(g.ratio_tolerance_pct, 5, '§73.62(b): DA ratio tolerance ±5%');
   assert.ok(g.total_atu_cost_usd.typical > 12000, 'DA ATU+phasor cost must exceed NDA cost');
 });
 

@@ -8226,12 +8226,12 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div style={{ background: '#0f172a', borderRadius: 4, padding: 8, textAlign: 'center' }}>
                   <div style={{ fontSize: 10, color: '#94a3b8' }}>Current Tolerance</div>
                   <div style={{ fontWeight: 600, color: '#f1f5f9' }}>±{g.current_tolerance_pct}%</div>
-                  <div style={{ fontSize: 9, color: '#64748b' }}>§73.155(a)</div>
+                  <div style={{ fontSize: 9, color: '#64748b' }}>§73.62(b)</div>
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 4, padding: 8, textAlign: 'center' }}>
                   <div style={{ fontSize: 10, color: '#94a3b8' }}>Phase Tolerance</div>
                   <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{g.phase_tolerance_deg != null ? `±${g.phase_tolerance_deg}°` : 'N/A (NDA)'}</div>
-                  <div style={{ fontSize: 9, color: '#64748b' }}>§73.155(d)</div>
+                  <div style={{ fontSize: 9, color: '#64748b' }}>§73.62(b)</div>
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 4, padding: 8, textAlign: 'center' }}>
                   <div style={{ fontSize: 10, color: '#94a3b8' }}>Commission Days</div>
@@ -8242,7 +8242,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               {g.is_da && (
                 <div style={{ background: '#1c1917', borderRadius: 6, padding: 10, marginBottom: 8, borderLeft: '3px solid #f97316' }}>
                   <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600, marginBottom: 4 }}>DA Array: Phasor System Required</div>
-                  <div style={{ fontSize: 10, color: '#94a3b8' }}>Phasor cost: ${(g.phasor_cost_usd || 0).toLocaleString()} · Ratio ±{g.ratio_tolerance_pct}% · Phase ±{g.phase_tolerance_deg}° (§73.155(d))</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8' }}>Phasor cost: ${(g.phasor_cost_usd || 0).toLocaleString()} · Ratio ±{g.ratio_tolerance_pct}% · Phase ±{g.phase_tolerance_deg}° (§73.62(b))</div>
                 </div>
               )}
               <div style={{ fontSize: 10, color: '#64748b', marginTop: 8 }}>{g.note}</div>

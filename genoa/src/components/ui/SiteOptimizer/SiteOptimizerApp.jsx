@@ -1986,12 +1986,12 @@ const DEMO_RESULT = {
           { step: 2, action: 'ATU design and fabrication', detail: 'Design L/T/π network to transform measured base impedance to 50Ω; specify component L and C values; use RF-rated components with adequate current/voltage rating', equipment: 'ATU fabrication (commercial or custom)' },
           { step: 3, action: 'Low-power coarse tune (10W test transmitter)', detail: 'Inject 10W at 780 kHz; adjust ATU for minimum reflected power; verify SWR < 1.5:1 before increasing power', equipment: 'Lab transmitter or signal generator + RF amplifier' },
           { step: 4, action: 'Full-power fine tune and SWR verification', detail: 'Increase to licensed power (5 kW TPO); fine-tune for minimum SWR; target SWR < 1.1:1; record final L and C settings', equipment: 'Directional wattmeter (e.g., Bird 43 or equivalent)' },
-          { step: 5, action: 'Base current calibration and documentation', detail: 'Calibrate base current meter to read licensed current value; verify within ±5% tolerance per §73.155(a); document settings for FCC records', equipment: 'Base current meter (e.g., Deltec or Potomac Instruments)' }
+          { step: 5, action: 'Base current calibration and documentation', detail: 'Calibrate base current meter to read licensed current value; verify operating power within +5%/-10% per §73.1560(a); document settings for FCC records', equipment: 'Base current meter (e.g., Deltec or Potomac Instruments)' }
         ],
         current_tolerance_pct: 5, phase_tolerance_deg: null, ratio_tolerance_pct: null,
-        current_tolerance_cfr: '47 CFR §73.155(a)', da_tolerance_cfr: null,
+        current_tolerance_cfr: '47 CFR §73.1560(a)', da_tolerance_cfr: null,
         frequency_tolerance_hz: 20, frequency_tolerance_cfr: '47 CFR §73.1545',
-        reference: '47 CFR §73.155 (operating tolerances); §73.61 (base current monitoring); §73.1545 (frequency tolerance); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
+        reference: '47 CFR §73.1560 (operating power tolerance); §73.61 (base current monitoring); §73.1545 (frequency tolerance); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
         note: 'NDA 780 kHz, λ/4=96m. Base resistance ~36Ω; base current ~11.79A rms at 5 kW. ATU cost: $7,800–$19,200 (typ. $12,000). Commissioning: 2–5 days. Antenna efficiency: ~92% with 120-radial system.'
       },
       tower_construction_contract_guide: {
