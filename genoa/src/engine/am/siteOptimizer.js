@@ -11069,10 +11069,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const translator_max_erp_w    = 250;
       const translator_max_erp_kw   = round2(translator_max_erp_w / 1000);
 
-      // AM fill-in area (translator geographic constraint, §74.1201(g)/(j)):
+      // AM fill-in area (translator geographic constraint, §74.1201(g)/§74.1231(i)):
       //   the translator coverage contour must stay within the GREATER of the AM
-      //   2 mV/m daytime contour or a 40 km (25-mile) radius of the AM transmitter.
-      const am_primary_contour_mv_m = 2;    // §74.1201(j) fill-in contour (2 mV/m daytime)
+      //   2 mV/m daytime groundwave contour OR a 40 km (25-mile) radius of the AM transmitter.
+      const am_primary_contour_mv_m = 2;    // §74.1231(i) fill-in contour (2 mV/m daytime OR 40 km radius)
 
       // Typical FM translator coverage radius at 250 W ERP (flat terrain baseline):
       //   Using FCC FM F(50,50) curves at ~100 MHz, 250 W ERP, HAAT=30m → ~20 km service radius.
@@ -11136,7 +11136,7 @@ async function scoreCandidate(pt, ctx, warnings){
         engineering_high_usd,
         total_translator_low_usd,
         total_translator_high_usd,
-        reference: '47 CFR §74.1201(g)/(j) (fill-in area: greater of 2 mV/m daytime contour or 40 km radius); §74.1235(a) (250 W ERP maximum); §74.1232(d)–(f) (AM revitalization priority); FCC MB Docket 13-249 (AM revitalization); FCC Form 349 (FM translator application)',
+        reference: '47 CFR §74.1201(g)/§74.1231(i) (fill-in area: GREATER of 2 mV/m daytime groundwave contour OR 40 km radius from AM transmitter); §74.1235(a) (250 W ERP maximum); §74.1232(d)–(f) (AM revitalization priority); FCC MB Docket 13-249 (AM revitalization); FCC Form 349 (FM translator application)',
         note: `${fcc_class}-class AM station (${tpo_kw} kW, ${frequency_khz} kHz) is eligible for an FM translator per §74.1201(g), limited to ${translator_max_erp_w} W ERP. Translator coverage must remain within the greater of the AM 2 mV/m daytime contour or a 40 km (25-mile) radius of the AM transmitter (§74.1201(j)) and must rebroadcast the AM signal. ${elevated_site_likely ? `Elevated terrain at this candidate site favors translator coverage radius ~${translator_coverage_km} km.` : `Flat-terrain translator coverage radius ~${translator_coverage_km} km.`} On relocation, modify existing translator authorization via ${translator_modification_form}. Estimated audience reach uplift with translator: ${audience_reach_uplift_pct_low}–${audience_reach_uplift_pct_high}%.`
       };
     })(),
@@ -27705,11 +27705,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // Online Public Inspection File obligations (§73.3526)
       const OPIF_REQUIREMENTS = [
         { id: 'LICENSE', label: 'FCC License and authorizations', update_freq: 'As issued', cfr: '§73.3526(e)(1)', required: true },
-        { id: 'OWNERSHIP_REPORTS', label: 'FCC Form 323 Ownership Reports', update_freq: 'Biennial (every 2 years in even years)', cfr: '§73.3526(e)(4)', required: true },
+        { id: 'OWNERSHIP_REPORTS', label: 'FCC Form 323 Ownership Reports', update_freq: 'Biennial (every 2 years in even years)', cfr: '§73.3526(e)(3)', required: true },
         { id: 'POLITICAL_FILE', label: 'Political broadcasting records', update_freq: 'Within 1 business day of request', cfr: '§73.3526(e)(6)', required: true },
         { id: 'EEO_ANNUAL', label: 'EEO Annual Public File Report', update_freq: 'Annually, 1 year after renewal window opens', cfr: '§73.2080(c)(6)', required: true },
         { id: 'QUARTERLY_ISSUES', label: 'Issues & Programs Lists', update_freq: 'Quarterly (Jan 10, Apr 10, Jul 10, Oct 10)', cfr: '§73.3526(e)(11)(i)', required: true },
-        { id: 'CONTOUR_MAPS', label: 'Station contour maps', update_freq: 'On change of coverage area', cfr: '§73.3526(e)(3)', required: true },
+        { id: 'CONTOUR_MAPS', label: 'Station contour maps', update_freq: 'On change of coverage area', cfr: '§73.3526(e)(4)', required: true },
         { id: 'CONSTRUCTION_PERMIT', label: 'Construction permit (if CP pending)', update_freq: 'As issued', cfr: '§73.3526(e)(2)', required: false }
       ];
 
