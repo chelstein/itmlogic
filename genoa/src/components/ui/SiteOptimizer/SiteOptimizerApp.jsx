@@ -3974,7 +3974,7 @@ const DEMO_RESULT = {
       iboc_hd_radio_analysis: {
         applicable: true, fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
         is_clear_channel: true, hybrid_mode_available: true, all_digital_available: false,
-        iboc_digital_erp_dbw: -14, digital_sideband_erp_kw: 0.0199,
+        iboc_digital_erp_dbc: -14, digital_sideband_erp_kw: 0.199,
         digital_bandwidth_khz: { lower: 765, upper: 795, span_khz: 30 },
         first_adj_threatened_khz: { lower: 770, upper: 790 },
         analog_reach_km: 115.2, iboc_digital_reach_km: 97.92, iboc_digital_reach_fraction: 0.85,
@@ -3987,7 +3987,7 @@ const DEMO_RESULT = {
         },
         nrsc5_requirements: [
           { id: 'hybrid_mode',   req: 'Hybrid (analog + digital) mode',      standard: 'NRSC-5-D §4.2',        status: 'REQUIRED_FOR_AM_IBOC', note: 'All-digital AM not yet FCC-approved.' },
-          { id: 'digital_power', req: 'Digital sideband level ≤ −14 dBc',    standard: '47 CFR §73.404(c)',     status: 'MANDATORY',            note: 'At 5 kW analog, digital sidebands ≤ 0.0199 kW.' },
+          { id: 'digital_power', req: 'Digital sideband level ≤ −14 dBc',    standard: '47 CFR §73.404(c)',     status: 'MANDATORY',            note: 'At 5 kW analog, digital sidebands ≤ 0.199 kW (5 kW × 10^(−14/10) = 199 W per NRSC-5-D §4.2).' },
           { id: 'exporter',      req: 'HD Exporter device',                   standard: 'NRSC-5-D Appendix D',  status: 'REQUIRED',             note: 'Converts audio + metadata to OFDM digital baseband for exciter injection.' },
           { id: 'importer',      req: 'HD Importer (SFN/delay alignment)',    standard: 'NRSC-5-D Appendix E',  status: 'REQUIRED_IF_SFN',      note: 'Required only for single-frequency networks using IBOC fill-in translators.' },
           { id: 'psd',           req: 'Program Service Data (PSD)',           standard: 'NRSC-5-D §7',          status: 'RECOMMENDED',          note: 'Artist/title metadata on IBOC logical channel 1.' },
