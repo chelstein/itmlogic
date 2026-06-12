@@ -830,7 +830,7 @@ const DEMO_RESULT = {
     daytime_reach_km: 28.5,
     ground_sigma_mS_m: 8,
     ground_sigma_quality: 'EXCELLENT',
-    ground_sigma_source: 'Desert SW (~2 mS/m, FCC M3 zone estimate)',
+    ground_sigma_source: 'FCC M3 zone table (~8 mS/m for current KAZM site; verify via Wenner 4-electrode soil survey per §73.190)',
     ground_sigma_filing_grade: 'screening',
     field_at_col_centroid_mvm: 3.7,
     estimated_daytime_population_served: 87500,
@@ -1116,7 +1116,7 @@ const DEMO_RESULT = {
           { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
         ],
         matching_network_complexity: 'LOW — λ/4 tower presents near-unity VSWR to 50 Ω transmitter output; base ATU rarely required beyond coarse trimming.',
-        design_note: 'Standard 120-radial ground system at 96.15 m length achieves ~82% radiation efficiency at σ=5 mS/m. Extending to 180 radials (144 m) gains ~9 pts efficiency.'
+        design_note: 'Standard 120-radial ground system at 96.15 m length achieves ~82% radiation efficiency at σ=5 mS/m. Extending to 180 radials at 144.23 m (3λ/8) gains ~9 pts efficiency.'
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
