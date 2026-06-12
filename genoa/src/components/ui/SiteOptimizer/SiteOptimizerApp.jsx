@@ -3113,7 +3113,7 @@ const DEMO_RESULT = {
         col_field_thresholds: { day_mvm: 5, night_mvm: null, service_contour_mvm: 0.5 },
         coverage_zones: [
           { id: 'PRIMARY', label: 'Primary Service Contour (0.5 mV/m)', cfr: '§73.182 / §73.187', threshold_mvm: 0.5, radius_km: 87.4, area_km2: 23990.2, service_quality: 'Reliable daytime reception; defines primary coverage area' },
-          { id: 'COL_MINIMUM', label: 'City of License Minimum Coverage (§73.24(i))', cfr: '§73.24(i)', threshold_mvm: 5, radius_km: 42.1, area_km2: 5569.8, service_quality: 'COL must receive ≥5 mV/m daytime groundwave per §73.24(i) (≥80% of principal community)' },
+          { id: 'TRANSLATOR_CONTOUR', label: 'AM translator service boundary (2 mV/m, §74.1232(d))', cfr: '§74.1232(d)(1)', threshold_mvm: 2, radius_km: 42.1, area_km2: 5569.8, service_quality: 'FM translator 60 dBu contour must fit within AM 2 mV/m daytime contour per §74.1232(d)(1)' },
           { id: 'INTERFERENCE_FREE', label: 'Interference-Free Service (5 mV/m)', cfr: '§73.182 Table 1', threshold_mvm: 5, radius_km: 22.3, area_km2: 1561.8, service_quality: 'High-fidelity reception; resists co-channel interference at D/U > 20 dB' }
         ],
         n_coverage_zones: 3,
@@ -3276,10 +3276,10 @@ const DEMO_RESULT = {
       },
       site_security_perimeter_guide: {
         tower_height_m: 144.23, fence_radius_m: 7.21, perimeter_m: 45.3,
-        mpe_evaluation_required: true, mpe_threshold_kw: 5,
+        mpe_evaluation_required: true, mpe_threshold_kw: 5, mpe_boundary_m: 61.22,
         security_components: [
           { id: 'FENCE', label: '§73.49 Chain-Link Fence or Enclosure', required: true, cfr: '47 CFR §73.49', spec: '8-foot chain-link (ASTM F567), galvanized, with locked entry gate', perimeter_m: 45.3, unit_cost_per_m: 85, cost_usd: 3850.50, notes: 'FCC requires substantial barrier; most inspectors accept 8-ft chain-link with barbed wire top' },
-          { id: 'RF_WARNING', label: 'RF Exposure Warning Signs (OET Bulletin 65)', required: true, cfr: '47 CFR §1.1310; OET Bulletin 65', spec: 'ANSI Z535.2 caution signs at all fence entry points; post at ≤ 10m intervals', n_signs: 5, cost_usd: 175, notes: 'ERP 5 kW meets §1.1310 evaluation threshold — RF signage required' },
+          { id: 'RF_WARNING', label: 'RF Exposure Warning Signs (OET Bulletin 65)', required: true, cfr: '47 CFR §1.1310; OET Bulletin 65', spec: 'ANSI Z535.2 caution signs posted at MPE boundary (61.22 m from tower base, near-field λ/2π); also at §73.49 fence entries', n_signs: 6, cost_usd: 210, notes: 'ERP 5 kW meets §1.1310 evaluation threshold — RF signage required at MPE boundary (61.22 m), not just at the §73.49 base enclosure fence' },
           { id: 'ANTI_CLIMB', label: 'Anti-Climb Device / Tower Base Barrier', required: true, cfr: '47 CFR §73.49', spec: 'Anti-climb collar on tower base sections (first 4m); smooth conduit sleeve or steel collar', cost_usd: 1200, notes: 'Required at any accessible tower; deters unauthorized climbing' },
           { id: 'INTRUSION_DETECTION', label: 'Intrusion Detection and CCTV', required: false, cfr: 'DHS/CISA Tower Security Guidance', spec: '4-camera IP CCTV system with motion detection; cellular alarm relay to station', n_cameras: 4, cost_usd: 4800, notes: 'Not explicitly required by FCC but strongly recommended post-2001' },
           { id: 'EQUIPMENT_ROOM', label: 'Transmitter Building Physical Security', required: true, cfr: '47 CFR §73.1745; §11.35', spec: 'Solid-core door with deadbolt; no accessible windows at ground level; alarm monitoring', cost_usd: 1800, notes: '§11.35 requires EAS equipment remain secure and operable' }
