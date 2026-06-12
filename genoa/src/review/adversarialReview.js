@@ -196,7 +196,7 @@ export function buildAdversarialReview(exhibit) {
           field: 'compliance-pass',
           rule:  '47 CFR §73.215',
           reviewer_question: `${missingCite.length} violation(s) have no rule citation. Which specific rule does each violation invoke?`,
-          why_it_matters:    'Each violation must cite the rule it invokes (§73.207 vs §73.215 vs §73.213). Without a citation the applicant cannot know what remedy is required.',
+          why_it_matters:    `Each violation must cite the rule it invokes (${isAM ? '§73.37 vs §73.182(r)' : '§73.207 vs §73.215 vs §73.213'}). Without a citation the applicant cannot know what remedy is required.`,
           current_evidence:  `${violations.length} violations, ${missingCite.length} missing cite field`,
           gap:               'Some violation records are missing the cite/rule field',
           recommended_fix:   'Add cite field to every violation entry (e.g. "47 CFR §73.215")'
@@ -400,7 +400,7 @@ export function buildAdversarialReview(exhibit) {
         field: 'compliance-pass',
         rule:  compBlockers[0]?.rule || '47 CFR §73.215',
         reviewer_question: `This exhibit has ${compBlockers.length} active compliance failure(s). What remediation is proposed?`,
-        why_it_matters:    'Compliance failures are fatal to a CP application. The FCC will not grant a construction permit to a station with unresolved §73.207/§73.215 violations.',
+        why_it_matters:    `Compliance failures are fatal to a CP application. The FCC will not grant a construction permit to a station with unresolved ${isAM ? '§73.37/§73.182' : '§73.207/§73.215'} violations.`,
         current_evidence:  msgs,
         gap:               'Active compliance failures block the filing',
         recommended_fix:   'Resolve all violations before submission: negotiate an interference protection agreement, modify the proposed parameters, or find a non-conflicting facility.'
