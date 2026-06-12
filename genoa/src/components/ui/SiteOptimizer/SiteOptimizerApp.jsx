@@ -948,7 +948,7 @@ const DEMO_RESULT = {
         eligibility: 'RESTRICTED',
         nif_complexity: 'VERY_HIGH',
         protection_class: 'Clear channel — Class A dominant (§73.25)',
-        key_constraint: '780 kHz is a §73.25 clear channel. Class D secondaries restricted at night; skywave interference to WJR (Class A) dominates NIF analysis.',
+        key_constraint: '780 kHz is a §73.25 clear channel. Class D secondaries restricted at night; skywave interference to WBBM (Class A) dominates NIF analysis.',
         nighttime_power_max_kw: 0.5,
         nif_study_required: true,
         rule: '47 CFR §73.182 / §73.25'
@@ -1020,7 +1020,7 @@ const DEMO_RESULT = {
         triggers: [
           {
             trigger: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME',
-            detail: 'Secondary Class D on clear channel 780 kHz. DA-N (nighttime directional) almost always required to protect dominant WJR Class A skywave contours at night.',
+            detail: 'Secondary Class D on clear channel 780 kHz. DA-N (nighttime directional) almost always required to protect dominant WBBM Class A skywave contours at night.',
             cfr: '47 CFR §73.25 / §73.182'
           }
         ],
@@ -1042,7 +1042,7 @@ const DEMO_RESULT = {
         protected_contour_25uvm_est_km: 120.21,
         groundwave_05mvm_est_km: 34.1,
         advisory_items: [
-          'Secondary Class D on clear channel 780 kHz: must not INCREASE nighttime interference to dominant WJR Class A station\'s 0.5 mV/m groundwave AND 25 µV/m skywave contours.',
+          'Secondary Class D on clear channel 780 kHz: must not INCREASE nighttime interference to dominant WBBM Class A station\'s 0.5 mV/m groundwave AND 25 µV/m skywave contours.',
           'The §73.182 NIF must demonstrate interference is not materially increased from the current authorized site — this is a delta comparison, not an absolute limit.',
           'Clear-channel secondary NIF requires 1° azimuthal resolution (360 bearings × standard skip-distance increments).'
         ],
@@ -1309,10 +1309,10 @@ const DEMO_RESULT = {
         total_buy_low_usd: 435000, total_buy_high_usd: 1580000,
         total_lease_yr1_low_usd: 341000, total_lease_yr1_high_usd: 1009000,
         annual_lease_low_usd: 6000, annual_lease_high_usd: 24000,
-        annual_power_kwh: 24090000, annual_power_cost_usd: 28908,
-        annual_operating_low_usd: 40908, annual_operating_high_usd: 102908,
+        annual_power_kwh: 78840, annual_power_cost_usd: 9461,
+        annual_operating_low_usd: 21461, annual_operating_high_usd: 83461,
         annual_revenue_est_low_usd: 250000, annual_revenue_est_high_usd: 900000,
-        payback_years_optimistic: 0.4, payback_years_conservative: 11.8,
+        payback_years_optimistic: 0.5, payback_years_conservative: 9.5,
         overall_feasibility: 'SIGNIFICANT_INVESTMENT',
         line_items: [
           { id: 'LAND_PURCHASE', label: 'Land acquisition', low_usd: 80000, high_usd: 250000, note: '3.52 ha min for 90-radial ground system (105 m radius)' },
@@ -1548,8 +1548,8 @@ const DEMO_RESULT = {
           { n_elements: 3, config_label: '3-Element Linear Array', spacing_lambdas: 0.25, spacing_m: 96.15, spacing_ft: 315.5, amplitude_ratios: [0.5, 1.0, 0.5], phase_deg: [90, 0, -90], max_gain_dbd: 4.8, null_depth_theoretical_db: '30–40', null_depth_practical_db: '25–38', suppression_achievable_db: '25–38', property_footprint_m: 232.3, property_footprint_ft: 762.1, use_case: 'Multiple interference threats at different bearings; more flexible pattern shaping.', mutual_coupling_note: 'Full 3×3 mutual impedance matrix required' },
           { n_elements: 4, config_label: '4-Element T or L Array', spacing_lambdas: 0.25, spacing_m: 96.15, spacing_ft: 315.5, amplitude_ratios: [0.5, 1.0, 1.0, 0.5], phase_deg: [90, 0, 0, -90], max_gain_dbd: 5.5, null_depth_theoretical_db: '30–45', null_depth_practical_db: '25–42', suppression_achievable_db: '25–42', property_footprint_m: 338.45, property_footprint_ft: 1110.4, use_case: 'Co-channel threats at 2+ azimuths simultaneously.', mutual_coupling_note: 'Full 4×4 mutual impedance matrix; professional design required' }
         ],
-        suppression_requirement_db: 28.3,
-        suppression_note: '§73.37 / §73.182: suppression ratio of ≥28.3 dB toward co-channel protected contours (NIF D/U standard for Class D on clear channel; 780 kHz is §73.25 clear channel, not regional).',
+        suppression_requirement_db: 20,
+        suppression_note: '§73.37 / §73.182 Table 1: co-channel D/U protection ratio is 20 dB (10:1 field ratio) at the protected station\'s 0.5 mV/m daytime contour. Required antenna pattern suppression toward a specific co-channel bearing is a site-specific calculation (NIF analysis per §73.182(k)); 20 dB is the regulatory floor — actual required suppression may be higher depending on geometry.',
         n_hrp_radials: 72, hrp_increment_deg: 5,
         form_301am_exhibits: [
           { exhibit: 'Schedule B (Antenna)', description: 'Tower heights (degrees electrical), self-impedance values', required: true },
@@ -4121,7 +4121,7 @@ const DEMO_RESULT = {
         eligibility: 'RESTRICTED',
         nif_complexity: 'VERY_HIGH',
         protection_class: 'Clear channel — Class A dominant (§73.25)',
-        key_constraint: '780 kHz is a §73.25 clear channel. Class D secondary operation at night limited by WJR skywave protection zone.',
+        key_constraint: '780 kHz is a §73.25 clear channel. Class D secondary operation at night limited by WBBM skywave protection zone.',
         nighttime_power_max_kw: 0.5,
         nif_study_required: true,
         rule: '47 CFR §73.182 / §73.25'
@@ -4132,7 +4132,7 @@ const DEMO_RESULT = {
         primary_reason: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME',
         study_type: 'DA_N_NIGHTTIME_ONLY',
         triggers: [
-          { trigger: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME', detail: 'Secondary Class D on clear channel 780 kHz — DA-N required at night to protect WJR Class A skywave contours.', cfr: '47 CFR §73.25 / §73.182' }
+          { trigger: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME', detail: 'Secondary Class D on clear channel 780 kHz — DA-N required at night to protect WBBM Class A skywave contours.', cfr: '47 CFR §73.25 / §73.182' }
         ],
         key_constraints: [
           'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
@@ -4147,7 +4147,7 @@ const DEMO_RESULT = {
         nif_study_type: '§73.182 full azimuthal skywave NIF (1° bearings, OET-72 methodology)',
         protected_contour_25uvm_est_km: 120.21, groundwave_05mvm_est_km: 31.2,
         advisory_items: [
-          'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WJR\'s 0.5 mV/m and 25 µV/m contours.',
+          'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WBBM\'s 0.5 mV/m and 25 µV/m contours.',
           '§73.182 NIF must demonstrate interference not materially increased from current authorized site.'
         ],
         key_risk: 'Secondary on §73.25 clear channel — delta comparison to current authorized site', treaty_factor: null, rule: '47 CFR §73.25 / §73.182'
@@ -4341,7 +4341,7 @@ const DEMO_RESULT = {
         nif_study_type: '§73.182 full azimuthal skywave NIF (1° bearings, OET-72 methodology)',
         protected_contour_25uvm_est_km: 120.21, groundwave_05mvm_est_km: 28.4,
         advisory_items: [
-          'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WJR\'s 0.5 mV/m and 25 µV/m contours.',
+          'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WBBM\'s 0.5 mV/m and 25 µV/m contours.',
           'Increasing TPO from 5→8.5 kW significantly increases skywave NIF complexity — must re-study full azimuthal skywave exposure at the higher power level.'
         ],
         key_risk: 'Secondary on §73.25 clear channel — power increase amplifies NIF burden on all bearings', treaty_factor: null, rule: '47 CFR §73.25 / §73.182'
@@ -4509,7 +4509,7 @@ const DEMO_RESULT = {
         nif_study_type: '§73.182 full azimuthal skywave NIF (1° bearings, OET-72 methodology)',
         protected_contour_25uvm_est_km: 120.21, groundwave_05mvm_est_km: 22.5,
         advisory_items: [
-          'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WJR\'s 0.5 mV/m and 25 µV/m contours.',
+          'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WBBM\'s 0.5 mV/m and 25 µV/m contours.',
           '§73.182 NIF must demonstrate interference not materially increased from current authorized site — this is a delta comparison.',
           'TREATY ZONE US-MX: binational skywave coordination required — FCC IB review adds 12–52 weeks. Pattern authorization likely restricted in directions toward the border.'
         ],
