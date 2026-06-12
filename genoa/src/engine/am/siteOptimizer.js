@@ -21342,7 +21342,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.182 Protection of dominant AM stations from short-spaced applicants:
       //   Short-spaced AM stations may coexist only if the new station does not increase interference
       //   to protected contours of dominant stations; requires NIF analysis per §73.182.
-      //   (§73.209 is the FM short-spacing protection rule — not applicable to AM)
+      //   (§73.209 is FM — FM 2nd adjacent protection rule, not applicable to AM; AM uses §73.182(r)/§73.37)
       //
       // D/U protection ratios for AM (engineering practice; ITU-R BS.560):
       //   Co-channel (0 kHz offset):    D/U ≥ 20 dB at protected contour (10:1 field ratio)
