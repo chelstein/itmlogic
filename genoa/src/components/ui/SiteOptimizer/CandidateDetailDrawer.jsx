@@ -6018,7 +6018,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
           return (
             <div key="rfi-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf6ec', borderRadius: 8, border: '2px solid #c2410c' }}>
-              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Tower Base Insulator &amp; RF Isolation (§73.49 / §73.1213)</div>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Tower Base Insulator &amp; RF Isolation (§73.49)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
                 <span style={{ color: '#c2410c' }}>Tower / Wavelength:</span><span>{g.tower_height_ft} ft (λ={g.wavelength_m} m at {g.frequency_khz} kHz)</span>
                 <span style={{ color: '#c2410c' }}>Base Insulator:</span><span style={{ fontWeight: 600 }}>{g.base_insulator_type} — {fmt(g.base_insulator_low_usd)} – {fmt(g.base_insulator_high_usd)}</span>
@@ -8880,7 +8880,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
               <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
-                AM Monitoring Points <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.1213</span>
+                AM Monitoring Points <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.158</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
