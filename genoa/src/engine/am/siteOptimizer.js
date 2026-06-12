@@ -12307,12 +12307,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //   • Any change that makes license data inaccurate
       //   Filing: FCC Form 302-AM (license application) or amendment to pending CP.
       //
-      // §73.1125 — Main Studio Rule:
-      //   AM station must maintain a staffed main studio within its principal community contour
-      //   OR within 25 miles of the reference coordinates of the community of license (CoL).
-      //   Waiver (§73.1125(a)): available if no suitable location in or near service area.
-      //   FCC has relaxed main studio rule since 2017 FCC streamlining order, but the
-      //   CoL proximity requirement remains in the rules.
+      // §73.1125 — Main Studio Rule (ELIMINATED by FCC 17-18, Nov 2017):
+      //   The requirement to maintain a staffed main studio within the community of license
+      //   or within 25 miles of CoL reference coordinates was fully eliminated (MB Docket 17-106).
+      //   No waiver is needed or available — the rule no longer exists.  The 25-mile proximity
+      //   check below is advisory only: transmitter proximity to CoL affects coverage quality
+      //   and community service but is not a regulatory floor after FCC 17-18.
       //   Distance check: haversine from candidate pt to CoL centroid vs 40.23 km (25 miles).
       //
       // §73.3538: License modifications — any technical change requires amended construction
@@ -12373,8 +12373,8 @@ async function scoreCandidate(pt, ctx, warnings){
         waiver_high_usd,
         total_renewal_low_usd,
         total_renewal_high_usd,
-        reference: '47 CFR §73.3539 (renewal); §73.3527 (public file); §73.1125 (main studio); §1.65 (material change); §73.3538 (license modification)',
-        note: `Candidate ${dist_col_km} km from CoL centroid (limit: ${MAIN_STUDIO_MAX_DIST_KM} km / 25 miles per §73.1125). ${main_studio_waiver_needed ? 'MAIN STUDIO WAIVER NEEDED — candidate exceeds 25-mile limit; §73.1125(a) waiver required.' : 'Main studio rule compliant at this candidate.'} Technical change at new site requires Form 302-AM amendment within 30 days of move per §1.65. License renews on 8-year cycle (Form 303-S); renewal fee $${form_renewal_fee_usd}.`
+        reference: '47 CFR §73.3539 (renewal); §73.3527 (public file); FCC 17-18 / MB Docket 17-106 (§73.1125 main studio rule eliminated Nov 2017); §1.65 (material change); §73.3538 (license modification)',
+        note: `Candidate ${dist_col_km} km from CoL centroid (advisory proximity check: 25 miles / ${MAIN_STUDIO_MAX_DIST_KM} km; note §73.1125 main studio rule was eliminated by FCC 17-18 — no regulatory limit, check is advisory for coverage quality). ${main_studio_waiver_needed ? 'ADVISORY: candidate exceeds 25-mile CoL proximity — review coverage adequacy for community service (no waiver required; §73.1125 was eliminated).' : 'Candidate within advisory 25-mile CoL proximity.'} Technical change at new site requires Form 302-AM amendment within 30 days of move per §1.65. License renews on 8-year cycle (Form 303-S); renewal fee $${form_renewal_fee_usd}.`
       };
     })(),
 
@@ -20589,7 +20589,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_height_milestones: HEIGHT_MILESTONES.length,
         height_milestones: HEIGHT_MILESTONES,
         coverage_estimates: COVERAGE_ESTIMATES,
-        reference: '47 CFR §73.160 (antenna height); §17.7 (ASR); §17.23 (FAA marking); ITU-R BS.346-1 (antenna gain vs height)',
+        reference: '47 CFR §73.160 (vertical plane radiation characteristics f(θ)); §17.7 (ASR); §17.23 (FAA marking); ITU-R BS.346-1 (antenna gain vs height)',
         note: `For ${freq_khz} kHz (λ=${Math.round(wavelength_m)} m): current tower ${current_height_ft} ft (λ/4, ${current_elec_deg}°) achieves baseline field strength. Increasing to 5λ/8 (${m_to_ft(five_eighth_m)} ft) yields +${max_coverage_gain_pct}% field gain. Towers above ${m_to_ft(61)} ft require FAA ASR registration (§17.7) and painting/lighting per §17.23.`
       };
     })(),
