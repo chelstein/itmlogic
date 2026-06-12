@@ -896,7 +896,7 @@ const DEMO_RESULT = {
       },
       per_candidate_engineering_checklist: [
         { id: 'SOIL_RESISTIVITY_SURVEY', priority: 'REQUIRED', label: 'Soil resistivity survey', note: 'Zone-table σ=8 mS/m used for screening. Commission a 4-electrode Wenner array survey.' },
-        { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
+        { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96.15 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
         { id: 'MPE_STUDY', priority: 'REQUIRED', label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz.' }
       ],
       tpo_power_sweep: [
@@ -909,7 +909,7 @@ const DEMO_RESULT = {
       regulatory_risk_score: {
         risk_score: 35, risk_category: 'MODERATE',
         risk_factors: [
-          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction; adds 8–16 weeks' },
+          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96.15 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction; adds 8–16 weeks' },
           { factor: 'MODERATE_CONDUCTIVITY', points: 5, note: 'σ=8 mS/m (GOOD): standard 120-radial system adequate but soil survey still required for §73.190 certification' },
           { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required for all non-local-channel stations at a new transmitter site' },
           { factor: 'DA_PATTERN_REQUIRED', points: 5, note: 'NDA operation reviewed; DA may be needed if sky-wave NIF fails' }
@@ -934,7 +934,7 @@ const DEMO_RESULT = {
         _mpe_source: '§1.1310 Table 1 uncontrolled, 0.3–1.34 MHz: 100 mW/cm². At 780 kHz both controlled and uncontrolled limits are 100 mW/cm².',
         far_field_exclusion_m: 0.81,
         recommended_fence_distance_m: 61.22,
-        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
+        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61.22 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
       },
       power_efficiency_metrics: {
         tpo_kw: 5,
@@ -1087,7 +1087,7 @@ const DEMO_RESULT = {
         gates: [
           { id: 'COL_COVERAGE', label: '§73.24(i) COL 5 mV/m coverage', status: 'PASS', value: '97% (need ≥80%)', rule: '47 CFR §73.24(i)', note: null },
           { id: 'BLANKET_POP', label: '§73.24(g) blanket population <1%', status: 'PASS', value: '0.5% (max 1%)', rule: '47 CFR §73.24(g)', note: null },
-          { id: 'ASR_REGISTRATION', label: '§17.7 ASR tower registration', status: 'WARN', value: 'λ/4 ≈ 96 m (threshold 60.96 m)', rule: '47 CFR §17.7', note: 'FCC Form 854 + FAA aeronautical study (7460-1) required before construction.' },
+          { id: 'ASR_REGISTRATION', label: '§17.7 ASR tower registration', status: 'WARN', value: 'λ/4 ≈ 96.15 m (threshold 60.96 m)', rule: '47 CFR §17.7', note: 'FCC Form 854 + FAA aeronautical study (7460-1) required before construction.' },
           { id: 'RF_EXPOSURE_MPE', label: '§1.1307 RF exposure (MPE) evaluation', status: 'WARN', value: 'Near-field boundary λ/(2π) ≈ 61 m', rule: '47 CFR §1.1307 / OET Bulletin 65', note: 'OET-65 near-field evaluation required — fence at ≥61 m from antenna base.' },
           { id: 'TREATY_COORDINATION', label: 'International treaty zone', status: 'PASS', value: 'None detected', rule: 'US/MX AM Agreement (1986)', note: null },
           { id: 'NIGHTTIME_NIF', label: '§73.182 nighttime NIF study', status: 'WARN', value: 'Required at any new site', rule: '47 CFR §73.182', note: 'NIF study must demonstrate no increase in nighttime interference from authorized site.' },
@@ -2088,9 +2088,12 @@ const DEMO_RESULT = {
         co_channel_du_ratio_db: 20,
         first_adj_du_ratio_db: 6,
         second_adj_du_ratio_db: 0,
+        // §73.37 Table I/II minimum separations (km) — Class D applicant.
+        // Source: minimum_spacing_reference block (extracted from siteOptimizer.js CO_CHANNEL_KM / ADJ_KM tables).
         separation_minimums_km: {
-          co_channel_class_a: 800, co_channel_class_b: 640, co_channel_class_c: 480, co_channel_class_d: 320,
-          first_adj_class_a: 400, first_adj_class_b: 320, second_adj_class_a: 200, second_adj_class_b: 160
+          co_channel_class_a: 1037, co_channel_class_b: 953, co_channel_class_c: 724, co_channel_class_d: 953,
+          first_adj_class_a: 805, first_adj_class_b: 724, first_adj_class_c: 402, first_adj_class_d: 724,
+          second_adj_class_a: 402, second_adj_class_b: 354, second_adj_class_c: 177, second_adj_class_d: 354
         },
         n_coordination_steps: 5,
         coordination_steps: [
@@ -4071,7 +4074,7 @@ const DEMO_RESULT = {
       regulatory_risk_score: {
         risk_score: 30, risk_category: 'MODERATE',
         risk_factors: [
-          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required' },
+          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96.15 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required' },
           { factor: 'FAIR_CONDUCTIVITY', points: 5, note: 'σ=6 mS/m (GOOD): soil survey still required for §73.190 certification' },
           { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required for all non-local-channel stations at a new transmitter site' }
         ],
@@ -4095,7 +4098,7 @@ const DEMO_RESULT = {
         _mpe_source: '§1.1310 Table 1 uncontrolled, 0.3–1.34 MHz: 100 mW/cm². At 780 kHz both controlled and uncontrolled limits are 100 mW/cm².',
         far_field_exclusion_m: 0.81,
         recommended_fence_distance_m: 61.22,
-        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
+        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61.22 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
       },
       power_efficiency_metrics: {
         tpo_kw: 5,
@@ -4245,14 +4248,14 @@ const DEMO_RESULT = {
       },
       per_candidate_engineering_checklist: [
         { id: 'SOIL_RESISTIVITY_SURVEY', priority: 'REQUIRED', label: 'Soil resistivity survey', note: 'Zone-table σ=10 mS/m used for screening. Commission a 4-electrode Wenner array survey.' },
-        { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
+        { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96.15 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
         { id: 'MPE_STUDY', priority: 'REQUIRED', label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz.' },
         { id: 'COL_COVERAGE_REMEDY', priority: 'REQUIRED', label: 'COL coverage remedy engineering', note: '78% COL coverage < §73.24(i) 80% floor. Increase TPO to ≥8.5 kW or design DA pattern (§73.150) to push coverage above floor.' }
       ],
       regulatory_risk_score: {
         risk_score: 45, risk_category: 'HIGH',
         risk_factors: [
-          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required' },
+          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96.15 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required' },
           { factor: 'MODERATE_CONDUCTIVITY', points: 5, note: 'σ=10 mS/m (EXCELLENT): standard 120-radial system adequate but soil survey still required' },
           { factor: 'COL_COVERAGE_FAILS', points: 10, note: 'COL coverage 78% < §73.24(i) 80% floor (gap 2%): coverage remedy required before filing' },
           { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required for all non-local-channel stations at a new transmitter site' },
@@ -4278,7 +4281,7 @@ const DEMO_RESULT = {
         _mpe_source: '§1.1310 Table 1 uncontrolled, 0.3–1.34 MHz: 100 mW/cm². At 780 kHz both controlled and uncontrolled limits are 100 mW/cm².',
         far_field_exclusion_m: 0.81,
         recommended_fence_distance_m: 61.22,
-        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
+        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61.22 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
       },
       power_efficiency_metrics: {
         tpo_kw: 5,
@@ -4417,7 +4420,7 @@ const DEMO_RESULT = {
         risk_score: 100, risk_category: 'VERY_HIGH',
         risk_factors: [
           { factor: 'TREATY_ZONE', points: 40, note: 'In treaty zone (US-MX advisory): FCC IB coordination adds 12–52 weeks; power/pattern restrictions likely' },
-          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction' },
+          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96.15 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction' },
           { factor: 'POOR_CONDUCTIVITY', points: 20, note: 'σ=1.5 mS/m (POOR): extended ground system required; adds cost, time, and uncertainty to §73.190 certification' },
           { factor: 'BLANKET_POP_EXCEEDS_LIMIT', points: 25, note: 'Estimated blanket pop 1.1% > §73.24(g) 1% limit: filing cannot proceed without power reduction or DA-N pattern' },
           { factor: 'COL_COVERAGE_FAILS', points: 20, note: 'COL coverage 62% < §73.24(i) 80% floor (gap 18%): coverage remedy required before filing' },
@@ -4443,7 +4446,7 @@ const DEMO_RESULT = {
         _mpe_source: '§1.1310 Table 1 uncontrolled, 0.3–1.34 MHz: 100 mW/cm². At 780 kHz both controlled and uncontrolled limits are 100 mW/cm².',
         far_field_exclusion_m: 0.81,
         recommended_fence_distance_m: 61.22,
-        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
+        note: 'MPE limit: 100 mW/cm² (§1.1310 Table 1, 0.3–1.34 MHz). At 5 kW, the near-field boundary (λ/2π = 61.22 m) extends beyond the far-field compliance distance, so OET-65 §3.B near-field analysis is required. Conservative fence at ≥62 m (near-field boundary); site-specific MPE evaluation required per OET Bulletin 65.'
       },
       power_efficiency_metrics: {
         tpo_kw: 5,
