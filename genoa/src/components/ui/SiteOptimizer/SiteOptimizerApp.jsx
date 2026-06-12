@@ -1477,8 +1477,8 @@ const DEMO_RESULT = {
           { to_class: 'D', cc_km:  953, fa_km: 724, sa_km: 354, from_class: 'D', co_channel_freq: 780 }
         ],
         verification_checklist: [
-          { id: 'cc_query', item: 'Co-channel (780 kHz) station database query', action: 'Query FCC LMS for all AM stations authorized on this frequency. Apply §73.37 Table 1 spacings to each.', data_source: 'FCC LMS AM Query or BIA/Kelsey AM database', required: true },
-          { id: 'fa_query', item: 'First-adjacent (770/790 kHz) station query', action: 'Query LMS for stations on ±10 kHz. Apply FA spacing column from §73.37 Table 1.', data_source: 'FCC LMS AM Query', required: true },
+          { id: 'cc_query', item: 'Co-channel (780 kHz) station database query', action: 'Query FCC LMS for all AM stations authorized on this frequency. Apply §73.37 Table I (co-channel) spacings to each.', data_source: 'FCC LMS AM Query or BIA/Kelsey AM database', required: true },
+          { id: 'fa_query', item: 'First-adjacent (770/790 kHz) station query', action: 'Query LMS for stations on ±10 kHz. Apply FA spacing column from §73.37 Table II (adjacent channel).', data_source: 'FCC LMS AM Query', required: true },
           { id: 'sa_query', item: 'Second-adjacent (760/800 kHz) station query', action: 'Query LMS for stations on ±20 kHz. Apply SA spacing column.', data_source: 'FCC LMS AM Query', required: true },
           { id: 'nif_check', item: '§73.182 skywave NIF consistency check', action: 'After §73.37 spacing compliance verified, confirm NIF study covers same station database snapshot.', data_source: 'LMS + §73.182 NIF study', required: true },
           { id: 'treaty_check', item: 'International co-channel check', action: 'Verify spacing to Canadian and Mexican AM stations on same frequency per bilateral agreements.', data_source: 'CRTC AM database (Canada); IFT (Mexico)', required: false },
@@ -3835,11 +3835,11 @@ const DEMO_RESULT = {
       skywave_coverage_analysis: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
         is_clear_channel: true, is_directional: false,
-        nighttime_power_max_kw: 0.25, actual_night_power_kw: 0.25,
+        nighttime_power_max_kw: 0.5, actual_night_power_kw: 0.25,
         skywave_contour: { field_mvm: 0.025, label: '25 µV/m skywave (§73.182 Class D secondary)' },
         skywave_dist_50pct_km: 70.7, skywave_dist_10pct_km: 91.9, skywave_dist_1pct_km: 120.2,
         nif_required: true, nif_study_type: 'FULL_CLEAR_CHANNEL_NIF',
-        nighttime_da_note: 'Non-directional; nighttime protection based on omnidirectional ERP and §73.182 spacing.',
+        nighttime_da_note: 'Non-directional; nighttime protection based on omnidirectional ERP and §73.182 spacing. FCC Class D maximum is 0.5 kW (§73.24); this analysis models 0.25 kW actual operation for improved NIF margin.',
         protection_levels: [
           { id: 'class_a_protected', field_mvm: 0.5,   basis: '§73.182: Class A 0.5 mV/m daytime GW',          applies_to_us: false },
           { id: 'class_b_protected', field_mvm: 0.25,  basis: '§73.182: Class B 0.25 mV/m daytime GW',         applies_to_us: false },
@@ -3849,7 +3849,7 @@ const DEMO_RESULT = {
         ],
         n_protection_levels: 5,
         reference: '47 CFR §73.182; §73.21; §73.25; §73.27; FCC skywave propagation curves (M3/M3a); ITU-R P.1147',
-        note: 'Nighttime skywave at 0.25 kW: 50% time ≈ 70.7 km; 10% ≈ 91.9 km; NIF 1% ≈ 120.2 km. NIF study: FULL_CLEAR_CHANNEL_NIF.'
+        note: 'Nighttime skywave at 0.25 kW actual (FCC Class D max 0.5 kW per §73.24): 50% time ≈ 70.7 km; 10% ≈ 91.9 km; NIF 1% ≈ 120.2 km. NIF study: FULL_CLEAR_CHANNEL_NIF.'
       },
       radial_system_engineering_guide: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5, sigma_msm_current: 9,
@@ -3950,8 +3950,8 @@ const DEMO_RESULT = {
         ],
         threat_tiers: [
           { tier: 1, label: 'Co-channel (0 kHz offset)',   offset_khz: 0,  du_threshold_db: 20,  spacing_req_km: 953, rule: '§73.37 Table I (D vs D) / §73.182' },
-          { tier: 2, label: 'First Adjacent (±10 kHz)',    offset_khz: 10, du_threshold_db: 6,   spacing_req_km: null, rule: '§73.37 Table 1 (FA column)' },
-          { tier: 3, label: 'Second Adjacent (±20 kHz)',   offset_khz: 20, du_threshold_db: 0,   spacing_req_km: null, rule: '§73.37 Table 1 (SA column)' },
+          { tier: 2, label: 'First Adjacent (±10 kHz)',    offset_khz: 10, du_threshold_db: 6,   spacing_req_km: null, rule: '§73.37 Table II (FA column)' },
+          { tier: 3, label: 'Second Adjacent (±20 kHz)',   offset_khz: 20, du_threshold_db: 0,   spacing_req_km: null, rule: '§73.37 Table II (SA column)' },
           { tier: 4, label: 'IBOC Sideband (±10–15 kHz)', offset_khz: 12, du_threshold_db: -10, spacing_req_km: null, rule: '§73.404(c) / NRSC-5-D' }
         ],
         n_threat_tiers: 4,
@@ -4469,10 +4469,10 @@ const DEMO_RESULT = {
         eligibility: 'RESTRICTED',
         nif_complexity: 'VERY_HIGH',
         protection_class: 'Clear channel — Class A dominant (§73.25)',
-        key_constraint: '780 kHz clear channel + US-MX treaty zone: FCC IB pre-coordination required before any nighttime operation.',
-        nighttime_power_max_kw: 0.25,
+        key_constraint: '780 kHz clear channel + US-MX treaty zone: FCC IB pre-coordination required before any nighttime operation. FCC Class D limit is 0.5 kW per §73.24; treaty coordination may impose further pattern or power restrictions.',
+        nighttime_power_max_kw: 0.5,
         nif_study_required: true,
-        rule: '47 CFR §73.182 / §73.25'
+        rule: '47 CFR §73.24 / §73.182 / §73.25'
       },
       da_gain_potential: {
         applicable: true,
