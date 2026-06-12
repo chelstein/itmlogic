@@ -686,7 +686,7 @@ const DEMO_RESULT = {
     ],
     caveats: [
       'This is a SCREENING-GRADE analysis only — field measurements, §73.182 NIF study, and full engineering design are required before filing.',
-      'Candidate scores use FCC M3 groundwave curves and population proxies; actual coverage contours must be computed per §73.183/§73.184.',
+      'Candidate scores use FCC M3 groundwave curves and population proxies; actual coverage contours must be computed per §73.184 (groundwave coverage methodology).',
       'Parcel availability, lease feasibility, zoning, and environmental review are outside the scope of this analysis.'
     ]
   },
@@ -722,8 +722,8 @@ const DEMO_RESULT = {
     },
     {
       priority: 'MEDIUM',
-      action: 'Evaluate TPO increase for §73.24(i) COL coverage on 2 candidate(s) (Rank 3: increase to ≥8.5 kW).',
-      rationale: 'Ranks 3 and 4 fail the §73.24(i) 5 mV/m principal-community floor at current TPO. The engine has pre-computed the minimum TPO at which the 5 mV/m groundwave contour reaches the community-of-license centroid distance. Verify the increased power is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket population problems.'
+      action: 'Evaluate DA pattern for §73.24(i) COL coverage on 2 candidate(s) (Rank 3: 8.5 kW needed but EXCEEDS Class D ceiling — DA pattern is only compliant path).',
+      rationale: 'Ranks 3 and 4 fail the §73.24(i) 5 mV/m principal-community floor at current 5 kW TPO. Class D maximum daytime power is 5 kW per §73.21(e) — no power increase available. DA pattern (§73.150) toward the COL bearing is the only compliant remediation path. Also verify the DA pattern does not create new §73.24(g) blanket population problems.'
     },
     {
       priority: 'MEDIUM',
@@ -867,7 +867,7 @@ const DEMO_RESULT = {
       status_labels: ['PROMISING', 'ENGINEER REVIEW REQUIRED'],
       status_category: 'PROMISING',
       blanket_pop_risk: 'OK', col_coverage_gap_pct: null, population_delta_vs_baseline: 37700,
-      power_class_ceiling_kw: 50, mpe_evaluation_required: true,
+      power_class_ceiling_kw: 5, mpe_evaluation_required: true,
       score_delta_explanation: {
         total: 28.9,
         components: { col_coverage: 12.1, population: 11.8, blanket: 3.6, conductivity: 6.3, confidence_penalty: -4.9 }
@@ -875,7 +875,7 @@ const DEMO_RESULT = {
       regulatory_compliance_summary: {
         col_coverage: { status: 'PASS', value: 0.97, threshold: 0.80, rule: '47 CFR §73.24(i)' },
         blanket_pop:  { status: 'PASS', value: 0.40, threshold: 1.00, rule: '47 CFR §73.24(g)' },
-        class_power:  { status: 'PASS', value: 5, ceiling: 50, rule: '47 CFR §73.21' },
+        class_power:  { status: 'PASS', value: 5, ceiling: 5,  rule: '47 CFR §73.21(e)' },
         treaty_zone:  { status: 'CLEAR', value: null, rule: 'US/MX 1986 Agreement; US/CA 1991 LOU' }
       },
       source: 'GRID',
@@ -888,7 +888,7 @@ const DEMO_RESULT = {
         col_coverage_meets_floor: true,
         tpo_needed_for_col_floor_kw: null,
         tpo_needed_within_class_ceiling: null,
-        class_power_ceiling_kw: 50,
+        class_power_ceiling_kw: 5,
         blanket_pop_pct: 0.40,
         blanket_pop_meets_limit: true,
         da_pattern_may_resolve: false,
@@ -1005,13 +1005,13 @@ const DEMO_RESULT = {
         note: 'Screening-grade circular-area population estimate.'
       },
       power_upgrade_analysis: {
-        applicable: true, current_tpo_kw: 5, max_class_power_kw: 50,
-        headroom_kw: 45, headroom_pct: 900,
-        col_coverage_estimate_at_max_pct: 100, reach_at_max_class_power_km: 78.4,
+        applicable: false, current_tpo_kw: 5, max_class_power_kw: 5,
+        headroom_kw: 0, headroom_pct: 0,
+        col_coverage_estimate_at_max_pct: 0.97, reach_at_max_class_power_km: 34.1,
         col_would_comply_at_max: true,
-        blanket_concern_at_max: { blanket_1000mvm_km: 2.3, estimated_blanket_pop_pct: 0.8, would_exceed_limit: false },
-        verdict: 'UPGRADE_RESOLVES_COL',
-        note: 'Class D ceiling is 50 kW (+45 kW / +900% over current TPO).'
+        blanket_concern_at_max: { blanket_1000mvm_km: 0.42, estimated_blanket_pop_pct: 0.4, would_exceed_limit: false },
+        verdict: 'NO_DAYTIME_UPGRADE_AVAILABLE',
+        note: 'Class D ceiling is 5 kW per §73.21(e) — current TPO is already AT the ceiling. No daytime power headroom. COL coverage already meets §73.24(i) floor at 5 kW (97%).'
       },
       directional_antenna_study_guide: {
         recommended: true,
@@ -1181,21 +1181,19 @@ const DEMO_RESULT = {
         note: 'Seasonal propagation summary is a planning tool only. All §73.24(i) compliance determinations must use FCC-approved groundwave software with measured soil data.'
       },
       fcc_class_power_ceiling_analysis: {
-        fcc_class: 'D', current_tpo_kw: 5, class_power_ceiling_kw: 50,
-        headroom_kw: 45, headroom_pct: 90, power_utilization_pct: 10,
-        utilization_tier: 'LOW_UTILIZATION',
-        reach_at_ceiling_km: 88.2, col_dist_at_ceiling_km: 14.1,
-        blanket_1000mvm_at_ceiling_km: 1.61, blanket_risk_at_ceiling: 'MODERATE',
+        fcc_class: 'D', current_tpo_kw: 5, class_power_ceiling_kw: 5,
+        headroom_kw: 0, headroom_pct: 0, power_utilization_pct: 100,
+        utilization_tier: 'AT_CEILING',
+        reach_at_ceiling_km: 34.1, col_dist_at_ceiling_km: 5.8,
+        blanket_1000mvm_at_ceiling_km: 0.42, blanket_risk_at_ceiling: 'LOW',
         min_tpo_for_col_kw: null,
         upgrade_path: [
-          'Engineering study (§73.183 groundwave + §73.24(g) blanket re-evaluation)',
-          'Amended Form 301-AM with updated COL coverage exhibit',
-          '§73.182 NIF study update (re-evaluate nighttime skywave at new power)',
-          'New RF exposure (MPE) evaluation at higher ERP (OET Bulletin 65)',
-          'Consider blanket interference (§73.24(g)) risk — larger 1000 mV/m contour'
+          'No daytime power upgrade available — Class D maximum is 5 kW per §73.21(e)',
+          'Nighttime upgrade path: 0 → 0.5 kW (clear-channel Class D nighttime maximum per §73.24)',
+          'DA-N nighttime pattern required for nighttime authorization (§73.150 + §73.182 NIF study)'
         ],
-        upgrade_feasibility: 'SIGNIFICANT',
-        note: 'Class D ceiling is 50 kW (§73.21). Current TPO is 5 kW (10% of ceiling). 45 kW headroom available. Power increase requires amended Form 301-AM.'
+        upgrade_feasibility: 'NONE',
+        note: 'Class D ceiling is 5 kW per §73.21(e) — current TPO is at ceiling. Zero daytime headroom. Nighttime-only upgrade to 0.5 kW requires DA-N pattern authorization.'
       },
       technical_proof_guide: {
         frequency_khz: 780, fcc_class: 'D', antenna_mode: 'DA', is_local_channel: false,
@@ -4259,7 +4257,7 @@ const DEMO_RESULT = {
         { id: 'SOIL_RESISTIVITY_SURVEY', priority: 'REQUIRED', label: 'Soil resistivity survey', note: 'Zone-table σ=10 mS/m used for screening. Commission a 4-electrode Wenner array survey.' },
         { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96.15 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
         { id: 'MPE_STUDY', priority: 'REQUIRED', label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)', note: 'Near-field boundary λ/(2π) = 61.22 m at 780 kHz.' },
-        { id: 'COL_COVERAGE_REMEDY', priority: 'REQUIRED', label: 'COL coverage remedy engineering', note: '78% COL coverage < §73.24(i) 80% floor. Increase TPO to ≥8.5 kW or design DA pattern (§73.150) to push coverage above floor.' }
+        { id: 'COL_COVERAGE_REMEDY', priority: 'REQUIRED', label: 'COL coverage remedy engineering', note: '78% COL coverage < §73.24(i) 80% floor. DA pattern (§73.150) toward COL bearing is the only compliant path — 8.5 kW needed for NDA compliance but exceeds Class D ceiling (5 kW per §73.21(e)).' }
       ],
       regulatory_risk_score: {
         risk_score: 45, risk_category: 'HIGH',
