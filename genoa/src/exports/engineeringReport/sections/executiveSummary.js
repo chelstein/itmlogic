@@ -149,7 +149,7 @@ export function buildExecutiveSummarySection(exhibit){
     recs.push('Re-run the exhibit with the live geo.fcc.gov parity check before filing if a definitive external cross-verification is required (the current run used tier-3 code-identity verification).');
   }
   if (exhibit?.am_blanket_compliance?.overall_pass === false){
-    recs.push('The §73.24(g) blanketing-interference population check FAILED — a §73.318(b) remediation plan and receiver-treatment commitment must accompany the application.');
+    recs.push('The §73.24(g) blanketing-interference population check FAILED — a §73.88 (AM blanketing) remediation plan and receiver-treatment commitment must accompany the application.');
   }
   if (exhibit?.am_city_coverage_compliance?.overall_pass === false){
     const pct = Number.isFinite(exhibit.am_city_coverage_compliance.coverage_pct)

@@ -884,7 +884,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
             const f = (exhibit.am_blanket_compliance.findings || []).find(x => x.rule === 'blanket_population_ratio');
             return f?.observed || 'see am_blanket_compliance.findings';
           })()
-        } — §73.318(b) remediation plan required before filing.`));
+        } — §73.88 (AM blanketing) remediation plan required before filing.`));
     }
 
     exhibit.am_city_coverage_compliance = checkAm73_24j({ exhibit });

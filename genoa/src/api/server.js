@@ -121,7 +121,7 @@ app.use('/api', sweepRoutes);        // parameter-sweep endpoint (POST /api/exhi
 app.use('/api', peCertificationRoutes); // PE certify / verify-cert (POST /api/exhibits/{certify,verify-cert,verify-build,verify-replay-token})
 app.use('/api', amDaDesignRoutes);   // AM DA pattern design (POST /api/am-da/{design,null})
 app.use('/api', amNightRoutes);      // AM nighttime allocation (POST /api/am-night/nif — §73.182 NIF contour)
-app.use('/api', amSunRoutes);        // FCC sunrise/sunset authority (GET /api/am/sun — §73.99 PSRA/PSSA + §73.1209)
+app.use('/api', amSunRoutes);        // FCC sunrise/sunset authority (GET /api/am/sun — §73.99 PSRA/PSSA + §73.1209 local time)
 app.use('/api', amPhysicsRoutes);    // AM Physics SOMNEC2D advisory evidence (POST /api/am/physics/somnec — independent NEC ground-field solver)
 app.use('/api', geoRfEvidenceRoutes); // Geo-RF Evidence — advisory environmental geospatial datasets (tree canopy, landcover, tau RF models); never modifies FCC rule outputs
 app.use('/api', amPsraPssaRoutes);   // §73.99(b)(1)/(2) PSRA/PSSA reduced-power exhibit (POST /api/am/psra-pssa)

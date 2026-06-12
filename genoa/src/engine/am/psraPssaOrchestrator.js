@@ -222,7 +222,7 @@ export async function psraPssaExhibit(input, ctx = {}){
         const N        = protectedRows[i];
         const pssaResult = batch.results[i * 2];
         const psraResult = batch.results[i * 2 + 1];
-        // E_max_allowed = §73.187 allowed contribution × rss_share.
+        // E_max_allowed = §73.182(k) RSS-budget share × rss_share (SS-1/SS-2 field from §73.190(c)).
         // Operator-supplied N.e_max_pssa_uv_m / N.e_max_psra_uv_m
         // overrides the heuristic when present.
         const e_pssa_field = Number(pssaResult?.field_uv_m);

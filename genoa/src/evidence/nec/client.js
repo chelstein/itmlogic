@@ -220,7 +220,7 @@ export const NEC_PROVENANCE = Object.freeze({
   regulation_basis: [
     '47 CFR §73.62  — directional AM pattern authorization',
     '47 CFR §73.150 — proof of performance, RTA',
-    '47 CFR §73.45  — MEOV monitor-point fields',
+    '47 CFR §73.61  — MEOV monitor-point field predictions',
     '47 CFR §1.1310 / OET-65 — near-field RF exposure'
   ],
   pattern_convention: 'Far-field gain reported as dBi over (theta × phi); ' +

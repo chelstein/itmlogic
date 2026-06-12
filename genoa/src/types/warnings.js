@@ -254,11 +254,11 @@ export const WARNING_CODES = Object.freeze({
 
   LICENSE_EXPIRING_SOON: { severity: 'warning', phase: 'evidence',
     title: 'FCC license expires soon',
-    description: 'The FCC license for this station expires within the lookahead window (default 180 days; configurable via LICENSE_EXPIRING_SOON_DAYS).  License renewal under §73.1020 must be filed in the renewal window or the authorization may lapse.  See evidence.fcc_lms.license.license_expiration_date.' },
+    description: 'The FCC license for this station expires within the lookahead window (default 180 days; configurable via LICENSE_EXPIRING_SOON_DAYS).  License renewal under §73.3539 must be filed in the renewal window or the authorization may lapse.  See evidence.fcc_lms.license.license_expiration_date.' },
 
   LICENSE_EXPIRED: { severity: 'blocker', phase: 'evidence',
     title: 'FCC license has expired',
-    description: 'The FCC license for this station expired before the compute date.  No new exhibit can be filed against an expired authorization; renewal under §73.1020 or a new application is required.  See evidence.fcc_lms.license.license_expiration_date.' },
+    description: 'The FCC license for this station expired before the compute date.  No new exhibit can be filed against an expired authorization; renewal under §73.3539 or a new application is required.  See evidence.fcc_lms.license.license_expiration_date.' },
 
   LMS_DATA_MISMATCH: { severity: 'warning', phase: 'evidence',
     title: 'FCC LMS record disagrees with application data',

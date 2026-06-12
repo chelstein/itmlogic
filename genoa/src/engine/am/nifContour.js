@@ -36,7 +36,7 @@
 // REGULATORY
 //   - 47 CFR §73.182      — engineering standards of allocation
 //   - 47 CFR §73.182(k)   — RSS aggregation, 25% exclusion
-//   - 47 CFR §73.183(b)   — class-specific protection ratios
+//   - 47 CFR §73.182 Table 1 — class-specific nighttime D/U protection ratios
 
 import {
   applyPatternFactor,

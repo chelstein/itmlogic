@@ -23,8 +23,8 @@
 //     ERP_eff(az) = ERP_omni · f(az)²
 //
 //   §73.62(a) requires DA sample current ratios to stay within ±5%
-//   (phases ±3°) of licensed values; MEOV-augmented patterns are
-//   authorized per §73.152.
+//   (phases ±3°) of licensed values; §73.152 governs day/night
+//   (DA-D/DA-N) operation authorization.
 //   §73.150 publishes the format of the pattern data submitted with
 //   the Form 301-AM construction permit application.  The Genoa engine does NOT regenerate
 //   the pattern from antenna physics — it interpolates the licensed

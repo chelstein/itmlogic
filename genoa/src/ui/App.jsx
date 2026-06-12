@@ -779,10 +779,14 @@ function MainApp({ onLogout, onOpenOptimizer }) {
 
       // Final fallback: synthesize a downloadable JSON file in-browser.
       const blob = new Blob([JSON.stringify(cleanedExhibit, null, 2)], { type: 'application/json' });
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = blobUrl;
       a.download = `${(cleanedExhibit.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_')}_genoa_exhibit.json`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
       setStatusMsg('Save unavailable on server — exhibit downloaded locally as JSON.');
     } catch (e){
       setStatusMsg(`Save failed: ${e.message}`);
@@ -814,10 +818,14 @@ function MainApp({ onLogout, onOpenOptimizer }) {
       if (!fn){ setStatusMsg('TXT export requires a saved exhibit; click Save first.'); return; }
       const [body, type, suffix] = fn();
       const blob = new Blob([body], { type });
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = blobUrl;
       a.download = `${(exhibit.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_')}_${suffix}`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
       return;
     }
     window.location = `/api/exhibits/${exhibit.id}/export/${format}`;
@@ -872,12 +880,16 @@ function MainApp({ onLogout, onOpenOptimizer }) {
       await new Promise(r => setTimeout(r, delay));
     }
     const blob = await ar.blob();
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    a.href = blobUrl;
     const call = (ex.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_');
     const ts   = new Date().toISOString().slice(0, 10);
     a.download = `genoa-engineering-statement-${call}-${ts}.${ext}`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
     setStatusMsg(`Engineering Statement ${ext.toUpperCase()} downloaded.`);
     } finally {
       setRenderingPdf(false);
@@ -897,10 +909,14 @@ function MainApp({ onLogout, onOpenOptimizer }) {
       throw new Error(`HTTP ${r.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
     }
     const blob = await r.blob();
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    a.href = blobUrl;
     a.download = `${(ex.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_')}_exhibit.pdf`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
     setStatusMsg('PDF downloaded.');
   }
 

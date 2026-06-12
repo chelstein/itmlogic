@@ -727,7 +727,7 @@ const DEMO_RESULT = {
   ],
   form_301_checklist: [
     { id: 'SITE_SURVEY',       status: 'REQUIRED',    description: 'Conduct professional site survey (zoning, lease availability, setbacks)', rule: 'General engineering practice; FCC Form 301 §I', note: null },
-    { id: 'ANTENNA_STUDY',     status: 'REQUIRED',    description: 'Design and model AM vertical antenna system for 780 kHz', rule: '47 CFR §73.316 / §73.45', note: 'Non-directional antenna — standard §73.45 field intensity / efficiency certification required' },
+    { id: 'ANTENNA_STUDY',     status: 'REQUIRED',    description: 'Design and model AM vertical antenna system for 780 kHz', rule: '47 CFR §73.45 / §73.189', note: 'Non-directional antenna — standard §73.45 antenna system / §73.189 efficiency certification required' },
     { id: 'ASR_REGISTRATION',  status: 'REQUIRED',    description: 'Verify tower height; file FCC ASR registration if > 200 ft (60.96 m)', rule: '47 CFR §17.7', note: 'ASR REGISTRATION REQUIRED: typical λ/4 antenna height at 780 kHz (96.15 m) exceeds the 200-ft §17.7 threshold' },
     { id: 'RF_EXPOSURE_MPE',   status: 'REQUIRED',    description: 'Prepare RF exposure (MPE) evaluation per OET Bulletin 65', rule: '47 CFR §1.1307 / OET Bulletin 65', note: 'ERP = 5 kW. All AM broadcast stations must demonstrate general population MPE compliance.' },
     { id: 'COL_COVERAGE',      status: 'REQUIRED',    description: 'Document ≥ 80% community-of-license coverage by the 5 mV/m daytime contour', rule: '47 CFR §73.24(i)', note: 'No COL polygon provided — polygon-based analysis required for filing' },
@@ -1188,7 +1188,7 @@ const DEMO_RESULT = {
           { id: 'MONITOR_POINT', label: 'DA monitor point measurement (§73.158 / §73.62)', rule: '47 CFR §73.158 / §73.62', instrument: 'Calibrated FI meter at FCC-specified monitor point location', notes: 'Clear channel Class D with DA-N pattern: the authorized DA monitor point must be measured at reference field.' }
         ],
         nda_radial_plan: null,
-        filing_trigger: 'FCC Form 302-AM (license to cover) must be filed within 3 years of CP grant date (§73.3534). Proof measurements must be complete before 302-AM is submitted.',
+        filing_trigger: 'FCC Form 302-AM (license to cover) must be filed within 3 years of CP grant date (§73.3536; §73.3598). Proof measurements must be complete before 302-AM is submitted.',
         reference: '47 CFR §73.154 (proof of performance); §73.190 (antenna efficiency); §73.316 (DA pattern measurements); OET Bulletin 65.',
         note: 'This is a screening-grade proof guide. Actual proof methodology must be coordinated with the licensed broadcast engineer of record and FCC counsel before construction.'
       },
@@ -1371,7 +1371,7 @@ const DEMO_RESULT = {
         power_tolerance: { rule: '47 CFR §73.1560', tolerance: '+5% / -10% of licensed power', monitoring: 'Transmitter output power must be monitored during all periods of operation.', log_required: true, note: 'Operating power must not exceed licensed TPO by more than +5% (§73.1560(a)).' },
         base_current_monitoring: { rule: '47 CFR §73.1350 / §73.61', required: true, frequency: 'Every 3 hours (DA monitor points per §73.158)', towers: 'All towers in DA array', log_format: 'Station operating log (§73.1820)', note: 'DA station: §73.158 monitor points must be checked at least once in each 3-hour period during hours of operation.' },
         eas_requirements: { rule: '47 CFR Part 11 / §11.35', equipment: 'FCC-certified EAS decoder/encoder', test_weekly: 'Required Weekly Tests (RWT)', test_monthly: 'Required Monthly Tests (RMT)', log_required: true, note: '§11.35: All EAS participants must test and log EAS equipment at least weekly. Records maintained for 2 years.' },
-        environmental_compliance: { rule: '47 CFR §1.1307 / §1.97', rf_annual: 'Annual RF exposure self-certification required. Repeat MPE evaluation if TPO or antenna configuration changes.', nepa_ongoing: 'Report any changes that might trigger previously unevaluated environmental impacts.', note: 'Any modification may trigger a new NEPA §1.1306 screening. File amendment with FCC before making changes.' },
+        environmental_compliance: { rule: '47 CFR §1.1307 / §1.1310', rf_annual: 'Annual RF exposure self-certification required. Repeat MPE evaluation if TPO or antenna configuration changes.', nepa_ongoing: 'Report any changes that might trigger previously unevaluated environmental impacts.', note: 'Any modification may trigger a new NEPA §1.1306 screening. File amendment with FCC before making changes.' },
         license_renewal: { rule: '47 CFR §73.3539', cycle: '8-year renewal cycle (FCC Form 303-S)', filing_window: '4 months before license expiration', must_certify: ['Station has operated in compliance with FCC rules', 'No character issues', 'EEO compliance certification', 'RF exposure (MPE) remains compliant', 'Directional antenna performance has not changed materially'], note: '§73.3539: AM broadcast licenses run 8 years. Applications for renewal must be filed via LMS (FCC Form 303-S) 4 months before expiration.' },
         nighttime_power: { required: false, rule: '47 CFR §73.99', nighttime_tpo_limit_kw: 5, note: 'Class D: nighttime operation may require DA pattern per license conditions or may be prohibited. Check specific license conditions.' },
         station_log: { rule: '47 CFR §73.1820', retention_years: 2, note: '§73.1820: Station operating log must be maintained and retained for 2 years.' },
@@ -1487,7 +1487,7 @@ const DEMO_RESULT = {
           note: 'Run a full LMS search using the CDBS FM query tool or BIA FM database.'
         },
         lpfm_protection: {
-          rule: '47 CFR §73.850(d)',
+          rule: '47 CFR §74.1204',
           co_channel: 'AM-revitalization translator must protect LPFM stations on the same channel within 7 km',
           first_adjacent: 'Protect LPFM stations on ±200 kHz within FCC-defined short-spacing distances',
           note: 'LPFM has secondary but protected status relative to translators under the 2015 rules.'
@@ -1495,7 +1495,7 @@ const DEMO_RESULT = {
         form_349_exhibits: [
           { exhibit: 'Exhibit A (Technical)', description: 'Proposed FM translator coordinates, antenna height, ERP, FM channel', required: true },
           { exhibit: 'Exhibit B (Interference)', description: '§73.207 spacing analysis showing no conflicts with co/adj-channel FM', required: true },
-          { exhibit: 'Exhibit C (LPFM)', description: '§73.807/§73.850(d) LPFM protection showing minimum separation met', required: true },
+          { exhibit: 'Exhibit C (LPFM)', description: '§74.1204 LPFM protection showing minimum separation met (LPFM spacing per §73.807)', required: true },
           { exhibit: 'Exhibit D (AM Contour)', description: 'FM 60 dBu contour within AM 2 mV/m daytime contour or 25 mi of AM transmitter', required: true },
           { exhibit: 'Exhibit E (Eligibility)', description: 'Certification of continuous AM operation since October 1, 2015', required: true },
           { exhibit: 'Environmental Certification', description: 'NEPA §1.1307 environmental assessment or negative declaration', required: true }
@@ -1503,7 +1503,7 @@ const DEMO_RESULT = {
         audience_gain_note: 'A 250 W FM translator at 34.8600, -111.8200 would provide a ≈12.5 km 60 dBu coverage radius, potentially reaching an additional FM audience not served by the AM signal.',
         filing_form: 'FCC Form 349 (Translator / Booster Station Application)',
         docket: 'MB Docket No. 13-249 (FCC 15-142)',
-        reference: '47 CFR §73.850; §73.850(b); §73.850(d); §73.207; §73.313; MB Docket 13-249',
+        reference: '47 CFR §74.1201; §74.1235(b); §74.1204; §73.207; §73.313; MB Docket 13-249',
         note: 'FM translator opportunity is a screening-grade assessment. Actual channel availability requires a full §73.207 spacing analysis using FCC LMS data.'
       },
       da_array_design_guide: {
@@ -1697,9 +1697,9 @@ const DEMO_RESULT = {
           { id: 'nepa_screening', label: 'NEPA §1.1306 desktop environmental screening', rule: '47 CFR §1.1306 / §1.1307', status: 'WARN', note: 'NEPA §1.1306 desktop environmental screening is required for all new transmitter site applications.', required_action: 'Complete §1.1306 environmental checklist. If any trigger is present, prepare an EA before Form 301-AM filing.' },
           { id: 'nhpa_106', label: 'NHPA §106 historic/cultural resource consultation', rule: '47 CFR §1.1307(a)(4) / 36 CFR Part 800', status: 'WARN', note: 'All new tower construction requires NHPA §106 SHPO consultation for archaeological and architectural survey.', required_action: 'Submit tower proposal to SHPO for §106 review. Allow 90–180 days for SHPO response.' },
           { id: 'form_301_am', label: 'FCC Form 301-AM application completeness', rule: '47 CFR §73.3533 / LMS', status: 'NOT_EVALUATED', note: 'Form 301-AM completeness depends on final engineering package, NIF study, and NEPA/NHPA outcomes.', required_action: 'Prepare complete engineering filing package with licensed broadcast consultant before filing.' },
-          { id: 'construction_deadline', label: 'CP construction completion and Form 302-AM deadline', rule: '47 CFR §73.3534', status: 'NOT_EVALUATED', note: 'CP not yet granted — construction deadline not applicable at screening stage.', required_action: 'Develop construction schedule immediately upon CP grant to avoid §73.3534 extension requirement.' }
+          { id: 'construction_deadline', label: 'CP construction completion and Form 302-AM deadline', rule: '47 CFR §73.3536', status: 'NOT_EVALUATED', note: 'CP not yet granted — construction deadline not applicable at screening stage.', required_action: 'Develop construction schedule immediately upon CP grant to avoid missing §73.3598 CP expiration deadline.' }
         ],
-        reference: '47 CFR §73.24(g)(j); §73.182; §73.316; §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3534; OET Bulletin 65',
+        reference: '47 CFR §73.24(g)(j); §73.182; §73.316; §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3536; OET Bulletin 65',
         note: 'regulatory_compliance_checklist is a screening-grade pre-filing assessment only. All WARN and NOT_EVALUATED items require professional engineering study, legal review, or additional data collection before Form 301-AM can be filed.'
       },
       licensing_timeline_estimate: {
@@ -1716,7 +1716,7 @@ const DEMO_RESULT = {
           { phase: 'CONSTRUCTION', label: 'Construction and equipment installation', weeks_low: 20, weeks_high: 36, key_tasks: ['Tower erection with FAA marking/lighting (ASR required)', 'Ground radial system installation', 'DA array element installation and initial phasing'] },
           { phase: 'LICENSE_TO_COVER', label: 'Proof of performance and Form 302-AM', weeks_low: 8, weeks_high: 16, key_tasks: ['DA proof (72-radial FI traversals per §73.154)', 'Base current measurements and antenna efficiency verification', 'File FCC Form 302-AM (license to cover)'] }
         ],
-        reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
+        reference: '47 CFR §73.3520; §73.3533; §73.3536; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
       fcc_form_301_exhibit_checklist_guide: {
@@ -1744,7 +1744,7 @@ const DEMO_RESULT = {
           { id: 'B5', section: 'B', title: 'Soil conductivity (M3 value or measured)', required: true, cfr: '§73.184; §73.150' },
           { id: 'B6', section: 'B', title: 'Proposed operating schedule (day/night/critical hours)', required: true, cfr: '§73.99; §73.1740' },
           { id: 'C1', section: 'C', title: 'Co-channel groundwave interference analysis (§73.182)', required: true, cfr: '§73.182; §73.24' },
-          { id: 'C2', section: 'C', title: 'Adjacent channel interference check (±10 kHz)', required: true, cfr: '§73.187; §73.188' },
+          { id: 'C2', section: 'C', title: 'Adjacent channel interference check (±10 kHz)', required: true, cfr: '§73.37; §73.182' },
           { id: 'C3', section: 'C', title: 'Blanket interference analysis (§73.24(g))', required: true, cfr: '§73.24(g)' },
           { id: 'C4', section: 'C', title: 'Nighttime skywave interference analysis (§73.182)', required: true, cfr: '§73.182; §73.24(g)' },
           { id: 'D1', section: 'D', title: 'NEPA Environmental Checklist (§1.1307)', required: true, cfr: '§1.1306; §1.1307' },
@@ -1894,7 +1894,7 @@ const DEMO_RESULT = {
           { method: 'GPS_COUNTER',    label: 'GPS-disciplined frequency counter',    accuracy_hz: 0.01, cost_usd: 800,  required: true,  notes: 'Primary on-site reference; ±0.01 Hz; GPSDO-locked' },
           { method: 'REMOTE_SDR',     label: 'Software-defined radio (SDR) monitor', accuracy_hz: 1.0,  cost_usd: 350,  required: false, notes: 'RTL-SDR + software; useful for continuous remote monitoring' },
           { method: 'COMMERCIAL_MON', label: 'Commercial frequency monitor',          accuracy_hz: 0.1,  cost_usd: 2500, required: false, notes: 'e.g., Inovonics 223, Belar FMCS-1; integrated with logging' },
-          { method: 'THIRD_PARTY',    label: 'Annual third-party frequency check',    accuracy_hz: 0.05, cost_usd: 500,  required: true,  notes: '§73.1215(c): independent verification annually; file in station log' }
+          { method: 'THIRD_PARTY',    label: 'Annual third-party frequency check',    accuracy_hz: 0.05, cost_usd: 500,  required: true,  notes: '§73.1540 (carrier frequency measurements): independent verification annually; file in station log' }
         ],
         correction_steps: [
           { step: 1, action: 'IDENTIFY_SOURCE', label: 'Identify drift source',                  time_min: 30, notes: 'Compare transmitter ref output vs. GPS counter; check oscillator temp' },
@@ -1903,8 +1903,8 @@ const DEMO_RESULT = {
           { step: 4, action: 'REDUCE_POWER',    label: 'Reduce power if approaching tolerance',  time_min: 5,  notes: 'If drift >15 Hz, reduce to auxiliary power (§73.1560) until corrected' },
           { step: 5, action: 'LOG_AND_REPORT',  label: 'Log correction in station records',      time_min: 15, notes: '§73.1820: all equipment adjustments logged; preserve GPS counter printout' }
         ],
-        reference: '47 CFR §73.1215 (carrier frequency tolerance); §73.1820 (station logs); §73.1560 (power reduction)',
-        note: 'AM frequency tolerance is ±20 Hz (25.64 ppm at 780 kHz) per §73.1215. Modern PLL transmitters operate well within this with <2 Hz typical drift. Annual third-party frequency check required. Monitor after relocation — new site ground conditions may shift ATU tuning slightly.'
+        reference: '47 CFR §73.1545 (carrier frequency tolerance ±20 Hz); §73.1820 (station logs); §73.1560 (power reduction)',
+        note: 'AM frequency tolerance is ±20 Hz (25.64 ppm at 780 kHz) per §73.1545. Modern PLL transmitters operate well within this with <2 Hz typical drift. Annual third-party frequency check required. Monitor after relocation — new site ground conditions may shift ATU tuning slightly.'
       },
       broadcast_attorney_and_consulting_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
@@ -1925,7 +1925,7 @@ const DEMO_RESULT = {
           { type: 'ENGINEER', service: 'FCC Form 301-AM Technical Exhibits', required: true, cost_low_usd: 3500, cost_typical_usd: 5500, cost_high_usd: 8500, notes: 'Radiation pattern computation, coverage contour map, interference analysis exhibits' },
           { type: 'ENGINEER', service: 'Interference Study (Adjacent/Co-channel)', required: false, cost_low_usd: 3000, cost_typical_usd: 5500, cost_high_usd: 9000, notes: 'Optional but common: D/U ratio analysis vs. protected contours, sky-wave interference, §73.182 compliance verification' }
         ],
-        reference: '47 CFR §73.3533; §73.3534; §73.154; §73.182; FCC Form 301-AM; NABOB Engineering Manual',
+        reference: '47 CFR §73.3533; §73.3536; §73.154; §73.182; FCC Form 301-AM; NABOB Engineering Manual',
         note: 'Cost estimates reflect 2024 market rates for experienced broadcast communications attorneys and licensed RF engineers. NDA proof is less costly than full DA proof (72-radial FI traversal). Attorney fees vary by firm size and market.'
       },
       zoning_and_land_use_compliance_guide: {
@@ -1986,12 +1986,12 @@ const DEMO_RESULT = {
           { step: 2, action: 'ATU design and fabrication', detail: 'Design L/T/π network to transform measured base impedance to 50Ω; specify component L and C values; use RF-rated components with adequate current/voltage rating', equipment: 'ATU fabrication (commercial or custom)' },
           { step: 3, action: 'Low-power coarse tune (10W test transmitter)', detail: 'Inject 10W at 780 kHz; adjust ATU for minimum reflected power; verify SWR < 1.5:1 before increasing power', equipment: 'Lab transmitter or signal generator + RF amplifier' },
           { step: 4, action: 'Full-power fine tune and SWR verification', detail: 'Increase to licensed power (5 kW TPO); fine-tune for minimum SWR; target SWR < 1.1:1; record final L and C settings', equipment: 'Directional wattmeter (e.g., Bird 43 or equivalent)' },
-          { step: 5, action: 'Base current calibration and documentation', detail: 'Calibrate base current meter to read licensed current value; verify within ±5% tolerance per §73.155(a); document settings for FCC records', equipment: 'Base current meter (e.g., Deltec or Potomac Instruments)' }
+          { step: 5, action: 'Base current calibration and documentation', detail: 'Calibrate base current meter to read licensed current value; verify operating power within +5%/-10% per §73.1560(a); document settings for FCC records', equipment: 'Base current meter (e.g., Deltec or Potomac Instruments)' }
         ],
         current_tolerance_pct: 5, phase_tolerance_deg: null, ratio_tolerance_pct: null,
-        current_tolerance_cfr: '47 CFR §73.155(a)', da_tolerance_cfr: null,
-        frequency_tolerance_hz: 20, frequency_tolerance_cfr: '47 CFR §73.1215',
-        reference: '47 CFR §73.155 (operating tolerances); §73.61 (base current monitoring); §73.1215 (frequency tolerance); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
+        current_tolerance_cfr: '47 CFR §73.1560(a)', da_tolerance_cfr: null,
+        frequency_tolerance_hz: 20, frequency_tolerance_cfr: '47 CFR §73.1545',
+        reference: '47 CFR §73.1560 (operating power tolerance); §73.61 (base current monitoring); §73.1545 (frequency tolerance); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
         note: 'NDA 780 kHz, λ/4=96m. Base resistance ~36Ω; base current ~11.79A rms at 5 kW. ATU cost: $7,800–$19,200 (typ. $12,000). Commissioning: 2–5 days. Antenna efficiency: ~92% with 120-radial system.'
       },
       tower_construction_contract_guide: {
@@ -2094,7 +2094,7 @@ const DEMO_RESULT = {
           { id: 'BASE_CURRENT_METERS', label: 'Base current meter (1 tower)', required: true, examples: 'Deltec, Potomac Instruments, Bird', typical_cost_usd: 1200, cfr: '§73.1350(b)(3); §73.61' },
           { id: 'PLATE_TELEMETRY', label: 'Plate voltage/current telemetry', required: true, examples: 'Transmitter built-in metering or external transducer', typical_cost_usd: 500, cfr: '§73.1350(b)(5)' },
           { id: 'MOD_MONITOR', label: 'Modulation monitor', required: true, examples: 'Orban 9200AM, CRL Systems, Inovonics 531', typical_cost_usd: 2500, cfr: '§73.1570; §73.1350(b)(4)' },
-          { id: 'FREQ_MONITOR', label: 'Frequency monitor', required: true, examples: 'Belar FMS-1, ERI Model 100', typical_cost_usd: 2000, cfr: '§73.1215; ±20 Hz tolerance' },
+          { id: 'FREQ_MONITOR', label: 'Frequency monitor', required: true, examples: 'Belar FMS-1, ERI Model 100', typical_cost_usd: 2000, cfr: '§73.1215 (monitor required); §73.1545 (±20 Hz tolerance)' },
           { id: 'CELLULAR_DATA', label: 'Cellular data backup for remote control link', required: false, examples: 'LTE/4G cellular modem; redundant to primary internet', typical_cost_usd: 150, cfr: 'Engineering best practice' },
           { id: 'ATS', label: 'Automatic Transmission System (ATS) for unattended operation', required: false, examples: 'Built into Burk ARC or standalone ATS controller', typical_cost_usd: 2000, cfr: '§73.1400' }
         ],
@@ -2105,7 +2105,7 @@ const DEMO_RESULT = {
           { parameter: 'Modulation (positive)', limit: '100%', action: 'Reduce modulation; alert operator', cfr: '§73.1570' },
           { parameter: 'Modulation (negative)', limit: '125%', action: 'Reduce modulation; alert operator', cfr: '§73.1570' },
           { parameter: 'Loss of modulation', limit: '3 hours continuous', action: 'Alert operator; automatic off-air after timeout', cfr: '§73.1400(b)' },
-          { parameter: 'Carrier frequency', limit: '±20 Hz (AM)', action: 'Alert operator; FCC §73.1215', cfr: '§73.1215' },
+          { parameter: 'Carrier frequency', limit: '±20 Hz (AM)', action: 'Alert operator; FCC §73.1545', cfr: '§73.1545' },
           { parameter: 'Power reduction', limit: 'Any fault condition', action: 'Reduce to 10% TPO or off-air per §73.1350', cfr: '§73.1350(e)' }
         ],
         da_phasor_monitoring: null,
@@ -2113,8 +2113,8 @@ const DEMO_RESULT = {
         modulation_limit_positive_pct: 100,
         modulation_limit_negative_pct: 125,
         control_point_license_copy_required: true,
-        reference: '47 CFR §73.1350 (remote control); §73.1400 (ATS); §73.61 (base current monitoring); §73.1215 (frequency tolerance); §73.1570 (modulation monitor)',
-        note: 'NDA 780 kHz: remote control authorized §73.1350. ATS (unattended) authorized §73.1400. 5 required RC components, $9,700 estimated cost. 1 tower monitored. Frequency tolerance ±20 Hz (§73.1215).'
+        reference: '47 CFR §73.1350 (remote control); §73.1400 (ATS); §73.61 (base current monitoring); §73.1545 (frequency tolerance); §73.1570 (modulation monitor)',
+        note: 'NDA 780 kHz: remote control authorized §73.1350. ATS (unattended) authorized §73.1400. 5 required RC components, $9,700 estimated cost. 1 tower monitored. Frequency tolerance ±20 Hz (§73.1545).'
       },
       fcc_silent_station_authorization_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -2253,9 +2253,9 @@ const DEMO_RESULT = {
         am_translator_authorized: true,
         n_legal_alternatives: 5,
         legal_alternatives: [
-          { id: 'RELOCATION', label: 'Main transmitter relocation (this optimizer)', cfr: '§73.3533; §73.3534', authorized: true, note: 'Move transmitter to better site for coverage improvement — requires FCC CP and construction' },
+          { id: 'RELOCATION', label: 'Main transmitter relocation (this optimizer)', cfr: '§73.3533; §73.3536', authorized: true, note: 'Move transmitter to better site for coverage improvement — requires FCC CP and construction' },
           { id: 'AM_TRANSLATOR', label: 'AM-to-FM translator', cfr: '§74.1201; MB 13-249', authorized: true, note: 'FCC authorized AM-to-FM translator service; 250W ERP FM fill-in translator within AM contour' },
-          { id: 'IBOC_HD', label: 'AM HD Radio (IBOC digital sidebands)', cfr: '§73.406; FCC IBOC authorization', authorized: true, note: 'Digital audio sidebands on AM carrier; improves quality and perceived coverage; requires separate FCC authorization' },
+          { id: 'IBOC_HD', label: 'AM HD Radio (IBOC digital sidebands)', cfr: '§73.404 (IBOC); MB Docket 99-325', authorized: true, note: 'Digital audio sidebands on AM carrier; improves quality and perceived coverage; requires separate FCC authorization' },
           { id: 'PART15_CC', label: 'Part 15 carrier current (in-building only)', cfr: '§15.221', authorized: true, note: 'Unlicensed; power limit 100 mW; effective only inside the building connected to the power line; not practical for area coverage' },
           { id: 'NEW_STATION', label: 'New AM station at a different frequency', cfr: '§73.3533; §73.21', authorized: true, note: 'Requires full FCC application, auction if competing applications, and separate license; very expensive' }
         ],
@@ -2269,7 +2269,7 @@ const DEMO_RESULT = {
         best_legal_option: 'RELOCATION',
         part15_limit_uv_m: 250,
         relocation_note: 'AM broadcast boosters are NOT authorized (§73.1660). The legally correct approach to coverage improvement is transmitter relocation (this optimizer), an AM-to-FM translator (§74.1201), or AM HD Radio. Unauthorized AM repeater devices can result in $10,000–$25,000 FCC forfeitures.',
-        reference: '47 CFR §73.1660; §73.406; §74.1201; §15.209; §15.221; §15.5; §301; §503(b); MB 13-249 (AM revitalization)',
+        reference: '47 CFR §73.1660; §73.404 (IBOC); §74.1201; §15.209; §15.221; §15.5; §301; §503(b); MB Docket 99-325 (AM IBOC); MB 13-249 (AM revitalization)',
         note: 'AM boosters: PROHIBITED (§73.1660). 5 legal alternatives available. Best option: transmitter relocation. AM-to-FM translator also authorized. Unauthorized booster forfeiture: $10k–$25k (§503b).'
       },
       community_of_license_change_guide: {
@@ -2321,8 +2321,8 @@ const DEMO_RESULT = {
           { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $325 filing fee electronically', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
           { step: 2, action: 'FCC issues public notice (PNOH)', detail: 'FCC Public Notice of Hearing or Application — 30-day window for petitions to deny (major modifications)', timeline: '30-day public comment period', cfr: '§73.3580' },
           { step: 3, action: 'FCC engineering review', detail: 'FCC Media Bureau AM engineers review technical exhibits, interference analysis, and DA proof if applicable', timeline: '3–18 months (NDA faster; DA longer)', cfr: '§73.3533' },
-          { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3534; §73.3526(e)(1)' },
-          { step: 5, action: 'Construct and file Form 302-AM (license to cover)', detail: 'After construction and proof-of-performance, file Form 302-AM with proof exhibits for license to cover', timeline: '3-year CP term; file 302-AM before CP expiration', cfr: '§73.3539; §73.3534(b)' }
+          { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3533; §73.3526(e)(1)' },
+          { step: 5, action: 'Construct and file Form 302-AM (license to cover)', detail: 'After construction and proof-of-performance, file Form 302-AM with proof exhibits for license to cover', timeline: '3-year CP term per §73.3598; file 302-AM before CP expiration', cfr: '§73.3536; §73.3598' }
         ],
         n_processing_steps: 5,
         cp_term_years: 3,
@@ -2332,7 +2332,7 @@ const DEMO_RESULT = {
         major_change_radius_miles: 2,
         processing_time_estimate: { nda_optimistic_months: 3, nda_conservative_months: 9, da_optimistic_months: 9, da_conservative_months: 18 },
         relocation_note: 'File FCC Form 301-AM via LMS. 9 required exhibits including interference analysis, contour map, FAA determination, and ASR number. $325 filing fee. NDA station. Processing: 3–9 months. CP valid for 3 years; 6-month extension available.',
-        reference: '47 CFR §73.3533; §73.3534; §73.3539; §73.3580; §73.316; §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
+        reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3539; §73.3580; §73.316; §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
         note: 'Form 301-AM via FCC LMS. 9 required exhibits. Filing fee: $325. CP term: 3 years + 6-month extension. Processing: 3–9 months. Public notice triggers 30-day petition window for major changes.'
       },
       transmitter_building_design_guide: {
@@ -2384,17 +2384,17 @@ const DEMO_RESULT = {
         ],
         relocation_steps: [
           { priority: 1, action: 'Identify provisional monitoring point locations for CP application', detail: 'Choose candidate monitoring point sites along main DA lobes and nulls; confirm GPS coordinates', cfr: '§73.154; §73.3533' },
-          { priority: 2, action: 'Obtain access permissions for monitoring points on private land', detail: 'Some monitoring points may require landowner permission; document access agreements', cfr: '§73.1213' },
+          { priority: 2, action: 'Obtain access permissions for monitoring points on private land', detail: 'Some monitoring points may require landowner permission; document access agreements', cfr: '§73.158' },
           { priority: 3, action: 'Establish monitoring points during proof-of-performance', detail: 'Measure field strength at all monitoring points during 72-radial proof (DA) or 8-radial proof (NDA)', cfr: '§73.154(a)' },
           { priority: 4, action: 'File monitoring point data with FCC Form 302-AM', detail: 'Include monitoring point GPS coordinates, measured FS values, and antenna system parameters as an exhibit', cfr: '§73.3526; Form 302-AM' },
-          { priority: 5, action: 'Install remote FSM units at permanent monitoring points', detail: 'After license to cover is issued, install remote monitoring hardware at established monitoring points for ongoing compliance', cfr: '§73.1213(b)' }
+          { priority: 5, action: 'Install remote FSM units at permanent monitoring points', detail: 'After license to cover is issued, install remote monitoring hardware at established monitoring points for ongoing compliance', cfr: '§73.158; §73.68' }
         ],
         n_relocation_steps: 5,
         estimated_annual_monitoring_cost_usd: 1200,
         fcc_tolerance_pct: 5,
         carrier_tolerance_hz: 20,
         relocation_note: 'NDA station: 2 recommended monitoring points. New points should be measured during proof and documented. Monitoring point distances: 192–1923m from tower (at 780 kHz). FCC tolerance: ±5% of authorized field value.',
-        reference: '47 CFR §73.1213; §73.1215; §73.1216; §73.154; Form 302-AM exhibit requirements',
+        reference: '47 CFR §73.158; §73.68; §73.1215; §73.154; Form 302-AM exhibit requirements',
         note: 'AM monitoring: 2 points required (1 pattern × 2). Distance range: 192–1923m. Annual cost: ~$1,200. NDA: manual quarterly monitoring adequate.'
       },
       utility_power_service_guide: {
@@ -2445,7 +2445,7 @@ const DEMO_RESULT = {
         ],
         estimated_annual_deicing_cost_usd: { low: 700, typical: 1150, high: 2000 },
         electrical_risks: [
-          { risk: 'Carrier frequency drift', cfr: '§73.1215', trigger: '25mm radial ice on tower base can shift ATU impedance, causing carrier drift >±20 Hz', mitigation: 'Monitor carrier frequency during icing events; retune ATU as needed' },
+          { risk: 'Carrier frequency drift', cfr: '§73.1545', trigger: '25mm radial ice on tower base can shift ATU impedance, causing carrier drift >±20 Hz', mitigation: 'Monitor carrier frequency during icing events; retune ATU as needed' },
           { risk: 'DA pattern distortion', cfr: '§73.182', trigger: 'Non-uniform ice on DA elements distorts radiation pattern; may cause interference to co-channel stations', mitigation: 'Pattern monitoring during icing; inspect antenna elements post-storm' },
           { risk: 'Base insulator flashover', cfr: '§73.49', trigger: 'Ice bridging across base insulator can cause flashover and transmitter shutdown', mitigation: 'Heated ATU enclosure; insulator inspection after freeze/thaw cycles' }
         ],
@@ -2569,7 +2569,7 @@ const DEMO_RESULT = {
           forfeiture_risk_usd: { low: 8000, high: 25000 }
         },
         rebroadcast_rules: {
-          consent_required: true, cfr: '§73.1207', anti_simulcast_cfr: '§73.242',
+          consent_required: true, cfr: '§73.1207', anti_simulcast_cfr: '§73.3556',
           am_fm_simulcast_restriction: 'AM and commonly-owned FM may simulcast if FM is within AM service area, but must offer separate programming for some portion of broadcast day'
         },
         compliance_elements: [
@@ -2582,7 +2582,7 @@ const DEMO_RESULT = {
         ],
         n_compliance_elements: 6, high_priority_elements: 3,
         max_forfeiture_indecency_usd: 503000,
-        reference: '47 CFR §73.1206; §73.1207; §73.1210; §73.1212; §73.1217; §73.3526; §73.3555; §73.3999; §73.4005; §73.4035',
+        reference: '47 CFR §73.1206; §73.1207; §73.1210; §73.1212; §73.1217; §73.3526; §73.3555; §73.3999; §73.4005; §73.1211',
         note: 'Content compliance: 6 elements, 3 HIGH priority. Indecency safe harbor: 10 PM–6 AM. Max forfeiture: $503,000 per incident.'
       },
       political_programming_compliance_guide: {
@@ -2649,7 +2649,7 @@ const DEMO_RESULT = {
       frequency_monitoring_plan_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', is_directional: false,
         carrier_frequency_monitoring: {
-          max_deviation_hz: 20, cfr: '§73.1215(b)',
+          max_deviation_hz: 20, cfr: '§73.1545',
           monitoring_method: 'GPS-locked frequency reference or calibrated frequency counter',
           check_frequency: 'Weekly minimum; continuous with automatic monitoring system preferred'
         },
@@ -2677,7 +2677,7 @@ const DEMO_RESULT = {
           total_estimated_usd: { low: 4300, high: 22000 }
         },
         reference: '47 CFR §73.44; §73.61; §73.62; §73.1215; §73.1350; §73.1570; §73.1820; NRSC-2-B',
-        note: 'Monitoring: carrier ±20 Hz (§73.1215), modulation 100%/125% (§73.1570). Remote control permitted (§73.1350(c)).'
+        note: 'Monitoring: carrier ±20 Hz (§73.1545), modulation 100%/125% (§73.1570). Remote control permitted (§73.1350(c)).'
       },
       asr_registration_update_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -2790,7 +2790,7 @@ const DEMO_RESULT = {
         readiness_actions: [
           { priority: 1, action: 'File full-power CP at best available site', rationale: 'Granted CP establishes preferred future site; repack would grandfather existing authorizations', cfr: '§73.3533' },
           { priority: 2, action: 'Obtain FM translator while windows open', rationale: 'FM translator creates secondary FM asset surviving AM band changes', cfr: '§74.1201; FCC 15-14' },
-          { priority: 3, action: 'Update FCC LMS records with accurate site data', rationale: 'Inaccurate records weaken interference protection claims', cfr: '§73.3527; §73.3529' },
+          { priority: 3, action: 'Update FCC LMS records with accurate site data', rationale: 'Inaccurate records weaken interference protection claims', cfr: '§73.3526; §73.3527' },
           { priority: 4, action: 'Comment in MB 13-249 proceedings if affected', rationale: 'Participation in FCC rulemaking protects small-market AM interests', cfr: '§1.415' },
           { priority: 5, action: 'Evaluate digital (HD Radio / DRM) compatibility', rationale: 'Early conversion may provide spectrum flexibility', cfr: '§73.404; NRSC-5-D' }
         ],
@@ -2861,7 +2861,7 @@ const DEMO_RESULT = {
           { step: 3, action: 'Interference analysis', detail: 'Protect all full-power FM, LPFM, existing translators', cfr: '§74.1204' },
           { step: 4, action: 'File FCC Form 349', detail: 'Submit construction permit application in filing window', cfr: '§74.1231; Form 349' },
           { step: 5, action: 'Construction', detail: 'Build translator facility', cfr: '§74.1263' },
-          { step: 6, action: 'License', detail: 'File FCC Form 350 after construction', cfr: '§74.1265' }
+          { step: 6, action: 'License', detail: 'File FCC Form 2100 Schedule 350 after construction', cfr: '§73.3536(b)(5)' }
         ],
         n_filing_steps: 6,
         cost_estimate: {
@@ -3014,11 +3014,11 @@ const DEMO_RESULT = {
           max_silent_weeks: 52,
           initial_sta_form: 'FCC Form 2100',
           sta_options: [
-            { id: 'INITIAL_STA', label: 'Initial 30-day STA (§73.3534(b))', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 290, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days' },
+            { id: 'INITIAL_STA', label: 'Initial 30-day STA (§73.1635)', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 290, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days' },
             { id: 'RENEWAL_STA', label: 'STA renewal (each 6-month extension)', form: 'STA renewal request (informal letter acceptable)', fee_usd: 290, duration_weeks: 26, notes: 'FCC will grant up to 12 months total absent extraordinary circumstances' },
             { id: 'REDUCED_POWER', label: 'Reduced power STA (interim operation during construction)', form: 'FCC Form 2100', fee_usd: 290, duration_weeks: null, notes: 'Allows partial operation during construction; must protect co-channel/adjacent allocations' }
           ],
-          filing_requirement: 'STA required for silent period > 30 days; file FCC Form 2100 citing §73.3534(b)',
+          filing_requirement: 'STA required for silent period > 30 days; file FCC Form 2100 citing §73.1635',
           cancellation_risk: 'CP or license may be cancelled after 12 months of silence per §73.1740(a)'
         },
         construction_timeline: {
@@ -3041,7 +3041,7 @@ const DEMO_RESULT = {
           { id: 'INTERIM_CP', label: 'File for interim CP on existing site as backup', notes: 'If new site falls through, interim authority to modify existing site preserves continuity. Dual-track approach.' }
         ],
         n_mitigation_strategies: 4,
-        reference: '47 CFR §73.1740; §73.1750; §73.3534; §1.65; FCC Form 2100; FCC Form 319 (legacy); §73.154',
+        reference: '47 CFR §73.1740; §73.1750; §73.1635; §1.65; FCC Form 2100; FCC Form 319 (legacy); §73.154',
         note: 'Construction: 15–62 wks (typical 32 wks). Max silent: 52 wks. License risk: MODERATE.'
       },
       am_propagation_variability_guide: {
@@ -3085,8 +3085,8 @@ const DEMO_RESULT = {
         n_coverage_zones: 3,
         primary_service_radius_km: 87.4,
         primary_service_area_km2: 23990.2,
-        translator_opportunity: { authorized: true, cfr: '47 CFR §74.1200; FCC AMTA 2020 proceeding', max_erp_w: 250, fm_band: '88.1–107.9 MHz', coverage_note: 'FM translator can extend effective coverage into areas with poor AM reception (buildings, urban canyons)', application_form: 'FCC Form 349', filing_fee_usd: 655, application_window: 'FCC AM Translator Window (periodic; last 2021)', band_stacking: 'FM translator must protect all co-channel and adjacent FM stations per §74.1204' },
-        reference: '47 CFR §73.24; §73.182; §73.187; §73.318; §74.1200; FCC AMTA 2020; FCC Form 349',
+        translator_opportunity: { authorized: true, cfr: '47 CFR §74.1201; FCC AMTA 2020 proceeding', max_erp_w: 250, fm_band: '88.1–107.9 MHz', coverage_note: 'FM translator can extend effective coverage into areas with poor AM reception (buildings, urban canyons)', application_form: 'FCC Form 349', filing_fee_usd: 655, application_window: 'FCC AM Translator Window (periodic; last 2021)', band_stacking: 'FM translator must protect all co-channel and adjacent FM stations per §74.1204' },
+        reference: '47 CFR §73.24; §73.182; §73.187; §74.1201; FCC AMTA 2020; FCC Form 349',
         note: 'Class D at 780 kHz. Primary 0.5 mV/m reach: 87.4 km (23990.2 km²). COL min: 2 mV/m day. FM translator (250W) authorized under AMTA.'
       },
       license_renewal_compliance_guide: {
@@ -3257,7 +3257,7 @@ const DEMO_RESULT = {
         n_nepa_exclusions: 8,
         categorical_exclusion: {
           applies: true,
-          cfr: '47 CFR §11.4(a)',
+          cfr: '47 CFR §1.1306',
           basis: 'Replacement or modification of existing AM broadcast facility with no substantial change in physical structure',
           conditions: ['No wilderness area', 'Outside floodplain', 'No wetland impact', 'No ESA-listed species in APE'],
           limitations: ['Antenna height < 60m above mean terrain', 'No new ground disturbance > 0.5 acres']
@@ -3302,7 +3302,7 @@ const DEMO_RESULT = {
         env_risk_level: 'LOW',
         estimated_ea_days: 90,
         environmental_checklist: [
-          { id: 'CAT_EX', label: '47 CFR §11.4 Categorical Exclusion Review', required: true, completed: false, responsible: 'Applicant / Consultant' },
+          { id: 'CAT_EX', label: '47 CFR §1.1306 Categorical Exclusion Review', required: true, completed: false, responsible: 'Applicant / Consultant' },
           { id: 'NHPA_106', label: 'NHPA §106 Consultation with SHPO', required: true, completed: false, responsible: 'Applicant / FCC' },
           { id: 'ESA_IPAC', label: 'ESA §7 IPaC Species Screening', required: true, completed: false, responsible: 'Applicant / USFWS' },
           { id: 'CWA_404', label: 'CWA §404 Wetland Delineation & NWP-62', required: true, completed: false, responsible: 'Applicant / USACE' },
@@ -3311,7 +3311,7 @@ const DEMO_RESULT = {
         ],
         n_checklist_items: 6,
         n_required_items: 5,
-        reference: '47 CFR §11.4; NHPA §106 (36 CFR Part 800); ESA §7; CWA §404; NEPA; EO 11988; FCC Environmental Review Guidelines',
+        reference: '47 CFR §1.1306; §1.1307; NHPA §106 (36 CFR Part 800); ESA §7; CWA §404; NEPA; EO 11988; FCC Environmental Review Guidelines',
         note: 'NEPA categorical exclusion assumed for standard AM relocation with no unusual environmental conditions. EA or EIS required if exclusion criteria not met.'
       },
       ground_conductivity_improvement: {
@@ -3358,11 +3358,11 @@ const DEMO_RESULT = {
           { item: 'Third adjacent station search (±30 kHz)', cfr: '§73.213', required: true, tool: 'FCC LMS API' },
           { item: 'IBOC interference study', cfr: '§73.404', required: false, tool: 'iBiquity/xperi modeling software' },
           { item: 'NIF study (clear channel)', cfr: '§73.182', required: false, tool: 'FCC groundwave/skywave propagation software' },
-          { item: 'Treaty protection analysis (Canada/Mexico)', cfr: '§73.1205', required: true, tool: 'FCC treaty database; AMQUERY' }
+          { item: 'Treaty protection analysis (Canada/Mexico)', cfr: '§73.1650', required: true, tool: 'FCC treaty database; AMQUERY' }
         ],
         n_coordination_items: 7, n_required_items: 5,
         coordination_timeline: { database_search_days: 3, propagation_study_days: 5, expert_review_days: 5, total_days: 13, note: 'Engineering study must be filed with Form 301-AM as Exhibit C (Interference Analysis)' },
-        reference: '47 CFR §73.182; §73.184; §73.209; §73.213; §73.404; §73.1205; FCC AM Allocation Engineering Data; REC Networks AMQUERY',
+        reference: '47 CFR §73.182; §73.37; §73.184; §73.404; §73.1650; FCC AM Allocation Engineering Data; REC Networks AMQUERY',
         note: 'REGIONAL channel at 780 kHz. Co-channel zone: 402 km. NIF study: not required.'
       },
       stl_network_link_guide: {
@@ -3390,7 +3390,7 @@ const DEMO_RESULT = {
           { id: 'SITE_SURVEY', phase: 'PRE_FILING', form: 'None (internal)', required: true, description: 'Ground conductivity survey (Wenner 4-pin method); soil analysis for radial design' },
           { id: 'FAA_OE', phase: 'PRE_FILING', form: 'FAA Form 7460-1', required: true, description: 'FAA aeronautical study (OE/AAA). Required when tower exceeds 61m. REQUIRED for this site.' },
           { id: 'ASR', phase: 'PRE_FILING', form: 'FCC ASR (CORES)', required: true, description: 'Antenna Structure Registration. Required when tower ≥ 60.96m AGL. REQUIRED.' },
-          { id: 'ENV_REVIEW', phase: 'PRE_FILING', form: 'FCC Environmental Review', required: false, description: 'FCC §11.4 NEPA environmental checklist.' },
+          { id: 'ENV_REVIEW', phase: 'PRE_FILING', form: 'FCC Environmental Review', required: false, description: 'FCC §1.1306/§1.1307 NEPA environmental checklist.' },
           { id: 'SHPO', phase: 'PRE_FILING', form: 'NHPA §106 Consultation', required: false, description: 'State Historic Preservation Officer consultation.' },
           { id: 'SPACING_STUDY', phase: 'PRE_FILING', form: 'Engineering study', required: true, description: 'Co-channel and adjacent-channel spacing verification per §73.182.' },
           { id: 'NIF_STUDY', phase: 'PRE_FILING', form: 'Engineering study', required: false, description: 'Nighttime interference/protection study. Not required (not clear channel).' }
@@ -3423,7 +3423,7 @@ const DEMO_RESULT = {
           { phase: 'POST_CONSTRUCTION', required_count: 2, filings: [] },
           { phase: 'ONGOING', required_count: 1, filings: [] }
         ],
-        reference: '47 CFR §73.150; §73.154; §73.182; §73.1212; §11.4; §17.7; FCC Form 301-AM instructions; FCC Media Bureau AM processing guide 2024',
+        reference: '47 CFR §73.150; §73.154; §73.182; §73.1212; §1.1307; §17.7; FCC Form 301-AM instructions; FCC Media Bureau AM processing guide 2024',
         note: '11 required filings for Class D NDA at 780 kHz. Total FCC fees: $6,465. DA proof required: false. ASR/FAA: true.'
       },
       transmitter_cooling_hvac_guide: {
@@ -3478,7 +3478,7 @@ const DEMO_RESULT = {
         ],
         nepa_triggers: [
           { trigger: 'Wilderness Area / National Park', applies: false, form: 'FCC Form 620 Environmental Review', risk: 'PROHIBITIVE' },
-          { trigger: 'Floodplain (100-year)', applies: false, form: 'FEMA Elevation Certificate + §11.4', risk: 'HIGH' },
+          { trigger: 'Floodplain (100-year)', applies: false, form: 'FEMA Elevation Certificate + §1.1307', risk: 'HIGH' },
           { trigger: 'Wetland (CWA §404)', applies: false, form: 'Army Corps NWP or Individual Permit', risk: 'HIGH' },
           { trigger: 'Endangered Species (ESA)', applies: false, form: 'USFWS Section 7 Consultation', risk: 'MODERATE' },
           { trigger: 'Historic Properties (NHPA §106)', applies: false, form: 'SHPO Consultation', risk: 'MODERATE' },
@@ -3501,7 +3501,7 @@ const DEMO_RESULT = {
           { item: 'Fencing easement (§73.49 RF barrier)', required: true, width_m: 2, notes: 'FCC §73.49 requires locked fencing around tower base' }
         ],
         n_access_requirements: 4,
-        reference: '47 CFR §11.4 (NEPA); 47 USC §332(c)(7); CWA §404; ESA §7; NHPA §106; NFPA 101; FCC Env. Review',
+        reference: '47 CFR §1.1307 (NEPA); 47 USC §332(c)(7); CWA §404; ESA §7; NHPA §106; NFPA 101; FCC Env. Review',
         note: 'Tower height est. 144.23 m (473.19 ft) for Class D at 780 kHz. Agricultural/industrial zoning preferred. Height variance likely in commercial zones.'
       },
       emergency_power_backup_guide: {

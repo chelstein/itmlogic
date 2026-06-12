@@ -117,7 +117,7 @@
       ]
     },
     {
-      "rule": "47 CFR §73.685 / FAA 14 CFR §77 / Part 17",
+      "rule": "47 CFR §17.7 / FAA 14 CFR §77 / Part 17",
       "title": "Tower Height, Obstruction Marking, and ASR Registration",
       "service": ["FM", "AM", "FX", "LPFM"],
       "inputs": [
