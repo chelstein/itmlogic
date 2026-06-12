@@ -9526,11 +9526,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM transmission line and coaxial feed system guide.
       //
       // Regulatory framework:
-      //   47 CFR §73.68: AM antenna system — the transmission line is part of the
-      //     "antenna system" and its impedance characteristics must be accounted for
-      //     in the base-current calculations submitted with FCC Form 302-AM.
-      //   §73.68 / §73.154: Antenna system measurements — feed system impedance and base
-      //     resistance must be measured and submitted with Form 302-AM.
+      //   47 CFR §73.68: Sampling systems for antenna monitors — sample loops and coupling
+      //     devices installed at each tower base for DA stations.  Transmission line
+      //     impedance characteristics must be accounted for in base-current calculations
+      //     submitted with FCC Form 302-AM.
+      //   §73.51 / §73.154: Power determination and antenna system measurements — feed
+      //     system impedance and base resistance measured and submitted with Form 302-AM.
       //     (§73.1215 covers indicating instruments, not antenna resistance.)
       //
       // Engineering model:
@@ -10111,8 +10112,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM antenna system impedance and base current guide.
       //
       // Regulatory framework:
-      //   47 CFR §73.68: Base current measurement.  Every AM station must have a
-      //     calibrated base current meter or equivalent.
+      //   47 CFR §73.51: Determining operating power — direct method (base current I
+      //     and radiation resistance R; P = I²R).  Every AM station must measure base current.
+      //   §73.68: Sampling systems for antenna monitors (DA stations — sample loops at each tower).
       //   §73.1215: Measurement accuracy: base current meters must be accurate to ±2%
       //     of full scale reading.
       //   §73.150(b): Directional antenna operation — base current ratios must match
@@ -11956,22 +11958,22 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_directional_antenna_phase_and_ratio_verification_guide: (() => {
-      // 47 CFR §73.68 — Directional antenna phase and ratio monitoring requirements.
+      // 47 CFR §73.62 / §73.68 — Directional antenna phase and ratio monitoring requirements.
       // Applies ONLY to DA (directional antenna) stations. NDA stations: all DA items are zero/N/A.
       //
       // §73.1820 (station log) / §73.62: DA AM stations must measure phase and current ratio at specified times
       //   (typically twice per day: once near noon, once near midnight) and log the readings.
       //   Measurements must be compared to FCC-authorized values (from proof of performance).
       //
-      // §73.62(a): sample current ratio tolerance: ±5% of licensed value; if exceeded the
-      //   station must reduce power to a level where it does not cause prohibited interference.
+      // §73.62(a): sample current ratio tolerance: ±5% of licensed value; phase tolerance: ±3°.
+      //   If exceeded, the station must reduce power to a level where it does not cause prohibited interference.
       //
-      // §73.68(a): Phase tolerance: ±3° of FCC-authorized phase angle.
-      //
-      // §73.68(b): If operating outside the above tolerances, the station must:
+      // §73.62(b): If operating outside the above tolerances, the station must:
       //   1. Immediately reduce power or return to non-directional operation at reduced power
       //   2. Log the out-of-tolerance condition and corrective action
       //   3. Return to normal DA operation only after restoring tolerances
+      //
+      // §73.68: Sampling systems for antenna monitors — specifies sample loop installation specs.
       //
       // §73.154(a): Proof of performance for DA stations:
       //   • 72 radials at 9° increments
@@ -12007,7 +12009,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // NDA stations: all DA items = $0.
       const isDA = /^DA/i.test(pattern_mode);
 
-      const phase_tolerance_deg  = 3;    // §73.68(a) — ±3°
+      const phase_tolerance_deg  = 3;    // §73.62(a) — ±3°
       const ratio_tolerance_pct  = 5;    // §73.62(a) — ±5% of licensed sample current ratio
       const proof_radials        = 72;   // full-proof practice matching §73.150 5° pattern azimuths (rule basis §73.151)
       const proof_increment_deg  = 9;    // 360/72 = 5° intervals; §73.154 says 0 through 355° at 5°... adjusted per rule
