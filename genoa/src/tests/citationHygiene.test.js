@@ -422,3 +422,30 @@ test('CFR-AUDIT — AM engine/UI never use the bare shorthand "§73.24j" (should
   assert.equal(offenders.length, 0,
     `AM-context files use bare "§73.24j" shorthand (use §73.24(i)): ${offenders.join(', ')}`);
 });
+
+test('CFR-AUDIT — AM engine/UI never use the bare shorthand "§73.24g" (should be §73.24(g))', () => {
+  // §73.24(g) is the blanketing interference rule.  The bare shorthand §73.24g
+  // (without parentheses) omits the paragraph marker and could be confused with
+  // the subsection letter.  All rendered citations must use the parenthesized form.
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  const BARE_24G = /§73\.24g/;
+  const offenders = files.filter(rel => {
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    if (!BARE_24G.test(src)) return false;
+    const lines = src.split('\n');
+    return lines.some(line => {
+      if (!BARE_24G.test(line)) return false;
+      if (/^\s*\/\//.test(line) && /legacy|section_73_24g|file.name|filename/.test(line)) return false;
+      return true;
+    });
+  });
+  assert.equal(offenders.length, 0,
+    `AM-context files use bare "§73.24g" shorthand (use §73.24(g)): ${offenders.join(', ')}`);
+});

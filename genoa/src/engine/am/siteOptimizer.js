@@ -6895,7 +6895,7 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         {
           goal:       'minimize_blanket_population',
-          label:      'Minimize blanket population (§73.24g)',
+          label:      'Minimize blanket population (§73.24(g))',
           raw_metric: blanket_population_pct,
           raw_unit:   '% of metro within 1 mV/m',
           formula:    '100 − 50×blanket_pct → clamp 0–100  (0%→100, 1%→50, 2%→0)',
@@ -7442,7 +7442,7 @@ async function scoreCandidate(pt, ctx, warnings){
         : 'REMOTE';
 
       const geoTierNote = {
-        PROXIMATE: 'Candidate is within 3 km of CoL centroid. §73.24(i) 5 mV/m coverage highly achievable even at minimum TPO. Monitor blanket population (§73.24g) at close range.',
+        PROXIMATE: 'Candidate is within 3 km of CoL centroid. §73.24(i) 5 mV/m coverage highly achievable even at minimum TPO. Monitor blanket population (§73.24(g)) at close range.',
         NEAR:      'Candidate within 10 km of CoL. §73.24(i) compliance straightforward at typical class TPO. Blanket population monitoring advisable.',
         MID:       'Candidate 10–30 km from CoL. §73.24(i) compliance depends on TPO and ground conductivity. Groundwave reach calculation critical.',
         FAR:       'Candidate 30–60 km from CoL. Higher TPO and/or better-conductivity site required for reliable §73.24(i) compliance. Consider DA pattern to direct energy toward CoL.',
@@ -24958,7 +24958,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'col_min',    mvm: 5.0,    label: 'COL Minimum Service (§73.24(i))',     color: '#22c55e', fill_opacity: 0.12, stroke_width: 2,   priority: 1 },
         { id: 'standard',   mvm: 2.0,    label: 'Standard Service (2 mV/m)',           color: '#3b82f6', fill_opacity: 0.08, stroke_width: 1.5, priority: 2 },
         { id: 'primary',    mvm: 0.5,    label: 'Primary Service / Protection (§73.182)', color: '#6366f1', fill_opacity: 0.05, stroke_width: 1,   priority: 3 },
-        { id: 'blanket',    mvm: 1000.0, label: 'Blanket (§73.24g / 1000 mV/m)',        color: '#ef4444', fill_opacity: 0.20, stroke_width: 2,   priority: 0 }
+        { id: 'blanket',    mvm: 1000.0, label: 'Blanket (§73.24(g) / 1000 mV/m)',      color: '#ef4444', fill_opacity: 0.20, stroke_width: 2,   priority: 0 }
       ];
 
       const contours = contourDefs.map(def => {

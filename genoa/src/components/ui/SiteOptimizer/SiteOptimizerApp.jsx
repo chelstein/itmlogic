@@ -3961,7 +3961,7 @@ const DEMO_RESULT = {
           { id: 'col_min',  mvm: 5.0,    label: 'COL Minimum Service (§73.24(i))',        color: '#22c55e', fill_opacity: 0.12, stroke_width: 2,   priority: 1, center_lat: 34.8606, center_lon: -111.8206, radius_km: 18.4,  radius_m: 18400,  geojson_type: 'circle', n_sides: 64 },
           { id: 'standard', mvm: 2.0,    label: 'Standard Service (2 mV/m)',              color: '#3b82f6', fill_opacity: 0.08, stroke_width: 1.5, priority: 2, center_lat: 34.8606, center_lon: -111.8206, radius_km: 42.3,  radius_m: 42300,  geojson_type: 'circle', n_sides: 64 },
           { id: 'primary',  mvm: 0.5,    label: 'Primary Service / Protection (§73.182)', color: '#6366f1', fill_opacity: 0.05, stroke_width: 1,   priority: 3, center_lat: 34.8606, center_lon: -111.8206, radius_km: 115.2, radius_m: 115200, geojson_type: 'circle', n_sides: 64 },
-          { id: 'blanket',  mvm: 1000.0, label: 'Blanket (§73.24g / 1000 mV/m)',          color: '#ef4444', fill_opacity: 0.20, stroke_width: 2,   priority: 0, center_lat: 34.8606, center_lon: -111.8206, radius_km: 0.42,  radius_m: 420,    geojson_type: 'circle', n_sides: 64 }
+          { id: 'blanket',  mvm: 1000.0, label: 'Blanket (§73.24(g) / 1000 mV/m)',        color: '#ef4444', fill_opacity: 0.20, stroke_width: 2,   priority: 0, center_lat: 34.8606, center_lon: -111.8206, radius_km: 0.42,  radius_m: 420,    geojson_type: 'circle', n_sides: 64 }
         ],
         col_service_area_km2: 1063,
         primary_area_km2: 41710,
