@@ -1547,7 +1547,7 @@ test('colocation GRID candidates have community_of_license_change_guide', async 
   assert.equal(out.available, true);
   for (const c of out.candidates) {
     assert.ok(c.community_of_license_change_guide != null, `rank ${c.rank} missing community_of_license_change_guide`);
-    assert.strictEqual(c.community_of_license_change_guide.col_contour_threshold_mv_m, 0.5, `rank ${c.rank} COL contour threshold must be 0.5 mV/m`);
+    assert.strictEqual(c.community_of_license_change_guide.col_contour_threshold_mv_m, 5, `rank ${c.rank} COL contour threshold must be 5 mV/m per §73.24(i)`);
   }
 });
 

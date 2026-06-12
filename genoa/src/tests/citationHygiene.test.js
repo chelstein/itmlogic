@@ -273,3 +273,53 @@ test('PR-CITE2 — repository-wide: no rendered §73.x placeholder anywhere unde
   assert.equal(offenders.length, 0,
     `the literal "§73.x" appears in rendered text of: ${offenders.join(', ')}`);
 });
+
+// ── CFR-AUDIT (batches 88–92): nonexistent Part 73 sections stay dead ─
+
+test('CFR-AUDIT — no source file cites a nonexistent/repealed §73.35xx section', () => {
+  // These sections either never existed or were repealed and must not be
+  // cited as live rules anywhere in the source tree:
+  //   §73.3522 — does not exist (minor-mod processing is §73.3571(e))
+  //   §73.3525 — does not exist (application fees: 47 U.S.C. §158 / FCC fee schedule)
+  //   §73.3556 — removed 2020 (former program-duplication rule)
+  //   §73.3561 — does not exist (no CFR rule sets FCC review timelines)
+  //   §73.3562 — does not exist (COL change: §73.3533 + §73.3571)
+  //   §73.3597 — does not exist (assignment processing: §73.3580/§73.3584/§73.3591)
+  // Comments are stripped first so historical notes remain allowed.
+  const BANNED = [/§73\.3522/, /§73\.3525/, /§73\.3556/, /§73\.3561/, /§73\.3562/, /§73\.3597/];
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/exports/**/*.js' 'src/review/**/*.js' 'src/components/**/*.jsx' 'src/ui/*.jsx' 'src/data/**/*.json'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean);
+  assert.ok(files.length > 0, 'glob should match at least one source file');
+  const offenders = [];
+  for (const rel of files){
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    const stripped = src
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const re of BANNED){
+      if (re.test(stripped)) offenders.push(`${rel} (${re.source})`);
+    }
+  }
+  assert.equal(offenders.length, 0,
+    `nonexistent/repealed CFR sections cited in: ${offenders.join('; ')}`);
+});
+
+test('CFR-AUDIT — AM engine/UI never cite the FM application-processing rule §73.3573', () => {
+  // §73.3573 is real but FM-only.  AM application processing is §73.3571.
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  const offenders = files.filter(rel =>
+    /§73\.3573/.test(readFileSync(join(repoRoot, rel), 'utf8')));
+  assert.equal(offenders.length, 0,
+    `AM-context files cite FM rule §73.3573 (use §73.3571): ${offenders.join(', ')}`);
+});

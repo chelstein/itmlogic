@@ -6561,7 +6561,7 @@ test('community_of_license_change_guide presence and structure', async () => {
 test('community_of_license_change_guide COL contour threshold is 0.5 mV/m', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].community_of_license_change_guide;
-  assert.strictEqual(g.col_contour_threshold_mv_m, 0.5, 'COL contour threshold must be 0.5 mV/m per §73.24(h)');
+  assert.strictEqual(g.col_contour_threshold_mv_m, 5, 'COL contour threshold must be 5 mV/m per §73.24(i)');
   assert.ok(g.col_service_cfr.includes('73.24'), 'COL service CFR must reference §73.24');
 });
 
@@ -15202,8 +15202,8 @@ it('KAZM quarterly issues/programs list deadline and letters retention', async (
 it('KAZM contour map and children\'s programming exemption', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_public_inspection_file_and_online_compliance_guide;
-  assert.strictEqual(g.contour_map_required, true, 'contour map required in public file per §73.3526(e)(1)');
-  assert.strictEqual(g.contour_map_contour_mv_m, 0.5, 'community contour is 0.5 mV/m daytime per §73.24(h)');
+  assert.strictEqual(g.contour_map_required, true, 'contour map required in public file per §73.3526(e)(4)');
+  assert.strictEqual(g.contour_map_contour_mv_m, 0.5, 'service contour map is 0.5 mV/m daytime per §73.182 / §73.3526(e)(4)');
   assert.strictEqual(g.childrens_programming_report_required, false, 'AM stations exempt from children\'s programming report per §73.3526(e)(11)(iii)');
 });
 
@@ -15234,7 +15234,7 @@ it('KAZM atmospheric noise ITU-R P.372-16 zone B value at 780 kHz', async () => 
   assert.ok(['LOW', 'ELEVATED', 'HIGH'].includes(g.noise_risk_level), 'noise_risk_level must be LOW/ELEVATED/HIGH');
 });
 
-it('KAZM daytime field strength and SNR thresholds per §73.24(h) and §73.37(a)', async () => {
+it('KAZM daytime field strength and SNR thresholds per §73.182 and §73.37(a)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_noise_floor_and_rf_interference_environment_guide;
   // 0.5 mV/m = 500 µV/m → 20*log10(500) = 53.98 dBµV/m

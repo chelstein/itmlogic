@@ -4076,7 +4076,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div><b>Audience Uplift:</b> {g.audience_reach_uplift_pct_low}–{g.audience_reach_uplift_pct_high}% with translator</div>
                 <div><b>On Relocation:</b> {g.translator_modification_form}</div>
                 <div><b>FCC Fee:</b> ${fmt(g.fcc_fee_usd)}</div>
-                <div><b>AM Contour:</b> within {g.am_primary_contour_mv_m} mV/m daytime (§74.1237)</div>
+                <div><b>AM Contour:</b> within {g.am_primary_contour_mv_m} mV/m daytime or 40 km radius (§74.1201(j))</div>
                 <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #c4b5fd', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
                   <span><b>Equipment:</b> ${fmt(g.equipment_low_usd)}–${fmt(g.equipment_high_usd)}</span>
                   <span><b>Engineering:</b> ${fmt(g.engineering_low_usd)}–${fmt(g.engineering_high_usd)}</span>
@@ -8730,7 +8730,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
               <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
-                Community of License (COL) Change <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3571 / §73.24(h)</span>
+                Community of License (COL) Change <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3571 / §73.24(i)</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>

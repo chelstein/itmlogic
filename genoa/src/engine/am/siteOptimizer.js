@@ -11068,8 +11068,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const translator_max_erp_w    = 250;
       const translator_max_erp_kw   = round2(translator_max_erp_w / 1000);
 
-      // AM primary service area daytime contour (defines translator geographic constraint):
-      const am_primary_contour_mv_m = 0.5;  // §73.24(h) daytime community contour
+      // AM fill-in area (translator geographic constraint, §74.1201(g)/(j)):
+      //   the translator coverage contour must stay within the GREATER of the AM
+      //   2 mV/m daytime contour or a 40 km (25-mile) radius of the AM transmitter.
+      const am_primary_contour_mv_m = 2;    // §74.1201(j) fill-in contour (2 mV/m daytime)
 
       // Typical FM translator coverage radius at 250 W ERP (flat terrain baseline):
       //   Using FCC FM F(50,50) curves at ~100 MHz, 250 W ERP, HAAT=30m → ~20 km service radius.
@@ -11133,8 +11135,8 @@ async function scoreCandidate(pt, ctx, warnings){
         engineering_high_usd,
         total_translator_low_usd,
         total_translator_high_usd,
-        reference: '47 CFR §74.1201(g) (AM→FM translator eligibility); §74.1235(a) (250 W ERP maximum); §74.1232(d)–(f) (AM revitalization priority); §74.1237 (translator location within AM primary service area); FCC MB Docket 13-249 (AM revitalization); FCC Form 349 (FM translator application)',
-        note: `${fcc_class}-class AM station (${tpo_kw} kW, ${frequency_khz} kHz) is eligible for an FM translator per §74.1201(g), limited to ${translator_max_erp_w} W ERP. Translator may be placed anywhere within the AM 0.5 mV/m daytime contour and must rebroadcast the AM signal. ${elevated_site_likely ? `Elevated terrain at this candidate site favors translator coverage radius ~${translator_coverage_km} km.` : `Flat-terrain translator coverage radius ~${translator_coverage_km} km.`} On relocation, modify existing translator authorization via ${translator_modification_form}. Estimated audience reach uplift with translator: ${audience_reach_uplift_pct_low}–${audience_reach_uplift_pct_high}%.`
+        reference: '47 CFR §74.1201(g)/(j) (fill-in area: greater of 2 mV/m daytime contour or 40 km radius); §74.1235(a) (250 W ERP maximum); §74.1232(d)–(f) (AM revitalization priority); FCC MB Docket 13-249 (AM revitalization); FCC Form 349 (FM translator application)',
+        note: `${fcc_class}-class AM station (${tpo_kw} kW, ${frequency_khz} kHz) is eligible for an FM translator per §74.1201(g), limited to ${translator_max_erp_w} W ERP. Translator coverage must remain within the greater of the AM 2 mV/m daytime contour or a 40 km (25-mile) radius of the AM transmitter (§74.1201(j)) and must rebroadcast the AM signal. ${elevated_site_likely ? `Elevated terrain at this candidate site favors translator coverage radius ~${translator_coverage_km} km.` : `Flat-terrain translator coverage radius ~${translator_coverage_km} km.`} On relocation, modify existing translator authorization via ${translator_modification_form}. Estimated audience reach uplift with translator: ${audience_reach_uplift_pct_low}–${audience_reach_uplift_pct_high}%.`
       };
     })(),
 
@@ -11201,7 +11203,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const ft_linear = Math.pow(10, fa_atmospheric_dBuVm / 10) + Math.pow(10, fa_manmade_dBuVm / 10);
       const ft_dBuVm  = round2(10 * Math.log10(ft_linear));
 
-      // Daytime service contour field strength (§73.24(h)):
+      // Daytime service contour field strength (0.5 mV/m per §73.182):
       const fs_day_dBuVm  = round2(20 * Math.log10(0.5 * 1000));   // 0.5 mV/m = 500 µV/m → 53.98 dBµV/m
       const fs_night_dBuVm = round2(20 * Math.log10(0.1 * 1000));  // 0.1 mV/m = 100 µV/m → 40 dBµV/m
 
@@ -11256,7 +11258,7 @@ async function scoreCandidate(pt, ctx, warnings){
         survey_cost_high_usd,
         total_noise_low_usd,
         total_noise_high_usd,
-        reference: '47 CFR §73.37(a) (10 dB SNR minimum at service contour); §73.24(h) (0.5 mV/m daytime contour); §73.24(i) (0.1 mV/m nighttime); ITU-R P.372-16 (noise figure, atmospheric and man-made); Terman (1955) ch. 20 (practical SNR thresholds)',
+        reference: '47 CFR §73.37(a) (10 dB SNR minimum at service contour); §73.182 (0.5 mV/m daytime service contour; 0.1 mV/m nighttime reference); ITU-R P.372-16 (noise figure, atmospheric and man-made); Terman (1955) ch. 20 (practical SNR thresholds)',
         note: `Estimated combined noise floor: ${ft_dBuVm} dBµV/m (atmospheric ${fa_atmospheric_dBuVm} + man-made ${fa_manmade_dBuVm} dBµV/m, ${noise_zone} zone). Daytime SNR at 0.5 mV/m contour: ${snr_day_dB} dB (FCC minimum ${snr_threshold_dB} dB — ${snr_day_compliant ? 'COMPLIANT' : 'BELOW THRESHOLD'}). Noise risk: ${noise_risk_level}. ${is_clear_channel_freq ? `780 kHz is a CLEAR CHANNEL — KKOB (Albuquerque, 50 kW) dominates nighttime coverage; secondary station nighttime operation is secondary to dominant station interference.` : ''}`
       };
     })(),
@@ -11347,11 +11349,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const opif_transition_deadline       = '2020-03-01';
 
       // Contour map requirement:
-      //   §73.3526(e)(1): Principal community coverage contour map must be in file.
-      //   For AM, this means the daytime 0.5 mV/m groundwave contour (§73.24(h)).
+      //   §73.3526(e)(4): Service contour maps as filed with FCC applications must
+      //   be in the file.  For AM, this is typically the daytime 0.5 mV/m groundwave
+      //   service contour (§73.182).
       //   Contour map must be updated whenever a change in facilities is authorized.
       const contour_map_required           = true;
-      const contour_map_contour_mv_m       = 0.5;   // daytime §73.24(h) community contour
+      const contour_map_contour_mv_m       = 0.5;   // daytime service contour (§73.182)
       const contour_map_update_trigger     = 'Any licensed facilities change (power, antenna, location)';
 
       // Cost estimates (2024):
@@ -22020,15 +22023,16 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // FCC COL change criteria (as applied in AM cases):
       //   - The new transmitter site must continue to serve the authorized COL with the principal
-      //     community contour (0.5 mV/m daytime) encompassing at least the COL city limits
-      //   - §73.24(h): AM stations must provide a principal community contour (0.5 mV/m day) over the COL
-      //   - If the COL is an incorporated municipality: the 0.5 mV/m contour must encompass the municipality
-      //   - If the COL is an unincorporated community: the contour must encompass the community center
+      //     community contour (5 mV/m daytime) per §73.24(i)
+      //   - §73.24(i): new stations must place the entire COL inside the daytime 5 mV/m contour;
+      //     modifications of licensed stations must cover at least 50% of the COL area or population
+      //   - If the COL is an incorporated municipality: coverage is measured against the municipal
+      //     boundary; for unincorporated communities, against the community center
       //
       // COL proximity to candidate site:
       //   - Distance from candidate to current COL centroid is a key metric
       //   - If candidate is within ~25 km of the COL, COL service is typically preserved
-      //   - If candidate is >50 km from COL and moves the 0.5 mV/m contour away from COL, a COL change may be triggered
+      //   - If candidate is >50 km from COL and moves the 5 mV/m contour away from COL, a COL change may be triggered
       //   - A COL change requires additional FCC review and may require a Form 301-AM major change
       //
       // Consequences of unauthorized COL change:
@@ -22055,16 +22059,16 @@ async function scoreCandidate(pt, ctx, warnings){
       }
 
       const COL_CHANGE_RISKS = [
-        { risk: 'Principal community contour failure', cfr: '§73.24(h); §73.3571', description: '0.5 mV/m daytime contour must encompass COL city limits or community center', severity: 'CRITICAL' },
+        { risk: 'Principal community contour failure', cfr: '§73.24(i); §73.3571', description: '5 mV/m daytime contour must cover the COL (entire community for new stations; ≥50% of area or population for modifications)', severity: 'CRITICAL' },
         { risk: 'Unauthorized COL change', cfr: '§73.3571(b)', description: 'Relocating without maintaining COL service may constitute an unauthorized COL change', severity: 'HIGH' },
         { risk: 'Forfeiture exposure', cfr: '§503(b)', description: 'FCC NAL for unauthorized COL change; typically $4,000–$20,000 per §503(b) guidelines', severity: 'HIGH' },
         { risk: 'Auction exposure', cfr: '§73.3571(b)', description: 'A major COL change that draws competing applications may trigger spectrum auction', severity: 'MEDIUM' }
       ];
 
       const COL_PRESERVATION_STRATEGIES = [
-        { priority: 1, action: 'Verify 0.5 mV/m contour over COL at each candidate site', detail: 'Run FCC curves (§73.190) to confirm daytime 0.5 mV/m contour includes COL city limits or community center', cfr: '§73.24(h)' },
-        { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that COL is within 0.5 mV/m daytime contour', cfr: '§73.3533; §73.3571' },
-        { priority: 3, action: 'Consider directional antenna to maintain COL service', detail: 'If NDA relocation degrades COL service, a DA pattern with a stronger lobe toward COL may preserve service', cfr: '§73.150; §73.24(h)' },
+        { priority: 1, action: 'Verify 5 mV/m contour over COL at each candidate site', detail: 'Run FCC curves (§73.190) to confirm daytime 5 mV/m contour covers the COL per §73.24(i) (≥50% of area or population for modifications)', cfr: '§73.24(i)' },
+        { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that the COL is covered by the 5 mV/m daytime contour', cfr: '§73.3533; §73.3571' },
+        { priority: 3, action: 'Consider directional antenna to maintain COL service', detail: 'If NDA relocation degrades COL service, a DA pattern with a stronger lobe toward COL may preserve service', cfr: '§73.150; §73.24(i)' },
         { priority: 4, action: 'If COL change is unavoidable, file formal COL change request', detail: 'File a major change Form 301-AM with an explicit COL change request; coordinate with FCC communications counsel', cfr: '§73.3571(b)' }
       ];
 
@@ -22075,16 +22079,16 @@ async function scoreCandidate(pt, ctx, warnings){
         triggers_col_change,
         col_change_risk,
         auction_required: triggers_col_change === true ? 'POSSIBLE' : 'UNLIKELY',
-        col_contour_threshold_mv_m: 0.5,
-        col_service_cfr: '§73.24(h)',
+        col_contour_threshold_mv_m: 5,
+        col_service_cfr: '§73.24(i)',
         col_change_risks: COL_CHANGE_RISKS,
         col_preservation_strategies: COL_PRESERVATION_STRATEGIES,
         n_strategies: COL_PRESERVATION_STRATEGIES.length,
         relocation_note: distance_from_col_km != null
-          ? `Candidate is ${distance_from_col_km} km from COL centroid. COL change risk: ${col_change_risk}. ${triggers_col_change ? 'Distance may compromise 0.5 mV/m COL coverage — verify contours. Formal COL change application may be required.' : 'COL coverage likely preserved — verify with FCC contour computation before filing.'}`
-          : 'COL centroid not available — verify 0.5 mV/m daytime contour over COL city limits for each candidate before filing Form 301-AM.',
-        reference: '47 CFR §73.24(h); §73.3571; §73.3571(b); §73.190; §503(b); FCC AM processing policies',
-        note: `COL change: ${distance_from_col_km != null ? `${distance_from_col_km} km from COL, risk ${col_change_risk}` : 'COL distance unknown'}. Must verify 0.5 mV/m daytime contour covers COL per §73.24(h). ${triggers_col_change ? 'COL change likely — formal application required.' : 'COL coverage expected — confirm with FCC curves.'}`
+          ? `Candidate is ${distance_from_col_km} km from COL centroid. COL change risk: ${col_change_risk}. ${triggers_col_change ? 'Distance may compromise 5 mV/m COL coverage — verify contours. Formal COL change application may be required.' : 'COL coverage likely preserved — verify with FCC contour computation before filing.'}`
+          : 'COL centroid not available — verify 5 mV/m daytime contour coverage of the COL for each candidate before filing Form 301-AM.',
+        reference: '47 CFR §73.24(i); §73.3571; §73.3571(b); §73.190; §503(b); FCC AM processing policies',
+        note: `COL change: ${distance_from_col_km != null ? `${distance_from_col_km} km from COL, risk ${col_change_risk}` : 'COL distance unknown'}. Must verify 5 mV/m daytime contour covers COL per §73.24(i). ${triggers_col_change ? 'COL change likely — formal application required.' : 'COL coverage expected — confirm with FCC curves.'}`
       };
     })(),
 

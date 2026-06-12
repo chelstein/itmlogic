@@ -2279,24 +2279,24 @@ const DEMO_RESULT = {
         triggers_col_change: false,
         col_change_risk: 'LOW',
         auction_required: 'UNLIKELY',
-        col_contour_threshold_mv_m: 0.5,
-        col_service_cfr: '§73.24(h)',
+        col_contour_threshold_mv_m: 5,
+        col_service_cfr: '§73.24(i)',
         col_change_risks: [
-          { risk: 'Principal community contour failure', cfr: '§73.24(h); §73.3571', description: '0.5 mV/m daytime contour must encompass COL city limits or community center', severity: 'CRITICAL' },
+          { risk: 'Principal community contour failure', cfr: '§73.24(i); §73.3571', description: '5 mV/m daytime contour must cover the COL (entire community for new stations; ≥50% of area or population for modifications)', severity: 'CRITICAL' },
           { risk: 'Unauthorized COL change', cfr: '§73.3571(b)', description: 'Relocating without maintaining COL service may constitute an unauthorized COL change', severity: 'HIGH' },
           { risk: 'Forfeiture exposure', cfr: '§503(b)', description: 'FCC NAL for unauthorized COL change; typically $4,000–$20,000 per §503(b) guidelines', severity: 'HIGH' },
           { risk: 'Auction exposure', cfr: '§73.3571(b)', description: 'A major COL change that draws competing applications may trigger spectrum auction', severity: 'MEDIUM' }
         ],
         col_preservation_strategies: [
-          { priority: 1, action: 'Verify 0.5 mV/m contour over COL at each candidate site', detail: 'Run FCC curves (§73.190) to confirm daytime 0.5 mV/m contour includes COL city limits or community center', cfr: '§73.24(h)' },
-          { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that COL is within 0.5 mV/m daytime contour', cfr: '§73.3533; §73.3571' },
-          { priority: 3, action: 'Consider directional antenna to maintain COL service', detail: 'If NDA relocation degrades COL service, a DA pattern with a stronger lobe toward COL may preserve service', cfr: '§73.150; §73.24(h)' },
+          { priority: 1, action: 'Verify 5 mV/m contour over COL at each candidate site', detail: 'Run FCC curves (§73.190) to confirm daytime 5 mV/m contour covers the COL per §73.24(i) (≥50% of area or population for modifications)', cfr: '§73.24(i)' },
+          { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that the COL is covered by the 5 mV/m daytime contour', cfr: '§73.3533; §73.3571' },
+          { priority: 3, action: 'Consider directional antenna to maintain COL service', detail: 'If NDA relocation degrades COL service, a DA pattern with a stronger lobe toward COL may preserve service', cfr: '§73.150; §73.24(i)' },
           { priority: 4, action: 'If COL change is unavoidable, file formal COL change request', detail: 'File a major change Form 301-AM with an explicit COL change request; coordinate with FCC communications counsel', cfr: '§73.3571(b)' }
         ],
         n_strategies: 4,
         relocation_note: 'Candidate is 12.4 km from COL centroid. COL change risk: LOW. COL coverage likely preserved — verify with FCC contour computation before filing.',
-        reference: '47 CFR §73.24(h); §73.3571; §73.3571(b); §73.190; §503(b); FCC AM processing policies',
-        note: 'COL change: 12.4 km from COL, risk LOW. Must verify 0.5 mV/m daytime contour covers COL per §73.24(h). COL coverage expected — confirm with FCC curves.'
+        reference: '47 CFR §73.24(i); §73.3571; §73.3571(b); §73.190; §503(b); FCC AM processing policies',
+        note: 'COL change: 12.4 km from COL, risk LOW. Must verify 5 mV/m daytime contour covers COL per §73.24(i). COL coverage expected — confirm with FCC curves.'
       },
       fcc_license_modification_guide: {
         frequency_khz: 780, fcc_class: 'D',
