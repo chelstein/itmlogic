@@ -1059,7 +1059,7 @@ const DEMO_RESULT = {
           efficiency_tier: 'EXCELLENT (≥90%)', area_required_ha: 29.1
         },
         extended_design: {
-          n_radials: 180, radial_length_m: 144.3, wire_gauge: '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)',
+          n_radials: 180, radial_length_m: 144.23, wire_gauge: '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)',
           burial_depth_mm: 150, R_g_estimated_ohm: 1.0, efficiency_pct: 97.3,
           note: 'Extended design recommended for σ < 5 mS/m or when §73.190 efficiency certification targets >90%'
         },
@@ -3731,7 +3731,7 @@ const DEMO_RESULT = {
         line_items: [
           { id: 'land',        category: 'Land / site acquisition',              low: 50000,  high: 250000, note: 'Highly variable; rural option ~$25K; suburban can exceed $500K.' },
           { id: 'tower',       category: 'Tower (new self-supporting)',           low: 253684, high: 507369, note: '144m tower at 3/8λ (473 ft). Guy-wired 30% less.' },
-          { id: 'radials',     category: 'Ground radial system (120 × λ/4 = 96.15 m)', low: 21347,  high: 38993,  note: '11,538 m #8 AWG copper + installation labor (120 radials × 96.15 m = λ/4 at 780 kHz).' },
+          { id: 'radials',     category: 'Ground radial system (120 × 0.4λ = 153.85 m)', low: 34155,  high: 62388,  note: '18,462 m #8 AWG copper + installation labor (120 radials × 153.85 m = 0.4λ Terman optimum; λ/4 minimum = 96.15 m).' },
           { id: 'building',    category: 'Transmitter building',                  low: 60000,  high: 200000, note: 'Modular pre-fab low; custom masonry high.' },
           { id: 'transmitter', category: 'Transmitter equipment',                 low: 20000,  high: 55000,  note: '5 kW NDA AM transmitter; new unit.' },
           { id: 'phasor_atu',  category: 'Antenna tuning unit (ATU)',             low: 5000,   high: 12000,  note: 'Non-directional ATU.' },
@@ -3739,13 +3739,13 @@ const DEMO_RESULT = {
           { id: 'fcc_fees',    category: 'FCC filing fees',                       low: 6465,   high: 6465,   note: 'FCC Schedule of Application Fees — major change CP application fee.' },
           { id: 'engineering', category: 'Engineering + proof-of-performance',    low: 25000,  high: 75000,  note: 'Spacing, NIF, §73.154 proof, FCC forms.' },
           { id: 'env_legal',   category: 'Environmental + legal + zoning',        low: 15000,  high: 60000,  note: 'NEPA §106, zoning CUP, FCC counsel.' },
-          { id: 'contingency', category: 'Contingency (15–20%)',                  low: 69674,  high: 242565, note: 'Reserve for scope changes, cost escalation, permit delays.' }
+          { id: 'contingency', category: 'Contingency (15–20%)',                  low: 71913,  high: 247234, note: 'Reserve for scope changes, cost escalation, permit delays.' }
         ],
         n_line_items: 11,
-        subtotal_low: 464496, subtotal_high: 1212827,
-        total_low: 534170, total_high: 1455392, total_midpoint: 994781,
+        subtotal_low: 477304, subtotal_high: 1236222,
+        total_low: 549217, total_high: 1483456, total_midpoint: 1016337,
         reference: 'Budget model based on FCC Schedule of Application Fees, engineering industry cost data, and RSMeans construction cost indices (2024).',
-        note: 'Total estimated relocation cost: $534,170 – $1,455,392 (midpoint ~$994,781). Estimates are screening-grade; actual costs vary significantly with site conditions.'
+        note: 'Total estimated relocation cost: $549,217 – $1,483,456 (midpoint ~$1,016,337). Radials use 0.4λ Terman optimum (153.85 m); λ/4 minimum = 96.15 m. Estimates are screening-grade; actual costs vary significantly with site conditions.'
       },
       rf_exposure_mpe_analysis: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
