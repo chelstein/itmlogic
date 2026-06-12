@@ -13967,7 +13967,7 @@ test('KAZM annual operating cost totals', async () => {
 test('KAZM annual ops reference and note fields', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
-  assert.ok(typeof g.reference === 'string' && g.reference.includes('§73.3585'), 'reference must cite §73.3585');
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§1.1102'), 'reference must cite §1.1102 (FCC regulatory fee schedule)');
   assert.ok(typeof g.note === 'string' && g.note.includes('kWh/yr'), 'note must mention kWh/yr');
 });
 

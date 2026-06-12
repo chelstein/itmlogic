@@ -13688,7 +13688,7 @@ async function scoreCandidate(pt, ctx, warnings){
         maintenance_low_usd: maintenance_low, maintenance_high_usd: maintenance_high,
         security_low_usd: security_low, security_high_usd: security_high,
         total_low_usd, total_high_usd,
-        reference: '47 CFR §73.3585 (annual FCC regulatory fee schedule); EIA commercial electricity rates; diesel fuel consumption (0.07 gal/kW-hr at 33% efficiency); RS Means facilities maintenance data',
+        reference: '47 CFR §1.1102 (FCC regulatory fee schedule); EIA commercial electricity rates; diesel fuel consumption (0.07 gal/kW-hr at 33% efficiency); RS Means facilities maintenance data',
         note: `${tpo_kw} kW TPO → ${electricity_draw_kw} kW grid draw (${kwh_per_year.toLocaleString()} kWh/yr). Annual total: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
@@ -21783,8 +21783,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //     FCC requires tribal, SHPO, and/or public notification as part of the EA/CE process
       //   - §106 NHPA process: if tower is in an area with potential historic or cultural significance,
       //     FCC requires notification of potentially affected parties, including tribes
-      //   - §73.3583: AM towers near wetlands, floodplains, or ESA critical habitat require
-      //     coordination with relevant federal/state agencies
+      //   - §1.1307: AM towers near wetlands, floodplains, or ESA critical habitat trigger
+      //     an EA and require coordination with relevant federal/state agencies
       //
       // Best practices for neighbor relations:
       //   - Proactive outreach to immediately adjacent landowners before filing the CUP application
