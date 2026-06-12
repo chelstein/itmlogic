@@ -1858,9 +1858,9 @@ const DEMO_RESULT = {
       },
       transmitter_power_upgrade_pathway_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
-        current_tpo_kw: 5, day_max_tpo_kw: 10, night_max_tpo_kw: 1,
-        day_headroom_kw: 5, can_upgrade_day_power: true, upgraded_tpo_kw: 10,
-        coverage_radius_factor: 1.414, coverage_gain_pct: 41,
+        current_tpo_kw: 5, day_max_tpo_kw: 5, night_max_tpo_kw: 0.5,
+        day_headroom_kw: 0, can_upgrade_day_power: false, upgraded_tpo_kw: 5,
+        coverage_radius_factor: 1.0, coverage_gain_pct: 0,
         is_directional: false, night_upgrade_requires_da_n: true,
         form301_fee_usd: 6465, form302_fee_usd: 435,
         transmitter_cost_low_usd: 15000, transmitter_cost_high_usd: 45000,
@@ -1873,11 +1873,11 @@ const DEMO_RESULT = {
           { step: 1, action: 'Interference analysis', form: null, cost_range_usd: '$4,000–$8,000', timeline: '2–4 weeks', notes: '§73.182 co-channel/adjacent-channel analysis; NDA — no pattern proof needed' },
           { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$6,465', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307)' },
           { step: 3, action: 'FCC processing / CP grant', form: null, cost_range_usd: 'included', timeline: '6–18 months', notes: 'CP grants construction authority; must be constructed within 3 years (§73.3598) — file Form 302-AM for license before CP lapses' },
-          { step: 4, action: 'Procure and install transmitter', form: null, cost_range_usd: '$22,500–$52,500', timeline: '4–12 weeks', notes: '10 kW AM transmitter + electrical service upgrade + bonding + commissioning' },
+          { step: 4, action: 'Procure and install DA-N nighttime antenna system', form: null, cost_range_usd: '$22,500–$52,500', timeline: '4–12 weeks', notes: 'Directional nighttime (DA-N) antenna array + phasor network + installation. Class D daytime ceiling is already reached (5 kW per §73.21); nighttime upgrade to 0.5 kW requires DA-N pattern + §73.182 NIF study.' },
           { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$435', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b))' }
         ],
         reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.3598 (CP construction period/lapse); §1.1102 (filing fees); FCC Form 301; FCC Form 302-AM',
-        note: '780 kHz Class D (NDA) — current 5 kW TPO. Daytime upgrade to 10 kW available (§73.21 Class D ceiling) — groundwave coverage radius grows ~41% (√ERP scaling). Nighttime ceiling: 1 kW (Class D secondary; DA-N antenna + §73.182 skywave analysis required for night upgrade).'
+        note: '780 kHz Class D (NDA) — current 5 kW TPO. No daytime upgrade available — 5 kW IS the Class D ceiling per §73.21(e). Nighttime upgrade path: 0 → 0.5 kW maximum (Class D clear channel nighttime ceiling per §73.24); requires DA-N directional antenna pattern + §73.182 NIF skywave study. Total project cost for nighttime authorization: $31,135–$65,135.'
       },
       am_coverage_optimization_by_tower_height_guide: {
         frequency_khz: 780, wavelength_m: 384.62,
@@ -2370,9 +2370,9 @@ const DEMO_RESULT = {
       transmitter_building_design_guide: {
         frequency_khz: 780, fcc_class: 'D',
         tpo_kw: 5,
-        tx_input_kw: 14,
-        heat_dissipation_kw: 9,
-        hvac_tons_required: 2,
+        tx_input_kw: 6.76,
+        heat_dissipation_kw: 1.76,
+        hvac_tons_required: 1,
         min_floor_area_sqft: 160,
         recommended_floor_area_sqft: 240,
         equipment_list: [
@@ -3904,8 +3904,8 @@ const DEMO_RESULT = {
           { id: 'fcc_engineering',  label: 'FCC Engineering Study',           weeks_optimistic: 6,  weeks_conservative: 16,  milestones: [
             { id: 'spacing_study',  task: '§73.37 spacing analysis (all channels)', days: 10, rule: '§73.37' },
             { id: 'nif_study',      task: '§73.182 NIF study (clear channel)',       days: 30, rule: '§73.182' },
-            { id: 'da_pattern',     task: 'Non-directional antenna design',           days: 7,  rule: '§73.183' },
-            { id: 'coverage_map',   task: '§73.183 coverage map',                     days: 7,  rule: '§73.183' },
+            { id: 'da_pattern',     task: 'Non-directional antenna design',           days: 7,  rule: '§73.150' },
+            { id: 'coverage_map',   task: '§73.184 coverage map',                     days: 7,  rule: '§73.184' },
             { id: 'env_assessment', task: 'Environmental assessment (§1.1301)',        days: 14, rule: '§1.1301' },
             { id: 'asr_filing',     task: 'ASR registration (FCC Form 854)',           days: 7,  rule: '§17.7' }
           ]},
@@ -3913,7 +3913,7 @@ const DEMO_RESULT = {
             { id: 'schedule_a',     task: 'Schedule A: Legal/ownership', days: 7, rule: '§73.3533' },
             { id: 'schedule_b',     task: 'Schedule B: Technical (antenna, pattern, ERP)', days: 7, rule: '§73.3533' },
             { id: 'schedule_c',     task: 'Schedule C: Transmitter', days: 3, rule: '§73.3533' },
-            { id: 'schedule_d',     task: 'Schedule D: Coverage map + §73.183 contour', days: 5, rule: '§73.183' },
+            { id: 'schedule_d',     task: 'Schedule D: Coverage map + §73.184 contour', days: 5, rule: '§73.184' },
             { id: 'schedule_e',     task: 'Schedule E: Environmental compliance', days: 5, rule: '§1.1301' },
             { id: 'fcc_filing',     task: 'LMS filing + fee payment', days: 1, rule: 'FCC Schedule of Application Fees' }
           ]},
@@ -4228,7 +4228,7 @@ const DEMO_RESULT = {
       notes: 'Lower COL but excellent conductivity and minimal blanket exposure.',
       explanation: {
         score_breakdown: { col_coverage: 27.6, population: 20.7, blanket: 18.4, conductivity: 13.8, wildfire: 0, treaty_zone: 0, confidence_penalty: -5.63 },
-        ranking_rationale: 'Conductivity wins offset lower coverage; §73.24(i) COL coverage 78% is below 80% floor — increase TPO to ≥8.5 kW to fix.'
+        ranking_rationale: 'Conductivity wins offset lower coverage; §73.24(i) COL coverage 78% is below 80% floor — 8.5 kW needed to close gap but EXCEEDS Class D ceiling (5 kW per §73.21(e)); DA pattern toward COL bearing is the only compliant path.'
       },
       status_labels: ['NON-COMPLIANT', 'ENGINEER REVIEW REQUIRED'],
       status_category: 'RECOVERABLE_WITH_POWER_INCREASE',
@@ -4236,7 +4236,7 @@ const DEMO_RESULT = {
       regulatory_compliance_summary: {
         col_coverage: { status: 'FAIL',  value: 0.78, threshold: 0.80, rule: '47 CFR §73.24(i)' },
         blanket_pop:  { status: 'PASS',  value: 0.30, threshold: 1.00, rule: '47 CFR §73.24(g)' },
-        class_power:  { status: 'PASS',  value: 5, ceiling: 50, rule: '47 CFR §73.21' },
+        class_power:  { status: 'PASS',  value: 5, ceiling: 5,  rule: '47 CFR §73.21(e)' },
         treaty_zone:  { status: 'CLEAR', value: null, rule: 'US/MX 1986 Agreement; US/CA 1991 LOU' }
       },
       source: 'GRID',
@@ -4244,16 +4244,16 @@ const DEMO_RESULT = {
       colocation_analysis: null,
       limitations: ['Moderate wildfire exposure — manual review of fuel maps required'],
       coverage_feasibility_assessment: {
-        verdict: 'FEASIBLE_WITH_POWER_INCREASE',
+        verdict: 'FEASIBLE_WITH_DA_PATTERN_ONLY',
         col_coverage_pct: 0.78,
         col_coverage_meets_floor: false,
         tpo_needed_for_col_floor_kw: 8.5,
-        tpo_needed_within_class_ceiling: true,
-        class_power_ceiling_kw: 50,
+        tpo_needed_within_class_ceiling: false,
+        class_power_ceiling_kw: 5,
         blanket_pop_pct: 0.30,
         blanket_pop_meets_limit: true,
         da_pattern_may_resolve: true,
-        summary: 'COL coverage 78% (floor 80%); 8.5 kW achieves floor (class ceiling 50 kW); DA pattern shaping may close coverage gap'
+        summary: 'COL coverage 78% (floor 80%); 8.5 kW needed but EXCEEDS Class D ceiling of 5 kW (§73.21(e)); DA pattern toward COL bearing is the only compliant path to close coverage gap'
       },
       per_candidate_engineering_checklist: [
         { id: 'SOIL_RESISTIVITY_SURVEY', priority: 'REQUIRED', label: 'Soil resistivity survey', note: 'Zone-table σ=10 mS/m used for screening. Commission a 4-electrode Wenner array survey.' },
@@ -4347,28 +4347,28 @@ const DEMO_RESULT = {
         key_risk: 'Secondary on §73.25 clear channel — power increase amplifies NIF burden on all bearings', treaty_factor: null, rule: '47 CFR §73.25 / §73.182'
       },
       transmission_line_analysis: {
-        frequency_khz: 780, tpo_kw: 8.5, assumed_run_m: 60,
+        frequency_khz: 780, tpo_kw: 5, assumed_run_m: 60,
         feedline_options: [
-          { id: 'EIA_7_8_IN', label: 'EIA 7/8" coax', atten_db_per_100m: 0.32, total_loss_db_at_60m: 0.19, erp_at_antenna_kw: 8.13 },
-          { id: 'EIA_1_5_8_IN', label: 'EIA 1-5/8" coax', atten_db_per_100m: 0.18, total_loss_db_at_60m: 0.11, erp_at_antenna_kw: 8.28 },
-          { id: 'EIA_3_1_8_IN', label: 'EIA 3-1/8" coax', atten_db_per_100m: 0.10, total_loss_db_at_60m: 0.06, erp_at_antenna_kw: 8.38 },
-          { id: 'OPEN_WIRE', label: 'Open wire (600 Ω)', atten_db_per_100m: 0.03, total_loss_db_at_60m: 0.02, erp_at_antenna_kw: 8.46 }
+          { id: 'EIA_7_8_IN', label: 'EIA 7/8" coax', atten_db_per_100m: 0.32, total_loss_db_at_60m: 0.19, erp_at_antenna_kw: 4.79 },
+          { id: 'EIA_1_5_8_IN', label: 'EIA 1-5/8" coax', atten_db_per_100m: 0.18, total_loss_db_at_60m: 0.11, erp_at_antenna_kw: 4.87 },
+          { id: 'EIA_3_1_8_IN', label: 'EIA 3-1/8" coax', atten_db_per_100m: 0.10, total_loss_db_at_60m: 0.06, erp_at_antenna_kw: 4.93 },
+          { id: 'OPEN_WIRE', label: 'Open wire (600 Ω)', atten_db_per_100m: 0.03, total_loss_db_at_60m: 0.02, erp_at_antenna_kw: 4.98 }
         ],
         recommended_feedline_id: 'EIA_7_8_IN',
         recommendation_rationale: 'At TPO ≤ 25 kW, EIA 7/8" coax provides excellent efficiency with manageable cost and installation complexity.',
-        note: 'Attenuation computed from skin-effect formula at 0.780 MHz, 60 m assumed run. 8.5 kW TPO (power upgrade scenario).'
+        note: 'Attenuation computed from skin-effect formula at 0.780 MHz, 60 m assumed run. Class D ceiling 5 kW (§73.21(e)).'
       },
       antenna_base_impedance: {
-        frequency_khz: 780, sigma_msm: 4, quarter_wave_m: 96.15, N_radials: 120,
-        quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 9.7, R_total_ohm: 46.3, efficiency_standard_pct: 79.0, R_g_extended_ohm: 4.3, efficiency_extended_pct: 89.5 },
+        frequency_khz: 780, sigma_msm: 10, quarter_wave_m: 96.15, N_radials: 120,
+        quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 6.1, R_total_ohm: 42.7, efficiency_standard_pct: 85.7, R_g_extended_ohm: 2.6, efficiency_extended_pct: 93.4 },
         five_eighths_wave: { R_r_ohm: 49.8, X_base_j: 45, note: 'Matching network required to cancel +j45 Ω reactance' },
         base_reactance_table: [
           { height_label: 'λ/4 (electrical 90°)', X_base_j: 0, notes: 'Purely resistive — simplest matching' },
           { height_label: '5/8λ (electrical 225°)', X_base_j: 45, notes: 'Inductive — series cap or shunt network required' },
           { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
         ],
-        matching_network_complexity: 'MODERATE — σ=4 mS/m raises ground resistance to ~9.7 Ω; consider extended radial system to improve efficiency.',
-        design_note: 'At σ=4 mS/m, efficiency is 79% standard / 89.5% extended. Extending to 180 radials recommended if pursuing power upgrade to 8.5 kW.'
+        matching_network_complexity: 'LOW — σ=10 mS/m (EXCELLENT) gives low ground resistance ~6.1 Ω; standard 120-radial system at λ/4 adequate.',
+        design_note: 'Standard 120-radial ground system at 96.15 m achieves ~85.7% radiation efficiency at σ=10 mS/m.'
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
@@ -4388,16 +4388,16 @@ const DEMO_RESULT = {
         note: 'Soft-cost estimate only. NIF and DA costs elevated by power upgrade to 8.5 kW. 2024 USD.'
       },
       signal_propagation_profile: {
-        frequency_khz: 780, tpo_kw: 8.5, sigma_msm: 4,
+        frequency_khz: 780, tpo_kw: 5, sigma_msm: 10,
         contours: [
-          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(i) COL floor)',   target_mvm: 5.0,    distance_km: 7.5,  area_km2: 176.7 },
-          { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',             target_mvm: 2.0,    distance_km: 16.1, area_km2: 814.9 },
-          { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)', target_mvm: 0.5,    distance_km: 37.2, area_km2: 4352 },
-          { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',        target_mvm: 0.1,    distance_km: 72.8, area_km2: 16638 },
-          { id: 'BLANKET_1000MVM', label: '1000 mV/m (§73.24(g) blanket contour)',        target_mvm: 1000.0, distance_km: 0.29, area_km2: 0.26 }
+          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(i) COL floor)',   target_mvm: 5.0,    distance_km: 9.2,  area_km2: 265.9 },
+          { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',             target_mvm: 2.0,    distance_km: 19.8, area_km2: 1231.7 },
+          { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)', target_mvm: 0.5,    distance_km: 52.4, area_km2: 8633 },
+          { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',        target_mvm: 0.1,    distance_km: 94.6, area_km2: 28101 },
+          { id: 'BLANKET_1000MVM', label: '1000 mV/m (§73.24(g) blanket contour)',        target_mvm: 1000.0, distance_km: 0.26, area_km2: 0.21 }
         ],
-        skywave_25uvm_est_km: 156.7,
-        note: 'Groundwave contours use FCC gwave curves (§73.184) at this σ and TPO. Skywave 25 µV/m estimate uses OET-72 textbook approximation — actual NIF requires FCC skywave propagation software.'
+        skywave_25uvm_est_km: 120.2,
+        note: 'Groundwave contours use FCC gwave curves (§73.184) at σ=10 mS/m (EXCELLENT), 5 kW TPO (Class D ceiling per §73.21(e)). Skywave 25 µV/m estimate uses OET-72 textbook approximation — actual NIF requires FCC skywave propagation software.'
       }
     },
     {
