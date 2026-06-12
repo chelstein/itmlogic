@@ -9733,7 +9733,7 @@ async function scoreCandidate(pt, ctx, warnings){
         automation_cost_high:     automation_high,
         power_relay_cost_low:     relay_cost_low,
         power_relay_cost_high:    relay_cost_high,
-        reference: '47 CFR §73.99 (PSRA/PSSA); §73.187 (critical hours); §73.1680 (emergency antennas); §73.1201 (station identification); §73.1800 (station log); USNO solar tables (for LMS-compliant exact UTC)',
+        reference: '47 CFR §73.99 (PSRA/PSSA); §73.187 (critical hours); §73.1201 (station identification); §73.1800 (station log); USNO solar tables (for LMS-compliant exact UTC)',
         note: `${isClearCh ? 'Clear channel — Class D must go SILENT at sunset (§73.99).' : `Non-clear — night power ≈ ${night_power_kw} kW (${100 - power_reduction_pct}% of day TPO).`} Summer: ${summer.day_length_h}h day, sunset ${summer.sunset_utc}. Winter: ${winter.day_length_h}h day, sunset ${winter.sunset_utc}.`
       };
     })(),
@@ -23020,7 +23020,7 @@ async function scoreCandidate(pt, ctx, warnings){
         full_redundancy_cost: FULL_REDUNDANCY_COST,
         eas_participant_redundancy_note,
         relocation_note: 'New transmitter site requires reassessment of backup transmitter compatibility (antenna system, feedline, power supply). Generator sizing should match new transmitter power requirements.',
-        reference: '47 CFR §73.1615; §73.1635; §73.1680; §11.35 (EAS equipment); NFPA 110 (emergency power); NAB Engineering Handbook Chapter 7 (transmitter redundancy)',
+        reference: '47 CFR §73.1615 (emergency reduced-power operation); §73.1635 (STA); §73.1675 (AM auxiliary transmitters); §11.35 (EAS equipment); NFPA 110 (emergency power); NAB Engineering Handbook Chapter 7 (transmitter redundancy)',
         note: `Backup transmitter NOT required by FCC but strongly recommended. Emergency reduced-power operation allowed ≤10 days without notification (§73.1615). Full redundancy estimate: \$29k–\$114k.`
       };
     })(),
@@ -31256,21 +31256,16 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // AM transmitter sites — especially rural relocation candidates — must
       // have reliable utility power.  This guide estimates utility extension
-      // costs, standby generator requirements, and §73.1660 / §73.1680
+      // costs, standby generator requirements, and §11.35 / §73.1615
       // obligations for backup power and unattended operation.
       //
       // KEY RULES
       // ─────────
-      // 47 CFR §73.1680 — Emergency and standby power.
-      //   AM broadcast stations are strongly encouraged (not strictly required)
-      //   to maintain standby power sufficient to sustain authorized operation
-      //   for at least 60 hours.  EAS participation obligations (§11.35) make
-      //   standby power effectively mandatory for EAS compliance.
-      //
       // 47 CFR §11.35 — EAS equipment operational readiness.
       //   All EAS participants must ensure equipment is operational at all times.
-      //   A power outage that takes a station off-air during an EAS event is an
-      //   enforcement risk.  Standby generator or battery backup is the standard.
+      //   A power outage during an EAS event is an enforcement risk.  FCC/EAS
+      //   guidance (not a hard Part 73 rule) encourages ≥60-hour standby power;
+      //   standby generator or battery backup is the broadcast engineering standard.
       //
       // 47 CFR §73.1560 — Operating power.
       //   Station must be able to operate at authorized power on demand; a site
@@ -31349,7 +31344,7 @@ async function scoreCandidate(pt, ctx, warnings){
         : generator_size_kva < 250 ? 120000
         : 250000;
 
-      const EAS_FUEL_RESERVE_HOURS = 60;   // §73.1680 recommended
+      const EAS_FUEL_RESERVE_HOURS = 60;   // FCC/EAS guidance (§11.35); 60-hr industry standard
       // Diesel consumption ≈ 0.07 gal/kWh × total_load_kw
       const fuel_gph     = round2(total_load_kw * 0.07);
       const fuel_reserve_gal = round2(fuel_gph * EAS_FUEL_RESERVE_HOURS);
@@ -31375,7 +31370,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_power_low_usd:  total_power_low,
           total_power_high_usd: total_power_high,
         },
-        reference: '47 CFR §73.1560; §73.1680; §11.35',
+        reference: '47 CFR §73.1560; §73.1615 (emergency reduced-power operation); §11.35 (EAS equipment readiness)',
         note: `${tpo_kw_num} kW @ ${dist_km} km: utility ${utility_availability}. Gen size ≈ ${generator_size_kva} kVA. ${EAS_FUEL_RESERVE_HOURS}-hr fuel reserve ≈ ${fuel_reserve_gal} gal. Total power est. $${total_power_low.toLocaleString()}–$${total_power_high.toLocaleString()}.`
       };
     })(),
@@ -32365,19 +32360,24 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_auxiliary_transmitter_and_emergency_operations_guide: (() => {
-      // §73.1680: Auxiliary transmitters must be operable within 30 days of primary failure.
-      // §73.1250: EAS (Emergency Alert System) must remain operable during emergencies.
+      // §73.1675: Auxiliary transmitters for AM broadcast stations (not mandated by rule but
+      // strongly recommended — engineering practice is readiness within ~30 days of failure).
+      // §73.1680: Emergency antennas — temporary use after both main AND auxiliary antennas are
+      // damaged.  §73.1250: EAS must remain operable during emergencies.
       // On relocation, auxiliary equipment must be re-installed and tested at new site.
       const tpo        = tpo_kw ?? 1;
       const isDA       = /^DA/i.test(pattern_mode ?? '');
       const fcc_cl     = fcc_class ?? 'D';
       const dist_km    = pt.distance_from_current_km ?? 10;
 
-      // §73.1680(a): Auxiliary must produce ≥10% of licensed power
+      // §73.1615(a): Emergency reduced-power operation allowed without prior FCC approval
+      // (≤10 days without notification).  Engineering standard: auxiliary should produce
+      // ≥10% of licensed power to maintain meaningful coverage.
       const AUX_MIN_POWER_PCT = 10;
       const aux_min_power_kw  = round2(tpo * AUX_MIN_POWER_PCT / 100);
 
-      // §73.1680 also allows operation in non-directional mode during failure
+      // §73.1680(b)(1): AM emergency antenna substituting for directional array must operate
+      // at ≤25% of nominal licensed power (or less if needed to stay within authorized fields).
       const aux_nda_allowed = isDA;
 
       // Emergency operations checklist
@@ -32388,7 +32388,7 @@ async function scoreCandidate(pt, ctx, warnings){
         'Emergency generator fuel checked and load-tested',
         'Remote control / unattended operation verified per §73.1350',
       ];
-      if (isDA) emergency_checklist.push('Auxiliary NDA operation mode documented (§73.1680(a)(2))');
+      if (isDA) emergency_checklist.push('Emergency NDA operation parameters documented per §73.1680(b)(1) (≤25% licensed power)');
       if (land_use_class === 'RURAL' || land_use_class === 'REMOTE') emergency_checklist.push('New site road access and emergency response route documented');
 
       const n_checklist_items = emergency_checklist.length;
@@ -32419,8 +32419,8 @@ async function scoreCandidate(pt, ctx, warnings){
           total_low_usd,
           total_high_usd,
         },
-        reference: '47 CFR §73.1680; §73.1250; §73.1350',
-        note: `Auxiliary transmitter must produce ≥${AUX_MIN_POWER_PCT}% of licensed power (${aux_min_power_kw} kW min). Switchover within ${SWITCHOVER_MAX_DAYS} days of failure. ${n_checklist_items} checklist items.${aux_nda_allowed ? ' DA may operate NDA in emergency.' : ''} Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+        reference: '47 CFR §73.1675 (AM auxiliary transmitters); §73.1615 (emergency reduced-power operation); §73.1680 (emergency antennas); §73.1250; §73.1350',
+        note: `Auxiliary transmitter engineering standard: ≥${AUX_MIN_POWER_PCT}% of licensed power (${aux_min_power_kw} kW min). Target switchover within ${SWITCHOVER_MAX_DAYS} days of failure (engineering practice). ${n_checklist_items} checklist items.${aux_nda_allowed ? ' DA emergency NDA: ≤25% licensed power per §73.1680(b)(1).' : ''} Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 
