@@ -1052,9 +1052,9 @@ const DEMO_RESULT = {
       },
       ground_system_design_specification: {
         frequency_khz: 780, sigma_msm: 8, soil_resistivity_ohm_m: 125, quarter_wave_m: 96.15,
-        ideal_radial_length_m: 96.2, practical_radial_length_m: 96.2, min_radial_length_m: 48.1,
+        ideal_radial_length_m: 96.15, practical_radial_length_m: 96.15, min_radial_length_m: 48.08,
         standard_design: {
-          n_radials: 120, radial_length_m: 96.2, wire_gauge: '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)',
+          n_radials: 120, radial_length_m: 96.15, wire_gauge: '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)',
           burial_depth_mm: 150, R_g_estimated_ohm: 2.2, efficiency_pct: 94.3,
           efficiency_tier: 'EXCELLENT (≥90%)', area_required_ha: 29.1
         },
@@ -1064,7 +1064,7 @@ const DEMO_RESULT = {
           note: 'Extended design recommended for σ < 5 mS/m or when §73.190 efficiency certification targets >90%'
         },
         minimum_design: {
-          n_radials: 60, radial_length_m: 48.1,
+          n_radials: 60, radial_length_m: 48.08,
           note: 'Minimum emergency design — ~10% efficiency loss vs. standard. Acceptable for temporary operation only.'
         },
         recommended_design: 'standard', soil_quality_tier: 'GOOD',
@@ -1223,8 +1223,8 @@ const DEMO_RESULT = {
         items: [
           { id: 'ZONING_VERIFICATION', category: 'Zoning & Land Use', priority: 'CRITICAL', action: 'Verify county/municipal zoning classification permits telecommunications tower and broadcast facility', what_to_check: 'Contact Yavapai County planning; AM towers may require conditional use permit.', timeline_weeks: [2, 6], notes: 'AM tower at 96 m may exceed local height limits — confirm variance process.' },
           { id: 'TITLE_SEARCH', category: 'Title & Encumbrances', priority: 'CRITICAL', action: 'Commission title search and title insurance for parcel', what_to_check: 'Easements, deed restrictions, mineral rights. Buried utility easements in ground system area must be documented.', timeline_weeks: [2, 4], notes: null },
-          { id: 'PARCEL_SIZE_ADEQUACY', category: 'Physical Requirements', priority: 'CRITICAL', action: 'Verify parcel ≥ 3.52 ha for 96.2-m radial system (min ~106 m radius)', what_to_check: 'Map all fence lines and structures within 106 m of proposed tower base.', timeline_weeks: [1, 2], notes: null },
-          { id: 'ASR_COORD_AIRPORT', category: 'FAA & ASR', priority: 'CRITICAL', action: 'File FAA Form 7460-1 aeronautical study — λ/4 tower (96.2 m) exceeds §17.7 200-ft threshold', what_to_check: 'Identify airports within 20 km. Pre-screen at FAA OE/AAA online tool.', timeline_weeks: [6, 16], notes: 'FAA review can take 45–90 days.' },
+          { id: 'PARCEL_SIZE_ADEQUACY', category: 'Physical Requirements', priority: 'CRITICAL', action: 'Verify parcel ≥ 3.52 ha for 96.15-m radial system (min ~106 m radius)', what_to_check: 'Map all fence lines and structures within 106 m of proposed tower base.', timeline_weeks: [1, 2], notes: null },
+          { id: 'ASR_COORD_AIRPORT', category: 'FAA & ASR', priority: 'CRITICAL', action: 'File FAA Form 7460-1 aeronautical study — λ/4 tower (96.15 m) exceeds §17.7 200-ft threshold', what_to_check: 'Identify airports within 20 km. Pre-screen at FAA OE/AAA online tool.', timeline_weeks: [6, 16], notes: 'FAA review can take 45–90 days.' },
           { id: 'NEPA_DESKTOP_REVIEW', category: 'Environmental', priority: 'HIGH', action: 'Complete NEPA §1.1306 13-item environmental desktop checklist', what_to_check: 'Floodplain, wetlands, protected species, historic properties, wilderness.', timeline_weeks: [2, 6], notes: 'Yavapai County has high potential for archaeological sites — allow extra time for SHPO review.' },
           { id: 'NHPA_SECTION_106', category: 'Environmental', priority: 'HIGH', action: 'Initiate NHPA §106 historic properties review with Arizona SHPO', what_to_check: 'APE within 192 m of proposed tower. Run SHPO consultation if historic properties within APE.', timeline_weeks: [4, 16], notes: null },
           { id: 'UTILITY_ACCESS', category: 'Utilities & Infrastructure', priority: 'HIGH', action: 'Confirm electrical service availability (3-phase preferred)', what_to_check: 'Identify nearest transformer. Estimate service extension cost.', timeline_weeks: [2, 4], notes: null },
@@ -1316,7 +1316,7 @@ const DEMO_RESULT = {
         overall_feasibility: 'SIGNIFICANT_INVESTMENT',
         line_items: [
           { id: 'LAND_PURCHASE', label: 'Land acquisition', low_usd: 80000, high_usd: 250000, note: '3.52 ha min for 90-radial ground system (105 m radius)' },
-          { id: 'TOWER_CONSTRUCTION', label: 'Tower (guyed monopole)', low_usd: 80000, high_usd: 300000, note: '96.2 m guyed monopole exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.' },
+          { id: 'TOWER_CONSTRUCTION', label: 'Tower (guyed monopole)', low_usd: 80000, high_usd: 300000, note: '96.15 m guyed monopole exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.' },
           { id: 'GROUND_SYSTEM', label: 'Ground system (90 radials × 87 m)', low_usd: 35000, high_usd: 100000, note: '§73.190 buried copper radial system; includes trenching and conductivity survey' },
           { id: 'TRANSMITTER', label: 'Transmitter (5 kW)', low_usd: 25000, high_usd: 100000, note: 'Primary + backup transmitters; includes installation and initial alignment' },
           { id: 'TRANSMISSION_LINE', label: 'Transmission line + ATU', low_usd: 6000, high_usd: 25000, note: 'Heliax from transmitter building to tower base + antenna tuning unit' },
@@ -1337,7 +1337,7 @@ const DEMO_RESULT = {
         da_recommended: 'STRONGLY_RECOMMENDED',
         da_recommended_note: 'NDA field at COL (4.1 mV/m) is below the §73.24(i) 5 mV/m floor. A DA pattern toward 212° can add 3–5 dB gain and may achieve compliance without increasing TPO.',
         element_spacing_options: [
-          { spacing_label: 'λ/4', spacing_m: 96.2, spacing_deg: 90, pattern_type: 'CARDIOID', gain_over_nda_db: 3.0, note: 'Standard 2-element cardioid; deep null opposite COL; simplest to optimize' },
+          { spacing_label: 'λ/4', spacing_m: 96.15, spacing_deg: 90, pattern_type: 'CARDIOID', gain_over_nda_db: 3.0, note: 'Standard 2-element cardioid; deep null opposite COL; simplest to optimize' },
           { spacing_label: '3λ/8', spacing_m: 144.2, spacing_deg: 135, pattern_type: 'MODIFIED_CARDIOID', gain_over_nda_db: 3.5, note: 'Wider front lobe; reduced null depth; useful when suppression is partial' },
           { spacing_label: 'λ/2', spacing_m: 192.3, spacing_deg: 180, pattern_type: 'FIGURE_EIGHT', gain_over_nda_db: 4.8, note: 'Figure-8 pattern; two nulls; gain toward COL; high suppression at 90°/270°' }
         ],
@@ -1687,20 +1687,20 @@ const DEMO_RESULT = {
         scenarios: [
           { label: 'Standard (120 radials)', radial_count: 120, radial_length_m: 96.15, ground_loss_ohm: 1.53, antenna_efficiency_pct: 96.0, effective_tpo_kw: 4.8, suitable_for: 'Preferred for all AM stations. Required for §73.190 certification without soil survey waiver.' },
           { label: 'Reduced (60 radials)', radial_count: 60, radial_length_m: 96.15, ground_loss_ohm: 3.06, antenna_efficiency_pct: 92.3, effective_tpo_kw: 4.6, suitable_for: 'Acceptable for temporary operations or land-constrained sites. §73.190 soil survey waiver application may be required.' },
-          { label: 'Urban-constrained (30 radials)', radial_count: 30, radial_length_m: 48.1, ground_loss_ohm: 6.11, antenna_efficiency_pct: 85.7, effective_tpo_kw: 4.3, suitable_for: 'Absolute minimum for urban/rooftop sites. Significant efficiency reduction. §73.190 variance required.' }
+          { label: 'Urban-constrained (30 radials)', radial_count: 30, radial_length_m: 48.08, ground_loss_ohm: 6.11, antenna_efficiency_pct: 85.7, effective_tpo_kw: 4.3, suitable_for: 'Absolute minimum for urban/rooftop sites. Significant efficiency reduction. §73.190 variance required.' }
         ],
         staging_phase1: { radial_count: 60, description: 'Phase 1 (60 radials): minimum viable system for initial operation while Phase 2 radials are installed in stages.' },
         staging_phase2: { radial_count: 120, description: 'Phase 2 (120 radials): complete standard system for §73.190 certification.' },
         wenner_survey: {
           method: 'Wenner 4-electrode (equal-spacing) soil resistivity measurement',
-          electrode_spacing_m: 96.2,
-          measurement_locations: 'Minimum 4 traverses at 0°, 45°, 90°, 135° from tower base to 96.2 m radius.',
+          electrode_spacing_m: 96.15,
+          measurement_locations: 'Minimum 4 traverses at 0°, 45°, 90°, 135° from tower base to 96.15 m radius.',
           interpretation: 'Measured ρ (Ω·m) → σ (mS/m) = 1000/ρ. Compare to M3 zone value (9 mS/m). If measured σ differs > ±30%, update groundwave reach and coverage calculations.'
         },
         certification_requirements: [
           'Soil resistivity survey (Wenner 4-electrode method) at proposed radial layout locations',
-          'Minimum 120 copper radials at λ/4 (96.2 m) length, buried 5–10 cm',
-          'Ground ring: solid copper conductor connecting all radial tips at 96.2 m radius',
+          'Minimum 120 copper radials at λ/4 (96.15 m) length, buried 5–10 cm',
+          'Ground ring: solid copper conductor connecting all radial tips at 96.15 m radius',
           'All radials bonded to tower base connection point',
           'Conductor specification: #10 AWG copper-clad steel or solid copper',
           'Antenna base current measurement before and after radial installation',
