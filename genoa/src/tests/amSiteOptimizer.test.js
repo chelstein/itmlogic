@@ -6582,7 +6582,7 @@ test('community_of_license_change_guide has CRITICAL risk for principal communit
   assert.ok(Array.isArray(g.col_change_risks), 'col_change_risks must be array');
   const criticalRisk = g.col_change_risks.find(r => r.severity === 'CRITICAL');
   assert.ok(criticalRisk != null, 'must have at least one CRITICAL risk');
-  assert.ok(criticalRisk.cfr.includes('73.24') || criticalRisk.cfr.includes('73.3573'), 'CRITICAL risk must reference §73.24 or §73.3573');
+  assert.ok(criticalRisk.cfr.includes('73.24') || criticalRisk.cfr.includes('73.3571'), 'CRITICAL risk must reference §73.24 or §73.3571');
 });
 
 test('community_of_license_change_guide comparison table columns present', async () => {

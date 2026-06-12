@@ -1128,7 +1128,7 @@ const DEMO_RESULT = {
         fcc_class: 'D', channel_class: 'clear_channel', frequency_khz: 780, tpo_kw: 5,
         required_count: 9, conditional_count: 2, total_items: 11,
         items: [
-          { id: 'LMS_FORM_301', form: 'FCC Form 301-AM', exhibit: 'Section I — Basic Engineering', status: 'REQUIRED', rule: '47 CFR §73.3500 / §73.3525', responsible: 'Communications counsel + broadcast engineer', note: 'Primary change-of-site application. Include antenna system description, coordinates, ground system plan, and TPO.' },
+          { id: 'LMS_FORM_301', form: 'FCC Form 301-AM', exhibit: 'Section I — Basic Engineering', status: 'REQUIRED', rule: '47 CFR §73.3533', responsible: 'Communications counsel + broadcast engineer', note: 'Primary change-of-site application. Include antenna system description, coordinates, ground system plan, and TPO.' },
           { id: 'LMS_GROUNDWAVE_STUDY', form: 'Form 301-AM — Exhibit B', exhibit: 'Groundwave field-intensity study (§73.184)', status: 'REQUIRED', rule: '47 CFR §73.183 / §73.184', responsible: 'Licensed broadcast engineer', note: 'FCC M3-zone conductivity σ=8 mS/m used for screening. Exhibit B requires groundwave distance/field table at compass bearings per §73.184.' },
           { id: 'LMS_COL_EXHIBIT', form: 'Form 301-AM — Exhibit C', exhibit: 'Principal community (COL) 5 mV/m coverage certification', status: 'REQUIRED', rule: '47 CFR §73.24(i)', responsible: 'Licensed broadcast engineer', note: 'Demonstrate ≥80% of principal community (97% estimated at screening) is covered by the 5 mV/m daytime groundwave contour.' },
           { id: 'LMS_BLANKET_POP', form: 'Form 301-AM — Exhibit D', exhibit: 'Blanket interference (§73.24(g)) population study', status: 'REQUIRED', rule: '47 CFR §73.24(g)', responsible: 'Licensed broadcast engineer', note: '1000 mV/m contour population must be <1% of service-area population. Current screen: 0.4%.' },
@@ -1430,11 +1430,11 @@ const DEMO_RESULT = {
           { step: 1, action: 'Engineering study', detail: 'Full §73.37 spacing analysis at the TARGET class. Spacing failure ends the process.', estimated_days: 15 },
           { step: 2, action: 'NIF study', detail: '§73.182 skywave NIF at the new class protection level.', estimated_days: 30 },
           { step: 3, action: 'Form 301-AM preparation', detail: 'Major change application: Schedule A (legal), B (antenna), C (transmitter), D (coverage), E (environmental).', estimated_days: 20 },
-          { step: 4, action: 'FCC filing', detail: 'File via LMS. Pay filing fee (§73.3525). Assigned to Audio Division.', estimated_days: 1 },
+          { step: 4, action: 'FCC filing', detail: 'File via LMS. Pay required application fee (see FCC Schedule of Application Fees). Assigned to Audio Division.', estimated_days: 1 },
           { step: 5, action: 'FCC processing', detail: 'Typically 12–24 months. Staff may issue letter of inquiry.', estimated_days: 365 },
           { step: 6, action: 'Construction permit', detail: 'CP issued; 3-year build period. File Form 302-AM after proof of performance.', estimated_days: 90 }
         ],
-        reference: '47 CFR §73.21; §73.37; §73.25; §1.401; §73.3525',
+        reference: '47 CFR §73.21; §73.37; §73.25; §1.401; §73.3571',
         note: 'License class upgrade analysis is a regulatory screening guide. Consult an FCC communications attorney before initiating proceedings.'
       },
       spacing_rule_compliance_guide: {
@@ -2282,20 +2282,20 @@ const DEMO_RESULT = {
         col_contour_threshold_mv_m: 0.5,
         col_service_cfr: '§73.24(h)',
         col_change_risks: [
-          { risk: 'Principal community contour failure', cfr: '§73.24(h); §73.3573', description: '0.5 mV/m daytime contour must encompass COL city limits or community center', severity: 'CRITICAL' },
-          { risk: 'Unauthorized COL change', cfr: '§73.3573(f)', description: 'Relocating without maintaining COL service may constitute an unauthorized COL change', severity: 'HIGH' },
+          { risk: 'Principal community contour failure', cfr: '§73.24(h); §73.3571', description: '0.5 mV/m daytime contour must encompass COL city limits or community center', severity: 'CRITICAL' },
+          { risk: 'Unauthorized COL change', cfr: '§73.3571(b)', description: 'Relocating without maintaining COL service may constitute an unauthorized COL change', severity: 'HIGH' },
           { risk: 'Forfeiture exposure', cfr: '§503(b)', description: 'FCC NAL for unauthorized COL change; typically $4,000–$20,000 per §503(b) guidelines', severity: 'HIGH' },
-          { risk: 'Auction exposure', cfr: '§73.3573(g)', description: 'A major COL change that draws competing applications may trigger spectrum auction', severity: 'MEDIUM' }
+          { risk: 'Auction exposure', cfr: '§73.3571(b)', description: 'A major COL change that draws competing applications may trigger spectrum auction', severity: 'MEDIUM' }
         ],
         col_preservation_strategies: [
           { priority: 1, action: 'Verify 0.5 mV/m contour over COL at each candidate site', detail: 'Run FCC curves (§73.190) to confirm daytime 0.5 mV/m contour includes COL city limits or community center', cfr: '§73.24(h)' },
-          { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that COL is within 0.5 mV/m daytime contour', cfr: '§73.3533; §73.3573' },
+          { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that COL is within 0.5 mV/m daytime contour', cfr: '§73.3533; §73.3571' },
           { priority: 3, action: 'Consider directional antenna to maintain COL service', detail: 'If NDA relocation degrades COL service, a DA pattern with a stronger lobe toward COL may preserve service', cfr: '§73.316; §73.24(h)' },
-          { priority: 4, action: 'If COL change is unavoidable, file formal COL change request', detail: 'File a major change Form 301-AM with an explicit COL change request; coordinate with FCC communications counsel', cfr: '§73.3573(f)' }
+          { priority: 4, action: 'If COL change is unavoidable, file formal COL change request', detail: 'File a major change Form 301-AM with an explicit COL change request; coordinate with FCC communications counsel', cfr: '§73.3571(b)' }
         ],
         n_strategies: 4,
         relocation_note: 'Candidate is 12.4 km from COL centroid. COL change risk: LOW. COL coverage likely preserved — verify with FCC contour computation before filing.',
-        reference: '47 CFR §73.24(h); §73.3573; §73.3573(f)(3); §73.190; §503(b); FCC AM processing policies',
+        reference: '47 CFR §73.24(h); §73.3571; §73.3571(b); §73.190; §503(b); FCC AM processing policies',
         note: 'COL change: 12.4 km from COL, risk LOW. Must verify 0.5 mV/m daytime contour covers COL per §73.24(h). COL coverage expected — confirm with FCC curves.'
       },
       fcc_license_modification_guide: {
@@ -2458,7 +2458,7 @@ const DEMO_RESULT = {
         frequency_khz: 780, fcc_class: 'D',
         recommended_lease_term_years: 25,
         minimum_lease_term_years: 20,
-        lease_term: { recommended_years: 25, minimum_years: 20, renewal_options: 2, renewal_option_years: 10, total_max_years: 45, rationale: 'AM license term is 8 years (§73.3574). Lease should span at least 3 license terms to avoid mid-license lease expiration. Two 10-year renewal options provide flexibility.' },
+        lease_term: { recommended_years: 25, minimum_years: 20, renewal_options: 2, renewal_option_years: 10, total_max_years: 45, rationale: 'AM license term is 8 years (47 U.S.C. §307(c)(1)). Lease should span at least 3 license terms to avoid mid-license lease expiration. Two 10-year renewal options provide flexibility.' },
         tower_height_m: 144.23,
         guy_radius_m: 101,
         ground_radial_radius_m: 96,
@@ -2569,7 +2569,7 @@ const DEMO_RESULT = {
           forfeiture_risk_usd: { low: 8000, high: 25000 }
         },
         rebroadcast_rules: {
-          consent_required: true, cfr: '§73.1207', anti_simulcast_cfr: '§73.3556',
+          consent_required: true, cfr: '§73.1207', anti_simulcast_cfr: null,
           am_fm_simulcast_restriction: 'AM and commonly-owned FM may simulcast if FM is within AM service area, but must offer separate programming for some portion of broadcast day'
         },
         compliance_elements: [
@@ -2604,7 +2604,7 @@ const DEMO_RESULT = {
         relocation_impacts: [
           { id: 'DISTRICT_CHANGE',  impact: 'EVALUATE', detail: 'Relocation changes service area; identify new federal/state/local districts served', cfr: '§73.1940' },
           { id: 'OPIF_UPDATE',      impact: 'REQUIRED',  detail: 'Political file in OPIF must be updated when station moves', cfr: '§73.3526; §73.3527' },
-          { id: 'COL_CHANGE',       impact: 'EVALUATE', detail: 'If COL changes, political programming obligations may shift to new community', cfr: '§73.3533; §73.3562' },
+          { id: 'COL_CHANGE',       impact: 'EVALUATE', detail: 'If COL changes, political programming obligations may shift to new community', cfr: '§73.3533; §73.3571' },
           { id: 'MAIN_STUDIO_FILE', impact: 'REQUIRED',  detail: 'Political file address must be updated when studio moves', cfr: '§73.3526(b); §73.1943(f)' }
         ],
         n_required_impacts: 2,
@@ -3691,7 +3691,7 @@ const DEMO_RESULT = {
           { id: 'transmitter', category: 'Transmitter equipment',                 low: 20000,  high: 55000,  note: '5 kW NDA AM transmitter; new unit.' },
           { id: 'phasor_atu',  category: 'Antenna tuning unit (ATU)',             low: 5000,   high: 12000,  note: 'Non-directional ATU.' },
           { id: 'eas',         category: 'EAS encoder/decoder (IPAWS)',           low: 8000,   high: 8000,   note: 'IPAWS-compatible EAS unit per §11.35/§11.56.' },
-          { id: 'fcc_fees',    category: 'FCC filing fees',                       low: 6465,   high: 6465,   note: '§73.3525 major change CP application fee.' },
+          { id: 'fcc_fees',    category: 'FCC filing fees',                       low: 6465,   high: 6465,   note: 'FCC Schedule of Application Fees — major change CP application fee.' },
           { id: 'engineering', category: 'Engineering + proof-of-performance',    low: 25000,  high: 75000,  note: 'Spacing, NIF, §73.154 proof, FCC forms.' },
           { id: 'env_legal',   category: 'Environmental + legal + zoning',        low: 15000,  high: 60000,  note: 'NEPA §106, zoning CUP, FCC counsel.' },
           { id: 'contingency', category: 'Contingency (15–20%)',                  low: 71913,  high: 247234, note: 'Reserve for scope changes, cost escalation, permit delays.' }
@@ -3699,7 +3699,7 @@ const DEMO_RESULT = {
         n_line_items: 11,
         subtotal_low: 477304, subtotal_high: 1236222,
         total_low: 549217, total_high: 1483456, total_midpoint: 1016337,
-        reference: 'Budget model based on FCC filing fees (§73.3525), engineering industry cost data, and RSMeans construction cost indices (2024).',
+        reference: 'Budget model based on FCC Schedule of Application Fees, engineering industry cost data, and RSMeans construction cost indices (2024).',
         note: 'Total estimated relocation cost: $549,217 – $1,483,456 (midpoint ~$1,016,337). Estimates are screening-grade; actual costs vary significantly with site conditions.'
       },
       rf_exposure_mpe_analysis: {
@@ -3865,10 +3865,10 @@ const DEMO_RESULT = {
             { id: 'schedule_c',     task: 'Schedule C: Transmitter', days: 3, rule: '§73.3533' },
             { id: 'schedule_d',     task: 'Schedule D: Coverage map + §73.183 contour', days: 5, rule: '§73.183' },
             { id: 'schedule_e',     task: 'Schedule E: Environmental compliance', days: 5, rule: '§1.1301' },
-            { id: 'fcc_filing',     task: 'LMS filing + fee payment', days: 1, rule: '§73.3525' }
+            { id: 'fcc_filing',     task: 'LMS filing + fee payment', days: 1, rule: 'FCC Schedule of Application Fees' }
           ]},
           { id: 'fcc_processing',   label: 'FCC Processing (CP Issuance)',     weeks_optimistic: 52, weeks_conservative: 130, milestones: [
-            { id: 'fcc_review',     task: 'FCC staff review (Audio Division)', days: 180, rule: '§73.3561' },
+            { id: 'fcc_review',     task: 'FCC staff review (Audio Division)', days: 180, rule: '§73.3571' },
             { id: 'public_notice',  task: 'Public notice / petitions to deny period', days: 30, rule: '§73.3584' },
             { id: 'cp_grant',       task: 'CP grant', days: 30, rule: '§73.3598' }
           ]},
@@ -3885,7 +3885,7 @@ const DEMO_RESULT = {
             { id: 'fcc_license',    task: 'FCC license grant',                 days: 45, rule: '§73.3536' }
           ]}
         ],
-        reference: '47 CFR §73.3533; §73.3598; §73.3561; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
+        reference: '47 CFR §73.3533; §73.3598; §73.3571; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
         note: 'CP timeline for Class D non-directional AM relocation. Optimistic: 94 weeks (~21.71 months). Conservative: 228 weeks (~52.65 months).'
       },
       co_channel_interference_budget: {

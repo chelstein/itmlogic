@@ -9105,7 +9105,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //       Form 303-S (renewal of license, not applicable to relocation)
       //     Note: FCC fee schedule updates annually in October.
       //     Actual FY2024 fee: $1,015 per filing per FCC DA 23-864 (Sep 2023).
-      //   §73.3522: Non-substantial (minor) modification — faster processing
+      //   §73.3571(e): Non-substantial (minor) modification — faster processing
       //     (30–60 days) vs. major modification (6–18 months).
       //   §73.3580: Public notice requirement — 30-day petition window triggered
       //     on acceptance of a major modification application.
@@ -22797,7 +22797,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.3999: Indecency — FCC prohibits indecent content between 6 AM and 10 PM (safe harbor 10 PM–6 AM)
       // 18 U.S.C. §1464: Obscenity — prohibited at all times; no safe harbor for obscene content
       // §73.1206: Telephone conversation broadcasts — must get consent before recording/airing a call
-      // §73.1207: Rebroadcasting — must get consent of originating station; program duplication limit (§73.3556)
+      // §73.1207: Rebroadcasting — must get consent of originating station
       // §73.1211: Lotteries — lottery information may be broadcast only for authorized lotteries
       // §73.1217: Broadcast hoaxes — FCC may impose forfeitures for hoaxes that cause harm
       // §73.3555: Multiple ownership — includes attribution rules for JSA/LMA arrangements
@@ -30271,10 +30271,11 @@ async function scoreCandidate(pt, ctx, warnings){
       //   A JSA under which one station sells more than 15% of the weekly advertising
       //   time of another AM station in the same market is attributable.
       //
-      // Spectrum leasing (47 CFR §73.3597) — AM spectrum leasing is generally
-      //   not permitted in the same way as ancillary spectrum leasing for wireless.
-      //   AM licensees may enter into time brokerage (selling blocks of air time)
-      //   but the licensee retains full legal and programming responsibility.
+      // Spectrum leasing — AM broadcast spectrum leasing (per Part 1 §1.9001 et seq.)
+      //   is not available; the secondary-market leasing framework applies only to
+      //   wireless/Part-27 licensees.  AM licensees may enter into time brokerage
+      //   (selling blocks of air time) but the licensee retains full legal and
+      //   programming responsibility under §73.3555(b).
       //
       // Key compliance obligations for TBA/LMA:
       //   1. Licensee must retain control over programming for at least 15% of
@@ -30536,15 +30537,20 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Assignee must be legally, technically, and financially qualified.
       //   Application must be filed and granted before the transaction closes.
       //
-      // 47 CFR §73.3597 — Processing of assignment/transfer applications.
-      //   Routine applications are processed in ~60 days (Streamlined).
-      //   Complex/contested applications can take 6–18 months.
-      //   FCC will place application on public notice for 30-day petition period.
+      // 47 CFR §73.3580 — Public notice of filed applications.
+      //   FCC places the assignment application on public notice; 30-day
+      //   petition window opens from that date.
       //
-      // 47 CFR §73.3522 — Anti-trafficking rule (repealed 1981 for radio).
-      //   No current anti-trafficking holding period for AM stations.
-      //   However, stations still must have served the public interest during
-      //   the holding period under license renewal standards.
+      // 47 CFR §73.3584 — Petitions to deny.
+      //   Any party may file a petition to deny within the 30-day window.
+      //
+      // 47 CFR §73.3591 — Grants without hearing.
+      //   Routine (streamlined) applications granted ~60 days after public notice.
+      //   Complex/contested applications can take 6–18 months.
+      //
+      // Anti-trafficking — No current CFR holding period for AM stations.
+      //   The former anti-trafficking rule (old §73.111) was repealed in 1981.
+      //   Stations must still demonstrate public interest service at renewal.
       //
       // 47 CFR §73.3555 — Ownership limits (see guide #115).
       //   Buyer must certify compliance with local ownership caps.
@@ -30642,7 +30648,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_high_items,
         anti_trafficking_holding_period: 'None (repealed 1981 for radio)',
         streamlined_eligible: true,
-        reference: '47 CFR §73.3540; §73.3597; §310(d) Communications Act; FCC Form 314; FCC Form 315; FCC Form 316',
+        reference: '47 CFR §73.3540; §73.3580; §73.3584; §73.3591; §310(d) Communications Act; FCC Form 314; FCC Form 315; FCC Form 316',
         note: `${frequency_khz} kHz (${fcc_class}): Assignment cost range $${total_cost_low_usd.toLocaleString()}–$${total_cost_high_usd.toLocaleString()}. Streamlined timeline ~${TIMELINE_DAYS.streamlined} days. ${n_critical_items} critical due-diligence items. ${is_da ? 'DA station: pattern exhibits required.' : 'NDA: standard exhibits.'}`
       };
     })(),
