@@ -1786,7 +1786,7 @@ const DEMO_RESULT = {
           { id: 'F3', section: 'F', title: 'Filing fee payment', required: true, cfr: '§1.1102' }
         ],
         reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301 Instructions (2024); OET Bulletin 65',
-        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 315 ft). Filing fee: $6,465 (FCC Schedule of Application Fees, major change CP).'
+        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 315.5 ft / 96.15 m). Filing fee: $6,465 (FCC Schedule of Application Fees, major change CP).'
       },
       electrical_power_consumption_guide: {
         frequency_khz: 780, tpo_kw: 5, hours_per_year: 8760,
@@ -4174,7 +4174,7 @@ const DEMO_RESULT = {
           { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
         ],
         matching_network_complexity: 'LOW — λ/4 tower presents near-unity VSWR; σ=6 mS/m ground gives slightly better efficiency than rank 1.',
-        design_note: 'Standard 120-radial ground system at 96 m length achieves ~85% radiation efficiency at σ=6 mS/m.'
+        design_note: 'Standard 120-radial ground system at 96.15 m length achieves ~85% radiation efficiency at σ=6 mS/m.'
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
