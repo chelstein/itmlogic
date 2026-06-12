@@ -2026,7 +2026,7 @@ const DEMO_RESULT = {
       tower_construction_contract_guide: {
         frequency_khz: 780, fcc_class: 'D',
         pattern_mode: 'NDA', is_da: false, n_towers: 1,
-        tower_height_m: 96, tower_height_ft: 315, tpo_kw: 5,
+        tower_height_m: 96.15, tower_height_ft: 315.5, tpo_kw: 5,
         per_tower_erection_cost_usd: 7087,
         per_tower_foundation_cost_usd: 50000,
         per_tower_guying_cost_usd: 25000,
@@ -2079,7 +2079,7 @@ const DEMO_RESULT = {
         is_clear_channel: true,
         is_local_channel: false,
         is_secondary_on_clear: true,
-        skywave_protection_required: false,
+        skywave_protection_required: true,
         n_du_ratio_pairs: 4,
         du_protection_ratios: [
           { offset_khz: 0,  label: 'Co-channel',      du_ratio_db: 20, field_ratio: 10.0, cfr: '§73.182' },
@@ -2394,9 +2394,9 @@ const DEMO_RESULT = {
         ],
         estimated_building_cost_usd: { prefab_shell_usd: 20400, block_shell_usd: 36000, site_prep_usd: 8000, grounding_usd: 4000, typical: 32400, high: 58000 },
         atu_location_note: 'ATU should be at or very near tower base to minimize RF transmission line loss. Outdoor weatherproof ATU cabinet is an alternative to running coax to the transmitter building.',
-        relocation_note: '5 kW transmitter → 9 kW heat dissipation + solar gain → 2 tons HVAC. Recommended building: 240 sq ft (12×20 ft). Estimated cost: $32,400 (prefab) to $58,000 (block).',
+        relocation_note: '5 kW transmitter at 74% efficiency → 1.76 kW heat dissipation + solar gain → 0.86 tons HVAC. Recommended building: 240 sq ft (12×20 ft). Estimated cost: $32,400 (prefab) to $58,000 (block).',
         reference: '47 CFR §73.49; §73.182; §73.1215; NEC §250; IEEE Std 1100; IBC; NFPA 70/72; manufacturer specifications',
-        note: 'Transmitter building: 240 sq ft recommended. HVAC: 2 tons (9 kW transmitter heat + solar). Estimated build cost: $32,400 typical.'
+        note: 'Transmitter building: 240 sq ft recommended. HVAC: 0.86 tons (1.76 kW transmitter heat + solar gain; 74% efficiency spec). Estimated build cost: $32,400 typical.'
       },
       am_monitoring_point_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -2432,14 +2432,14 @@ const DEMO_RESULT = {
       utility_power_service_guide: {
         frequency_khz: 780, fcc_class: 'D',
         tpo_kw: 5,
-        transmitter_draw_kw: 14,
-        hvac_kw: 2,
-        ancillary_kw: 3,
-        total_site_load_kw: 19,
-        required_service_amps: 200,
-        required_utility_service_kw: 48,
+        transmitter_draw_kw: 6.76,
+        hvac_kw: 0.94,
+        ancillary_kw: 1.30,
+        total_site_load_kw: 9.0,
+        required_service_amps: 60,
+        required_utility_service_kw: 12,
         generator_recommended: true,
-        generator_kw_recommended: 25,
+        generator_kw_recommended: 12,
         utility_extension_costs: {
           overhead_line_per_mile_usd: { low: 5000, typical: 10000, high: 15000 },
           underground_per_mile_usd: { low: 30000, typical: 55000, high: 80000 },
@@ -2449,14 +2449,14 @@ const DEMO_RESULT = {
         },
         estimated_utility_extension_cost_usd: { low: 5000, typical: 19000, high: 93000 },
         generator_costs: {
-          generator_purchase_usd: { low: 8000, typical: 15000, high: 28000, note: '25 kW diesel generator' },
+          generator_purchase_usd: { low: 4500, typical: 8000, high: 15000, note: '12 kW diesel generator' },
           ats_installation_usd: { low: 2500, typical: 4000, high: 6000 },
           annual_fuel_maintenance_usd: { low: 800, typical: 1500, high: 3000 }
         },
         backup_power_cfr: '§11.35(a) (EAS); §73.1680 (backup transmitter); §73.1215 (monitoring)',
-        relocation_note: '5 kW TPO → 14 kW transmitter draw + 2 kW HVAC + 3 kW ancillary = 19 kW total. Requires 200A / 240V utility service (48 kW). Recommend 25 kW diesel generator with ATS for EAS continuity.',
+        relocation_note: '5 kW TPO at 74% efficiency (Nautel/GatesAir spec) → 6.76 kW transmitter draw + 0.94 kW HVAC + 1.30 kW ancillary = 9.0 kW total. Requires 60A / 240V utility service. Recommend 12 kW diesel generator with ATS for EAS continuity.',
         reference: '47 CFR §11.35(a); §73.1680; §73.1215; NFPA 110; NEC Article 700/702; utility service handbook',
-        note: 'Utility power: 19 kW total load → 200A / 48 kW service. Generator: 25 kW recommended. Estimated utility extension cost: $19,000 typical.'
+        note: 'Utility power: 9.0 kW total load → 60A / 240V service. Generator: 12 kW recommended. Estimated utility extension cost: $19,000 typical.'
       },
       antenna_deicing_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -2662,9 +2662,9 @@ const DEMO_RESULT = {
           { option: 'SOLID_STATE',  power_kw: 5,   cost_est_usd: { low: 20000, high: 80000 }, note: 'Solid-state backup; lower maintenance, higher upfront cost' }
         ],
         n_sizing_options: 3,
-        input_power_kva_estimate: 20,
+        input_power_kva_estimate: 10,
         generator_guidance: {
-          recommended_kva: 25, fuel_type: 'Diesel', run_time_hours_per_tank: 24,
+          recommended_kva: 15, fuel_type: 'Diesel', run_time_hours_per_tank: 24,
           automatic_transfer_switch: true, cfr_reference: '§73.1680; NFPA 110'
         },
         full_redundancy_cost: {
