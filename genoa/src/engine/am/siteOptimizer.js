@@ -22871,10 +22871,11 @@ async function scoreCandidate(pt, ctx, warnings){
     political_programming_compliance_guide: (() => {
       // §73.1940: Legally qualified candidates — reasonable access required for federal candidates
       // §73.1941: Equal opportunities — if one candidate gets time, opponents may demand equal time
-      // §73.1943: Lowest unit charge (LUC) — during 45/60 days before primary/general, must offer
-      //   candidates the same rates as the station's most favored commercial advertiser
+      // §73.1942: Candidate rates (lowest unit charge/LUC) — during 45/60 days before primary/general,
+      //   must offer candidates the same rates as the station's most favored commercial advertiser;
+      //   no discrimination based on viewpoint
+      // §73.1943: Political file — maintain records of airtime requests and advertising agreements
       // §73.1944: Reasonable access for federal candidates (§312(a)(7) Communications Act)
-      // §73.1942: Candidate rates — no discrimination based on viewpoint
       // §315 Communications Act: "equal time" doctrine
       //
       // Relocation relevance: when the AM station relocates, its community of license (COL) changes.
@@ -22897,7 +22898,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const POLITICAL_OBLIGATIONS = [
         { id: 'REASONABLE_ACCESS', label: 'Reasonable access to federal candidates (§312(a)(7))', cfr: '§73.1940; §73.1944', applies_to: 'Federal candidates only', trigger: 'Candidate request during campaign season' },
         { id: 'EQUAL_OPPORTUNITIES', label: 'Equal opportunities if any candidate receives air time (§315)', cfr: '§73.1941', applies_to: 'All legally qualified candidates for same office', trigger: 'Within 7 days of opponent use' },
-        { id: 'LOWEST_UNIT_CHARGE', label: 'Lowest unit charge during windows: 45 days pre-primary, 60 days pre-general', cfr: '§73.1942; §73.1943', applies_to: 'Legally qualified candidates', trigger: '45/60 day windows before elections' },
+        { id: 'LOWEST_UNIT_CHARGE', label: 'Lowest unit charge during windows: 45 days pre-primary, 60 days pre-general', cfr: '§73.1942', applies_to: 'Legally qualified candidates', trigger: '45/60 day windows before elections' },
         { id: 'POLITICAL_FILE',    label: 'Maintain political file in OPIF (online public inspection file)', cfr: '§73.1943(f); §73.3526(e)(6)', applies_to: 'All candidates requesting time', trigger: 'Continuous; requests must be logged within 24 hours' },
         { id: 'SPONSORSHIP_ID',   label: 'Sponsorship identification for political ads ("paid for by...")', cfr: '§73.1212', applies_to: 'All political advertising', trigger: 'Each political broadcast' }
       ];
