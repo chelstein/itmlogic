@@ -1123,7 +1123,7 @@ const DEMO_RESULT = {
         range_label: '$58,000 – $117,000',
         total_soft_cost_low_usd: 58000, total_soft_cost_high_usd: 117000,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 1380, cost_high_usd: 1380 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
           { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
@@ -1321,7 +1321,7 @@ const DEMO_RESULT = {
           { id: 'TRANSMITTER', label: 'Transmitter (5 kW)', low_usd: 25000, high_usd: 100000, note: 'Primary + backup transmitters; includes installation and initial alignment' },
           { id: 'TRANSMISSION_LINE', label: 'Transmission line + ATU', low_usd: 6000, high_usd: 25000, note: 'Heliax from transmitter building to tower base + antenna tuning unit' },
           { id: 'ENGINEERING', label: 'Broadcast + structural engineering', low_usd: 20000, high_usd: 70000, note: '§73.182 NIF study, §73.154 proof design, structural PE' },
-          { id: 'FCC_FILING', label: 'FCC Form 301-AM filing + fees', low_usd: 3000, high_usd: 12000, note: 'FCC application fees + FCC counsel / legal costs' },
+          { id: 'FCC_FILING', label: 'FCC Form 301-AM filing + fees', low_usd: 9000, high_usd: 22000, note: 'FCC application fee $6,465 (major change CP per §1.1102) + FCC counsel / legal costs ($2,500–$15,500)' },
           { id: 'ENVIRONMENTAL', label: 'NEPA/NHPA environmental', low_usd: 5000, high_usd: 30000, note: 'NEPA desktop, §106 SHPO consultation, EA if required' },
           { id: 'SITE_PREP', label: 'Site preparation', low_usd: 30000, high_usd: 120000, note: 'Grading, access road, fence, electrical service, transmitter building' },
           { id: 'CONTINGENCY', label: 'Contingency (15%)', low_usd: 26250, high_usd: 96750, note: 'Industry standard 15% contingency on hard construction costs' }
@@ -1786,7 +1786,7 @@ const DEMO_RESULT = {
           { id: 'F3', section: 'F', title: 'Filing fee payment', required: true, cfr: '§1.1102' }
         ],
         reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301 Instructions (2024); OET Bulletin 65',
-        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 315 ft). Filing fee: $4,200.'
+        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 315 ft). Filing fee: $6,465 (FCC Schedule of Application Fees, major change CP).'
       },
       electrical_power_consumption_guide: {
         frequency_khz: 780, tpo_kw: 5, hours_per_year: 8760,
@@ -1872,11 +1872,11 @@ const DEMO_RESULT = {
         upgrade_steps: [
           { step: 1, action: 'Interference analysis', form: null, cost_range_usd: '$4,000–$8,000', timeline: '2–4 weeks', notes: '§73.182 co-channel/adjacent-channel analysis; NDA — no pattern proof needed' },
           { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$4,200', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307)' },
-          { step: 3, action: 'FCC processing / CP grant', form: null, cost_range_usd: 'included', timeline: '6–18 months', notes: 'CP grants construction authority; build must commence within 3 years (§73.1620)' },
+          { step: 3, action: 'FCC processing / CP grant', form: null, cost_range_usd: 'included', timeline: '6–18 months', notes: 'CP grants construction authority; must be constructed within 3 years (§73.3598) — file Form 302-AM for license before CP lapses' },
           { step: 4, action: 'Procure and install transmitter', form: null, cost_range_usd: '$22,500–$52,500', timeline: '4–12 weeks', notes: '10 kW AM transmitter + electrical service upgrade + bonding + commissioning' },
           { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$435', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b))' }
         ],
-        reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.1620 (CP construction period); §1.1102 (filing fees); FCC Form 301; FCC Form 302-AM',
+        reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.3598 (CP construction period/lapse); §1.1102 (filing fees); FCC Form 301; FCC Form 302-AM',
         note: '780 kHz Class D (NDA) — current 5 kW TPO. Daytime upgrade to 10 kW available (§73.21 Class D ceiling) — groundwave coverage radius grows ~41% (√ERP scaling). Nighttime ceiling: 1 kW (Class D secondary; DA-N antenna + §73.182 skywave analysis required for night upgrade).'
       },
       am_coverage_optimization_by_tower_height_guide: {
@@ -4181,7 +4181,7 @@ const DEMO_RESULT = {
         range_label: '$58,000 – $117,000',
         total_soft_cost_low_usd: 58000, total_soft_cost_high_usd: 117000,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 1380, cost_high_usd: 1380 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
           { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
@@ -4375,7 +4375,7 @@ const DEMO_RESULT = {
         range_label: '$62,000 – $128,000',
         total_soft_cost_low_usd: 62000, total_soft_cost_high_usd: 128000,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 1380, cost_high_usd: 1380 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
           { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
@@ -4545,7 +4545,7 @@ const DEMO_RESULT = {
         range_label: '$95,000 – $195,000',
         total_soft_cost_low_usd: 95000, total_soft_cost_high_usd: 195000,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 1380, cost_high_usd: 1380 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
           { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
