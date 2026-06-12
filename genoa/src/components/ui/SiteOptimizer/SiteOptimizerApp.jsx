@@ -1750,9 +1750,9 @@ const DEMO_RESULT = {
       },
       fcc_form_301_exhibit_checklist_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
-        is_directional: false, is_clear_channel: true, tower_height_ft: 315, asr_required: true,
+        is_directional: false, is_clear_channel: true, tower_height_ft: 315.5, asr_required: true,
         n_exhibits_total: 24, n_exhibits_required: 22, n_exhibits_da_specific: 0,
-        filing_fee_usd: 4200, filing_system: 'FCC LMS (Licensing Management System)',
+        filing_fee_usd: 6465, filing_system: 'FCC LMS (Licensing Management System)',
         n_deficiency_risks: 5,
         deficiency_triggers: [
           { rank: 1, issue: 'Missing nighttime skywave analysis', cfr: '§73.182', how_to_avoid: 'Run §73.182 skywave NIF contour analysis before filing; include FCC SKYWAVE tool output as exhibit' },
@@ -1862,7 +1862,7 @@ const DEMO_RESULT = {
         day_headroom_kw: 5, can_upgrade_day_power: true, upgraded_tpo_kw: 10,
         coverage_radius_factor: 1.414, coverage_gain_pct: 41,
         is_directional: false, night_upgrade_requires_da_n: true,
-        form301_fee_usd: 4200, form302_fee_usd: 435,
+        form301_fee_usd: 6465, form302_fee_usd: 435,
         transmitter_cost_low_usd: 15000, transmitter_cost_high_usd: 45000,
         installation_cost_usd: 7500,
         engineering_cost_low_usd: 4000, engineering_cost_high_usd: 8000,
@@ -1871,7 +1871,7 @@ const DEMO_RESULT = {
         n_upgrade_steps: 5,
         upgrade_steps: [
           { step: 1, action: 'Interference analysis', form: null, cost_range_usd: '$4,000–$8,000', timeline: '2–4 weeks', notes: '§73.182 co-channel/adjacent-channel analysis; NDA — no pattern proof needed' },
-          { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$4,200', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307)' },
+          { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$6,465', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307)' },
           { step: 3, action: 'FCC processing / CP grant', form: null, cost_range_usd: 'included', timeline: '6–18 months', notes: 'CP grants construction authority; must be constructed within 3 years (§73.3598) — file Form 302-AM for license before CP lapses' },
           { step: 4, action: 'Procure and install transmitter', form: null, cost_range_usd: '$22,500–$52,500', timeline: '4–12 weeks', notes: '10 kW AM transmitter + electrical service upgrade + bonding + commissioning' },
           { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$435', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b))' }
