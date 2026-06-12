@@ -96,15 +96,15 @@
       }
     },
     {
-      "rule": "47 CFR §73.316",
-      "title": "FM Antenna Location and Directional Antenna Requirements",
+      "rule": "47 CFR §73.316 (FM antenna systems); FCC Form 301 technical data (coordinates)",
+      "title": "FM Antenna Systems and Transmitter Coordinate Data",
       "service": ["FM"],
       "inputs": [
         "station_inputs.lat",
         "station_inputs.lon",
         "station_inputs.pattern"
       ],
-      "calculation": "Validate transmitter coordinates are within US territory (NAD83). When station_inputs.pattern is present, classify antenna as DA (directional) vs ND (non-directional). DA pattern table must be provided for Form 301-FM Section III.",
+      "calculation": "Validate transmitter coordinates are within US territory (NAD83) — a Form 301 technical-data sanity check, not a §73.316 requirement. When station_inputs.pattern is present, classify antenna as DA (directional) vs ND (non-directional). DA pattern table must be provided per §73.316 for Form 301-FM Section III.",
       "pass_condition": "Coordinates within US service territory; DA pattern table present when station_inputs.pattern is non-empty",
       "fail_condition": "Coordinates outside US territory; or DA station missing pattern table",
       "evidence_source": "station_inputs.lat, station_inputs.lon, station_inputs.pattern",

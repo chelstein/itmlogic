@@ -3972,7 +3972,7 @@ test('directional_antenna_study_guide pattern_radials_required = 72 when recomme
     const g = c.directional_antenna_study_guide;
     if (g.recommended) {
       assert.equal(g.pattern_radials_required, 72,
-        `pattern_radials_required must be 72 (§73.316 5° increments) for rank ${c.rank}`);
+        `pattern_radials_required must be 72 (§73.150(a) 5° increments) for rank ${c.rank}`);
     }
   }
 });

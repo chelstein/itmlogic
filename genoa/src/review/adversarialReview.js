@@ -74,7 +74,7 @@ export function buildAdversarialReview(exhibit) {
   if (lat == null || lon == null || lat === '' || lon === '') {
     points.push(issue('coordinate_source', 'CRITICAL', {
       field: 'lat/lon',
-      rule:  '47 CFR §73.316(a)',
+      rule:  'FCC Form 301 technical data (NAD83 coordinates)',
       reviewer_question: 'What are the transmitter coordinates? Coordinates are absent from this exhibit.',
       why_it_matters:    'Every spacing, contour, and distance calculation depends on coordinates. Missing coordinates make the entire engineering exhibit unverifiable.',
       current_evidence:  null,
@@ -84,7 +84,7 @@ export function buildAdversarialReview(exhibit) {
   } else if (!lookupSource && !raw.lat && !raw.lon) {
     points.push(issue('coordinate_source', 'MEDIUM', {
       field: 'lat/lon',
-      rule:  '47 CFR §73.316(a)',
+      rule:  'FCC Form 301 technical data (NAD83 coordinates)',
       reviewer_question: `Where did these coordinates (${lat}, ${lon}) originate? LMS, FMQ, ASR, or operator input?`,
       why_it_matters:    'Coordinates without a verified external source are operator assertions only. If wrong, every downstream calculation is invalid.',
       current_evidence:  `lat=${lat}, lon=${lon} (no external source recorded)`,
@@ -227,7 +227,7 @@ export function buildAdversarialReview(exhibit) {
   if (!commFromInputs && !commFromRaw) {
     points.push(issue('community_coverage', 'CRITICAL', {
       field: 'community-of-license',
-      rule:  '47 CFR §73.316',
+      rule:  'FCC Form 301 Section I (community of license)',
       reviewer_question: 'What is the community of license? It is absent from this exhibit.',
       why_it_matters:    'FCC Form 301 Section I requires the community of license. Missing community makes the filing incomplete on its face and causes LMS rejection.',
       current_evidence:  null,
@@ -302,8 +302,8 @@ export function buildAdversarialReview(exhibit) {
   if ((patternMode === 'DA' || patternMode === 'D') && !ev.pattern_data && !ev.da_pattern) {
     points.push(issue('directional_status', 'HIGH', {
       field: 'antenna-pattern',
-      rule:  '47 CFR §73.316',
-      reviewer_question: 'This station uses a directional antenna. Where is the horizontal radiation pattern table required by §73.316?',
+      rule:  '47 CFR §73.316 (FM) / §73.150 (AM)',
+      reviewer_question: 'This station uses a directional antenna. Where is the horizontal radiation pattern table required by §73.316 (FM) / §73.150 (AM)?',
       why_it_matters:    'DA stations must file a pattern table with Form 301. Without it, contour calculations for any azimuth are unverifiable and LMS will reject the filing.',
       current_evidence:  `pattern_mode = ${patternMode} — no pattern table in evidence`,
       gap:               'No DA pattern table found in evidence.pattern_data',
