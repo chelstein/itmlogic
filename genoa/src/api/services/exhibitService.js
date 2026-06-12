@@ -3048,7 +3048,7 @@ export async function computeExhibit(req){
       ]);
       exhibit.evidence.site_survey_8km = {
         radius_km:  SURVEY_RADIUS_KM,
-        regulation: '47 CFR §73.30, §73.150, §73.155 — site-survey context; not a per-rule check.  Tower / airport entries surface for the engineer to evaluate co-location, blanket interference, and Part 17 lighting/painting interactions.',
+        regulation: '47 CFR §73.30, §73.150; §17.7 (ASR) — site-survey context; not a per-rule check.  Tower / airport entries surface for the engineer to evaluate co-location, blanket interference, and Part 17 lighting/painting interactions.',
         towers: {
           available:  towerResp?.available === true || Array.isArray(towerResp?.records),
           source:     towerResp?.source || 'asr-sidecar',
