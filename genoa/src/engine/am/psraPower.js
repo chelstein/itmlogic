@@ -21,9 +21,10 @@
 //     E_max_allowed_at_N = the §73.182 RSS-equivalent field that the
 //                          proposed station is allowed to contribute
 //                          to N's nighttime protected contour
-//                          (typically the §73.187 SS-1 / SS-2 limit
-//                          divided down so the proposed station's
-//                          share doesn't exceed the RSS budget)
+//                          (the §73.182(k) RSS-budget share; SS-1/SS-2
+//                          fields from §73.190(c) skywave computation;
+//                          share scaled so each co-channel pair's
+//                          contribution stays within the RSS budget)
 //     P_daytime          = the proposed station's filed daytime ERP
 //
 //   The actual reduced power is:
