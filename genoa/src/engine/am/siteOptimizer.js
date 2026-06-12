@@ -16239,7 +16239,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_annual_compliance_high_usd,
         pv_10yr_low_usd,
         pv_10yr_high_usd,
-        reference: '47 CFR §1.1152 (annual regulatory fees); §73.1020 (license term — 8 years); §73.3570 (Form 303-S renewal); §11.61 (EAS testing); §73.3526 (public file); FCC Schedule of Fees FY 2024 (AM Class D: $585; Class A: $5,400)',
+        reference: '47 CFR §1.1152 (annual regulatory fees); §73.1020 (license term — 8 years); §73.3539 (Form 303-S renewal application); §11.61 (EAS testing); §73.3526 (public file); FCC Schedule of Fees FY 2024 (AM Class D: $585; Class A: $5,400)',
         note: `Annual regulatory burden for Class ${fcc_class} AM station at ${frequency_khz} kHz: FCC fee $${annual_fcc_fee_usd}/yr; renewal amortized $${renewal_amortized_annual_usd}/yr (8-yr cycle, $${renewal_fee_usd} fee); EAS testing $${eas_testing_annual_low_usd}–$${eas_testing_annual_high_usd}/yr; compliance counsel $${compliance_consultant_annual_low_usd}–$${compliance_consultant_annual_high_usd}/yr. Total: $${total_annual_compliance_low_usd.toLocaleString()}–$${total_annual_compliance_high_usd.toLocaleString()}/yr. 10-yr PV: $${pv_10yr_low_usd.toLocaleString()}–$${pv_10yr_high_usd.toLocaleString()}.`
       };
     })(),
