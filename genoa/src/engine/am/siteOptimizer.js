@@ -1847,7 +1847,7 @@ export async function runSiteOptimizer(body = {}){
 
     // Does this frequency have an FCC-designated dominant (Class A) station?
     // We approximate: clear-channel freqs in the 640-1210 kHz set are all
-    // designated clear channels per §73.25/§73.26.  The station itself may
+    // designated clear channels per §73.25.  The station itself may
     // or may not be the dominant.
     const dominant_station_note = isClear
       ? `${frequency_khz} kHz is a clear channel with a designated Class A dominant station. All other stations (Class B/D) must protect the dominant's primary service area at night.`
@@ -5664,7 +5664,7 @@ async function scoreCandidate(pt, ctx, warnings){
         measurements: proofMeasurements,
         nda_radial_plan: isDA_pg ? null : ndaRadials,
         filing_trigger: 'FCC Form 302-AM (license to cover, §73.3536) must be filed before CP expiration (3-year term per §73.3598(a)). Proof measurements must be complete before 302-AM is submitted.',
-        reference: '47 CFR §73.151 (DA proof of performance); §73.154 (DA partial proof); §73.186 (NDA field measurements); §73.190 (antenna efficiency); §73.150 (DA pattern, 5° increments); FCC Form 302-AM (license to cover); OET Bulletin 65 (RF exposure).',
+        reference: '47 CFR §73.151 (DA proof of performance); §73.154 (DA partial proof); §73.186 (NDA field measurements); §73.45 (antenna efficiency); §73.150 (DA pattern, 5° increments); FCC Form 302-AM (license to cover); OET Bulletin 65 (RF exposure).',
         note: 'This is a screening-grade proof guide. Actual proof methodology must be coordinated with the licensed broadcast engineer of record and FCC counsel before construction.'
       };
     })(),
@@ -8239,13 +8239,13 @@ async function scoreCandidate(pt, ctx, warnings){
       const design_items = [
         { item: '120 buried radials per tower, uniform 3° spacing', ref: '§73.189(b)(4)', required: true },
         { item: `Radial length 0.35λ (${Math.round(radial_len_m * 3.28084)} ft at ${frequency_khz} kHz) per §73.189(b)(4) / NBS TN-24`, ref: '§73.189(b)(4)', required: true },
-        { item: '#10 AWG bare copper wire, buried 6–12 inches minimum', ref: '§73.186', required: true },
+        { item: '#10 AWG bare copper wire, buried 6–12 inches minimum', ref: 'NBS Technical Note 24 (engineering practice)', required: true },
         { item: 'All radials bonded at tower base with low-resistance clamp', ref: '§73.189(b)(4)', required: true },
-        { item: 'Ground conductivity (M3 zone) verified per §73.184', ref: '§73.184; §73.186', required: true },
+        { item: 'Ground conductivity (M3 zone) verified per §73.184', ref: '§73.184; §73.190', required: true },
         { item: isDA_gs ? 'Separate full ground system per tower in DA array' : null, ref: '§73.189(b)(4)', required: true },
-        { item: 'Base insulator clearance ≥ 3 ft from any buried conductor', ref: '§73.186 (engineering practice)', required: true },
+        { item: 'Base insulator clearance ≥ 3 ft from any buried conductor', ref: 'Engineering practice', required: true },
         { item: 'Optional: augmented radial count (>120) for low-conductivity sites', ref: '§73.189(b)(4)', required: false },
-        { item: 'RF bonding of guy anchors and buried metalwork per §73.190(c)', ref: '§73.190(c)', required: true }
+        { item: 'RF bonding of guy anchors and buried metalwork (NEC Article 810; engineering practice)', ref: 'Engineering practice (NEC Article 810)', required: true }
       ].filter(d => d.item !== null);
 
       return {
@@ -8267,7 +8267,7 @@ async function scoreCandidate(pt, ctx, warnings){
         install_weeks_high,
         ground_efficiency_note,
         design_items,
-        reference: '47 CFR §73.189(b)(4) (AM ground system standard — 120 × 0.35λ); §73.184 (groundwave conductivity map); §73.51 (direct method power); §73.190(c) (bonding); NBS Technical Note 24',
+        reference: '47 CFR §73.189(b)(4) (AM ground system standard — 120 × 0.35λ); §73.184 (groundwave conductivity map); §73.51 (direct method power); NBS Technical Note 24',
         note: `Standard AM ground system: ${radials_standard} radials × ${Math.round(radial_len_m * 3.28084)} ft (0.35λ) = ${wire_length_per_tower_ft.toLocaleString()} LF per tower. DA: ${da_tower_est_gs} tower estimate × = ${Math.round(total_wire_ft).toLocaleString()} LF total. Installed cost: $${ground_cost_low_usd.toLocaleString()}–$${ground_cost_high_usd.toLocaleString()}.`
       };
     })(),
@@ -12925,7 +12925,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Daytime: groundwave propagation, limited by conductivity and TPO.
       // Nighttime: skywave from ionospheric D-layer reflection; clear-channel stations can reach 1000+ km.
       // Class D secondary stations: nighttime operation restricted by dominant station protection.
-      // 47 CFR §73.182: AM protection ratios for skywave; §73.185: nighttime protection.
+      // 47 CFR §73.182: AM protection ratios for skywave; §73.185: interfering signal computation (daytime/groundwave).
       // FCC field strength thresholds: 0.5 mV/m daytime (principal city coverage),
       //   0.1 mV/m for rural/fringe areas; 0.025 mV/m (25 µV/m) nighttime skywave protected.
       const erp_kw_cov = round2(tpo_kw * 0.85);
@@ -12955,7 +12955,7 @@ async function scoreCandidate(pt, ctx, warnings){
         is_directional: isDA_cov,
         nighttime_restriction,
         fcc_class_used: fcc_class,
-        reference: '47 CFR §73.182 (AM service protection ratios — skywave); 47 CFR §73.185 (nighttime operation of Class D stations); 47 CFR §73.14 (definitions: dominant/secondary); FCC AM groundwave/skywave coverage tables (§73.190); ITU-R P.1147 (AM groundwave propagation)',
+        reference: '47 CFR §73.182 (AM service protection ratios — skywave); 47 CFR §73.185 (computation of interfering signal); 47 CFR §73.14 (definitions: dominant/secondary); FCC AM groundwave/skywave coverage tables (§73.190); ITU-R P.1147 (AM groundwave propagation)',
         note: `${frequency_khz} kHz Class ${fcc_class} ${isDA_cov ? 'DA' : 'NDA'}: daytime 0.5 mV/m radius ~${daytime_05mvpm_radius_km} km (~${daytime_coverage_area_km2.toLocaleString()} km²). Nighttime skywave reach ~${nighttime_skywave_radius_km} km${is_clear_channel_cov ? ' (clear channel dominant)' : ''}. Class D: ${nighttime_restriction}.`
       };
     })(),
@@ -14265,7 +14265,7 @@ async function scoreCandidate(pt, ctx, warnings){
         skywave_study_low_usd, skywave_study_high_usd,
         da_night_system_low_usd, da_night_system_high_usd,
         total_study_low_usd, total_study_high_usd,
-        reference: '47 CFR §73.25 (clear channel nighttime); §73.182(k) (nighttime interference); §73.26 (dominant station protection); FCC Skywave Interference Calculator; NRSC AM Improvement Program guidelines',
+        reference: '47 CFR §73.25 (clear channel designation); §73.182(k) (nighttime interference); §73.26 (regional channel designations); FCC Skywave Interference Calculator; NRSC AM Improvement Program guidelines',
         note: `${frequency_khz} kHz ${is_clear ? 'clear channel' : is_local ? 'local channel' : 'regional channel'} — ${nighttime_power_note}. Skywave reach: ${skywave_reach_km_low}–${skywave_reach_km_high} km. Study cost: $${total_study_low_usd.toLocaleString()}–$${total_study_high_usd.toLocaleString()}`
       };
     })(),
@@ -16005,7 +16005,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_ground_system_resistance_and_maintenance_guide: (() => {
-      // Ongoing ground system maintenance and resistance monitoring per §73.190(c).
+      // Ongoing ground system maintenance and resistance monitoring per §73.189(b)(4) / NAB Engineering Handbook.
       // Annual resistance measurements track changes in the buried radial system
       // due to corrosion, soil disturbance, or seasonal moisture variation.
 
@@ -16060,7 +16060,7 @@ async function scoreCandidate(pt, ctx, warnings){
         comprehensive_amortized_annual_usd,
         total_annual_ground_maint_low_usd,
         total_annual_ground_maint_high_usd,
-        reference: '47 CFR §73.189(b)(4) (AM ground system standard — 120 × 0.35λ radials); §73.190(c) (ground resistance monitoring); §73.61 (base current log); NAB Engineering Handbook 11th Ed. Ch. 6 (AM ground system maintenance); TIA-222-H (antenna structure standards)',
+        reference: '47 CFR §73.189(b)(4) (AM ground system standard — 120 × 0.35λ radials); §73.61 (base current log); NAB Engineering Handbook 11th Ed. Ch. 6 (AM ground system maintenance); TIA-222-H (antenna structure standards)',
         note: `Ground system maintenance: σ=${sigma_msm} mS/m → Rg≈${rg_est_ohm} Ω (${rg_acceptable ? 'meets' : 'EXCEEDS'} ${rg_target_ohm} Ω target for Class ${fcc_class}). Annual resistance check: $${annual_resistance_check_low_usd.toLocaleString()}–$${annual_resistance_check_high_usd.toLocaleString()}. Radial replacement: ${n_radials_annual_replace_low}–${n_radials_annual_replace_high}/yr × $${radial_repair_cost_per_radial_usd}. Total annual reserve: $${total_annual_ground_maint_low_usd.toLocaleString()}–$${total_annual_ground_maint_high_usd.toLocaleString()}.`
       };
     })(),
@@ -28054,7 +28054,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // the single largest capital cost item for most AM relocations outside of
       // the tower itself.
       //
-      // FCC/industry standards (§73.186; NBS TN-24; FCC AM engineering guidance):
+      // FCC/industry standards (§73.189(b)(4); NBS TN-24; FCC AM engineering guidance):
       //   - Optimum (minimum-loss) system: 120 radials, each 0.35λ in length per §73.189(b)(4) / NBS TN-24
       //   - Practical minimum for licensed operation: 30–60 radials
       //   - Systems with <30 radials show significant efficiency degradation
@@ -31047,15 +31047,16 @@ async function scoreCandidate(pt, ctx, warnings){
       //   must maintain from Class A dominants to avoid prohibited skywave
       //   interference at night.
       //
-      // 47 CFR §73.26 — Clear channels.
+      // 47 CFR §73.25 — Clear channels.
       //   Class A stations (dominant) receive exclusive nighttime skywave
       //   protection on their channels.  A secondary (Class D) station on
       //   the same channel may not increase its nighttime interference to
       //   the dominant below 0.5 mV/m at night.
       //
-      // 47 CFR §73.29 — Dominant stations; exclusion zones.
-      //   Class D stations in the same channel as a Class A dominant must
-      //   operate daytime-only or comply with §73.182 nighttime protection.
+      // 47 CFR §73.182 — Engineering standards of allocation.
+      //   Sets the nighttime interference protection ratios (D/U, RSS limits)
+      //   that Class D stations on clear channels must satisfy, or else
+      //   operate daytime-only.
       //
       // EXCLUSION ZONE LOGIC
       // ────────────────────
@@ -31130,7 +31131,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_nighttime_options: NIGHTTIME_OPTIONS.length,
         dominant_protection_standard: '0.5 mV/m skywave contour must not be exceeded at night',
         daytime_only_required: exclusion_zone_applies,
-        reference: '47 CFR §73.26; §73.29; §73.182; §73.186',
+        reference: '47 CFR §73.25 (clear channel designation); §73.182 (nighttime interference protection standards)',
         note: `${frequency_khz} kHz (${fcc_class}): ${is_clear_channel_freq ? 'CLEAR CHANNEL frequency' : 'Not a clear channel'}. ${exclusion_zone_applies ? `Class D on clear channel — nighttime exclusion zone ≈ ${nighttime_exclusion_km} km. Daytime-only or §73.182 DA pattern required.` : is_class_a ? 'Class A dominant — receives nighttime skywave protection.' : 'No clear-channel exclusion zone applies.'}`
       };
     })(),
@@ -32612,7 +32613,7 @@ async function scoreCandidate(pt, ctx, warnings){
         sigma_val < 2  ? 120 :   // POOR — full 120 radials recommended
         sigma_val < 5  ? 90  :   // FAIR
         sigma_val < 15 ? 60  :   // GOOD
-                         60;     // EXCELLENT — still 60 minimum per §73.186 note
+                         60;     // EXCELLENT — 60-radial practical minimum (engineering practice)
 
       // Total copper required (AWG 10 copper: ~0.0038 kg/m)
       const copper_kg_per_m = 0.0038;
@@ -32924,13 +32925,13 @@ function frequencyChannelClass(frequency_khz){
 }
 
 // Ground radial system sizing — §73.189(b)(4) FCC ground system design standard (120 × 0.35λ per NBS TN-24).
-// §73.190 governs conductivity measurement and certification; §73.186 governs the system design.
+// §73.190 Figure M3 provides the ground conductivity zone maps; §73.189(b)(4) governs the system design.
 // Returns a structured object with recommended radial count, length, copper estimate,
 // and certification method.  Based on the FCC AM Antenna Systems engineering guide and
 // standard 120-radial buried-copper system practice.
 //
 // Key references:
-//   - 47 CFR §73.190: Ground conductivity measurement method
+//   - 47 CFR §73.190 Figure M3: Ground conductivity zone maps
 //   - FCC Form 302-AM: Ground system certification
 //   - Terman (1943) / Belrose (1975) radial length / count tradeoff empirical data
 //   - NBS Tech. Note 300 (Wait & Spies, 1969): effect of radial count on ERP
@@ -32956,7 +32957,7 @@ function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
   const stdCopperKg = stdLen ? copperKg(stdCount, stdLen) : null;
   const extCopperKg = extLen ? copperKg(extCount, extLen) : null;
 
-  const certMethod = '§73.190(c) Appendix A conductivity measurement (4-electrode Wenner array) — results must be filed on FCC Form 302-AM exhibit';
+  const certMethod = '§73.189(b)(4) ground system certification; §73.190 Figure M3 (conductivity zones); ground resistivity per IEEE Std 81 (4-electrode Wenner method) — results filed on FCC Form 302-AM exhibit';
 
   if (sigma_msm >= 4){
     return {
@@ -32969,7 +32970,7 @@ function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
       deep_driven_rods_required: false,
       estimated_copper_kg: stdCopperKg,
       certification_method: certMethod,
-      note: `Standard 120-radial system at 0.35λ (${stdLen ?? '?'} m per §73.189(b)(4)) adequate for σ=${sigma_msm} mS/m. §73.190(c) conductivity survey still required for Form 302-AM certification.`
+      note: `Standard 120-radial system at 0.35λ (${stdLen ?? '?'} m per §73.189(b)(4)) adequate for σ=${sigma_msm} mS/m. §73.189(b)(4) conductivity verification still required for Form 302-AM certification.`
     };
   }
   if (sigma_msm >= 2){
@@ -32997,7 +32998,7 @@ function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
     estimated_copper_kg: extCopperKg,
     estimated_standard_copper_kg: stdCopperKg,
     certification_method: certMethod,
-    note: `POOR conductivity (σ=${sigma_msm} mS/m): §73.186 extended ground system required. Recommend ${extCount} radials at ~0.5λ (${extLen ?? '?'} m per NBS TN-24 extended) + deep-driven copper rods (≥3 m at 3 m centers). Estimated copper: ${extCopperKg ?? '?'} kg. Soil survey urgently needed before site commitment.`
+    note: `POOR conductivity (σ=${sigma_msm} mS/m): §73.189(b)(4) extended ground system required. Recommend ${extCount} radials at ~0.5λ (${extLen ?? '?'} m per NBS TN-24 extended) + deep-driven copper rods (≥3 m at 3 m centers). Estimated copper: ${extCopperKg ?? '?'} kg. Soil survey urgently needed before site commitment.`
   };
 }
 
@@ -33447,7 +33448,7 @@ function buildRecommendedActions({
     actions.push({
       priority: 'INFORMATIONAL',
       action: 'Commission soil resistivity survey at POOR/FAIR conductivity candidate sites.',
-      rationale: `One or more top candidates have FAIR or POOR ground conductivity (σ < 4 mS/m). The §73.186 ground radial system design requirements and achievable antenna efficiency are highly sensitive to soil resistivity at these levels. A resistivity survey before site commitment can avoid costly ground system overruns.`
+      rationale: `One or more top candidates have FAIR or POOR ground conductivity (σ < 4 mS/m). The §73.189(b)(4) ground radial system design requirements and achievable antenna efficiency (§73.190) are highly sensitive to soil resistivity at these levels. A resistivity survey before site commitment can avoid costly ground system overruns.`
     });
   }
 
