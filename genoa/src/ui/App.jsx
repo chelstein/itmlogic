@@ -832,65 +832,34 @@ function MainApp({ onLogout, onOpenOptimizer }) {
   }
 
   async function statelessEngineeringReportDownload(ex, ext){
-    const kind = ext === 'pdf' ? 'engineering_report_pdf' : 'engineering_report_txt';
-    setStatusMsg(`Submitting Engineering Statement ${ext.toUpperCase()} job…`);
+    const endpoint = ext === 'pdf'
+      ? '/api/exhibits/export/engineering-report.pdf'
+      : '/api/exhibits/export/engineering-report.txt';
+    setStatusMsg(`Rendering Engineering Statement ${ext.toUpperCase()}…`);
     setRenderingPdf(true);
     const cleaned = stripDomAndReact(ex);
     try {
-      const view = await runJobAndWait(
-        kind,
-        { input: { exhibit: cleaned } },
-        (msg) => setStatusMsg(msg)
-      );
-    if (!view.artifact_url) throw new Error('Job completed without artifact');
-    setStatusMsg(`Downloading ${ext.toUpperCase()} artifact…`);
-    // Per the operator's standing rule: each downstream step's clock
-    // starts only after upstream actually finishes; correctness over
-    // latency.  The artifact-retry clock starts AFTER the job poll
-    // saw status='complete'.  We retry on 409 / 404 with backoff up to
-    // ~7 minutes total — the artifact upload can sit behind a slow
-    // disk write on a cold container, behind a finalising Chromium
-    // render in the map sidecar, etc.  Showing per-attempt elapsed
-    // time keeps the operator oriented while they wait.
-    const ARTIFACT_RETRY_BACKOFF_MS = [
-      1000, 2000, 3000, 5000, 7000, 10000, 15000, 20000,
-      30000, 30000, 30000, 30000, 60000, 60000, 60000, 60000
-    ];
-    const retryStartedAt = Date.now();
-    let ar = null;
-    for (let attempt = 0; attempt <= ARTIFACT_RETRY_BACKOFF_MS.length; attempt++){
-      ar = await fetch(view.artifact_url);
-      if (ar.ok) break;
-      if (ar.status !== 409 && ar.status !== 404){
-        const txt = await ar.text().catch(() => '');
-        throw new Error(`Artifact fetch failed: HTTP ${ar.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+      const r = await fetch(endpoint, {
+        method:  'POST',
+        headers: { 'content-type': 'application/json' },
+        body:    JSON.stringify({ exhibit: cleaned })
+      });
+      if (!r.ok){
+        const txt = await r.text().catch(() => '');
+        throw new Error(`HTTP ${r.status}${txt ? ' — ' + txt.slice(0, 200) : ''}`);
       }
-      if (attempt === ARTIFACT_RETRY_BACKOFF_MS.length){
-        // Out of retries.  Surface the latest body so the engineer can
-        // see what state the job is stuck in.
-        const txt = await ar.text().catch(() => '');
-        throw new Error(`Artifact still not ready after ~7 min of retries.  Last response: HTTP ${ar.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
-      }
-      const delay = ARTIFACT_RETRY_BACKOFF_MS[attempt];
-      const waitedS = Math.round((Date.now() - retryStartedAt) / 1000);
-      const waitedTag = waitedS < 60
-        ? `${waitedS} s waited`
-        : `${Math.floor(waitedS / 60)} m ${waitedS % 60} s waited`;
-      setStatusMsg(`Artifact not ready yet (HTTP ${ar.status}) · ${waitedTag} · retrying in ${Math.round(delay / 1000)} s…`);
-      await new Promise(r => setTimeout(r, delay));
-    }
-    const blob = await ar.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    const call = (ex.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_');
-    const ts   = new Date().toISOString().slice(0, 10);
-    a.download = `genoa-engineering-statement-${call}-${ts}.${ext}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(blobUrl);
-    setStatusMsg(`Engineering Statement ${ext.toUpperCase()} downloaded.`);
+      const blob = await r.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      const call = (ex.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_');
+      const ts   = new Date().toISOString().slice(0, 10);
+      a.download = `genoa-engineering-statement-${call}-${ts}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      setStatusMsg(`Engineering Statement ${ext.toUpperCase()} downloaded.`);
     } finally {
       setRenderingPdf(false);
     }

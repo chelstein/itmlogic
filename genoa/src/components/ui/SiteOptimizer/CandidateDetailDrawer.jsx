@@ -3567,7 +3567,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div style={{ gridColumn: '1/-1' }}><b>Total soft cost:</b> ${fmt(g.total_soft_cost_low)}–${fmt(g.total_soft_cost_high)}</div>
                 <div><b>FCC processing:</b> {g.fcc_processing_days_low}–{g.fcc_processing_days_high} days</div>
                 <div><b>Total timeline (excl. construction):</b> {g.total_timeline_days_low}–{g.total_timeline_days_high} days</div>
-                <div><b>CP construction window:</b> {g.construction_days_allowed} days (§73.3561)</div>
+                <div><b>CP construction window:</b> {g.construction_days_allowed} days (§73.3598)</div>
               </div>
               {g.filing_sequence && (
                 <div style={{ marginTop: 8 }}>
@@ -8730,7 +8730,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
               <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
-                Community of License (COL) Change <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3573 / §73.24(h)</span>
+                Community of License (COL) Change <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3571 / §73.24(h)</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
@@ -14490,7 +14490,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <li>Reduce TPO to shrink the 1000 mV/m blanket contour below the §73.24(g) 1% limit.</li>
             )}
             {candidate.status_category === 'RECOVERABLE_WITH_COL_CHANGE' && (
-              <li>Consider a community-of-license change filing (§73.3573) — current CoL is too far from this site.</li>
+              <li>Consider a community-of-license change filing (Form 301-AM, §73.3571) — current CoL is too far from this site.</li>
             )}
             {candidate.status_category === 'TREATY_REVIEW' && (
               <li>Engage FCC International Bureau for treaty consultation before any engineering commitment.</li>

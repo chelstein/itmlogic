@@ -740,7 +740,7 @@ function assignStatusCategory(c, scoreCutoff, { current_site }){
       reasoning.push('Principal-community 5 mV/m contour shortfall is plausibly recoverable via directional-antenna design (§73.150).');
     } else {
       category = 'RECOVERABLE_WITH_COL_CHANGE';
-      reasoning.push('Candidate is too far from current city of license for DA recovery; a community-of-license change application (§73.3573) may be the cleaner path.');
+      reasoning.push('Candidate is too far from current city of license for DA recovery; a community-of-license change application (Form 301-AM under §73.3571) may be the cleaner path.');
     }
   } else if (blanketFail && !colFail && c.score >= RECOVERY_SCORE_FLOOR){
     category = 'RECOVERABLE_WITH_REDUCED_POWER';

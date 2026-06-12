@@ -5288,7 +5288,7 @@ async function scoreCandidate(pt, ctx, warnings){
           form:        'FCC Form 301-AM',
           exhibit:     'Section I — Basic Engineering',
           status:      'REQUIRED',
-          rule:        '47 CFR §73.3500 / §73.3525',
+          rule:        '47 CFR §73.3533',
           responsible: 'Communications counsel + broadcast engineer',
           note:        'Primary change-of-site application. Include antenna system description, coordinates, ground system plan, and TPO.'
         },
@@ -7115,7 +7115,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // 11. Form 301-AM application completeness
       const i11 = item('form_301_am', 'FCC Form 301-AM application completeness', '47 CFR §73.3533 / LMS', 'WARN',
-        'Form 301-AM (change of transmitter site) requires: engineering exhibits (coverage map, blanket pop analysis, NIF study), antenna data (HRP if DA), ground system description, NEPA/NHPA certifications, filing fee (§73.3525), and ASR number (if applicable).',
+        'Form 301-AM (change of transmitter site) requires: engineering exhibits (coverage map, blanket pop analysis, NIF study), antenna data (HRP if DA), ground system description, NEPA/NHPA certifications, FCC application fee (see FCC Schedule of Application Fees, 47 U.S.C. §158), and ASR number (if applicable).',
         'Prepare complete engineering filing package with licensed broadcast consultant. LMS rejects incomplete Form 301-AM submissions; completeness review before filing saves significant processing delays.');
 
       // 12. Construction completion and license-to-cover deadline
@@ -9105,7 +9105,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //       Form 303-S (renewal of license, not applicable to relocation)
       //     Note: FCC fee schedule updates annually in October.
       //     Actual FY2024 fee: $1,015 per filing per FCC DA 23-864 (Sep 2023).
-      //   §73.3522: Non-substantial (minor) modification — faster processing
+      //   §73.3571(e): Non-substantial (minor) modification — faster processing
       //     (30–60 days) vs. major modification (6–18 months).
       //   §73.3580: Public notice requirement — 30-day petition window triggered
       //     on acceptance of a major modification application.
@@ -22005,7 +22005,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     community_of_license_change_guide: (() => {
-      // §73.3573: An AM station relocation may or may not change the community of license (COL).
+      // §73.3571: An AM station relocation may or may not change the community of license (COL).
       // The COL is the community for which the station is licensed and which the station is required to serve.
       // The COL appears on the FCC license and determines the station's call sign area and local service obligations.
       //
@@ -22013,9 +22013,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - If the new transmitter site causes the new principal community contour (0.5 mV/m daytime)
       //     to no longer encompass the licensed COL, the FCC may find that the station effectively
       //     changed its COL without authorization — this constitutes a significant issue
-      //   - Under §73.3573(f): FCC allows minor change applications (no auction) if the proposed
+      //   - Under §73.3571(b): FCC allows minor change applications (no auction) if the proposed
       //     change in principal community service is not a "substantial change" per FCC criteria
-      //   - Under §73.3573(g): A "major change" (including certain COL changes) requires a comparative
+      //   - Under §73.3571(b): A "major change" (including certain COL changes) requires a comparative
       //     hearing or auction if there are competing applications
       //
       // FCC COL change criteria (as applied in AM cases):
@@ -22036,7 +22036,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - FCC may require the station to return to prior COL service or apply formally for COL change
       //   - A COL change application that faces competition becomes an auction — expensive and uncertain
       //
-      // §73.3573(f)(3): Minor COL changes (no auction needed): moving transmitter site within the same
+      // §73.3571(b): Minor COL changes (no auction needed): moving transmitter site within the same
       //   market area if community coverage is maintained; FCC has discretion to allow
 
       const colCentroid = ctx.col_centroid; // {lat, lon} of community of license centroid
@@ -22055,17 +22055,17 @@ async function scoreCandidate(pt, ctx, warnings){
       }
 
       const COL_CHANGE_RISKS = [
-        { risk: 'Principal community contour failure', cfr: '§73.24(h); §73.3573', description: '0.5 mV/m daytime contour must encompass COL city limits or community center', severity: 'CRITICAL' },
-        { risk: 'Unauthorized COL change', cfr: '§73.3573(f)', description: 'Relocating without maintaining COL service may constitute an unauthorized COL change', severity: 'HIGH' },
+        { risk: 'Principal community contour failure', cfr: '§73.24(h); §73.3571', description: '0.5 mV/m daytime contour must encompass COL city limits or community center', severity: 'CRITICAL' },
+        { risk: 'Unauthorized COL change', cfr: '§73.3571(b)', description: 'Relocating without maintaining COL service may constitute an unauthorized COL change', severity: 'HIGH' },
         { risk: 'Forfeiture exposure', cfr: '§503(b)', description: 'FCC NAL for unauthorized COL change; typically $4,000–$20,000 per §503(b) guidelines', severity: 'HIGH' },
-        { risk: 'Auction exposure', cfr: '§73.3573(g)', description: 'A major COL change that draws competing applications may trigger spectrum auction', severity: 'MEDIUM' }
+        { risk: 'Auction exposure', cfr: '§73.3571(b)', description: 'A major COL change that draws competing applications may trigger spectrum auction', severity: 'MEDIUM' }
       ];
 
       const COL_PRESERVATION_STRATEGIES = [
         { priority: 1, action: 'Verify 0.5 mV/m contour over COL at each candidate site', detail: 'Run FCC curves (§73.190) to confirm daytime 0.5 mV/m contour includes COL city limits or community center', cfr: '§73.24(h)' },
-        { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that COL is within 0.5 mV/m daytime contour', cfr: '§73.3533; §73.3573' },
+        { priority: 2, action: 'Document COL coverage in Form 301-AM contour exhibit', detail: 'Include COL boundary on contour map exhibit; show that COL is within 0.5 mV/m daytime contour', cfr: '§73.3533; §73.3571' },
         { priority: 3, action: 'Consider directional antenna to maintain COL service', detail: 'If NDA relocation degrades COL service, a DA pattern with a stronger lobe toward COL may preserve service', cfr: '§73.150; §73.24(h)' },
-        { priority: 4, action: 'If COL change is unavoidable, file formal COL change request', detail: 'File a major change Form 301-AM with an explicit COL change request; coordinate with FCC communications counsel', cfr: '§73.3573(f)' }
+        { priority: 4, action: 'If COL change is unavoidable, file formal COL change request', detail: 'File a major change Form 301-AM with an explicit COL change request; coordinate with FCC communications counsel', cfr: '§73.3571(b)' }
       ];
 
       return {
@@ -22083,7 +22083,7 @@ async function scoreCandidate(pt, ctx, warnings){
         relocation_note: distance_from_col_km != null
           ? `Candidate is ${distance_from_col_km} km from COL centroid. COL change risk: ${col_change_risk}. ${triggers_col_change ? 'Distance may compromise 0.5 mV/m COL coverage — verify contours. Formal COL change application may be required.' : 'COL coverage likely preserved — verify with FCC contour computation before filing.'}`
           : 'COL centroid not available — verify 0.5 mV/m daytime contour over COL city limits for each candidate before filing Form 301-AM.',
-        reference: '47 CFR §73.24(h); §73.3573; §73.3573(f)(3); §73.190; §503(b); FCC AM processing policies',
+        reference: '47 CFR §73.24(h); §73.3571; §73.3571(b); §73.190; §503(b); FCC AM processing policies',
         note: `COL change: ${distance_from_col_km != null ? `${distance_from_col_km} km from COL, risk ${col_change_risk}` : 'COL distance unknown'}. Must verify 0.5 mV/m daytime contour covers COL per §73.24(h). ${triggers_col_change ? 'COL change likely — formal application required.' : 'COL coverage expected — confirm with FCC curves.'}`
       };
     })(),
@@ -22585,7 +22585,7 @@ async function scoreCandidate(pt, ctx, warnings){
         renewal_options: 2,
         renewal_option_years: 10,
         total_max_years: 45,
-        rationale: 'AM license term is 8 years (§73.3574). Lease should span at least 3 license terms to avoid mid-license lease expiration. Two 10-year renewal options provide flexibility.'
+        rationale: 'AM license term is 8 years (47 U.S.C. §307(c)(1)). Lease should span at least 3 license terms to avoid mid-license lease expiration. Two 10-year renewal options provide flexibility.'
       };
 
       // Rent estimates by land type
@@ -22797,7 +22797,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.3999: Indecency — FCC prohibits indecent content between 6 AM and 10 PM (safe harbor 10 PM–6 AM)
       // 18 U.S.C. §1464: Obscenity — prohibited at all times; no safe harbor for obscene content
       // §73.1206: Telephone conversation broadcasts — must get consent before recording/airing a call
-      // §73.1207: Rebroadcasting — must get consent of originating station; program duplication limit (§73.3556)
+      // §73.1207: Rebroadcasting — must get consent of originating station
       // §73.1211: Lotteries — lottery information may be broadcast only for authorized lotteries
       // §73.1217: Broadcast hoaxes — FCC may impose forfeitures for hoaxes that cause harm
       // §73.3555: Multiple ownership — includes attribution rules for JSA/LMA arrangements
@@ -22832,12 +22832,12 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Rebroadcasting
       // §73.1207: Must get written or oral consent of originating station before rebroadcasting
-      // §73.3556: Duplication of programming on commonly owned or time-brokered stations
-      //   (the radio duplication limit; §73.242 was the pre-1986 FM nonduplication rule and no longer exists)
+      // AM-FM simulcast is generally permissible; the old radio nonduplication rule (§73.242) was repealed.
+      // No specific Part 73 rule currently limits simulcast on commonly-owned AM and FM stations.
       const REBROADCAST_RULES = {
         consent_required: true,
         cfr: '§73.1207',
-        anti_simulcast_cfr: '§73.3556',
+        anti_simulcast_cfr: null,
         am_fm_simulcast_restriction: 'AM and commonly-owned FM may simulcast if FM is within AM service area, but must offer separate programming for some portion of broadcast day'
       };
 
@@ -22916,7 +22916,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const RELOCATION_IMPACTS_PPG = [
         { id: 'DISTRICT_CHANGE',   impact: 'EVALUATE', detail: 'Relocation changes the station\'s primary service area; identify new federal/state/local districts served', cfr: '§73.1940' },
         { id: 'OPIF_UPDATE',       impact: 'REQUIRED',  detail: 'Political file location and station information in OPIF must be updated when station moves', cfr: '§73.3526; §73.3527' },
-        { id: 'COL_CHANGE',        impact: 'EVALUATE', detail: 'If community of license changes (requires FCC approval), political programming obligations may shift to new community', cfr: '§73.3533; §73.3562' },
+        { id: 'COL_CHANGE',        impact: 'EVALUATE', detail: 'If community of license changes (requires FCC approval), political programming obligations may shift to new community', cfr: '§73.3533; §73.3571' },
         { id: 'MAIN_STUDIO_FILE',  impact: 'REQUIRED', detail: 'Political file must be kept at main studio (or electronically via OPIF); update address when studio moves', cfr: '§73.3526(b); §73.1943(f)' }
       ];
 
@@ -24694,7 +24694,7 @@ async function scoreCandidate(pt, ctx, warnings){
             { step: 1, action: 'Engineering study', detail: 'Full §73.37 spacing analysis at the TARGET class. Commission immediately — spacing failure ends the process.', estimated_days: 15 },
             { step: 2, action: 'NIF study', detail: 'Skywave NIF analysis at the new class protection level (§73.182). Required for all non-local classes.', estimated_days: 30 },
             { step: 3, action: 'Form 301-AM preparation', detail: 'Major change application: Schedule A (legal), B (antenna), C (transmitter), D (coverage), E (environmental).', estimated_days: 20 },
-            { step: 4, action: 'FCC filing', detail: 'File via LMS. Pay filing fee (§73.3525). Application assigned to Audio Division for review.', estimated_days: 1 },
+            { step: 4, action: 'FCC filing', detail: 'File via LMS. Pay required application fee (see FCC Schedule of Application Fees). Application assigned to Audio Division for review.', estimated_days: 1 },
             { step: 5, action: 'FCC processing', detail: 'Typically 12–24 months. Staff may issue letter of inquiry (LOI) requesting additional information.', estimated_days: 365 },
             { step: 6, action: 'Construction permit', detail: 'CP issued; 3-year period to construct. File Form 302-AM (license to cover) after proof of performance.', estimated_days: 90 }
           ]
@@ -24708,7 +24708,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_upgrade_paths: upgradePaths.length,
         upgrade_filing_steps: upgradeFiling,
         primary_feasibility: upgradePaths[0]?.feasibility ?? 'UNKNOWN',
-        reference: '47 CFR §73.21 (power limits by class); §73.37 (minimum spacing); §73.25 (clear channels); §1.401 (rulemaking petition); §73.3525 (major changes)',
+        reference: '47 CFR §73.21 (power limits by class); §73.37 (minimum spacing); §73.25 (clear channels); §1.401 (rulemaking petition); §73.3571 (AM major changes)',
         note: 'License class upgrade analysis is a regulatory screening guide. Consult a licensed FCC communications attorney before initiating a class upgrade proceeding. Class upgrade timelines are highly variable and depend on FCC workload and contested filings.'
       };
     })(),
@@ -25199,7 +25199,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     construction_permit_timeline_optimizer: (() => {
-      // Detailed CP milestone scheduling per §73.3533, §73.3598, §73.3561, §73.3580
+      // Detailed CP milestone scheduling per §73.3533, §73.3598, §73.3580
       // From site selection to license grant for AM relocation
       const isDA_cpt = /^DA/i.test(pattern_mode);
       const isClear_cpt = CLEAR_CHANNEL_KHZ.has(frequency_khz);
@@ -25241,7 +25241,7 @@ async function scoreCandidate(pt, ctx, warnings){
             { id: 'schedule_c',       task: 'Schedule C: Transmitter', days: 3, rule: '§73.3533', note: 'FCC-certified transmitter model. Must match TPO.' },
             { id: 'schedule_d',       task: 'Schedule D: Coverage map + §73.183 contour', days: 5, rule: '§73.183', note: 'Exhibit: daytime groundwave service contour map.' },
             { id: 'schedule_e',       task: 'Schedule E: Environmental compliance', days: 5, rule: '§1.1301', note: 'NEPA, NHPA §106, migratory bird assessment.' },
-            { id: 'fcc_filing',       task: 'LMS filing + fee payment', days: 1, rule: '§73.3525', note: 'Major change filing fee (§73.3525); submit via LMS.' }
+            { id: 'fcc_filing',       task: 'LMS filing + fee payment', days: 1, rule: '§73.3533', note: 'FCC application fee per Schedule of Application Fees (47 U.S.C. §158); submit via LMS.' }
           ]
         },
         {
@@ -25249,7 +25249,7 @@ async function scoreCandidate(pt, ctx, warnings){
           label: 'FCC Processing (CP Issuance)',
           weeks_optimistic: 52, weeks_conservative: 130,
           milestones: [
-            { id: 'fcc_review',       task: 'FCC staff review (Audio Division)', days: 180, rule: '§73.3561', note: 'Typical processing 6–18 months for major AM modifications. Clear-channel NIF cases take longer.' },
+            { id: 'fcc_review',       task: 'FCC staff review (Audio Division)', days: 180, rule: '§73.3533', note: 'Typical processing 6–18 months for major AM modifications. Clear-channel NIF cases take longer.' },
             { id: 'public_notice',    task: 'Public notice / petitions to deny period', days: 30, rule: '§73.3584', note: '30-day petition window after acceptance public notice.' },
             { id: 'cp_grant',         task: 'CP grant', days: 30, rule: '§73.3598', note: 'CP must be granted before construction may begin. 3-year build period from CP date.' }
           ]
@@ -25302,7 +25302,7 @@ async function scoreCandidate(pt, ctx, warnings){
         critical_path_milestone_ids: criticalPath,
         n_critical_path:           criticalPath.length,
         filing_fee_major_change_usd: 6465,
-        reference: '47 CFR §73.3533; §73.3598; §73.3561; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
+        reference: '47 CFR §73.3533; §73.3598; §73.3580; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
         note: `CP timeline for ${fcc_class} class ${isDA_cpt ? 'directional' : 'non-directional'} AM relocation. Optimistic: ${totalOptimisticWeeks} weeks (~${round2(totalOptimisticWeeks / 4.33)} months). Conservative: ${totalConservativeWeeks} weeks (~${round2(totalConservativeWeeks / 4.33)} months).`
       };
     })(),
@@ -25745,7 +25745,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'transmitter',  category: 'Transmitter equipment',        low: txCostLow,       high: txCostHigh,       note: `${tpo_kw} kW ${isDA_cost ? 'DA-capable' : 'NDA'} AM transmitter; cost assumes new unit.` },
         { id: 'phasor_atu',   category: isDA_cost ? 'Phasor + ATU' : 'Antenna tuning unit (ATU)', low: phasorCostLow, high: phasorCostHigh, note: isDA_cost ? 'DA phasor and ATU for directional antenna.' : 'Non-directional ATU.' },
         { id: 'eas',          category: 'EAS encoder/decoder (IPAWS)', low: easCost,          high: easCost,          note: 'IPAWS-compatible EAS unit per §11.35/§11.56.' },
-        { id: 'fcc_fees',     category: 'FCC filing fees',             low: fccFilingFee,     high: fccFilingFee,     note: '§73.3525 major change CP application fee.' },
+        { id: 'fcc_fees',     category: 'FCC filing fees',             low: fccFilingFee,     high: fccFilingFee,     note: 'FCC major change CP application fee per Schedule of Application Fees (47 U.S.C. §158).' },
         { id: 'engineering',  category: 'Engineering + proof-of-performance', low: engineeringLow, high: engineeringHigh, note: 'Spacing study, NIF study, DA pattern, §73.154 proof, FCC forms.' },
         { id: 'env_legal',    category: 'Environmental + legal + zoning', low: envLegalLow,   high: envLegalHigh,     note: 'NEPA §106, zoning CUP, FCC counsel.' },
         { id: 'contingency',  category: 'Contingency (15–20%)',         low: contingencyLow,  high: contingencyHigh,  note: 'Reserve for scope changes, cost escalation, permit delays.' }
@@ -25765,7 +25765,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_low:         totalLow,
         total_high:        totalHigh,
         total_midpoint:    round2((totalLow + totalHigh) / 2),
-        reference: 'Budget model based on FCC filing fees (§73.3525), engineering industry cost data, and RSMeans construction cost indices (2024).',
+        reference: 'Budget model based on FCC Schedule of Application Fees (47 U.S.C. §158), engineering industry cost data, and RSMeans construction cost indices (2024).',
         note: `Total estimated relocation cost: $${totalLow.toLocaleString()} – $${totalHigh.toLocaleString()} (midpoint ~$${Math.round((totalLow + totalHigh) / 2).toLocaleString()}). Estimates are screening-grade; actual costs vary significantly with site conditions.`
       };
     })(),
@@ -30271,10 +30271,11 @@ async function scoreCandidate(pt, ctx, warnings){
       //   A JSA under which one station sells more than 15% of the weekly advertising
       //   time of another AM station in the same market is attributable.
       //
-      // Spectrum leasing (47 CFR §73.3597) — AM spectrum leasing is generally
-      //   not permitted in the same way as ancillary spectrum leasing for wireless.
-      //   AM licensees may enter into time brokerage (selling blocks of air time)
-      //   but the licensee retains full legal and programming responsibility.
+      // Spectrum leasing — AM broadcast spectrum leasing (per Part 1 §1.9001 et seq.)
+      //   is not available; the secondary-market leasing framework applies only to
+      //   wireless/Part-27 licensees.  AM licensees may enter into time brokerage
+      //   (selling blocks of air time) but the licensee retains full legal and
+      //   programming responsibility under §73.3555(b).
       //
       // Key compliance obligations for TBA/LMA:
       //   1. Licensee must retain control over programming for at least 15% of
@@ -30536,15 +30537,20 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Assignee must be legally, technically, and financially qualified.
       //   Application must be filed and granted before the transaction closes.
       //
-      // 47 CFR §73.3597 — Processing of assignment/transfer applications.
-      //   Routine applications are processed in ~60 days (Streamlined).
-      //   Complex/contested applications can take 6–18 months.
-      //   FCC will place application on public notice for 30-day petition period.
+      // 47 CFR §73.3580 — Public notice of filed applications.
+      //   FCC places the assignment application on public notice; 30-day
+      //   petition window opens from that date.
       //
-      // 47 CFR §73.3522 — Anti-trafficking rule (repealed 1981 for radio).
-      //   No current anti-trafficking holding period for AM stations.
-      //   However, stations still must have served the public interest during
-      //   the holding period under license renewal standards.
+      // 47 CFR §73.3584 — Petitions to deny.
+      //   Any party may file a petition to deny within the 30-day window.
+      //
+      // 47 CFR §73.3591 — Grants without hearing.
+      //   Routine (streamlined) applications granted ~60 days after public notice.
+      //   Complex/contested applications can take 6–18 months.
+      //
+      // Anti-trafficking — No current CFR holding period for AM stations.
+      //   The former anti-trafficking rule (old §73.111) was repealed in 1981.
+      //   Stations must still demonstrate public interest service at renewal.
       //
       // 47 CFR §73.3555 — Ownership limits (see guide #115).
       //   Buyer must certify compliance with local ownership caps.
@@ -30642,7 +30648,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_high_items,
         anti_trafficking_holding_period: 'None (repealed 1981 for radio)',
         streamlined_eligible: true,
-        reference: '47 CFR §73.3540; §73.3597; §310(d) Communications Act; FCC Form 314; FCC Form 315; FCC Form 316',
+        reference: '47 CFR §73.3540; §73.3580; §73.3584; §73.3591; §310(d) Communications Act; FCC Form 314; FCC Form 315; FCC Form 316',
         note: `${frequency_khz} kHz (${fcc_class}): Assignment cost range $${total_cost_low_usd.toLocaleString()}–$${total_cost_high_usd.toLocaleString()}. Streamlined timeline ~${TIMELINE_DAYS.streamlined} days. ${n_critical_items} critical due-diligence items. ${is_da ? 'DA station: pattern exhibits required.' : 'NDA: standard exhibits.'}`
       };
     })(),
@@ -33134,7 +33140,7 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
       id:    'FCC_PROCESSING',
       label: 'FCC processing — major modification',
       weeks: '12–26',
-      description: `FCC Media Bureau processing for AM major modification (§73.3573). Current average processing time 3–6 months. Clear-channel or contested applications may take longer.`,
+      description: `FCC Media Bureau processing for AM major modification (§73.3571). Current average processing time 3–6 months. Clear-channel or contested applications may take longer.`,
       blocking: true
     },
     {
