@@ -56,7 +56,7 @@ export function buildFacilityParametersSection(exhibit){
     : ['HAAT', fmt(haatDisplay, 'm')];
   const terrainRow = isAm
     ? ['Allocation basis',
-       'Groundwave field strength per §73.184 / §73.183; no terrain elevation model required']
+       'Groundwave field strength per §73.184 M3 conductivity curves; no terrain elevation model required']
     : ['Terrain source',
        ev.terrain?.source || (ev.terrain_haat_per_radial?.length ? 'per-radial DEM' : 'flat HAAT (CONSTANT_HAAT_ASSUMED)')];
 

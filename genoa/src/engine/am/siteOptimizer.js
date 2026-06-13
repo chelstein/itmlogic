@@ -28661,7 +28661,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // References:
       //   47 CFR §73.182 (nighttime protection)
       //   47 CFR §73.37 (daytime prohibited operations)
-      //   47 CFR §73.183/§73.184 (groundwave method)
+      //   47 CFR §73.184 (groundwave M3 conductivity curves method)
       //   FCC Form 301-AM Instructions
       //   US/Mexico AM Agreement (1986); US/Canada Agreement
 

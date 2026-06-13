@@ -1,4 +1,4 @@
-// AM groundwave (47 CFR §73.183 / §73.184).
+// AM groundwave propagation curves (47 CFR §73.184; interference thresholds per §73.183).
 //
 // FCC-CANONICAL via the vendored gwave.js (Sommerfeld-Norton evaluation
 // against the FCC's pre-tabulated field grid in

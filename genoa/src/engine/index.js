@@ -52,7 +52,7 @@ function methodFor(service){
     case 'FM':   return { method: FM_CONTOUR_METHODS.F50_50, regs: ['§73.313', '§73.333'] };
     case 'LPFM': return { method: LPFM_METHOD,                regs: ['§73.811', '§73.333'] };
     case 'FX':   return { method: FX_METHOD,                  regs: ['§74.1204', '§73.333'] };
-    case 'AM':   return { method: '47 CFR §73.183 / §73.184 groundwave', regs: ['§73.183', '§73.184'] };
+    case 'AM':   return { method: '47 CFR §73.184 groundwave M3 conductivity curves', regs: ['§73.184', '§73.183'] };
     default: throw new Error(`unknown service: ${service}`);
   }
 }
