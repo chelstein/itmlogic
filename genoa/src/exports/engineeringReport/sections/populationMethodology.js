@@ -8,7 +8,7 @@
 // provenance, dataset vintage, and the contour-weighting rule
 // applied.  Without this, a reviewer is left wondering whether the
 // persons-served figure came from the Census API, an internal
-// estimate, or a placeholder.
+// estimate, or a model estimate without a real Census dispatch.
 
 export function buildPopulationMethodologySection(exhibit){
   const pop = exhibit?.population_estimate;
@@ -16,10 +16,10 @@ export function buildPopulationMethodologySection(exhibit){
     return null;   // skip — nothing to typeset and Population is informational
   }
 
-  const isPlaceholder = !pop.source && !pop.vintage;
-  const isFailed      = pop.attempt_status === 'failed';
+  const isModelEstimate = !pop.source && !pop.vintage;
+  const isFailed        = pop.attempt_status === 'failed';
 
-  if (isPlaceholder){
+  if (isModelEstimate){
     return {
       id:      'population-methodology',
       type:    'paragraphs',

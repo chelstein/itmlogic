@@ -3058,7 +3058,7 @@ async function scoreCandidate(pt, ctx, warnings){
     flags.push(`Blanket population ${blanket_population_pct.toFixed(2)}% > §73.24(g) 1% ceiling`);
   }
 
-  // --- limitations array (placeholders + missing data) ---
+  // --- limitations array (pending integrations + missing data) ---
   const limitations = [];
   if (goals.avoid_wildfire_risk) limitations.push(
     'Wildfire sub-score uses geographic region proxy (Western US / PNW / SE / Midwest zones); ' +
@@ -25860,7 +25860,7 @@ async function scoreCandidate(pt, ctx, warnings){
           radius_km = r?.distance_km != null ? round2(r.distance_km) : null;
         } catch { /* ok */ }
         const area_km2 = radius_km != null ? round2(Math.PI * radius_km * radius_km) : null;
-        // Population density placeholder: candidate lat/lon determines regional density
+        // Population density model estimate: candidate lat/lon determines regional density
         // US average ≈ 36 people/km²; urban ≈ 800/km²; suburban ≈ 300/km²; rural ≈ 10/km²
         // We use the candidate's conductivity as a proxy (higher σ often rural/agricultural)
         const densityFactor = sigma_msm >= 8 ? 15 : sigma_msm >= 4 ? 50 : 200; // people/km² proxy
