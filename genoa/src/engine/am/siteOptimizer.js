@@ -9074,8 +9074,11 @@ async function scoreCandidate(pt, ctx, warnings){
         grand_total_low_usd:          total_low_pf,
         grand_total_high_usd:         total_high_pf,
         grand_total_midpoint_usd:     midpoint_pf,
+        cost_basis_vintage:           'Q4 2024',
+        cost_basis_source:            'ARBE cost model (2023); ENR CCI Q4 2024',
+        refresh_cadence:              'annual',
         reference: '47 CFR §73.3500; §73.3533; §73.3598; §17.7; §1.1307; §1.1310; OET Bulletin 65 Ed. 97-01; FCC FY2024 fee schedule (§1.1102); ARBE cost model (2023); ENR CCI Q4 2024',
-        note: `SCREENING-GRADE pro forma. Total project cost estimate: $${(total_low_pf/1000).toFixed(0)}K–$${(total_high_pf/1000).toFixed(0)}K (midpoint ~$${(midpoint_pf/1000).toFixed(0)}K) including 15–25% contingency. Class ${fcc_class} ${frequency_khz} kHz, ${tpo_kw} kW ${is_da_pf ? 'DA' : 'NDA'}, ${h_ft_pf} ft tower. Engage a licensed broadcast engineer and FCC counsel before committing capital.`
+        note: `SCREENING-GRADE pro forma (cost basis: ENR CCI Q4 2024). Total project cost estimate: $${(total_low_pf/1000).toFixed(0)}K–$${(total_high_pf/1000).toFixed(0)}K (midpoint ~$${(midpoint_pf/1000).toFixed(0)}K) including 15–25% contingency. Class ${fcc_class} ${frequency_khz} kHz, ${tpo_kw} kW ${is_da_pf ? 'DA' : 'NDA'}, ${h_ft_pf} ft tower. Engage a licensed broadcast engineer and FCC counsel before committing capital.`
       };
     })(),
 
@@ -9186,8 +9189,12 @@ async function scoreCandidate(pt, ctx, warnings){
           'FCC Form 302-AM — License to Cover CP',
           'FCC grant of license'
         ],
+        fee_vintage:     'FY2024',
+        fee_source:      'FCC Fee Schedule DA 23-864',
+        rate_vintage:    '2023 market rates',
+        refresh_cadence: 'annual',
         reference: '47 CFR §73.3500 (applications); §73.3533 (major mod); §73.3584 (petitions to deny); §73.3580 (public notice); §73.3598 (CP period of construction — 3 years); FCC FY2024 Fee Schedule DA 23-864 ($1,015 per Form 301-AM / 302-AM)',
-        note: `${isDA ? 'DA' : 'NDA'} ${fcc_class} station. FCC fees: $${total_fcc_fees.toLocaleString()}. Soft costs (atty + eng): $${total_soft_low.toLocaleString()}–$${total_soft_high.toLocaleString()}. Timeline: ${total_timeline_low}–${total_timeline_high} days (excl. construction).`
+        note: `${isDA ? 'DA' : 'NDA'} ${fcc_class} station. FCC fees: $${total_fcc_fees.toLocaleString()} (FY2024). Soft costs (atty + eng, 2023 market rates): $${total_soft_low.toLocaleString()}–$${total_soft_high.toLocaleString()}. Timeline: ${total_timeline_low}–${total_timeline_high} days (excl. construction).`
       };
     })(),
 
@@ -10096,8 +10103,10 @@ async function scoreCandidate(pt, ctx, warnings){
         col_field_compliant,
         study_cost_low_usd,
         study_cost_high_usd,
-        reference: '47 CFR §73.183 (groundwave service contours); §73.184 (M3 groundwave curves, ITU-R P.368-9); §73.182 (2 mV/m primary service area boundary — AM engineering standards); §73.37 (0.5 mV/m co-channel separation); ITU-R P.368-9 Annex 1 tables',
-        note: `Screening-grade M3 estimate (±30%) at ${condMsm} mS/m, ${tpo_kw} kW. 0.5 mV/m contour: ~${contour_05mvm_radius_km} km. 0.1 mV/m contour: ~${contour_01mvm_radius_km} km. Formal §73.183 study required for FCC filing: $${study_cost_low_usd.toLocaleString()}–$${study_cost_high_usd.toLocaleString()}.`
+        estimate_type: 'screening_grade',
+        confidence_band_pct: 30,
+        reference: '47 CFR §73.184 (groundwave coverage methodology; M3 curves, ITU-R P.368-9); §73.182 (2 mV/m primary service area boundary — AM engineering standards); §73.37 (0.5 mV/m co-channel separation); ITU-R P.368-9 Annex 1 tables',
+        note: `Screening-grade M3 estimate (±30%) at ${condMsm} mS/m, ${tpo_kw} kW. 0.5 mV/m contour: ~${contour_05mvm_radius_km} km. 0.1 mV/m contour: ~${contour_01mvm_radius_km} km. Formal §73.184 M3 study required for FCC filing: $${study_cost_low_usd.toLocaleString()}–$${study_cost_high_usd.toLocaleString()}.`
       };
     })(),
 
@@ -16404,7 +16413,9 @@ async function scoreCandidate(pt, ctx, warnings){
         frequency_khz,
         f_mhz:                    f_mhz_nf,
         fa_atmospheric_db,
+        fa_atmospheric_formula:   'Fa = 53 − 28·log10(f_MHz) — Curve D regression fit, ITU-R P.372-15 §5 (daytime, summer, temperate/subtropical)',
         fa_man_made_db,
+        fa_man_made_basis:        'ITU-R P.372-15 Table 1: rural=20 dB, suburban=32 dB, urban Fa_mm≈40 dB (screened from land_use_class)',
         fa_total_db,
         land_use_noise_class,
         noise_floor_db_uvm,
@@ -20173,8 +20184,11 @@ async function scoreCandidate(pt, ctx, warnings){
         n_atu_networks,
         is_directional:       isDA_atu,
         atu_network_type:     'L-network (shunt inductor / series capacitor)',
+        estimate_type: 'screening_grade',
+        rr_basis: 'Classical monopole theory: Rr = 36.6 Ω at λ/4 resonance (ITU-R BS.346-1)',
+        rg_basis: '120 radials at 0.35λ on 4 mS/m soil per §73.189(b)(4) / NBS TN-24; Rg=2–5 Ω range',
         reference: '47 CFR §73.189(b)(4) (ground system); §73.190 (conductivity); §73.62 (DA tolerances); §73.154 (proof of performance); ITU-R BS.346-1 (monopole radiation resistance); IEEE Std 100 (ATU design)',
-        note: `${frequency_khz} kHz λ/4 monopole (${Math.round(lambda_q_m)} m): base impedance ~${R_base_low}–${R_base_high} Ω (Rr=${Rr_ohm} Ω + Rg=${Rg_low_ohm}–${Rg_high_ohm} Ω). ATU: ${lambda_m.toFixed(0)}-m-wavelength L-network; shunt L ≈ ${L_shunt_uH} μH, series C ≈ ${C_ser_pF} pF; -3 dB BW ≈ ${BW_3dB_khz} kHz. Antenna efficiency ≈ ${eta_typ_pct}% (increases to ~95% with low-Rg ground system). Base current at ${tpo_kw} kW TPO: ≈ ${I_base_typ_a} A (monitor per §73.62). Guy wire detuning coils required within ${detuning_radius_m} m of tower base (§73.190).`
+        note: `${frequency_khz} kHz λ/4 monopole (${Math.round(lambda_q_m)} m): screening-grade base impedance ~${R_base_low}–${R_base_high} Ω (Rr=${Rr_ohm} Ω + Rg=${Rg_low_ohm}–${Rg_high_ohm} Ω). ATU: ${lambda_m.toFixed(0)}-m-wavelength L-network; shunt L ≈ ${L_shunt_uH} μH, series C ≈ ${C_ser_pF} pF; -3 dB BW ≈ ${BW_3dB_khz} kHz. Antenna efficiency ≈ ${eta_typ_pct}% (increases to ~95% with low-Rg ground system). Base current at ${tpo_kw} kW TPO: ≈ ${I_base_typ_a} A (monitor per §73.62). Guy wire detuning coils required within ${detuning_radius_m} m of tower base (§73.190).`
       };
     })(),
 
@@ -21883,10 +21897,12 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const tpo_kw_num = Number(tpo_kw) || 5;
 
-      // Equipment value estimates
+      // Equipment value estimates (2023–2024 broadcast insurance market rates)
       const transmitter_value_usd = tpo_kw_num <= 5 ? 75000 :
                                     tpo_kw_num <= 10 ? 120000 : 200000;
-      const tower_value_usd = 275000; // 3/8λ at 780 kHz, guyed tower, midpoint estimate
+      // Guyed AM tower value: 3/8λ height at station frequency × $600/ft (insured replacement midpoint)
+      const ins_tower_h_ft = Math.round(3 / 8 * (984000 / Number(frequency_khz))); // 3/8λ in feet
+      const tower_value_usd = Math.round(ins_tower_h_ft * 600); // $600/ft guyed tower replacement cost
       const atu_value_usd = 14000;
       const ancillary_value_usd = 12000; // EAS, STL, metering
       const building_value_usd = 40000;
@@ -21914,6 +21930,8 @@ async function scoreCandidate(pt, ctx, warnings){
       return {
         frequency_khz, fcc_class,
         tpo_kw: tpo_kw_num,
+        tower_height_ft_3_8_lambda: ins_tower_h_ft,
+        tower_value_basis: '$600/ft guyed tower replacement cost (2023–2024 market)',
         transmitter_value_usd,
         tower_value_usd,
         atu_value_usd,
