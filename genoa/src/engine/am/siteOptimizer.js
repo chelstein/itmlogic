@@ -77,10 +77,10 @@ const CLEAR_CHANNEL_KHZ = Object.freeze(new Set([
 // FCC class daytime TPO limits (47 CFR §73.21).
 // Nighttime limits for Class D are not enforced here (require separate analysis).
 const FCC_CLASS_POWER_KW = Object.freeze({
-  A: { min: 10,   max: 50 },
-  B: { min: 0.25, max: 50 },   // 10 kW max in the 1605–1705 kHz expanded band
-  C: { min: 0.25, max: 1  },   // §73.21(c)(1): 0.25–1 kW, unlimited time
-  D: { min: 0.25, max: 50 }    // daytime; nighttime < 0.25 kW per §73.21(b)(2)
+  A: { min: 10,   max: 50  },  // §73.21(a): Class A clear-channel dominant 10–50 kW
+  B: { min: 0.25, max: 50  },  // §73.21(b): Class B regional 0.25–50 kW (10 kW max in 1605–1705 kHz expanded band)
+  C: { min: 0.25, max: 1   },  // §73.21(c): Class C local 0.25–1 kW unlimited time
+  D: { min: 0.25, max: 5   }   // §73.21(e): Class D secondary on clear channel; daytime 0.25–5 kW max; nighttime ≤ 0.5 kW or sign-off per §73.21(b)(2)
 });
 
 // Goals enum — these are the keys the API exposes.  The set is fixed;
