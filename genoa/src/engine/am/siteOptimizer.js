@@ -13809,7 +13809,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const max_power_kw  = class_info.max_day_kw;
       const tpo_pct_of_max = round2((tpo_kw / max_power_kw) * 100);
       const headroom_kw   = round2(max_power_kw - tpo_kw);
-      // Power upgrade potential (Class D limited to 1 kW; Class A/B could go to 50 kW)
+      // Power upgrade potential (Class D: 5 kW day max per §73.21(e); Class A/B up to 50 kW)
       const upgrade_potential_kw = headroom_kw > 0 ? headroom_kw : 0;
       return {
         frequency_khz, fcc_class, tpo_kw,
@@ -30714,10 +30714,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // KEY RULES
       // ─────────
-      // 47 CFR §73.183 — Groundwave field strengths.
-      //   Specifies the FCC M3 conductivity map and Terman/Soil Conductivity
-      //   prediction method for AM groundwave field-strength estimation.
-      //   Contour predictions must use FCC-published M3 values or better.
+      // 47 CFR §73.183 — Groundwave field strength used to determine interference.
+      //   Establishes the field strength thresholds (e.g., 0.5 mV/m, 0.1 mV/m) used to
+      //   define service and interference contours.
+      //   Contour predictions must use FCC-published M3 conductivity curves (§73.184).
       //
       // 47 CFR §73.184 — Groundwave field strength curves.
       //   The FCC Figure curves (Figures 1a–1e in §73.184) are the authoritative
@@ -30817,7 +30817,7 @@ async function scoreCandidate(pt, ctx, warnings){
         n_radials,
         map_scale,
         map_datum: 'NAD83',
-        accepted_methods: ['FCC §73.184 curves + §73.183 M3', 'AM_STAT', 'Measured field data'],
+        accepted_methods: ['FCC §73.184 M3 groundwave curves', 'AM_STAT', 'Measured field data'],
         contour_distances_km: {
           d_5mvm_km,
           d_05mvm_km,
