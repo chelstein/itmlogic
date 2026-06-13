@@ -10573,7 +10573,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const operating_hrs_per_year   = operating_hrs_per_day * 365;
 
       // Electricity rate:
-      const electricity_rate_usd_kwh = 0.115;   // AZ commercial rate (EIA 2024)
+      const electricity_rate_usd_kwh = 0.115;   // US commercial average (EIA 2024); varies ±40% by state
 
       // Annual electricity cost:
       const annual_electric_usd      = round2(avg_power_kw * operating_hrs_per_year * electricity_rate_usd_kwh);
@@ -10624,7 +10624,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_site_load_kw,
         annual_total_electric_usd,
         reference: '47 CFR §73.1560(a) (operating power 90–105% of authorized); EIA 2024 commercial electricity rates; Nautel NX series specs (solid-state AM, 85%+ plate efficiency); Terman (1955) ch. 14 (plate efficiency); §73.21 (Class D power limits 5 kW daytime)',
-        note: `${tx_type} transmitter at ${tpo_kw} kW: ${overall_efficiency_pct}% overall efficiency → ${ac_input_kw} kW AC input, avg ${avg_power_kw} kW (incl. 10% modulation uplift). Annual electricity at ${operating_hrs_per_day} hrs/day: ~$${annual_electric_usd.toLocaleString()} (at $${electricity_rate_usd_kwh}/kWh AZ rate). Full site load: ${total_site_load_kw} kW (~$${annual_total_electric_usd.toLocaleString()}/yr). Waste heat: ${waste_heat_kw} kW → ${cooling_required_type} cooling. At 50% power (${power_50pct_kw} kW): ~$${annual_50pct_usd.toLocaleString()}/yr.`
+        note: `${tx_type} transmitter at ${tpo_kw} kW: ${overall_efficiency_pct}% overall efficiency → ${ac_input_kw} kW AC input, avg ${avg_power_kw} kW (incl. 10% modulation uplift). Annual electricity at ${operating_hrs_per_day} hrs/day: ~$${annual_electric_usd.toLocaleString()} (at $${electricity_rate_usd_kwh}/kWh — US commercial average EIA 2024; verify local rate). Full site load: ${total_site_load_kw} kW (~$${annual_total_electric_usd.toLocaleString()}/yr). Waste heat: ${waste_heat_kw} kW → ${cooling_required_type} cooling. At 50% power (${power_50pct_kw} kW): ~$${annual_50pct_usd.toLocaleString()}/yr.`
       };
     })(),
 
