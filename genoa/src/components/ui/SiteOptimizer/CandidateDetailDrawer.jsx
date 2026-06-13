@@ -3825,7 +3825,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#fff7f0', border: '1px solid #fbbf24', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 8 }}>
-                Groundwave Field Strength Estimate (§73.183 / §73.184 M3 Curves)
+                Groundwave Field Strength Estimate (§73.184 M3 Curves)
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
                 <div><b>σ (conductivity):</b> {fmtF(g.conductivity_msm)} mS/m</div>

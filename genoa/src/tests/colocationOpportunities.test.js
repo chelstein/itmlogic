@@ -749,7 +749,7 @@ test('colocation GRID candidates have fcc_class_power_ceiling_analysis', async (
   assert.equal(out.available, true);
   for (const c of out.candidates) {
     assert.ok(c.fcc_class_power_ceiling_analysis != null, `rank ${c.rank} missing fcc_class_power_ceiling_analysis`);
-    assert.equal(c.fcc_class_power_ceiling_analysis.class_power_ceiling_kw, 50, `rank ${c.rank} Class D ceiling must be 50 kW`);
+    assert.equal(c.fcc_class_power_ceiling_analysis.class_power_ceiling_kw, 5, `rank ${c.rank} Class D ceiling must be 5 kW (§73.21(e))`);
     assert.ok(['NONE','LIMITED','SIGNIFICANT'].includes(c.fcc_class_power_ceiling_analysis.upgrade_feasibility),
       `rank ${c.rank} invalid upgrade_feasibility`);
   }

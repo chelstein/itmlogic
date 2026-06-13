@@ -564,8 +564,8 @@ export const FORM_301_AM_FIELDS = Object.freeze([
     type: 'file_reference',
     source: 'genoa-auto',
     required: true,
-    cite: '47 CFR §73.183, §73.184',
-    notes: 'AM contour map shows groundwave field strength contours from §73.183 / §73.184 curves applied with §73.190 M3 conductivity — NOT FM 60/54/40 dBu contours.',
+    cite: '47 CFR §73.184',
+    notes: 'AM contour map shows groundwave field strength contours from §73.184 M3 conductivity curves / §73.190 M3 conductivity maps — NOT FM 60/54/40 dBu contours.',
     derive: (exhibit) => {
       const call = String(exhibit?.station_inputs?.call || 'exhibit')
                      .replace(/[^A-Za-z0-9]/g, '_');

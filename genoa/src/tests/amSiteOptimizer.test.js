@@ -11730,9 +11730,9 @@ test('am_utility_power_service_and_metering_guide KAZM rank-1 no line extension'
 test('am_utility_power_service_and_metering_guide KAZM power cost estimate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_utility_power_service_and_metering_guide;
-  assert.strictEqual(g.power_rate_per_kwh,     0.12,    'power_rate_per_kwh should be $0.12');
-  assert.strictEqual(g.monthly_power_cost_usd, 923.62,  'KAZM monthly_power_cost_usd should be $923.62');
-  assert.strictEqual(g.annual_power_cost_usd,  11083.44, 'KAZM annual_power_cost_usd should be $11,083.44');
+  assert.strictEqual(g.power_rate_per_kwh,     0.115,   'power_rate_per_kwh should be $0.115 (EIA 2024 national commercial average)');
+  assert.strictEqual(g.monthly_power_cost_usd, 885.13,  'KAZM monthly_power_cost_usd should be $885.13 (10.69 kW × 720 h × $0.115)');
+  assert.strictEqual(g.annual_power_cost_usd,  10621.56, 'KAZM annual_power_cost_usd should be $10,621.56');
 });
 
 test('am_utility_power_service_and_metering_guide comparison table columns present', async () => {
@@ -13892,8 +13892,8 @@ test('am_frequency_allocation_class_and_channel_guide comparison table columns p
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.fac_channel_type,         'clear', 'rank-1 fac_channel_type should be clear');
-  assert.strictEqual(r0.fac_class_max_day_kw,      50,    'rank-1 fac_class_max_day_kw should be 50 (§73.21(b))');
-  assert.strictEqual(r0.fac_upgrade_potential_kw,  45,    'rank-1 fac_upgrade_potential_kw should be 45 (50 − 5 kW)');
+  assert.strictEqual(r0.fac_class_max_day_kw,      5,     'rank-1 fac_class_max_day_kw should be 5 kW (Class D, §73.21(e))');
+  assert.strictEqual(r0.fac_upgrade_potential_kw,  0,     'rank-1 fac_upgrade_potential_kw should be 0 (KAZM at 5 kW = Class D max)');
 });
 
 test('am_modulation_and_audio_processing_guide present on KAZM candidate', async () => {

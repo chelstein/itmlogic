@@ -406,7 +406,7 @@
       "expected_distance_km": 38.613,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave (Sommerfeld-Norton)",
+        "method":          "47 CFR §73.184 groundwave (Sommerfeld-Norton)",
         "source":          "fcc.amDistanceKm(sigma=8, eps=15, freq=1030, field=5, fs1km=707.1)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -424,7 +424,7 @@
       "expected_distance_km": 58.633,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave (Sommerfeld-Norton)",
+        "method":          "47 CFR §73.184 groundwave (Sommerfeld-Norton)",
         "source":          "fcc.amDistanceKm(sigma=8, eps=15, freq=1030, field=2, fs1km=707.1)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -442,7 +442,7 @@
       "expected_distance_km": 103.164,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave (Sommerfeld-Norton)",
+        "method":          "47 CFR §73.184 groundwave (Sommerfeld-Norton)",
         "source":          "fcc.amDistanceKm(sigma=8, eps=15, freq=1030, field=0.5, fs1km=707.1)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -460,7 +460,7 @@
       "expected_distance_km": 293.594,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave (Sommerfeld-Norton)",
+        "method":          "47 CFR §73.184 groundwave (Sommerfeld-Norton)",
         "source":          "fcc.amDistanceKm(sigma=8, eps=15, freq=1030, field=0.025, fs1km=707.1)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -478,7 +478,7 @@
       "expected_distance_km": 13.076,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave (Sommerfeld-Norton)",
+        "method":          "47 CFR §73.184 groundwave (Sommerfeld-Norton)",
         "source":          "fcc.amDistanceKm(sigma=4, eps=15, freq=1240, field=2, fs1km=100.0)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -496,7 +496,7 @@
       "expected_distance_km": 23.428,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave (Sommerfeld-Norton) — low-band frequency",
+        "method":          "47 CFR §73.184 groundwave (Sommerfeld-Norton) — low-band frequency",
         "source":          "fcc.amDistanceKm(sigma=2, eps=15, freq=540, field=5, fs1km=316.2)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -515,7 +515,7 @@
       "expected_distance_km": 70.742,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave (Sommerfeld-Norton)",
+        "method":          "47 CFR §73.184 groundwave (Sommerfeld-Norton)",
         "source":          "fcc.amDistanceKm(sigma=2, eps=15, freq=540, field=0.5, fs1km=316.2)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -533,7 +533,7 @@
       "expected_distance_km": 11.123,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave (Sommerfeld-Norton) — upper-band frequency",
+        "method":          "47 CFR §73.184 groundwave (Sommerfeld-Norton) — upper-band frequency",
         "source":          "fcc.amDistanceKm(sigma=6, eps=15, freq=1700, field=5, fs1km=223.6)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -552,7 +552,7 @@
       "expected_distance_km": 31.387,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave (Sommerfeld-Norton)",
+        "method":          "47 CFR §73.184 groundwave (Sommerfeld-Norton)",
         "source":          "fcc.amDistanceKm(sigma=6, eps=15, freq=1700, field=0.5, fs1km=223.6)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -571,7 +571,7 @@
       "expected_distance_km": 20.693,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave — minimum conductivity edge case",
+        "method":          "47 CFR §73.184 groundwave — minimum conductivity edge case",
         "source":          "fcc.amDistanceKm(sigma=1, eps=15, freq=1030, field=2, fs1km=707.1)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -590,7 +590,7 @@
       "expected_distance_km": 33.193,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave — maximum conductivity + upper-band frequency edge case",
+        "method":          "47 CFR §73.184 groundwave — maximum conductivity + upper-band frequency edge case",
         "source":          "fcc.amDistanceKm(sigma=8, eps=15, freq=1700, field=2, fs1km=707.1)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -609,7 +609,7 @@
       "expected_distance_km": 222.891,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave — far-field / nighttime interference edge case",
+        "method":          "47 CFR §73.184 groundwave — far-field / nighttime interference edge case",
         "source":          "fcc.amDistanceKm(sigma=4, eps=15, freq=630, field=0.1, fs1km=707.1)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -628,7 +628,7 @@
       "expected_distance_km": 10.708,
       "provenance": {
         "curve_family":    "AM groundwave",
-        "method":          "47 CFR §73.183/§73.184 groundwave — low-ERP (Class D) edge case",
+        "method":          "47 CFR §73.184 groundwave — low-ERP (Class D) edge case",
         "source":          "fcc.amDistanceKm(sigma=4, eps=15, freq=1030, field=2, fs1km=50.0)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -717,7 +717,7 @@
       "tolerance_mvm":        0.1,
       "provenance": {
         "curve_family":    "AM groundwave inverse",
-        "method":          "47 CFR §73.183/§73.184 groundwave field at distance (round-trip verification)",
+        "method":          "47 CFR §73.184 groundwave field at distance (round-trip verification)",
         "source":          "fcc.amField(sigma=8, eps=15, freq=1030, dist=58.633, fs1km=707.1)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -738,7 +738,7 @@
       "tolerance_mvm":        0.1,
       "provenance": {
         "curve_family":    "AM groundwave inverse",
-        "method":          "47 CFR §73.183/§73.184 groundwave field at distance (round-trip verification)",
+        "method":          "47 CFR §73.184 groundwave field at distance (round-trip verification)",
         "source":          "fcc.amField(sigma=8, eps=15, freq=1030, dist=38.613, fs1km=707.1)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",
@@ -759,7 +759,7 @@
       "tolerance_mvm":        0.1,
       "provenance": {
         "curve_family":    "AM groundwave inverse",
-        "method":          "47 CFR §73.183/§73.184 groundwave field at distance (round-trip verification) — low-band frequency",
+        "method":          "47 CFR §73.184 groundwave field at distance (round-trip verification) — low-band frequency",
         "source":          "fcc.amField(sigma=2, eps=15, freq=540, dist=70.742, fs1km=316.2)",
         "upstream_file":   "controllers/gwave.js",
         "upstream_commit": "b55870d3f20618e886cd02379008ef980229d44b",

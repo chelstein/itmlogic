@@ -10005,7 +10005,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_propagation_groundwave_field_strength_estimate_guide: (() => {
-      // AM groundwave field strength estimate — §73.183 / §73.184 FCC M3 curves.
+      // AM groundwave field strength estimate — §73.184 FCC M3 groundwave curves.
       //
       // Regulatory framework:
       //   47 CFR §73.184: Groundwave propagation curves (M3 conductivity method).  Applicants must calculate the
@@ -19371,7 +19371,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const da_bearing_factor = (col_bearing_favored === true) ? 1.15 : (col_bearing_favored === false ? 0.85 : 1.0);
       const effective_range_col_km = Math.round(estimated_range_km * da_bearing_factor);
 
-      // FCC §73.183/§73.184 reference field strength contours
+      // FCC §73.184 reference field strength contours (groundwave coverage, §73.183 sets interference thresholds)
       const fcc_r50_50_contour_uvm = 100; // mV/m standard primary service
       const fcc_r50_10_contour_uvm = 25;  // mV/m secondary service
 
@@ -28708,7 +28708,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Co-channel search methodology overview
       const STUDY_METHODOLOGY = {
-        groundwave_method: '47 CFR §73.183 / §73.184 FCC gwave conductivity curves',
+        groundwave_method: '47 CFR §73.184 FCC groundwave M3 conductivity curves',
         skywave_method:    hasSkywave ? '47 CFR §73.190(c) Wang 1985 Ionospheric method (FCCAM sidecar)' : 'N/A — Class C no skywave obligation',
         rss_formula:       hasSkywave ? 'RSS = √(∑ Eₙ²) where Eₙ is interfering skywave field; proposed ≤ √(Eprotected² - ∑ Eₙ²)' : 'N/A',
         du_ratio_method:   '§73.182 Table I (co-channel), Table II (adj-channel); FCC gwave distance',

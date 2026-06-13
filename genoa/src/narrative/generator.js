@@ -95,7 +95,7 @@ function section_provenance(x){
   lines.push(`Facility       : ${fm.facility_lookup_source || '—'}${fm.facility_endpoint ? '  · ' + fm.facility_endpoint : ''}`);
   if (fm.facility_updated_at) lines.push(`               (updated ${fm.facility_updated_at})`);
   // Terrain provenance line — labelled "HAAT" for FM/TV (per §73.313),
-  // "Ground σ" for AM since §73.183 keys on conductivity, not terrain
+  // "Ground σ" for AM since §73.184 keys on conductivity, not terrain
   // elevation.  Same evidence packet for AM is the conductivity source.
   const isAmFacility = String(s.service || '').toUpperCase() === 'AM';
   lines.push(isAmFacility
@@ -217,7 +217,7 @@ function section_summary(x){
 }
 
 function section_inputs(s){
-  // AM narrative uses §73.183 vocabulary: TPO + ground conductivity +
+  // AM narrative uses §73.184 vocabulary: TPO + ground conductivity +
   // DA/NDA mode.  ERP/HAAT are FM/TV concepts and would look like an
   // FM exhibit imported onto an AM filing — exactly the credibility
   // hit an AM engineer would flag.
