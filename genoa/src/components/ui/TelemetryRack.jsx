@@ -141,7 +141,7 @@ export default function TelemetryRack({ exhibit }) {
           <div className="font-mono text-[11px] text-textDim italic">
             {pop.attempt_status === 'failed'
               ? `Census API failed: ${pop.attempt_error || 'unknown'}`
-              : 'Placeholder — computing exhibit will fetch real Census data'}
+              : 'Not yet computed — Census/ACS data will be fetched when the exhibit is run'}
           </div>
         )}
       </RackPanel>

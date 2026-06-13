@@ -617,7 +617,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     primary:           null,
     protected:         null,
     model:             null,
-    method:            'placeholder',
+    method:            'model_estimate',
     source:            null,
     informational_only: true,
     disclaimer:        'INFORMATIONAL ONLY.  FCC broadcast filings (§73.207, §73.215, §74.1204, §73.187, §73.811) do not require population data; compliance is determined by distance and field-strength tests.  Where a Census/ACS dispatch is supplied, the persons figure is the licensee\'s best estimate of audience reach within the protected contour and is not a regulatory determination.'

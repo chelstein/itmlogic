@@ -94,13 +94,6 @@ const KNOWN_GOALS = Object.freeze([
   'minimize_int_treaty_zone'
 ]);
 
-// Goals that are placeholders for the screening-grade pipeline; if
-// enabled, surface them in the candidate's limitations[] so the
-// operator knows the sub-score isn't backed by real data yet.
-// Note: avoid_wildfire_risk now uses a geographic region proxy (no longer null);
-// USFS FIA / LANDFIRE raster would improve it from screening to filing grade.
-const PLACEHOLDER_GOALS = Object.freeze({});
-
 // Geographic wildfire risk proxy — same boundaries used in scoring, score_breakdown_detail,
 // and the vegetation management guide so all three are always in sync.
 // LOW=100, MODERATE=75, ELEVATED=50, HIGH=25, VERY_HIGH=0.

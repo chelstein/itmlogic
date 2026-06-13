@@ -352,7 +352,7 @@ function section_population(pop){
   } else {
     lines.push(`Primary contour:  ~${(pop?.primary ?? 0).toLocaleString()} (${pop?.model || '—'})`);
     lines.push(`Protected:        ~${(pop?.protected ?? 0).toLocaleString()}`);
-    lines.push(`PLACEHOLDER — population sourced from model estimate only.`);
+    lines.push(`MODEL ESTIMATE — population sourced from area/density proxy, not Census/ACS data.`);
     lines.push(`A Census/ACS dispatch is required for any filing-grade population claim.`);
   }
   return lines.join('\n');
@@ -380,7 +380,7 @@ function section_warnings(warnings, fr){
 
 function section_certification(fr){
   return [
-    hr('Engineering Certification Placeholder'),
+    hr('Engineering Certification — Engineer Stamp Required Before Filing'),
     CERTIFICATION_LANGUAGE,
     '',
     `Genoa filing readiness:   ${fr.score ?? '—'}/100  (${fr.status || '—'})`,

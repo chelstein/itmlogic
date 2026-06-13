@@ -1589,7 +1589,7 @@ function PaneEvidence({ exhibit }){
               ['Error',    pop.attempt_error || '—'],
               ['Endpoint', pop.attempt_endpoint || '—']
             ]
-          : [['Status', 'Placeholder — real Census data will populate once an exhibit is computed with lat/lon coordinates.']]} />
+          : [['Status', 'Not yet computed — Census/ACS data will populate once an exhibit is computed with lat/lon coordinates.']]} />
       <SubHead title="Measurements (SDR captures via ZTR)" />
       <SubKv kv={ev.measurements?.available
         ? [
