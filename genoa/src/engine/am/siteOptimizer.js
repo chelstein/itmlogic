@@ -10907,7 +10907,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_rc_low_usd,
         total_rc_high_usd,
         reference: '47 CFR §73.1300 (unattended operation); §73.1400 (transmission system monitoring); §73.1350 (transmission system operation — corrective action within 3 hours, 3 minutes where interference); §73.1215 (instrument accuracy 2%); §73.1820(a) (daily log requirement); §73.69 (antenna monitors); §73.61 (DA field strength measurements)',
-        note: `Remote control ${remote_required ? 'RECOMMENDED' : 'OPTIONAL'} for site ${round2(dist_km)} km from current location. Required capabilities: transmitter on/off, TPO/antenna current monitoring (±${rc_accuracy_pct}%), modulation monitoring.${isDA_rc ? ` DA station (${pattern_mode}): antenna monitor data channel required per §73.69.` : ''} Out-of-tolerance operation must be corrected or terminated within ${operator_response_time_hrs} hours per §73.1350(c) (3 minutes where interference is caused). Preferred connection: ${preferred_connection}. POTS line-based legacy remote control: high risk in rural AZ. Log minimum: ${log_min_frequency}.`
+        note: `Remote control ${remote_required ? 'RECOMMENDED' : 'OPTIONAL'} for site ${round2(dist_km)} km from current location. Required capabilities: transmitter on/off, TPO/antenna current monitoring (±${rc_accuracy_pct}%), modulation monitoring.${isDA_rc ? ` DA station (${pattern_mode}): antenna monitor data channel required per §73.69.` : ''} Out-of-tolerance operation must be corrected or terminated within ${operator_response_time_hrs} hours per §73.1350(c) (3 minutes where interference is caused). Preferred connection: ${preferred_connection}. POTS line-based legacy remote control: high risk at remote transmitter sites; cellular or IP preferred. Log minimum: ${log_min_frequency}.`
       };
     })(),
 
@@ -11224,10 +11224,13 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Distance to nearest major road / industrial zone from pt.lat, pt.lon is not
       //   available without an external API; we estimate based on:
       //   - land_use_class is the canonical urbanization proxy (computed from distance + conductivity)
-      //   - Sedona/Flagstaff area: low industrial density → residential zone noise level
+      //   - lower land_use_class (RURAL) implies lower man-made noise per ITU-R P.372-16 Table 1
 
-      // ITU-R P.372-16: atmospheric noise at 780 kHz, North American zone B (continental)
-      const fa_atmospheric_dBuVm   = 53.0;   // ITU-R P.372-16 zone B, 780 kHz, daytime median
+      // ITU-R P.372-16 Curve D (North American continental zone) regression:
+      //   Fa = 53 − 28·log10(f_MHz) — valid ~0.3–3 MHz MF/lower-HF range
+      const fa_f_mhz = frequency_khz / 1000;
+      const fa_atmospheric_dBuVm = round2(53 - 28 * Math.log10(fa_f_mhz));
+      const fa_atmospheric_formula = `53 − 28·log10(${fa_f_mhz.toFixed(3)}) = ${fa_atmospheric_dBuVm} dBµV/m`;
 
       // Man-made noise estimate — use land_use_class (distance + conductivity proxy)
       // as a more consistent urbanization signal than raw distance from current site.
@@ -11278,7 +11281,10 @@ async function scoreCandidate(pt, ctx, warnings){
 
       return {
         fa_atmospheric_dBuVm,
+        fa_atmospheric_formula,
+        fa_atmospheric_basis: 'ITU-R P.372-16 Curve D (North American continental zone) regression: Fa = 53 − 28·log10(f_MHz)',
         fa_manmade_dBuVm,
+        fa_manmade_basis: 'ITU-R P.372-16 Table 1 approximate MF values by zone',
         noise_zone,
         ft_dBuVm,
         fs_day_dBuVm,
@@ -11596,7 +11602,6 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Rural/agricultural (1–2 hr from metro): $10,000–$30,000/year
       //   Suburban/exurban (30–60 min from metro): $24,000–$60,000/year
       //   Urban-adjacent: $60,000–$120,000+/year
-      //   KAZM (Sedona AZ, rural high-desert): likely $10,000–$25,000/year
       //
       // Escalation clause: typical 3% annual CPI-linked increases; negotiate cap at 5%.
       //
@@ -11760,9 +11765,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   The closer a candidate is to co-channel or adjacent-channel stations, the higher the
       //   risk of contour overlap.  This guide uses the candidate's daytime reach (reach_scale_km)
       //   as a proxy for the 0.5 mV/m contour radius.
-      //   Adjacent channel risk: ±10 kHz (770 and 790 kHz from 780 kHz, for KAZM).
+      //   Adjacent channel risk: ±10 kHz neighbors of the station's operating frequency.
+      //   Example: 780 kHz → adjacent channels are 770 kHz (WABC New York, Class A 50 kW) and 790 kHz.
       //
-      // Adjacent channels to 780 kHz: 770 kHz (KKLA Los Angeles, Class A 50 kW) and 790 kHz.
       //   Any candidate that extends its 2 mV/m contour toward a co-channel or adjacent station
       //   must file a contour overlap study before the FCC will process the application.
       //
@@ -12214,9 +12219,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   suspend nighttime operations.  This is determined by the FCC skywave prediction method
       //   (§73.182 Appendix A — ITU-R P.1147 based methodology).
       //
-      // Dominant station on 780 kHz: WBBM Chicago IL (50 kW Class A) — per FCC §73.25 / LMS.
+      // Dominant station on each clear channel per §73.25 / FCC LMS (see CLEAR_DOMINANTS table below).
       //
-      // Skywave skip distance at 780 kHz:
+      // Skywave skip distance (MF AM range):
       //   Skip zone (no skywave coverage): typically 300–1,000 km from transmitter
       //   First-hop skywave coverage: ~800–2,500 km from transmitter
       //
@@ -12224,9 +12229,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   interfering skywave at the dominant's service area be < the dominant's skywave.
       //   FCC uses Appendix A curves; screening requires a dedicated nighttime skywave study.
       //
-      // Nighttime operating window: varies by season and latitude.
-      //   For Arizona (lat ~34.9°, lon ~111.8°): winter sunset ~1800 MST, sunrise ~0700 MST
-      //   (approximately 13 hours nighttime operation restricted / at risk for secondary).
+      // Nighttime operating window: varies by season and latitude of the candidate site.
+      //   Computed from pt.lat if available; typical CONUS range is 10–14 hours in winter.
       //
       // Cost: nighttime skywave interference study (ITU-R P.1147 / FCC method):
       //   Engineering study: $4,000–$12,000
@@ -12287,8 +12291,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Approximate sky-wave hop distance check for Class D at this candidate location.
       // ITU-R P.1147 first-hop F2: distance D_1 ≈ 2000 × sin(θ) km where θ is hop angle;
       // for standard nighttime F-layer height ~350 km, D_1 ≈ 2 × sqrt(h²−(h−H)²) for flat geometry.
-      // Simplified: skip distance for 780 kHz ≈ 400–600 km (depends on season/K-index).
-      // Example: KAZM at 34.86°N, 111.82°W: WBBM at ~41.88°N, 87.89°W → distance ≈ 2,430 km.
+      // Simplified: skip distance at MF AM frequencies ≈ 400–600 km (depends on frequency/season/K-index).
       const skip_zone_est_km = 400;
       const skywave_first_hop_max_km = 2500;
 
@@ -13258,11 +13261,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const isHighClass_str = /^[AB]/i.test(fcc_class);
       const tower_height_m_str = round2(isHighClass_str ? lambda_m_str * 0.625 : lambda_m_str * 0.375);
       const tower_height_ft_str = round2(tower_height_m_str * 3.28084);
-      // Design wind speed (ASCE 7-22, 3-sec gust, Risk Category II): Southwest US typically 90–115 mph
+      // Design wind speed (ASCE 7-22, 3-sec gust, Risk Category II): CONUS range 90–115 mph
       const design_wind_speed_mph_low  = 90;
       const design_wind_speed_mph_high = 115;
-      // Ice load: Southwest arid sites typically negligible, northern sites 0.5–1.0 in radial
-      const ice_radial_in = 0; // arid Southwest default
+      // Ice load: ASCE 7-22 Fig. 10-1; ≤35°N latitude → negligible; >35°N → 0.5–1.0 in radial
+      const ice_radial_in = (pt.lat ?? 35) > 35 ? 0.5 : 0;
       // Structural analysis cost: $8,000–$25,000 for full EIA/TIA-222-H analysis + PE stamp
       const structural_analysis_low_usd  = 8000;
       const structural_analysis_high_usd = 25000;
@@ -13294,7 +13297,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_structural_low_usd,
         total_structural_high_usd,
         reference: 'EIA/TIA-222-H (2017) (structural design of antenna supporting structures and antennas); ASCE 7-22 (minimum design loads and associated criteria); 47 CFR §17.6 (notification requirements for construction); IBC 2021 §1609 (wind loads); ANSI/TIA-5G-TOWER (5G co-location structural assessment)',
-        note: `Class ${fcc_class} tower ${tower_height_ft_str} ft (${tower_height_m_str} m): ${guy_levels} guy level(s). Design wind: ${design_wind_speed_mph_low}–${design_wind_speed_mph_high} mph (ASCE 7-22 3-sec gust). Ice: ${ice_radial_in}" radial (Southwest arid). Structural analysis + PE stamp: $${total_structural_low_usd.toLocaleString()}–$${total_structural_high_usd.toLocaleString()}.`
+        note: `Class ${fcc_class} tower ${tower_height_ft_str} ft (${tower_height_m_str} m): ${guy_levels} guy level(s). Design wind: ${design_wind_speed_mph_low}–${design_wind_speed_mph_high} mph (ASCE 7-22 3-sec gust). Ice: ${ice_radial_in}" radial (ASCE 7-22 Fig. 10-1 lat-based screening). Structural analysis + PE stamp: $${total_structural_low_usd.toLocaleString()}–$${total_structural_high_usd.toLocaleString()}.`
       };
     })(),
 
@@ -13459,10 +13462,15 @@ async function scoreCandidate(pt, ctx, warnings){
       // Categorical exclusion (CE): most AM sites qualify unless triggering conditions apply.
       const candidate_lat = pt.lat;
       const candidate_lon = pt.lon;
-      // Southwest US (lat 30–38, lon -115 to -103): arid/desert, generally low wetland probability
-      // Wetland flag: rough heuristic based on lat/lon region
-      const probable_wetland = candidate_lat > 36 && candidate_lat < 38 && candidate_lon > -112 && candidate_lon < -110;
-      const nepa_category = probable_wetland ? 'EA_REQUIRED' : 'CATEGORICAL_EXCLUSION';
+      // Wetland probability: NWI lookup required for definitive determination (§1.1307(a)(3)).
+      // Screening heuristic: high-conductivity soils (σ > 8 mS/m) in humid regions (lon > -100)
+      // correlate with wetland-prone areas (Gulf Coast, Southeast, Great Lakes).
+      // Arid interior (lon < -100) with low σ typically has low wetland probability.
+      // This is a screening flag only — Phase I ESA (ASTM E1527-21) is always required.
+      const humid_region = (candidate_lon ?? 0) > -100;  // east of 100°W meridian
+      const high_conductivity = (sigma_msm ?? 8) > 8;
+      const probable_wetland = humid_region && high_conductivity;
+      const nepa_category = probable_wetland ? 'EA_LIKELY' : 'CATEGORICAL_EXCLUSION_PROBABLE';
       const ea_required = nepa_category === 'EA_REQUIRED';
       // Phase 1 ESA: environmental site assessment (ASTM E1527-21)
       const phase1_esa_low_usd  = 2500;
@@ -13636,25 +13644,25 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM ground-wave propagation is affected by terrain, soil conductivity, and land cover.
       // Key factors:
       // 1. Soil conductivity (σ): low conductivity = higher attenuation; FCC M3 maps classify
-      //    conductivity zones from 1–30 mS/m; arid Southwest typically 2–5 mS/m (poor)
+      //    conductivity zones from 1–30 mS/m.
       // 2. Terrain roughness: mountainous terrain causes additional diffraction loss
       // 3. Water bodies (high conductivity) enhance coverage in certain directions
-      // Sedona/Cottonwood AZ area (KAZM region): predominantly rocky desert, σ ≈ 2–4 mS/m
       const candidate_lat = pt.lat;
       const candidate_lon = pt.lon;
       const bearing_deg   = round2(pt.bearing_deg ?? 0);
       const distance_km   = round2(pt.distance_from_current_km ?? 0);
-      // Elevation at candidate (derive from lat/lon proxy — Arizona high desert)
-      // Use latitude as a proxy for elevation zone: 34–36°N = 1,000–2,200m elevation
-      const elev_proxy_m  = round2(Math.min(2200, Math.max(500, (candidate_lat - 30) * 200)));
-      // Conductivity: Arizona high desert typically 2–5 mS/m (FCC M3 zone C/D)
-      const conductivity_ms_per_m_low  = 2;
-      const conductivity_ms_per_m_high = 5;
-      const fcc_m3_zone    = 'C/D';   // typical for arid Southwest
+      // Elevation: use site-provided value or flag as not available (no lat-based proxy)
+      const elev_proxy_m  = pt.elevation_m != null ? round2(pt.elevation_m) : null;
+      // Conductivity from sigma_msm (FCC M3 zone-table or measured value)
+      const sigma_terrain  = sigma_msm ?? 8;  // mS/m; 8 mS/m = FCC M3 default for unlisted zones
+      const conductivity_ms_per_m_low  = round2(sigma_terrain * 0.75);
+      const conductivity_ms_per_m_high = round2(sigma_terrain * 1.25);
+      // FCC M3 zone classification from sigma
+      const fcc_m3_zone = sigma_terrain < 1 ? 'E' : sigma_terrain < 3 ? 'D' : sigma_terrain < 10 ? 'C' : sigma_terrain < 30 ? 'B' : 'A';
       // Ground-wave attenuation function correction for low conductivity:
       // At 1000 kHz, signal at 100 km over σ=2 mS/m may be 6–12 dB weaker than σ=30 mS/m
-      const conductivity_penalty_db_low  = 6;
-      const conductivity_penalty_db_high = 12;
+      const conductivity_penalty_db_low  = sigma_terrain < 3 ? 9  : sigma_terrain < 8 ? 4 : 0;
+      const conductivity_penalty_db_high = sigma_terrain < 3 ? 15 : sigma_terrain < 8 ? 8 : 2;
       // Engineering study cost for terrain/conductivity analysis:
       const terrain_study_low_usd  = 2500;
       const terrain_study_high_usd = 8000;
@@ -13671,8 +13679,8 @@ async function scoreCandidate(pt, ctx, warnings){
         conductivity_penalty_db_low, conductivity_penalty_db_high,
         terrain_study_low_usd, terrain_study_high_usd,
         study_tools,
-        reference: '47 CFR §73.183 (AM groundwave tables); ITU-R P.368 (ground-wave propagation); FCC M3 ground conductivity map; USGS National Elevation Dataset; Rotheram (1992) terrain diffraction correction; ITU-R P.526 (diffraction loss)',
-        note: `Candidate (${round2(candidate_lat)}°N, ${Math.abs(round2(candidate_lon))}°W): est. conductivity ${conductivity_ms_per_m_low}–${conductivity_ms_per_m_high} mS/m (FCC M3 zone ${fcc_m3_zone}); penalty ${conductivity_penalty_db_low}–${conductivity_penalty_db_high} dB vs. ideal ground. Engineering study: $${terrain_study_low_usd.toLocaleString()}–$${terrain_study_high_usd.toLocaleString()}`
+        reference: '47 CFR §73.184 (AM groundwave propagation method); §73.190 (AM groundwave conductivity certification); ITU-R P.368 (ground-wave propagation curves); FCC M3 ground conductivity map; USGS National Elevation Dataset; Rotheram (1992) terrain diffraction correction; ITU-R P.526 (diffraction loss)',
+        note: `Candidate (${round2(candidate_lat)}°N, ${Math.abs(round2(candidate_lon))}°W): σ≈${sigma_terrain} mS/m (FCC M3 zone ${fcc_m3_zone}); conductivity range est. ${conductivity_ms_per_m_low}–${conductivity_ms_per_m_high} mS/m; penalty ${conductivity_penalty_db_low}–${conductivity_penalty_db_high} dB vs. ideal ground.${elev_proxy_m != null ? ` Elevation: ${elev_proxy_m} m.` : ''} Engineering study: $${terrain_study_low_usd.toLocaleString()}–$${terrain_study_high_usd.toLocaleString()}`
       };
     })(),
 
@@ -13782,10 +13790,10 @@ async function scoreCandidate(pt, ctx, warnings){
 
     am_frequency_allocation_class_and_channel_guide: (() => {
       // FCC AM frequency allocation per 47 CFR §73.21–§73.29:
-      // Class A: dominant clear channel, up to 50 kW, nationwide coverage
-      // Class B: regional channel, up to 50 kW daytime, limited nighttime
-      // Class C: local channel, up to 1 kW daytime
-      // Class D: secondary/local, up to 1 kW daytime, nighttime secondary only
+      // Class A: dominant clear channel, up to 50 kW, nationwide coverage (§73.21(a))
+      // Class B: regional channel, up to 50 kW daytime, limited nighttime (§73.21(b))
+      // Class C: local channel, up to 1 kW daytime (§73.21(c))
+      // Class D: secondary, up to 5 kW daytime per §73.21(e); nighttime ≤0.5 kW or sign-off (§73.21(b)(2))
       const is_clear_fac  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const is_local_fac  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
       const is_regional   = !is_clear_fac && !is_local_fac;
@@ -13795,7 +13803,7 @@ async function scoreCandidate(pt, ctx, warnings){
         A: { max_day_kw: 50, max_night_kw: 50,   protection: 'dominant — nationwide co-channel protection', nighttime: 'full nighttime operation', coverage: 'national', ref: '§73.21(a)' },
         B: { max_day_kw: 50, max_night_kw: 50,   protection: 'regional — limited co-channel protection',    nighttime: 'with interference study',  coverage: 'regional', ref: '§73.21(b)' },
         C: { max_day_kw:  1, max_night_kw:  1,   protection: 'local — no co-channel protection',            nighttime: 'unlimited time at licensed power (0.25–1 kW)', coverage: 'local', ref: '§73.21(c)' },
-        D: { max_day_kw: 50, max_night_kw: 0.25, protection: 'secondary — must protect Class A/B',          nighttime: 'less than 0.25 kW where authorized (§73.21(b)(2))', coverage: 'secondary', ref: '§73.21(b)' },
+        D: { max_day_kw:  5, max_night_kw: 0.5,  protection: 'secondary — must protect Class A/B',          nighttime: '≤0.5 kW where authorized or sign-off per §73.21(b)(2)', coverage: 'secondary', ref: '§73.21(e)' },
       };
       const class_key     = fcc_class.toUpperCase();
       const class_info    = class_descriptions[class_key] ?? class_descriptions['D'];
@@ -13995,7 +14003,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const study_high_usd = isDA_ic ? 25000 : 10000;
       // Interference protection distance (rough): using 5 mV/m and 0.1 mV/m contours
       // For Class D on clear channel: must protect dominant Class A 0.1 mV/m groundwave contour
-      // (dominant Class A stations on 780 kHz may have 0.1 mV/m contour extending hundreds of km)
+      // (dominant Class A clear-channel stations may have 0.1 mV/m contour extending hundreds of km)
       const skywave_protection_km_low  = is_clear_ic && is_class_cd_i ? 1000 : 0;
       const skywave_protection_km_high = is_clear_ic && is_class_cd_i ? 2500 : 0;
       return {
@@ -14009,7 +14017,7 @@ async function scoreCandidate(pt, ctx, warnings){
         du_adjacent_channel_db,
         study_low_usd, study_high_usd,
         skywave_protection_km_low, skywave_protection_km_high,
-        reference: '47 CFR §73.182(r)/§73.37(a) (D/U ratios); §73.182 (service and interference); §73.183 (groundwave field strength tables); §73.25 (clear channel dominant station protection); FCC Groundwave Assistant; MWAA (Medium Wave Antenna Analysis)',
+        reference: '47 CFR §73.182(r)/§73.37(a) (D/U ratios); §73.182 (service and interference); §73.184 (groundwave propagation method); §73.183 (interference field strength computation); §73.25 (clear channel dominant station protection); FCC Groundwave Assistant; MWAA (Medium Wave Antenna Analysis)',
         note: `Class ${fcc_class} ${is_clear_ic ? 'clear' : is_local_ic ? 'local' : 'regional'} channel — D/U co-channel: ${du_cochannel_db} dB; adjacent: ${du_adjacent_channel_db} dB. ${is_class_cd_i && is_clear_ic ? `Skywave protection zone: ${skywave_protection_km_low}–${skywave_protection_km_high} km. Must not interfere with dominant Class A. ` : ''}Engineering study: $${study_low_usd.toLocaleString()}–$${study_high_usd.toLocaleString()}`
       };
     })(),
@@ -14312,7 +14320,7 @@ async function scoreCandidate(pt, ctx, warnings){
     am_signal_contour_and_coverage_area_guide: (() => {
       // Simplified inverse-distance ground-wave formula for AM:
       //   E(mV/m) = (k * sqrt(P_kW)) / d_km   (very rough; actual uses M3 map tables / Groundwave Assistant)
-      // FCC §73.183 uses M3 ground conductivity maps; here we use theoretical free-space approximation
+      // FCC §73.184 uses M3 ground conductivity maps; here we use theoretical free-space approximation
       // suitable only for planning comparison. k ≈ 1000 * sqrt(1) for 1 kW at 1 km reference.
       // More accurately: E_1kW_1km ≈ 300 mV/m for AM ground wave (ITU-R P.368).
       // Radiated power: apply efficiency for ground system (typ. 80–95% for NDA, 70–85% for DA base).
@@ -14345,7 +14353,7 @@ async function scoreCandidate(pt, ctx, warnings){
         r_05mvm_km,    r_05mvm_mi,
         r_0025mvm_km,  r_0025mvm_mi: round2(r_0025mvm_km * 0.621371),
         area_5mvm_km2, area_05mvm_km2,
-        reference: 'ITU-R P.368 (ground-wave propagation); 47 CFR §73.182 (AM service contours); §73.183 (groundwave field strength tables); FCC M3 ground conductivity map; simplified planning formula only — use Groundwave Assistant for precise contours',
+        reference: 'ITU-R P.368 (ground-wave propagation); 47 CFR §73.182 (AM service contours); §73.184 (groundwave propagation method, M3 conductivity maps); FCC M3 ground conductivity map; simplified planning formula only — use Groundwave Assistant for precise contours',
         note: `${tpo_kw} kW ${isDA_sc ? 'DA' : 'NDA'}: 5 mV/m radius ≈ ${r_5mvm_km} km (${r_5mvm_mi} mi); 0.5 mV/m ≈ ${r_05mvm_km} km (${r_05mvm_mi} mi). Simplified planning estimate only.`
       };
     })(),
@@ -14810,7 +14818,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Annual operating costs: power, maintenance, monitoring, engineering.
       // Power dominates for high-TPO stations; AC-to-RF efficiency ~65% means
       // actual wall-power draw is higher than TPO.
-      const power_rate_per_kwh = 0.12; // $/kWh, typical US commercial rate
+      const power_rate_per_kwh = 0.115; // $/kWh, US commercial average (EIA 2024)
       const power_factor       = 0.65; // typical solid-state AM transmitter efficiency
       const annual_power_kw_input = round2(tpo_kw / power_factor);
       const annual_kwh        = round2(annual_power_kw_input * 8760);
@@ -14915,18 +14923,16 @@ async function scoreCandidate(pt, ctx, warnings){
 
     am_soil_conductivity_and_ground_loss_assessment_guide: (() => {
       // FCC AM propagation uses M3 ground conductivity maps (σ in mS/m).
-      // Arid Southwest US (lat 29-42N, lon 100-120W) typically has low conductivity
-      // (0.5–3 mS/m) which attenuates groundwave propagation and lowers effective reach.
       // On-site four-electrode (Wenner) resistivity testing refines FCC M3 assumptions;
       // poor-conductivity sites may benefit from chemical or bentonite soil treatment.
+      // Use sigma_msm from the site scoring context (FCC M3 zone-table lookup or measured value).
       const candidate_lat = pt.lat;
       const candidate_lon = pt.lon;
-      const likely_arid = (candidate_lat >= 29 && candidate_lat <= 42 && candidate_lon >= -120 && candidate_lon <= -100);
-      const conductivity_tier = likely_arid ? 'arid_low' : 'average';
-      const sigma_est_ms_m    = likely_arid ? 2.0 : 5.0;
+      const sigma_est_ms_m = sigma_msm ?? 8;  // mS/m from FCC M3 zone; 8 mS/m is FCC default
+      const conductivity_tier = sigma_est_ms_m < 2 ? 'very_low' : sigma_est_ms_m < 5 ? 'low' : sigma_est_ms_m < 15 ? 'average' : 'high';
       const resistivity_test_low_usd  = 2000;
       const resistivity_test_high_usd = 8000;
-      const soil_treatment_needed     = likely_arid;
+      const soil_treatment_needed     = sigma_est_ms_m < 3;  // low conductivity warrants bentonite/salt treatment
       const soil_treatment_low_usd    = soil_treatment_needed ? 8000  : 0;
       const soil_treatment_high_usd   = soil_treatment_needed ? 25000 : 0;
       const total_low_usd  = round2(resistivity_test_low_usd  + soil_treatment_low_usd);
