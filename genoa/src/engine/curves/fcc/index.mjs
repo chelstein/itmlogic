@@ -70,7 +70,7 @@ const FS_OR_DIST_ERP      = 3;
 // FCC code itself accepts 200..300 and gates ERP/HAAT separately.
 export function fmFrequencyToChannel(frequency_mhz){
   const f = Number(frequency_mhz);
-  if (!Number.isFinite(f)) return 261;            // ~100.1 MHz default
+  if (!Number.isFinite(f)) throw new Error(`fmFrequencyToChannel: invalid frequency_mhz=${frequency_mhz}`);
   const ch = Math.round((f - 87.9) / 0.2) + 200;
   return Math.max(200, Math.min(300, ch));
 }
@@ -88,7 +88,8 @@ export function fccDistanceKm({
   channel = null,
   frequency_mhz = null
 }){
-  const ch = channel ?? (frequency_mhz != null ? fmFrequencyToChannel(frequency_mhz) : 261);
+  if (channel == null && frequency_mhz == null) throw new Error('fccDistanceKm: channel or frequency_mhz is required');
+  const ch = channel ?? fmFrequencyToChannel(frequency_mhz);
   const curve = mode === '50,10' ? CURVE_F5010
               : mode === '50,90' ? CURVE_F5090
               :                    CURVE_F5050;
@@ -177,7 +178,8 @@ export function fccFieldDbuAtDistance({
   channel = null,
   frequency_mhz = null
 }){
-  const ch = channel ?? (frequency_mhz != null ? fmFrequencyToChannel(frequency_mhz) : 261);
+  if (channel == null && frequency_mhz == null) throw new Error('fccFieldDbuAtDistance: channel or frequency_mhz is required');
+  const ch = channel ?? fmFrequencyToChannel(frequency_mhz);
   const curve = mode === '50,10' ? CURVE_F5010
               : mode === '50,90' ? CURVE_F5090
               :                    CURVE_F5050;

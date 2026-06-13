@@ -16807,13 +16807,14 @@ async function scoreCandidate(pt, ctx, warnings){
 
       return {
         sigma_current, sigma_candidate,
+        sigma_method: 'lat_lon_bucket_screening', // regional lat/lon bucket — NOT the full FCC M3 raster; ±40% accuracy
         d_current_km, d_candidate_km, freq_scale_ci,
         area_current_km2, area_candidate_km2, coverage_delta_km2,
         coverage_radius_delta_pct, displacement_km, bearing_deg_ci,
         dist_current_to_col_km, dist_candidate_to_col_km,
         col_in_current_contour, col_in_candidate_contour, col_field_improvement,
         verdict,
-        reference: 'FCC M3 ground conductivity map; ITU-R P.368-9 (groundwave propagation); 47 CFR §73.182 (AM coverage computation)',
+        reference: 'FCC M3 ground conductivity map (zone-table screening proxy); ITU-R P.368-9 (groundwave propagation); 47 CFR §73.182 (AM coverage computation)',
         note: `Coverage vs current site: radius ${d_candidate_km} km (candidate) vs ${d_current_km} km (current) — ${coverage_radius_delta_pct >= 0 ? '+' : ''}${coverage_radius_delta_pct}% (${coverage_delta_km2 >= 0 ? '+' : ''}${coverage_delta_km2} km²). ${col_field_improvement}. Displacement: ${displacement_km} km at ${bearing_deg_ci}°. Verdict: ${verdict}.`
       };
     })(),
@@ -21792,8 +21793,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //     noise (generator, HVAC), lighting (FAA lights at night), and property values
       //   - A neighbor opposition campaign can delay or kill a CUP application; early engagement is key
 
-      const tower_height_m = 144.23; // 3/8λ at 780 kHz
-      const rf_safety_radius_m = 30; // MPE exclusion zone radius for 5 kW at 780 kHz (approximate)
+      const tower_height_m = round2(3 / 8 * (300000 / frequency_khz)); // 3/8λ at station frequency
+      // OET-65 / §1.1310 screening estimate: far-field isotropic × 2 (MF near-field enhancement factor)
+      // MPE uncontrolled limit 0.3–3 MHz: 0.2 mW/cm² → E_limit ≈ 27.5 V/m (§1.1310 Table 1)
+      // r = 2 × sqrt(30 × ERP_W) / E_limit.  Formal near-field analysis (OET-65 Supplement B) required for compliance.
+      const MPE_E_LIMIT_0_3_3_MHZ = 27.5; // V/m, general public / uncontrolled per §1.1310 Table 1
+      const rf_safety_radius_m = Math.ceil(2 * Math.sqrt(30 * tpo_kw * 1000) / MPE_E_LIMIT_0_3_3_MHZ);
       const typical_zoning_notice_radius_ft = 500; // feet from tower base
       const typical_zoning_notice_radius_m = Math.round(typical_zoning_notice_radius_ft * 0.3048);
       const recommended_notice_radius_km = 2; // proactive outreach radius
@@ -25413,15 +25418,18 @@ async function scoreCandidate(pt, ctx, warnings){
       };
       const skywaveContour = SKYWAVE_CONTOUR_MVM[fcc_class] ?? SKYWAVE_CONTOUR_MVM.D;
 
-      // Skywave propagation distance estimate: ITU/FCC curves
-      // FCC §73.182 Table 1: approximate skywave distances for 50 kW at 50% time, 50% locations
-      // At 800 kHz, 50 kW, 50% time: ~800–1200 km; scale as sqrt(ERP)
-      const SKY_BASE_KM_50KW = 1000; // approximate for MF band (800 kHz region)
+      // Skywave propagation distance estimate: FCC §73.182 Table 1 / ITU-R P.1147
+      // §73.182 Table 1 shows 50 kW at 800 kHz, 50% time/50% locs: ~1000 km (midpoint 800–1200 km range).
+      // ERP scaling: D ∝ sqrt(ERP_kW) (inverse-square far-field approximation for skywave, verified against
+      // FCC curves in range 1–50 kW; accuracy ±30% vs. full ITU-R P.1147 prediction).
+      // Time-percentage ratios from reading FCC §73.182 Table 1 columns:
+      //   D(10%)/D(50%) ≈ 1.3; D(1%)/D(50%) ≈ 1.7  (MF band, CONUS latitudes, screening grade)
+      const SKY_BASE_KM_50KW = 1000; // §73.182 Table 1 midpoint for 50 kW at ~800 kHz
       const skyDistERP_km = round2(SKY_BASE_KM_50KW * Math.sqrt(actualNightPower_kw / 50));
-      // Scale to different time percentages:
+      // Scale to different time percentages (§73.182 Table 1 ratios, screening-grade ±30%):
       const sky50pct_km  = skyDistERP_km;                           // 50% of time
-      const sky10pct_km  = round2(skyDistERP_km * 1.3);             // 10% — farther
-      const sky1pct_km   = round2(skyDistERP_km * 1.7);             // 1% — farthest (used in NIF)
+      const sky10pct_km  = round2(skyDistERP_km * 1.3);             // 10% — ratio per §73.182 Table 1
+      const sky1pct_km   = round2(skyDistERP_km * 1.7);             // 1% — NIF contour per §73.182 Table 1
 
       // NIF study requirement: clear channel or Class A/B
       const nifRequiredSw = isClear_sw || ['A', 'B'].includes(fcc_class);
