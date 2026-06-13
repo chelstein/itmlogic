@@ -15437,8 +15437,8 @@ it('KAZM NIF fraction reflects clear channel secondary limitation', async () => 
 it('candidate_comparison_table nif columns are present and valid for KAZM', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
-  assert.ok(r0.nif_dist_to_kkob_km > 400, 'nif_dist_to_kkob_km must be >400 km (Sedona to Albuquerque)');
-  assert.strictEqual(r0.nif_kkob_compliant, true, 'nif_kkob_compliant must be true for KAZM area candidates');
+  assert.ok(r0.nif_dist_to_dominant_km > 400, 'nif_dist_to_dominant_km must be >400 km (Sedona AZ to WBBM Chicago IL ≈2800 km)');
+  assert.strictEqual(r0.nif_dominant_compliant, true, 'nif_dominant_compliant must be true for KAZM area candidates');
   assert.ok(r0.nif_fraction_pct_low >= 10, 'nif_fraction_pct_low must be ≥10%');
 });
 
