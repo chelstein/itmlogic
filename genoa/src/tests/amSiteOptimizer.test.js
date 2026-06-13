@@ -15408,20 +15408,21 @@ it('am_nighttime_nif_service_contour_analysis_guide is present and non-null for 
   }
 });
 
-it('KAZM distance to KKOB and skywave protection compliance per §73.182(j)', async () => {
+it('KAZM distance to WBBM (dominant on 780 kHz) and skywave protection compliance per §73.182(j)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nighttime_nif_service_contour_analysis_guide;
-  // Sedona AZ to Albuquerque NM ≈ 460–490 km
-  assert.ok(g.dist_to_kkob_km > 400 && g.dist_to_kkob_km < 600, `dist_to_kkob_km should be 400–600 km, got ${g.dist_to_kkob_km}`);
+  // Sedona AZ (34.86°N, -111.82°W) to WBBM Chicago IL (41.88°N, -87.89°W) ≈ 2,200 km
+  const dist = g.dist_to_dominant_km ?? g.dist_to_kkob_km;
+  assert.ok(dist > 1500 && dist < 3000, `dist_to_dominant_km should be 1500–3000 km (Sedona to Chicago), got ${dist}`);
   assert.strictEqual(g.protection_threshold_uVm, 50, 'Class D clear channel protection threshold must be 50 µV/m per §73.182(j)');
-  assert.strictEqual(g.kkob_interference_compliant, true, 'KAZM at Sedona-area sites must be KKOB-compliant at 5 kW');
+  assert.strictEqual(g.dominant_interference_compliant ?? g.kkob_interference_compliant, true, 'KAZM at Sedona-area sites must be WBBM-compliant at 5 kW (skywave << 50 µV/m at 2200 km)');
 });
 
 it('KAZM skywave estimate below 50 µV/m at KKOB distance', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nighttime_nif_service_contour_analysis_guide;
   assert.ok(g.sky_uVm > 0, 'skywave estimate must be positive');
-  assert.ok(g.sky_uVm < 50, `skywave at KKOB must be < 50 µV/m for compliant Class D, got ${g.sky_uVm}`);
+  assert.ok(g.sky_uVm < 50, `skywave at WBBM (dominant, ~2200 km) must be < 50 µV/m for compliant Class D, got ${g.sky_uVm}`);
   assert.ok(g.nighttime_0p1_km > 20, 'nighttime 0.1 mV/m contour radius must be > 20 km');
   assert.ok(g.nighttime_0p1_km < 100, 'nighttime 0.1 mV/m contour radius must be < 100 km for 5 kW Class D');
 });
