@@ -2133,7 +2133,7 @@ test('coverage_feasibility_assessment present on every candidate with correct sh
 });
 
 test('coverage_feasibility_assessment.class_power_ceiling_kw matches §73.21 class table', async () => {
-  const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 50 };
+  const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 5 };
   for (const [cls, ceil] of Object.entries(CLASS_CEILINGS)){
     const out = await runSiteOptimizer({ ...KAZM, fcc_class: cls, candidate_limit: 3 });
     assert.equal(out.available, true);
@@ -8301,7 +8301,7 @@ test('skywave_coverage_analysis NIF requirement for clear channel', async () => 
 test('skywave_coverage_analysis nighttime power limits enforced', async () => {
   const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
   const s = out.candidates[0].skywave_coverage_analysis;
-  // Class D max night power is 0.25 kW; TPO 5 kW should clamp to 0.25
+  // Class D max night power is 0.5 kW per §73.21(b)(2); TPO 5 kW should clamp to 0.5
   assert.ok(s.actual_night_power_kw <= s.nighttime_power_max_kw, 'actual night power must not exceed class max');
   assert.ok(s.nighttime_power_max_kw > 0, 'nighttime power max must be positive');
 });
@@ -10765,7 +10765,7 @@ test('am_daytime_interference_and_protection_guide KAZM clear channel secondary 
   // 780 kHz is a clear channel; Class D → secondary status
   assert.strictEqual(g.channel_type, 'CLEAR_CHANNEL', '780 kHz should be CLEAR_CHANNEL');
   assert.strictEqual(g.is_secondary, true, 'Class D on clear channel should be secondary');
-  assert.strictEqual(g.night_power_limit_kw, 0.25, 'Class D clear-channel night limit should be 0.25 kW');
+  assert.strictEqual(g.night_power_limit_kw, 0.5, 'Class D clear-channel night limit should be 0.5 kW per §73.21(b)(2)');
   assert.strictEqual(g.co_channel_risk, 'HIGH', 'Class D on clear channel has HIGH co-channel risk');
 });
 
@@ -10918,9 +10918,9 @@ test('am_annual_operating_cost_analysis_guide present on KAZM candidate', async 
 test('am_annual_operating_cost_analysis_guide KAZM Class D clear-channel daytime operation', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_analysis_guide;
-  // Class D on clear channel: 13h/day daytime, 11h night at 0.25kW
+  // Class D on clear channel: 13h/day daytime, ~3h brief night auth or sign-off; ≤0.5 kW night per §73.21(b)(2)
   assert.strictEqual(g.daily_hrs_day, 13, 'Class D clear-channel should have 13 daily hrs daytime');
-  assert.strictEqual(g.daily_hrs_night, 11, 'Class D clear-channel should have 11 nightly hrs');
+  assert.strictEqual(g.daily_hrs_night, 3, 'Class D clear-channel should have 3 nightly hrs (brief auth or sign-off)');
   assert.ok(g.night_draw_kw > 0, 'night draw should be positive for Class D clear-channel');
   assert.ok(g.annual_kwh_total > 10000, 'KAZM should use >10,000 kWh/yr');
   assert.ok(g.annual_kwh_total < 100000, 'KAZM should use <100,000 kWh/yr');
@@ -12895,21 +12895,21 @@ test('KAZM operating cost power calculation (5 kW / 65% efficiency)', async () =
   const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
   assert.strictEqual(g.annual_power_kw_input, 7.69,       'KAZM 5 kW / 0.65 efficiency = 7.69 kW input');
   assert.strictEqual(g.annual_kwh,            67364.4,    '7.69 kW × 8760 hrs = 67364.4 kWh');
-  assert.strictEqual(g.power_rate_per_kwh,    0.12,       'power rate should be $0.12/kWh');
+  assert.strictEqual(g.power_rate_per_kwh,    0.115,      'power rate should be $0.115/kWh (EIA 2024 national commercial average)');
 });
 
 test('KAZM annual power cost range', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
-  assert.strictEqual(g.annual_power_cost_low,  6466.98, 'annual_power_cost_low should be $6,466.98');
-  assert.strictEqual(g.annual_power_cost_high, 9700.47, 'annual_power_cost_high should be $9,700.47');
+  assert.strictEqual(g.annual_power_cost_low,  6197.52, 'annual_power_cost_low should be $6,197.52 (67364.4 kWh × $0.115 × 0.8)');
+  assert.strictEqual(g.annual_power_cost_high, 9296.29, 'annual_power_cost_high should be $9,296.29 (67364.4 kWh × $0.115 × 1.2)');
 });
 
 test('KAZM annual operating total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
-  assert.strictEqual(g.annual_total_low,  11466.98, 'annual_total_low should be $11,466.98');
-  assert.strictEqual(g.annual_total_high, 31700.47, 'annual_total_high should be $31,700.47');
+  assert.strictEqual(g.annual_total_low,  11197.52, 'annual_total_low should be $11,197.52');
+  assert.strictEqual(g.annual_total_high, 31296.29, 'annual_total_high should be $31,296.29');
 });
 
 test('am_operating_cost_and_annual_expense_guide comparison table columns present', async () => {
@@ -13865,8 +13865,8 @@ test('KAZM 780 kHz Class D clear channel allocation', async () => {
   const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
   assert.strictEqual(g.channel_type,        'clear', '780 kHz should be clear channel type');
   assert.strictEqual(g.is_clear_channel,     true,   'is_clear_channel should be true');
-  assert.strictEqual(g.class_max_day_kw,     50,     'Class D max day power is 50 kW (§73.21(b))');
-  assert.strictEqual(g.class_max_night_kw,   0.25,   'Class D night < 0.25 kW where authorized (§73.21(b)(2))');
+  assert.strictEqual(g.class_max_day_kw,     5,      'Class D max day power is 5 kW (§73.21(e))');
+  assert.strictEqual(g.class_max_night_kw,   0.5,    'Class D night ≤ 0.5 kW where authorized (§73.21(b)(2))');
 });
 
 test('KAZM Class D power relative to class maximum', async () => {
