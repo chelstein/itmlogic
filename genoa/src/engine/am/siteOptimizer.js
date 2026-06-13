@@ -5208,8 +5208,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Summer daytime noise in continental mid-latitude US (roughly zone D).
       // Values extrapolated from ITU-R P.372 median curves at 0.5–1.7 MHz:
       // ~65–70 dBμV/m for low MF, decreasing toward 3 MHz.
-      // For AM broadcast (530–1700 kHz): Fa ≈ 67 - 30*log10(f_mhz) (rough fit zone D summer day)
-      const fa_atm_db = round2(Math.max(20, 67 - 30 * Math.log10(f_mhz)));
+      // For AM broadcast (530–1700 kHz): Fa = 53 − 28·log10(f_MHz) — ITU-R P.372-16 Curve D, North American continental zone
+      const fa_atm_db = round2(Math.max(20, 53 - 28 * Math.log10(f_mhz)));
 
       // Man-made noise (ITU-R P.372-15 Table I, residential environment):
       // Fa_mm ≈ 76.8 - 27.7*log10(f_mhz) for residential; +10 dB urban, -10 dB rural.
