@@ -7752,8 +7752,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // from skywave interference by Class B, C, and D co-channel stations.
       //
       // Key rules:
-      //   §73.182 — Nighttime interference; skywave signal contours
-      //   §73.183 — Class A dominant station nighttime protection (50 µV/m)
+      //   §73.182 — Nighttime interference; skywave signal contours and Class A protection
       //   §73.25–27 — Channel classification (clear/regional/local)
       //   §73.21 — Class A stations may operate up to 50 kW nights on clear channels
       //   §73.21(b) — Class B/D stations severely restricted at night on clear channels
@@ -7787,7 +7786,7 @@ async function scoreCandidate(pt, ctx, warnings){
       if (fcc_class === 'A') {
         night_power_limit_kw = Math.min(tpo_kw, 50);
         night_operation_type = 'FULL_POWER';
-        nighttime_constraint = 'Class A dominant — may operate full power nights; provides §73.183 50 µV/m protection to others';
+        nighttime_constraint = 'Class A dominant — may operate full power nights; receives §73.182 50 µV/m skywave protection from co-channel secondaries';
       } else if (isClearCh_sw && fcc_class === 'D') {
         night_power_limit_kw = Math.min(tpo_kw, 1.0);
         night_operation_type = 'LIMITED_1KW_OR_DAN';
@@ -7807,43 +7806,47 @@ async function scoreCandidate(pt, ctx, warnings){
         nighttime_constraint = 'Local channel station — §73.27: no nighttime skywave protection limits (local channels operate without dominance protection)';
       }
 
-      // Dominant station lookup for clear channels (780 kHz = KKOB, Albuquerque NM, 50 kW)
-      // This is a simplified lookup — in production this would be the FCC AM database query
+      // Dominant station lookup for clear channels.
+      // Source: FCC AM Query / LMS records, FCC §73.25 Table (§73.25(a) clear-channel list).
+      // Each entry: [call_label, approx_lat, approx_lon] for screening distance estimates.
+      // Full compliance analysis requires the FCC AM database query for the exact transmitter coordinates.
       const clearChannelDominants = {
-        640: 'KFI Los Angeles CA (50 kW)',
-        650: 'WSM Nashville TN (50 kW)',
-        660: 'WNBC/WFAN New York NY (50 kW)',
-        670: 'KLUP/KNBR San Francisco CA (50 kW)',
-        700: 'WLW Cincinnati OH (50 kW)',
-        710: 'WOR New York NY (50 kW)',
-        720: 'WGN Chicago IL (50 kW)',
-        750: 'WSB Atlanta GA (50 kW)',
-        760: 'WJR Detroit MI (50 kW)',
-        770: 'KKOB Albuquerque NM (50 kW)',
-        780: 'KKOB Albuquerque NM (50 kW)',
-        820: 'WBAP Fort Worth TX (50 kW)',
-        830: 'WCCO Minneapolis MN (50 kW)',
-        840: 'WHAS Louisville KY (50 kW)',
-        870: 'WWL New Orleans LA (50 kW)',
-        880: 'WCBS New York NY (50 kW)',
-        890: 'WLS Chicago IL (50 kW)',
-        940: 'WINZ Miami FL (50 kW)',
-        990: 'WNTP Philadelphia PA (50 kW)',
-        1000: 'WNWS/KOMO Seattle WA (50 kW)',
-        1020: 'KDKA Pittsburgh PA (50 kW)',
-        1030: 'WBZ Boston MA (50 kW)',
-        1040: 'WHO Des Moines IA (50 kW)',
-        1060: 'KYW Philadelphia PA (50 kW)',
-        1070: 'KNX Los Angeles CA (50 kW)',
-        1100: 'WTAM Cleveland OH (50 kW)',
-        1120: 'KMOX St. Louis MO (50 kW)',
-        1160: 'KSL Salt Lake City UT (50 kW)',
-        1180: 'WHAM Rochester NY (50 kW)',
-        1200: 'WOAI San Antonio TX (50 kW)',
-        1210: 'WPHT Philadelphia PA (50 kW)'
+        640:  ['KFI Los Angeles CA (50 kW)',       33.96, -118.36],
+        650:  ['WSM Nashville TN (50 kW)',          36.23,  -86.69],
+        660:  ['WFAN New York NY (50 kW)',          40.77,  -73.88],
+        670:  ['KNBR San Francisco CA (50 kW)',     37.63, -122.47],
+        700:  ['WLW Cincinnati OH (50 kW)',         39.31,  -84.53],
+        710:  ['WOR New York NY (50 kW)',           40.77,  -73.88],
+        720:  ['WGN Chicago IL (50 kW)',            41.98,  -87.63],
+        750:  ['WSB Atlanta GA (50 kW)',            33.95,  -84.47],
+        760:  ['WJR Detroit MI (50 kW)',            42.35,  -83.12],
+        770:  ['WABC New York NY (50 kW)',          40.77,  -73.88],
+        780:  ['WBBM Chicago IL (50 kW)',           41.88,  -87.89],
+        820:  ['WBAP Fort Worth TX (50 kW)',        32.83,  -97.39],
+        830:  ['WCCO Minneapolis MN (50 kW)',       44.87,  -93.26],
+        840:  ['WHAS Louisville KY (50 kW)',        38.18,  -85.76],
+        870:  ['WWL New Orleans LA (50 kW)',        30.13,  -90.18],
+        880:  ['WCBS New York NY (50 kW)',          40.77,  -73.88],
+        890:  ['WLS Chicago IL (50 kW)',            41.98,  -87.63],
+        940:  ['WINZ Miami FL (50 kW)',             25.84,  -80.27],
+        990:  ['WNTP Philadelphia PA (50 kW)',      39.91,  -75.28],
+        1000: ['KOMO Seattle WA (50 kW)',           47.69, -122.36],
+        1020: ['KDKA Pittsburgh PA (50 kW)',        40.44,  -80.00],
+        1030: ['WBZ Boston MA (50 kW)',             42.35,  -71.05],
+        1040: ['WHO Des Moines IA (50 kW)',         41.64,  -93.74],
+        1060: ['KYW Philadelphia PA (50 kW)',       39.91,  -75.28],
+        1070: ['KNX Los Angeles CA (50 kW)',        33.96, -118.36],
+        1100: ['WTAM Cleveland OH (50 kW)',         41.47,  -81.65],
+        1120: ['KMOX St. Louis MO (50 kW)',         38.52,  -90.35],
+        1160: ['KSL Salt Lake City UT (50 kW)',     40.78, -111.89],
+        1180: ['WHAM Rochester NY (50 kW)',         43.15,  -77.61],
+        1200: ['WOAI San Antonio TX (50 kW)',       29.57,  -98.47],
+        1210: ['WPHT Philadelphia PA (50 kW)',      39.91,  -75.28]
       };
 
-      const dominant_station = isClearCh_sw ? (clearChannelDominants[frequency_khz] ?? `Clear-channel dominant on ${frequency_khz} kHz`) : null;
+      const dominant_station = isClearCh_sw
+        ? ((clearChannelDominants[frequency_khz]?.[0]) ?? `Clear-channel dominant on ${frequency_khz} kHz`)
+        : null;
 
       // Skywave 50% contour distance estimate (simplified)
       // At night, the 50% skywave signal from a 50 kW Class A dominant reaches ~1500–2500 km
@@ -7879,7 +7882,7 @@ async function scoreCandidate(pt, ctx, warnings){
         night_study_cost_high_usd,
         psa_eligible,
         psa_note,
-        reference: '47 CFR §73.182 (nighttime skywave); §73.183 (Class A protection); §73.21–27 (class power limits); §73.21(b)(2) (Class D nighttime restrictions); §73.99 (PSA); §73.182 skywave interference analysis methodology',
+        reference: '47 CFR §73.182 (nighttime skywave and Class A protection obligations); §73.21–27 (class power limits); §73.21(b)(2) (Class D nighttime restrictions); §73.25 (clear channel frequencies; Class A dominance); §73.99 (PSA); §73.182 skywave interference analysis methodology',
         note: `Class ${fcc_class} on ${frequency_khz} kHz (${isClearCh_sw ? 'clear' : isRegionalCh_sw ? 'regional' : 'local'} channel). Night limit: ${night_power_limit_kw} kW (${night_operation_type}). ${nighttime_constraint}`
       };
     })(),
@@ -10644,40 +10647,70 @@ async function scoreCandidate(pt, ctx, warnings){
       //   §73.182(j): Dominant-station protection: Class D cannot exceed a specified skywave
       //     field strength (typically 50 µV/m or 0.05 mV/m at dominant station's 0.5 mV/m contour).
       //
-      // KKOB protection calculation:
-      //   KKOB: Albuquerque, NM; 780 kHz; Class A; 50 kW (daytime) / 50 kW (nighttime).
-      //   KKOB's 0.5 mV/m daytime groundwave contour extends ~190 km from Albuquerque.
-      //   Distance from KAZM current site (Sedona, AZ) to KKOB (Albuquerque):
-      //     ~460 km (approximate great-circle).
-      //   FCC §73.182(j) skywave protection for Class D secondary on 780 kHz:
-      //     Class D must not cause predicted skywave > 50 µV/m at the dominant station's
-      //     50% skywave field strength at the dominant station's location.
-      //     At 460 km, a 5 kW NDA station's skywave is typically < 50 µV/m — compliant.
-      //
-      // Distance from candidate site to KKOB:
-      //   We compute approximate great-circle distance from pt.lat, pt.lon to KKOB (35.1, -106.6).
-      const kkob_lat = 35.1107;   // KKOB transmitter site: Albuquerque, NM
-      const kkob_lon = -106.5994;
-      const lat1r = pt.lat * Math.PI / 180;
-      const lon1r = pt.lon * Math.PI / 180;
-      const lat2r = kkob_lat * Math.PI / 180;
-      const lon2r = kkob_lon * Math.PI / 180;
-      const dlat  = lat2r - lat1r;
-      const dlon  = lon2r - lon1r;
-      const a_hav = Math.sin(dlat/2)**2 + Math.cos(lat1r)*Math.cos(lat2r)*Math.sin(dlon/2)**2;
-      const dist_to_kkob_km = round2(6371 * 2 * Math.asin(Math.sqrt(a_hav)));
+      // Dominant station protection calculation.
+      // Clear channel dominant stations are defined in §73.25(a) and the FCC LMS AM database.
+      // Source for coordinates: FCC LMS AM station records (approximate screening coordinates).
+      // Full NIF analysis requires the exact licensed transmitter coordinates from FCC LMS.
+      // [call_label, approx_lat, approx_lon] — same table as am_skywave_nighttime_guide
+      const NIF_CLEAR_CHANNEL_DOMINANTS = {
+        640:  ['KFI Los Angeles CA (50 kW)',       33.96, -118.36],
+        650:  ['WSM Nashville TN (50 kW)',          36.23,  -86.69],
+        660:  ['WFAN New York NY (50 kW)',          40.77,  -73.88],
+        670:  ['KNBR San Francisco CA (50 kW)',     37.63, -122.47],
+        700:  ['WLW Cincinnati OH (50 kW)',         39.31,  -84.53],
+        710:  ['WOR New York NY (50 kW)',           40.77,  -73.88],
+        720:  ['WGN Chicago IL (50 kW)',            41.98,  -87.63],
+        750:  ['WSB Atlanta GA (50 kW)',            33.95,  -84.47],
+        760:  ['WJR Detroit MI (50 kW)',            42.35,  -83.12],
+        770:  ['WABC New York NY (50 kW)',          40.77,  -73.88],
+        780:  ['WBBM Chicago IL (50 kW)',           41.88,  -87.89],
+        820:  ['WBAP Fort Worth TX (50 kW)',        32.83,  -97.39],
+        830:  ['WCCO Minneapolis MN (50 kW)',       44.87,  -93.26],
+        840:  ['WHAS Louisville KY (50 kW)',        38.18,  -85.76],
+        870:  ['WWL New Orleans LA (50 kW)',        30.13,  -90.18],
+        880:  ['WCBS New York NY (50 kW)',          40.77,  -73.88],
+        890:  ['WLS Chicago IL (50 kW)',            41.98,  -87.63],
+        940:  ['WINZ Miami FL (50 kW)',             25.84,  -80.27],
+        990:  ['WNTP Philadelphia PA (50 kW)',      39.91,  -75.28],
+        1000: ['KOMO Seattle WA (50 kW)',           47.69, -122.36],
+        1020: ['KDKA Pittsburgh PA (50 kW)',        40.44,  -80.00],
+        1030: ['WBZ Boston MA (50 kW)',             42.35,  -71.05],
+        1040: ['WHO Des Moines IA (50 kW)',         41.64,  -93.74],
+        1060: ['KYW Philadelphia PA (50 kW)',       39.91,  -75.28],
+        1070: ['KNX Los Angeles CA (50 kW)',        33.96, -118.36],
+        1100: ['WTAM Cleveland OH (50 kW)',         41.47,  -81.65],
+        1120: ['KMOX St. Louis MO (50 kW)',         38.52,  -90.35],
+        1160: ['KSL Salt Lake City UT (50 kW)',     40.78, -111.89],
+        1180: ['WHAM Rochester NY (50 kW)',         43.15,  -77.61],
+        1200: ['WOAI San Antonio TX (50 kW)',       29.57,  -98.47],
+        1210: ['WPHT Philadelphia PA (50 kW)',      39.91,  -75.28]
+      };
+      const dominantEntry = NIF_CLEAR_CHANNEL_DOMINANTS[frequency_khz];
+      const dominant_label = dominantEntry?.[0] ?? `Clear-channel dominant on ${frequency_khz} kHz`;
+      const dominant_lat   = dominantEntry?.[1] ?? null;
+      const dominant_lon   = dominantEntry?.[2] ?? null;
+      let dist_to_dominant_km = null;
+      if (dominant_lat != null && dominant_lon != null) {
+        const lat1r = pt.lat * Math.PI / 180;
+        const lon1r = pt.lon * Math.PI / 180;
+        const lat2r = dominant_lat * Math.PI / 180;
+        const lon2r = dominant_lon * Math.PI / 180;
+        const dlat  = lat2r - lat1r;
+        const dlon  = lon2r - lon1r;
+        const a_hav = Math.sin(dlat/2)**2 + Math.cos(lat1r)*Math.cos(lat2r)*Math.sin(dlon/2)**2;
+        dist_to_dominant_km = round2(6371 * 2 * Math.asin(Math.sqrt(a_hav)));
+      }
+      const dist_to_kkob_km = dist_to_dominant_km; // alias for downstream compat
 
-      // FCC M3 skywave field strength estimate:
-      //   At distance d km, nighttime skywave field strength from a station with TPO P (kW) is
-      //   approximated by the FCC nighttime skywave curves (ITU-R f curves / M3 model):
-      //   F_sky(50%, 50%) at 780 kHz for NDA station.
-      //   Simplified empirical approximation for 780 kHz NDA (ITU-R HF propagation):
-      //   F_sky ≈ 10 * log10(P_kW) + 120 - 20 * log10(d_km) - 40  [dBµV/m rough model]
-      //   This is a rough screening estimate — actual M3 / FCC ITU f-curve computation required.
-      //   For 5 kW at 460 km: F ≈ 7 + 120 - 53.3 - 40 = 33.7 dBµV/m → 48 µV/m (< 50 µV/m threshold)
+      // FCC M3 skywave field strength screening estimate (§73.182 / ITU-R f-curves):
+      //   F_sky ≈ 10·log10(P_kW) + 120 − 20·log10(d_km) − 40  [dBµV/m, rough free-space model]
+      //   This is a rough screening estimate (±10 dB) — actual M3 / FCC ITU f-curve
+      //   computation is required for a formal NIF study.
       const tpo_dB      = 10 * Math.log10(tpo_kw);
-      const sky_raw_dB  = tpo_dB + 120 - 20 * Math.log10(dist_to_kkob_km) - 40;
-      const sky_uVm     = round2(Math.pow(10, sky_raw_dB / 20));  // µV/m at KKOB site
+      const sky_raw_dB  = dist_to_dominant_km != null
+        ? tpo_dB + 120 - 20 * Math.log10(Math.max(dist_to_dominant_km, 1)) - 40
+        : null;
+      const sky_uVm     = sky_raw_dB != null ? round2(Math.pow(10, sky_raw_dB / 20)) : null;  // µV/m at dominant site
 
       // FCC Class D secondary protection toward the clear-channel dominant:
       //   Class A stations are protected at night to their 0.5 mV/m-50% skywave contour
@@ -10686,7 +10719,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   This guide's 50%-time screening model uses a 50 µV/m screening threshold —
       //   roughly equivalent at the 50% percentile; a full NIF study is authoritative.
       const protection_threshold_uVm = 50;  // screening value (50%-time model)
-      const kkob_interference_compliant = sky_uVm <= protection_threshold_uVm;
+      const kkob_interference_compliant = sky_uVm != null ? sky_uVm <= protection_threshold_uVm : null;
 
       // Nighttime service contour:
       //   0.1 mV/m groundwave contour defines the nighttime service area.
@@ -10706,13 +10739,11 @@ async function scoreCandidate(pt, ctx, warnings){
                                  : 35;   // rough screening from FCC Table 1
 
       // NIF area fraction estimate:
-      //   For Class D on 780 kHz (clear channel, KKOB dominant):
-      //   A significant portion of the nighttime contour area is subject to interference
-      //   from KKOB's skywave and other clear-channel secondaries.
       //   Conservative NIF estimate: 20–50% of 0.1 mV/m contour area may be interference-free
-      //   depending on the candidate's distance from KKOB.
-      const nif_fraction_pct_low  = dist_to_kkob_km > 500 ? 40 : (dist_to_kkob_km > 350 ? 25 : 15);
-      const nif_fraction_pct_high = dist_to_kkob_km > 500 ? 60 : (dist_to_kkob_km > 350 ? 45 : 30);
+      //   depending on the candidate's distance from the clear-channel dominant.
+      const d_nif = dist_to_dominant_km ?? 400; // fallback 400 km if dominant coords unavailable
+      const nif_fraction_pct_low  = d_nif > 500 ? 40 : (d_nif > 350 ? 25 : 15);
+      const nif_fraction_pct_high = d_nif > 500 ? 60 : (d_nif > 350 ? 45 : 30);
 
       // NIF study engineering cost:
       //   Full NIF analysis requires M3 skywave model computation for all co-channel stations.
@@ -10724,10 +10755,13 @@ async function scoreCandidate(pt, ctx, warnings){
       const total_nif_high_usd = nif_study_high_usd;
 
       return {
-        dist_to_kkob_km,
+        dominant_station:            dominant_label,
+        dist_to_dominant_km,
+        dist_to_kkob_km,             // deprecated alias — use dist_to_dominant_km
         sky_uVm,
         protection_threshold_uVm,
-        kkob_interference_compliant,
+        dominant_interference_compliant: kkob_interference_compliant,
+        kkob_interference_compliant,  // deprecated alias — use dominant_interference_compliant
         nighttime_0p1_km,
         nif_fraction_pct_low,
         nif_fraction_pct_high,
@@ -10737,7 +10771,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_nif_low_usd,
         total_nif_high_usd,
         reference: '47 CFR §73.182 (NIF analysis required for AM applications); §73.182(j) (Class D dominant-station protection — 50 µV/m skywave limit); §73.182(k) (interference-free service definition); §73.24(i) (0.1 mV/m nighttime community contour); §73.37(b) (Class D secondary no-interference obligation); §73.184 (AM groundwave curves)',
-        note: `Class D secondary station on 780 kHz (clear channel — KKOB dominant). Distance to KKOB: ${dist_to_kkob_km} km. Estimated KAZM skywave at KKOB: ~${sky_uVm} µV/m (protection threshold: ${protection_threshold_uVm} µV/m — ${kkob_interference_compliant ? 'COMPLIANT' : 'EXCEEDS THRESHOLD — nighttime power reduction may be required'}). Nighttime 0.1 mV/m contour radius ≈ ${nighttime_0p1_km} km (σ ≈ ${sigma_proxy_mSm} mS/m). Estimated NIF area: ${nif_fraction_pct_low}–${nif_fraction_pct_high}% of nighttime contour. Full §73.182 NIF study required before filing.`
+        note: `Class D secondary station on ${frequency_khz} kHz (clear channel — ${dominant_label}). Distance to dominant: ${dist_to_dominant_km ?? '—'} km. Estimated skywave at dominant: ~${sky_uVm ?? '—'} µV/m (threshold: ${protection_threshold_uVm} µV/m — ${kkob_interference_compliant === true ? 'COMPLIANT' : kkob_interference_compliant === false ? 'EXCEEDS THRESHOLD — nighttime power reduction may be required' : 'UNKNOWN — dominant coordinates unavailable'}). Nighttime 0.1 mV/m contour radius ≈ ${nighttime_0p1_km} km (σ ≈ ${sigma_proxy_mSm} mS/m). Estimated NIF area: ${nif_fraction_pct_low}–${nif_fraction_pct_high}% of nighttime contour. Full §73.182 NIF study required before filing.`
       };
     })(),
 
