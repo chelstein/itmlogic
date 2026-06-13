@@ -5480,7 +5480,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Class B: 50 kW (day), 50 kW (night local), 5 kW (night regional)
       //   Class C: 1 kW (day and night, §73.21(c))
       //   Class D: 5 kW (day, §73.21(e)); nighttime ≤ 0.5 kW where authorized per §73.21(b)(2)
-      const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 50 };
+      const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 5 }; // D: 5 kW max daytime per §73.21(e)
       const ceiling_kw = CLASS_CEILINGS[fcc_class] ?? 50;
       const headroom_kw = round2(ceiling_kw - tpo_kw);
       const headroom_pct = round2((headroom_kw / ceiling_kw) * 100);
@@ -17242,16 +17242,16 @@ async function scoreCandidate(pt, ctx, warnings){
       // Class D on clear channel: daytime-only operation (~13h/day average annual)
       // Other classes: near-continuous (23h/day accounting for maintenance windows)
       const daily_hrs_day   = is_clear_ch_aoc && fcc_class === 'D' ? 13 : 23;
-      const daily_hrs_night = is_clear_ch_aoc && fcc_class === 'D' ? 11 : 1;  // night at 0.25kW or off
-      const night_draw_kw   = is_clear_ch_aoc && fcc_class === 'D' ? round2(0.25 / tx_system_efficiency) : 0;
+      const daily_hrs_night = is_clear_ch_aoc && fcc_class === 'D' ? 3 : 1;   // Class D clr: brief night auth or sign-off; assume ~3 h avg
+      const night_draw_kw   = is_clear_ch_aoc && fcc_class === 'D' ? round2(Math.min(tpo_kw, 0.5) / tx_system_efficiency) : 0; // ≤0.5 kW night per §73.21(b)(2)
 
       const annual_kwh_day   = Math.round(tx_draw_kw   * daily_hrs_day   * 365);
       const annual_kwh_night = Math.round(night_draw_kw * daily_hrs_night * 365);
       const annual_kwh_total = annual_kwh_day + annual_kwh_night;
 
-      // Electricity cost: $0.10–$0.20/kWh (commercial rate)
-      const elec_cost_low_usd  = Math.round(annual_kwh_total * 0.10);
-      const elec_cost_high_usd = Math.round(annual_kwh_total * 0.20);
+      // Electricity cost: $0.08–$0.22/kWh (US commercial range; national avg $0.115/kWh EIA 2024)
+      const elec_cost_low_usd  = Math.round(annual_kwh_total * 0.08);
+      const elec_cost_high_usd = Math.round(annual_kwh_total * 0.22);
 
       // ---- Equipment maintenance ----
       // 5% of equipment value per year (from transmitter guide logic)
@@ -25446,8 +25446,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Class-based nighttime power limits (per §73.21, §73.25, §73.27)
       // FCC allows Class A 50 kW night; Class B 50 kW night; Class C 1 kW night; Class D daytime only or limited
-      const CLASS_NIGHT_POWER_KW = { A: 50, B: 50, C: 1, D: 0.25 };
-      const nightPowerMax_kw = CLASS_NIGHT_POWER_KW[fcc_class] ?? 0.25;
+      const CLASS_NIGHT_POWER_KW = { A: 50, B: 50, C: 1, D: 0.5 }; // D: ≤0.5 kW per §73.21(b)(2)
+      const nightPowerMax_kw = CLASS_NIGHT_POWER_KW[fcc_class] ?? 0.5;
       const actualNightPower_kw = Math.min(tpo_kw, nightPowerMax_kw);
 
       // Skywave protection distances per §73.182 Table 1 (approximate screening values)
@@ -31253,7 +31253,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const fc = fcc_class.toUpperCase();
 
       // Current class power ceiling
-      const CLASS_MAX_KW = { A: 50, B: 50, C: 1, D: 50 };
+      const CLASS_MAX_KW = { A: 50, B: 50, C: 1, D: 5 }; // D: 5 kW max daytime per §73.21(e)
       const current_max_kw = CLASS_MAX_KW[fc] ?? 50;
       const headroom_kw = round2(Math.max(0, current_max_kw - tpo_kw_num));
       const headroom_db = headroom_kw > 0 ? round2(10 * Math.log10((tpo_kw_num + headroom_kw) / tpo_kw_num)) : 0;
