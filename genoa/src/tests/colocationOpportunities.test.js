@@ -3697,7 +3697,7 @@ test('colocation candidates include am_skywave_nighttime_service_and_interferenc
     assert.ok(g, `candidate missing am_skywave_nighttime_service_and_interference_guide`);
     assert.strictEqual(g.is_clear_channel, true, '780 kHz is a clear channel');
     assert.strictEqual(g.night_signoff_risk, true, 'Class D on 780 kHz has nighttime sign-off risk');
-    assert.ok(g.dominant_station.includes('KKOB'), 'dominant on 780 kHz is KKOB');
+    assert.ok(g.dominant_station.includes('WBBM'), 'dominant on 780 kHz is WBBM Chicago IL (50 kW); KKOB is 770 kHz Albuquerque NM');
   }
 });
 

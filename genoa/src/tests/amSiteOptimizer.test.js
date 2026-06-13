@@ -14850,11 +14850,11 @@ it('am_skywave_nighttime_service_and_interference_guide is present on each candi
   }
 });
 
-it('am_skywave_nighttime_service_and_interference_guide 780 kHz is clear channel with KKOB dominant', async () => {
+it('am_skywave_nighttime_service_and_interference_guide 780 kHz is clear channel with WBBM dominant', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_skywave_nighttime_service_and_interference_guide;
   assert.strictEqual(g.is_clear_channel, true, '780 kHz is a clear channel');
-  assert.ok(g.dominant_station.includes('KKOB'), 'dominant on 780 kHz is KKOB (Albuquerque)');
+  assert.ok(g.dominant_station.includes('WBBM'), 'dominant on 780 kHz is WBBM Chicago IL (50 kW), not KKOB (770 kHz Albuquerque NM)');
 });
 
 it('am_skywave_nighttime_service_and_interference_guide night_signoff_risk true for Class D on clear channel', async () => {
@@ -16612,10 +16612,10 @@ test('#95 KAZM 780 kHz (clear, Class D): night limit 1 kW, PSA eligible', async 
   assert.strictEqual(sw.psa_eligible, true, 'Class D clear channel must be PSA eligible');
 });
 
-test('#95 KAZM: dominant_station string contains KKOB', async () => {
+test('#95 KAZM: dominant_station string contains WBBM (780 kHz dominant is WBBM Chicago IL)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const sw = out.candidates[0].am_skywave_nighttime_guide;
-  assert.ok(sw.dominant_station?.includes('KKOB'), `dominant_station should include KKOB, got: ${sw.dominant_station}`);
+  assert.ok(sw.dominant_station?.includes('WBBM'), `dominant_station should include WBBM (780 kHz Chicago IL), got: ${sw.dominant_station}`);
 });
 
 test('#95 regional channel: night limit 5 kW, no PSA', async () => {
