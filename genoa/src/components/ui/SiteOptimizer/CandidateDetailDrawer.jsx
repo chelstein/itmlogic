@@ -3837,7 +3837,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <span style={{ color: compColor, fontWeight: 600 }}>{fmtF(g.field_at_col_dist_mvm, 2)} mV/m</span>
                 </div>
                 <div><b>§73.182 min (2 mV/m):</b> <span style={{ color: compColor }}>{g.col_field_compliant ? '✓ MET' : '✗ FAILS'}</span></div>
-                <div style={{ gridColumn: '1/-1' }}><b>Formal §73.183 study cost:</b> ${fmt(g.study_cost_low_usd)}–${fmt(g.study_cost_high_usd)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Formal §73.184 groundwave study cost:</b> ${fmt(g.study_cost_low_usd)}–${fmt(g.study_cost_high_usd)}</div>
                 <div style={{ gridColumn: '1/-1', fontSize: 10, color: '#b45309' }}>Screening estimate ±30%. Formal M3 study required for FCC filing.</div>
               </div>
             </div>
@@ -10629,7 +10629,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
               <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
-                Signal Coverage Mapping &amp; Contour Documentation (§73.183 / §73.186)
+                Signal Coverage Mapping &amp; Contour Documentation (§73.184 / §73.186)
               </div>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
                 <div>
