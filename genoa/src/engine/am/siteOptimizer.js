@@ -7849,9 +7849,8 @@ async function scoreCandidate(pt, ctx, warnings){
         : null;
 
       // Skywave 50% contour distance estimate (simplified)
-      // At night, the 50% skywave signal from a 50 kW Class A dominant reaches ~1500–2500 km
-      // At the candidate site in AZ (~500 km from Albuquerque for KKOB/780 kHz),
-      // the dominant's skywave signal is likely above threshold → protection required
+      // At night, the 50% skywave signal from a 50 kW Class A dominant reaches ~1500–2500 km.
+      // A secondary Class D candidate anywhere within this range must demonstrate skywave compliance.
       const night_study_required = isClearCh_sw && fcc_class !== 'A';
       const night_study_weeks_low  = night_study_required ? 4  : 0;
       const night_study_weeks_high = night_study_required ? 12 : 0;
@@ -8611,8 +8610,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //     Required separation from co-channel station (Class A):
       //       §73.37 Table I minimum for Class D vs Class A co-channel ≈ 50–100 km.
       //     Nighttime skywave screening:
-      //       For clear-channel dominant at 780 kHz (KKOB, Albuquerque NM, 50 kW Class A):
-      //         KKOB 0.5 mV/m 50% skywave contour ≈ radius 600–800 km from KKOB.
+      //       For clear-channel dominant at 780 kHz (WBBM, Chicago IL, 50 kW Class A):
+      //         WBBM 0.5 mV/m 50% skywave contour ≈ radius 600–800 km from Chicago.
       //         Any new Class D operation within this contour must limit skywave contribution.
       //
       // NIF computation approach:
@@ -10844,7 +10843,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_rc           = /^DA/i.test(pattern_mode);
       const dist_km           = pt.distance_from_current_km ?? 25;
       const remote_required   = dist_km > 10;   // sites > 10 km: full-time staffing impractical
-      const cellular_coverage_likely = true;    // Sedona/AZ area has good coverage
+      const cellular_coverage_likely = pt.lat != null && pt.lon != null
+        ? (pt.lat > 25 && pt.lat < 50 && pt.lon > -125 && pt.lon < -65)  // CONUS — generally covered; site survey required
+        : true;  // assume covered if coordinates unavailable (conservative)
 
       // Response time standard per §73.1300:
       const operator_response_time_hrs = 3;  // §73.1350(c): correct or terminate within 3 hours (3 minutes where interference is caused)
@@ -11296,7 +11297,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_noise_low_usd,
         total_noise_high_usd,
         reference: '47 CFR §73.37(a) (10 dB SNR minimum at service contour); §73.182 (0.5 mV/m daytime service contour; 0.1 mV/m nighttime reference); ITU-R P.372-16 (noise figure, atmospheric and man-made); Terman (1955) ch. 20 (practical SNR thresholds)',
-        note: `Estimated combined noise floor: ${ft_dBuVm} dBµV/m (atmospheric ${fa_atmospheric_dBuVm} + man-made ${fa_manmade_dBuVm} dBµV/m, ${noise_zone} zone). Daytime SNR at 0.5 mV/m contour: ${snr_day_dB} dB (FCC minimum ${snr_threshold_dB} dB — ${snr_day_compliant ? 'COMPLIANT' : 'BELOW THRESHOLD'}). Noise risk: ${noise_risk_level}. ${is_clear_channel_freq ? `780 kHz is a CLEAR CHANNEL — KKOB (Albuquerque, 50 kW) dominates nighttime coverage; secondary station nighttime operation is secondary to dominant station interference.` : ''}`
+        note: `Estimated combined noise floor: ${ft_dBuVm} dBµV/m (atmospheric ${fa_atmospheric_dBuVm} + man-made ${fa_manmade_dBuVm} dBµV/m, ${noise_zone} zone). Daytime SNR at 0.5 mV/m contour: ${snr_day_dB} dB (FCC minimum ${snr_threshold_dB} dB — ${snr_day_compliant ? 'COMPLIANT' : 'BELOW THRESHOLD'}). Noise risk: ${noise_risk_level}. ${is_clear_channel_freq ? `${frequency_khz} kHz is a CLEAR CHANNEL — secondary station nighttime operation restricted by §73.182 dominant-station skywave protection.` : ''}`
       };
     })(),
 
@@ -12213,16 +12214,11 @@ async function scoreCandidate(pt, ctx, warnings){
       //   suspend nighttime operations.  This is determined by the FCC skywave prediction method
       //   (§73.182 Appendix A — ITU-R P.1147 based methodology).
       //
-      // Dominant stations on 780 kHz (KKOB Albuquerque NM is dominant US Class A):
-      //   KKOB (Albuquerque, NM, 50 kW, Class A) — primary dominant
-      //   WBBM (Chicago, IL, 50 kW, Class A) — secondary dominant (different channel, listed for reference)
-      //   NOTE: 780 kHz is dominated by KKOB.  KAZM at 5 kW Class D is secondary to KKOB.
+      // Dominant station on 780 kHz: WBBM Chicago IL (50 kW Class A) — per FCC §73.25 / LMS.
       //
       // Skywave skip distance at 780 kHz:
       //   Skip zone (no skywave coverage): typically 300–1,000 km from transmitter
       //   First-hop skywave coverage: ~800–2,500 km from transmitter
-      //   At KAZM location (Sedona AZ), KKOB (Albuquerque) is ~450 km away —
-      //   within the mixed groundwave/skywave transition zone.
       //
       // D/U ratio obligation: §73.182 requires that the field strength of the Class D's
       //   interfering skywave at the dominant's service area be < the dominant's skywave.
@@ -12250,7 +12246,7 @@ async function scoreCandidate(pt, ctx, warnings){
         750:  'WSB (Atlanta, GA)',
         760:  'WJR (Detroit, MI)',
         770:  'WABC (New York, NY)',
-        780:  'KKOB (Albuquerque, NM)',
+        780:  'WBBM (Chicago, IL)',
         800:  'XEROK / CKLW',
         810:  'WGY (Schenectady, NY)',
         820:  'WBAP (Fort Worth, TX)',
@@ -12292,7 +12288,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // ITU-R P.1147 first-hop F2: distance D_1 ≈ 2000 × sin(θ) km where θ is hop angle;
       // for standard nighttime F-layer height ~350 km, D_1 ≈ 2 × sqrt(h²−(h−H)²) for flat geometry.
       // Simplified: skip distance for 780 kHz ≈ 400–600 km (depends on season/K-index).
-      // KAZM at 34.86°N, 111.82°W: KKOB at ~35.04°N, 106.62°W → distance ≈ 450 km.
+      // Example: KAZM at 34.86°N, 111.82°W: WBBM at ~41.88°N, 87.89°W → distance ≈ 2,430 km.
       const skip_zone_est_km = 400;
       const skywave_first_hop_max_km = 2500;
 
@@ -12707,7 +12703,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // R_g estimate: standard 120-radial system ≈ 1.5 Ω; fewer radials → higher R_g
       const r_g_std_ohm = 1.5;
       // Soil resistivity surrogate from σ_msm (σ = 1/ρ × 1000 → ρ = 1000/σ Ω·m)
-      const sigma_local = ctx.goals ? (8) : 8; // default 8 mS/m when not site-specific (KAZM region)
+      const sigma_local = sigma_msm ?? 8; // mS/m from site score context; §73.190 Figure M3 default = 8 mS/m
       const rho_soil_ohm_m = round2(1000 / sigma_local); // Ω·m from mS/m
       // CP need: high soil corrosivity if ρ < 300 Ω·m (σ > 3.3 mS/m) or pH issues
       const cp_recommended = rho_soil_ohm_m < 300;
