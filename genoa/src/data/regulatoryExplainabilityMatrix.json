@@ -173,7 +173,7 @@
         "station_inputs.lat",
         "station_inputs.lon"
       ],
-      "calculation": "Compute daytime groundwave field strength using FCC M3 propagation curves (conductivity-based). Determine the distance at which the 0.5 mV/m daytime service contour is reached, and check against §73.183 groundwave protection requirements for co-channel and adjacent-channel AM stations.",
+      "calculation": "Compute daytime groundwave field strength using FCC M3 propagation curves per §73.184 (conductivity-based). Determine the distance at which the 0.5 mV/m daytime service contour is reached, and check against §73.183 interference field strength thresholds (protection requirements) for co-channel and adjacent-channel AM stations.",
       "pass_condition": "Groundwave 0.5 mV/m service contour does not encroach upon another station's 0.5 mV/m protected contour",
       "fail_condition": "Groundwave service contour overlaps a co-channel or adjacent-channel protected contour",
       "evidence_source": "evidence.am_physics, evidence.am_physics_fccgw",
