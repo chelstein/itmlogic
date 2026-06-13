@@ -1585,7 +1585,7 @@ function PaneEvidence({ exhibit }){
           ]
         : pop.attempt_status === 'failed'
           ? [
-              ['Status',   'Census API call failed — placeholder retained'],
+              ['Status',   'Census API call failed — model estimate retained'],
               ['Error',    pop.attempt_error || '—'],
               ['Endpoint', pop.attempt_endpoint || '—']
             ]
@@ -1847,7 +1847,7 @@ function PaneProvenance({ exhibit }){
             ['Missing fields',   (pop.attempt_missing || []).join(', ') || '—']
           ];
         }
-        return [['Status', 'placeholder — exhibit needs lat/lon coordinates for FCC Census Block API lookup']];
+        return [['Status', 'model estimate — exhibit needs lat/lon coordinates for FCC Census Block API lookup']];
       })()} />
     </div>
   );
