@@ -2611,7 +2611,7 @@ async function scoreCandidate(pt, ctx, warnings){
   // 1b. Multi-contour population reach bands.
   //     Five standard field-strength contours: 5.0, 2.0, 1.0, 0.5, 0.25 mV/m.
   //     Each band gives: distance_km, area_km2, and estimated_population (density proxy).
-  //     Useful for comparing relative audience reach across candidates without full §73.183 study.
+  //     Useful for comparing relative audience reach across candidates without full §73.184 groundwave propagation study.
   const population_reach_bands = (() => {
     const targets = [
       { mvm: 5.0,  label: '5 mV/m (§73.24(i) principal community)' },
@@ -2638,7 +2638,7 @@ async function scoreCandidate(pt, ctx, warnings){
         bands.push({ target_mvm: mvm, label, distance_km: null, area_km2: null, estimated_population: null });
       }
     }
-    return { bands, note: 'Screening-grade circular-area population estimate using distance-adjusted density proxy. Not a §73.183 propagation contour.' };
+    return { bands, note: 'Screening-grade circular-area population estimate using distance-adjusted density proxy. Not a §73.184 groundwave propagation contour.' };
   })();
 
   // 2. Principal-community coverage (§73.24(i)).  When a polygon was
@@ -5523,7 +5523,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // What's needed to upgrade power?
       const isDA = CLEAR_CHANNEL_KHZ.has(frequency_khz) && fcc_class !== 'A';
       const upgrade_path = headroom_kw <= 0 ? 'AT_MAX_POWER' : [
-        'Engineering study (§73.183 groundwave + §73.24(g) blanket re-evaluation)',
+        'Engineering study (§73.184 groundwave propagation + §73.24(g) blanket re-evaluation)',
         'Amended Form 301-AM with updated COL coverage exhibit',
         isDA ? '§73.182 NIF study update (re-evaluate nighttime skywave at new power)' : null,
         'New RF exposure (MPE) evaluation at higher ERP (OET Bulletin 65)',
@@ -10008,9 +10008,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM groundwave field strength estimate — §73.183 / §73.184 FCC M3 curves.
       //
       // Regulatory framework:
-      //   47 CFR §73.183: Groundwave service contours.  Applicants must calculate the
+      //   47 CFR §73.184: Groundwave propagation curves (M3 conductivity method).  Applicants must calculate the
       //     predicted groundwave field strength contour at 0.5 mV/m (daytime service)
-      //     and 0.1 mV/m (nighttime service) using the FCC groundwave curves.
+      //     and 0.1 mV/m (nighttime service) using the FCC M3 groundwave curves.
       //   §73.184: FCC groundwave field strength curves (M3 curves, ITU-R P.368-9).
       //     Curves are tabulated by frequency (MHz) and ground conductivity (mS/m).
       //   §73.182: Minimum usable field strength at community of license (primary service area):
@@ -10038,8 +10038,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Scaling with frequency: lower frequencies travel farther; approximate
       //   radius ∝ (f_ref/f)^0.5 relative to the 780 kHz reference values.
       //
-      //   These are screening-grade estimates (±30%).  A formal §73.183 study using
-      //   FCC published M3 curves is required for filing.
+      //   These are screening-grade estimates (±30%).  A formal §73.184 groundwave study using
+      //   FCC published M3 conductivity curves is required for filing.
 
       // --- M3 reference radii at 1 kW, 780 kHz (km) ---
       // Conductivity breakpoints: [1, 2, 4, 8, 16] mS/m
@@ -10541,10 +10541,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   For Class D secondary on 780 kHz (clear channel): nighttime sign-off often required
       //     or power reduction → effective hours ≈ 12–16 hrs/day average.
       //
-      // US commercial electricity rates (2024 EIA data):
-      //   National average commercial rate: $0.118/kWh
-      //   Western US (AZ): $0.108–$0.124/kWh
-      //   Southwest AZ commercial: ≈ $0.115/kWh
+      // US commercial electricity rates (EIA 2024):
+      //   National average commercial rate: $0.115/kWh (EIA Electric Power Monthly, 2024 annual avg)
+      //   Range by state: $0.08–$0.22/kWh; override with site-specific utility rate where known.
       //
       // Modulation effect on efficiency:
       //   AM modulation increases power during positive peaks.
@@ -10821,7 +10820,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Unattended operation implications for candidate site:
       //   If the candidate site is remote (distance > 20 km from city), full-time staffing
       //   is impractical. Remote control via IP/cellular is the expected solution.
-      //   Cellular coverage at Sedona area transmitter sites: generally available (Verizon/AT&T).
+      //   Cellular coverage at rural transmitter sites: varies; major carriers (Verizon/AT&T) cover most sites within 40 km of population centers.
       //
       // Internet connectivity requirement:
       //   IP remote control requires broadband at the transmitter site.
@@ -18931,7 +18930,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // Radio market tiers (Arbitron/Nielsen Audio ADI ranks):
       //   MAJOR:   ADI 1–25   (NYC, LA, Chicago, PHX, etc.)
-      //   MEDIUM:  ADI 26–75  (Flagstaff, Prescott, Sedona area)
+      //   MEDIUM:  ADI 26–75  (e.g., Raleigh NC, Louisville KY, Hartford CT)
       //   SMALL:   ADI 76–200
       //   RURAL:   ADI 200+   (unrated markets)
       //
@@ -20427,15 +20426,15 @@ async function scoreCandidate(pt, ctx, warnings){
                        : fcc_class === 'A' ? 50
                        : fcc_class === 'B' ? 50
                        : fcc_class === 'C' ? 1
-                       : 50;     // Class D: 50 kW day per §73.21(b)
+                       : 5;      // Class D: 5 kW day max per §73.21(e)
 
       // Nighttime ceiling (§73.21): Class C unlimited time at licensed power;
-      // Class D nighttime, where authorized, is less than 0.25 kW (§73.21(b)(2)).
+      // Class D nighttime, where authorized, is ≤ 0.5 kW per §73.21(b)(2) (or sign-off).
       const night_max_kw = is_local_ch       ? 1
                          : fcc_class === 'A' ? 50
                          : fcc_class === 'B' ? 50
                          : fcc_class === 'C' ? 1
-                         : 0.25; // Class D night < 0.25 kW where authorized
+                         : 0.5; // Class D night ≤ 0.5 kW per §73.21(b)(2)
 
       const day_headroom_kw  = Math.max(0, day_max_kw - tpo_kw);
       const can_upgrade_day  = day_headroom_kw > 0;
@@ -21417,7 +21416,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { step: 1, action: 'Co-channel station inventory within 1500 km', detail: 'Pull all co-channel AM stations from FCC LMS; compute daytime 0.5 mV/m and 2 mV/m contour intersections with proposed site coordinates', tool: 'FCC LMS / AM Query tool', cfr: '§73.182' },
         { step: 2, action: 'Adjacent-channel station inventory within 500 km', detail: 'Pull all ±10 kHz and ±20 kHz channel stations from LMS; apply the §73.37(a) overlap table; flag any potential prohibited overlap', tool: 'FCC LMS', cfr: '§73.37(a)' },
         { step: 3, action: 'D/U interference analysis for short-spaced stations', detail: 'For any station with potential contour overlap per §73.37(a), compute predicted field strengths and D/U ratios at protected contours; document compliance or interference', tool: 'FCC AM interference calculator / ITM', cfr: '§73.37; §73.182' },
-        { step: 4, action: 'Night-time skywave analysis (if applicable)', detail: isClearChannel ? `780 kHz is a CLEAR CHANNEL; night-time skywave from Class A dominant (e.g., WBBM/Chicago) must be protected; Class D secondary stations must not increase interference to dominant station's 0.5 mV/m contour` : 'N/A for regional/local channel', tool: 'FCC skywave prediction model', cfr: '§73.182(a); §73.24(b)' },
+        { step: 4, action: 'Night-time skywave analysis (if applicable)', detail: isClearChannel ? `${frequency_khz} kHz is a CLEAR CHANNEL (§73.25); night-time skywave from the Class A dominant must be protected; Class D secondary stations must not increase interference to dominant station's 0.5 mV/m contour per §73.182` : 'N/A for regional/local channel', tool: 'FCC skywave prediction model', cfr: '§73.182(a); §73.24(b)' },
         { step: 5, action: 'Coordination agreement with affected stations (if needed)', detail: 'If interference analysis shows potential impact, negotiate engineering agreement with affected station; document agreement as exhibit to FCC Form 301-AM', tool: 'Direct station-to-station contact', cfr: '§73.37; §73.182' }
       ];
 
@@ -22941,8 +22940,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Determine which electoral environment the candidate site serves
       // This is a planning-level estimate; actual district mapping requires GIS
-      const lat_ppg = pt.lat ?? 34.9;
-      const lon_ppg = pt.lon ?? -111.8;
+      const lat_ppg = pt.lat ?? 35;
+      const lon_ppg = pt.lon ?? -98;
       // Very rough congressional district zone estimate by geographic region
       const region_note = lat_ppg > 40 ? 'Northern latitude — likely serves different congressional districts than current site' : 'Southern/Western latitude — verify congressional district coverage change post-relocation';
 
@@ -26067,7 +26066,7 @@ async function scoreCandidate(pt, ctx, warnings){
       };
 
       // Terrain irregularity parameter Δh (terrain roughness index)
-      // FCC §73.183: uses 10–90 percentile height spread of terrain profile
+      // FCC §73.184 / ITM: uses 10–90 percentile height spread of terrain profile
       // Typical values: flat plains 10–30m, rolling hills 50–100m, mountains 200–500m
       const TERRAIN_CLASS_tp = [
         { id: 'FLAT',        label: 'Flat / coastal',      delta_h_m: 15,  path_loss_extra_db: 0,   description: 'Plains, desert, coastal marsh. Closest to smooth-earth FCC curves.' },
@@ -26109,7 +26108,7 @@ async function scoreCandidate(pt, ctx, warnings){
         relative_permittivity: sigma_msm >= 8 ? 25 : sigma_msm >= 4 ? 15 : 7 // FCC Table 1 typical values
       };
 
-      // Knife-edge diffraction model (single obstacle, §73.183 supplement)
+      // Knife-edge diffraction model (single obstacle, §73.184 / ITM propagation supplement)
       // For HILLY+ terrain: estimate single ridge diffraction loss using Fresnel-Kirchhoff
       const ridge_diffraction = (() => {
         if (terrainClass_tp.id === 'FLAT' || terrainClass_tp.id === 'ROLLING') {
@@ -26141,7 +26140,7 @@ async function scoreCandidate(pt, ctx, warnings){
         `Estimated terrain correction: +${terrainClass_tp.path_loss_extra_db} dB excess path loss`,
         propagation_study_required
           ? 'FCC requires Longley-Rice propagation study (ITM v7.0) for mountainous terrain changes'
-          : 'Smooth-earth FCC groundwave curves (§73.183) applicable with minor terrain correction',
+          : 'Smooth-earth FCC groundwave curves (§73.184) applicable with minor terrain correction',
         `Ground conductivity σ=${sigma_msm} mS/m; permittivity ε=${itm_inputs.relative_permittivity}`,
         `Polarization: vertical (AM §73.150); climate: ${itm_inputs.climate_zone}`
       ];
@@ -26580,7 +26579,7 @@ async function scoreCandidate(pt, ctx, warnings){
       };
 
       // Annual operating cost estimate
-      const electricRate_usd_kwh = 0.12;
+      const electricRate_usd_kwh = 0.115; // US commercial average (EIA 2024)
       const hvacOperatingHrs_yr  = 8760; // continuous
       const annualHvacCost_usd   = round2(recommendedHvac.power_kw * hvacOperatingHrs_yr * electricRate_usd_kwh);
 
@@ -27000,7 +26999,7 @@ async function scoreCandidate(pt, ctx, warnings){
           max_improvement_pct: 400, // sigma jump from 1→4+ mS/m
           description:   'Best sigma improvement is site relocation to coastal marsh, lakeside, or agricultural bottomland. Sigma 8–30 mS/m vs. 0.5–2 mS/m in desert/rocky.',
           prerequisites: ['Available land near water', 'No EPA wetland restriction'],
-          standard:      'FCC §73.183 conductivity maps; Salat & Ziegler (1991) ITT Reference Data'
+          standard:      'FCC §73.184 M3 conductivity maps; Salat & Ziegler (1991) ITT Reference Data'
         }
       ];
 
@@ -27040,7 +27039,7 @@ async function scoreCandidate(pt, ctx, warnings){
         coverage_gain_pct:           Math.max(coverageGainPct, 0),
         treatment_area_km2:          siteAreaKm2,
         improvement_budget_usd:      improvementBudget,
-        reference: '47 CFR §73.150; §73.183; IEEE Std 80-2013 ground electrode systems; Terman (1950) Radio Engineers Handbook; Belrose (1966) IRE; ERITECH GCP-35',
+        reference: '47 CFR §73.150; §73.184 (M3 conductivity maps); IEEE Std 80-2013 ground electrode systems; Terman (1950) Radio Engineers Handbook; Belrose (1966) IRE; ERITECH GCP-35',
         note: `Baseline σ=${sigma_gci} mS/m (${isHighConductivity ? 'preferred — no improvement needed' : isLowConductivity ? 'low — improvement recommended' : 'moderate — improvement beneficial'}). Est. σ after improvement: ${sigmaAfterImprovement} mS/m (+${Math.max(coverageGainPct, 0)}% coverage).`
       };
     })(),
@@ -30727,7 +30726,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // 47 CFR §73.186 — Computation of coverage.
       //   NDA stations: single omnidirectional contour centered on the antenna.
-      //   DA stations: full 360° radiation pattern applied to §73.183 M3 ground.
+      //   DA stations: full 360° radiation pattern applied to §73.184 M3 groundwave conductivity.
       //   Class A (clear channel) coverage: 0.5 mV/m daytime.
       //   Class B (regional): 0.5 mV/m daytime.
       //   Class C (local): 0.5 mV/m daytime (service contour).
@@ -30757,7 +30756,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // SOFTWARE / METHODS ACCEPTED BY FCC
       // ────────────────────────────────────
       //   • AM_STAT (FCC-published legacy program)
-      //   • Any program that correctly implements §73.184 curves + §73.183 M3
+      //   • Any program that correctly implements §73.184 M3 groundwave curves
       //   • Measured data (overrides computed where measurement > computation)
       //
       // COST ESTIMATES
@@ -31214,7 +31213,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Class A: 10–50 kW (dominant on clear channel), unlimited hours.
       //   Class B: 0.25–50 kW (regional channel), unlimited hours.
       //   Class C: 0.25–1 kW (local channel), unlimited hours.
-      //   Class D: 0.25–50 kW (secondary, daytime-only or limited nighttime).
+      //   Class D: 1–5 kW daytime (§73.21(e)); ≤ 0.5 kW nighttime or sign-off (§73.21(b)(2)).
       //
       // 47 CFR §73.24 — Licensing requirements.
       //   A station must demonstrate it can serve the public interest with the
@@ -32752,7 +32751,7 @@ async function scoreCandidate(pt, ctx, warnings){
     am_faa_tower_lighting_and_obstruction_marking_guide: (() => {
       // FAA obstruction marking thresholds per 47 CFR §17.7/§17.21–§17.23 and FAA AC 70/7460-1M
       // Height above ground level (AGL) in feet drives lighting requirements.
-      // For AM towers: 3/8λ for Class C/D (e.g., ~472 ft at 780 kHz); 5/8λ for Class A/B.
+      // For AM towers: 3/8λ for Class C/D (e.g., ~369 ft at 1000 kHz); 5/8λ for Class A/B.
       const freq_khz   = frequency_khz ?? 1000;
       const tpo        = tpo_kw ?? 1;
       const isDA       = /^DA/i.test(pattern_mode ?? '');
