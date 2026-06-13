@@ -20403,12 +20403,13 @@ async function scoreCandidate(pt, ctx, warnings){
 
     transmitter_power_upgrade_pathway_guide: (() => {
       // 47 CFR §73.21 sets class-based daytime TPO ceilings.  Class D on a clear
-      // channel may operate up to 10 kW day; nighttime is capped at 1 kW for
-      // secondary stations (must protect the dominant Class A via §73.182 skywave).
+      // channel may operate up to 5 kW daytime per §73.21(e); nighttime is capped at
+      // 0.5 kW (PSA) or sign-off for secondary stations that must protect the dominant
+      // Class A via §73.182 skywave.
       //
-      // At 5 kW (KAZM baseline) the operator retains 5 kW of daytime headroom.
-      // Going 5 → 10 kW doubles ERP; groundwave field ∝ √ERP, so the coverage
-      // radius to a fixed contour (e.g. 0.5 mV/m) grows by √2 ≈ +41%.
+      // A station operating at the Class D ceiling (5 kW) has no further daytime headroom.
+      // Increasing daytime coverage requires a reclassification (Class change, requires FCC action)
+      // or a DA pattern to focus coverage toward the COL.
       //
       // CP pathway (major facility change):
       //   Form 301 filed → FCC processing 6-18 mo → CP granted → build → Form 302-AM.
@@ -20603,7 +20604,7 @@ async function scoreCandidate(pt, ctx, warnings){
         notes: m.notes
       }));
 
-      const current_height_m     = lambda_quarter_m;   // KAZM current tower = λ/4
+      const current_height_m     = lambda_quarter_m;   // baseline: λ/4 (standard reference height per ITU-R BS.346-1)
       const current_height_ft    = m_to_ft(lambda_quarter_m);
       const current_elec_deg     = 90;
       const optimal_height_m     = five_eighth_m;      // 5λ/8 for maximum field strength
@@ -20655,7 +20656,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Antenna loading shift (ice loading, ground saturation changes antenna Q)
       //   - ATU component aging (capacitor drift in L/C tuning networks)
       //
-      // KAZM physics: 780 kHz assigned; tolerance = ±20 Hz → 779,980–780,020 Hz
+      // Frequency tolerance example at station frequency: ±20 Hz → [freq_hz−20, freq_hz+20]
 
       const freq_khz         = frequency_khz;                      // 780
       const freq_hz          = freq_khz * 1000;                     // 780,000
@@ -27712,7 +27713,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Seasonal SR/SS variation
       const SR_SS_VARIATION = {
-        max_seasonal_diff_hours: round2(Math.abs(Math.cos(Math.PI / 180 * 34.86)) * 3.5), // approx for KAZM lat
+        max_seasonal_diff_hours: round2(Math.abs(Math.cos(Math.PI / 180 * (pt.lat ?? 35))) * 3.5), // approx from candidate site latitude
         schedule_update_freq: 'Monthly update to ASID timer recommended; FCC sunrise/sunset tables used',
         cfr: '§73.99; FCC Sunrise/Sunset Table (Media Bureau)'
       };
