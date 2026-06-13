@@ -19304,7 +19304,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   VERY_ROUGH:   Δh > 300m (mountain terrain)
       //
       // FCC uses Δh = 90m as the standard smooth-earth deviation factor
-      // for irregular terrain correction in §73.183 Table 1 footnote.
+      // for irregular terrain correction in FCC AM propagation tables (§73.184 / ITM).
       //
       // Propagation range estimate (FCC R(50,50) groundwave, 100 mV/m):
       //   Class A (50 kW): ~200 km smooth / ~120 km rough
