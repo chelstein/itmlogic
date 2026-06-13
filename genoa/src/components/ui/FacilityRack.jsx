@@ -28,7 +28,7 @@ const FCC_CLASSES_BY_SERVICE = {
   FM:   ['A', 'B1', 'B', 'C3', 'C2', 'C1', 'C0', 'C'],
   FX:   ['A', 'B1', 'B', 'C3', 'C2', 'C1', 'C0', 'C'],   // translators inherit primary class
   LPFM: ['L1'],
-  TV:   ['LP', 'CP', 'LD']                                // low-power TV classes (placeholder)
+  TV:   ['LP', 'CA', 'LD']                                // FCC LPTV/Class A TV station types (LP=LPTV analog, CA=Class A TV, LD=LPTV digital)
 };
 const FCC_CLASSES_DEFAULT = ['A', 'B1', 'B', 'C3', 'C2', 'C1', 'C0', 'C', 'D', 'L1'];
 function classesFor(service){
