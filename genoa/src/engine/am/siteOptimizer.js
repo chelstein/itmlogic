@@ -34026,7 +34026,7 @@ export { buildTopSummary, frequencyChannelClass, buildRegulatoryTimeline };
 // v1 conductivity abstraction — resolveConductivityAtPoint({ lat, lon })
 // Returns { value_ms_m, source, confidence, blocking }
 // When the GeoTIFF raster is loaded: high confidence, filing-grade.
-// When using zone-table fallback: low confidence, marked mock/screening.
+// When using zone-table fallback: low confidence, marked zone_table/screening.
 // When both fail: null value, confidence=none, blocking=false (candidate may still rank).
 export async function resolveConductivityAtPoint({ lat, lon }){
   let _m3 = await lookupM3Conductivity(lat, lon).catch(() => null);
@@ -34042,7 +34042,7 @@ export async function resolveConductivityAtPoint({ lat, lon }){
   if (zone?.available && zone.sigma_mS_m != null){
     return {
       value_ms_m:  zone.sigma_mS_m,
-      source:      'mock_conductivity_raster',
+      source:      'm3_zone_table',
       confidence:  'low',
       blocking:    false
     };
