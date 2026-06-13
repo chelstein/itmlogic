@@ -211,7 +211,7 @@ export function buildValidationVerdictSection(exhibit){
     components.push({
       name:   'Terrain source',
       status: 'SKIP',
-      detail: '§73.184 AM groundwave does not use terrain — FCC curve over assumed conductivity per §73.183 / §73.190.  No DEM lookup is required or performed for AM exhibits.'
+      detail: '§73.184 AM groundwave does not use terrain — FCC curve over assumed conductivity per §73.184 / §73.190 Figure M3.  No DEM lookup is required or performed for AM exhibits.'
     });
   } else {
     components.push({

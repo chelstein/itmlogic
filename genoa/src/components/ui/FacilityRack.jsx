@@ -318,11 +318,11 @@ export default function FacilityRack({
         </div>
         {inputs.service === 'AM' ? (
           <>
-            {/* AM uses 47 CFR §73.183 groundwave — TPO drives the
+            {/* AM uses 47 CFR §73.184 groundwave — TPO drives the
                 unattenuated RMS field at 1 km, ground conductivity
                 (AM σ below) drives the propagation curve.  ERP/HAAT
                 are FM/TV concepts and don't apply.  Internal field
-                is still erp_kw so the engine's existing §73.183 math
+                is still erp_kw so the engine's existing §73.184 math
                 keeps working untouched (for non-DA AM, TPO ≈ "ERP"
                 for the inverse-distance reference). */}
             <div>

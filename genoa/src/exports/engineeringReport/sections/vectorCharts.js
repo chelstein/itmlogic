@@ -72,7 +72,7 @@ export function buildDaPatternChartSection(exhibit){
   const isAmPat = svc === 'AM';
   const mode = isAmPat ? '§73.150 ground-wave' : '§73.316 horizontal';
   // Power label / scaling caption must reflect the service vocabulary.
-  // AM is TPO (transmitter output power) and the §73.183 inverse-distance
+  // AM is TPO (transmitter output power) and the §73.184 inverse-distance
   // field scales as TPO × f²; FM/TV is ERP × f² per §73.316.  Mixing the
   // two reads as FM-engine architecture leaking into an AM filing.
   const powerLabel = isAmPat ? 'TPO' : 'ERP';

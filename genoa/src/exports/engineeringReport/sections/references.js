@@ -44,7 +44,7 @@ export function buildReferencesSection(exhibit){
     cite('47 CFR §73.182',
          'Engineering standards of allocation for AM; nighttime interference / RSS aggregation (NIF study).');
     cite('47 CFR §73.183',
-         'AM groundwave signals; field-strength calculation methodology.');
+         'Groundwave field strength used to determine interference; D/U protection thresholds (0.5 mV/m daytime, 0.1 mV/m nighttime) for AM interference analysis.');
     cite('47 CFR §73.184',
          'AM groundwave field-strength graphs; §73.184 Figure M3 conductivity-zone basis.');
     cite('47 CFR §73.187',

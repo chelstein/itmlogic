@@ -103,7 +103,7 @@ export default function TelemetryRack({ exhibit }) {
         {String(s.service || '').toUpperCase() === 'AM' ? (
           <>
             {/* AM: transmitter power + ground conductivity drive the
-                §73.183 groundwave field.  Show TPO and σ, not ERP/HAAT. */}
+                §73.184 groundwave field.  Show TPO and σ, not ERP/HAAT. */}
             <MetricReadout label="TPO"         value={s.erp_kw ?? '—'}            unit="kW"   tone="gold" />
             <MetricReadout label="σ (ground)"  value={s.ground_sigma_mS_m ?? '—'} unit="mS/m" tone="gold" />
           </>

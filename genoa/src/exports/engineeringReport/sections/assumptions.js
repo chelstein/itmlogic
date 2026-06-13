@@ -22,7 +22,7 @@ export function buildAssumptionsSection(exhibit){
   // Service vocabulary divides everything below.  AM exhibits MUST NOT
   // mention HAAT, ERP, or §73.313 — those are FM/TV concepts under
   // §73.316 / §73.333.  AM uses TPO, RMS field at 1 km, and ground
-  // conductivity σ under §73.183 / §73.184.  Leaking the FM vocabulary
+  // conductivity σ under §73.184.  Leaking the FM vocabulary
   // into an AM exhibit reads as FM-engine architecture poking through.
   const svc  = String(s.service || '').toUpperCase();
   const isAm = svc === 'AM' || svc === 'AX';

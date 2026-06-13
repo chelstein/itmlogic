@@ -3172,8 +3172,8 @@ async function scoreCandidate(pt, ctx, warnings){
   const candidate_type = pt.candidate_type ?? 'grid';
   const blockers = flags.filter(f => f.includes('§73.24')).map(f => ({ code: 'COMPLIANCE_FAIL', message: f }));
   const required_next_studies = [
-    '47 CFR §73.183 daytime groundwave study',
-    '47 CFR §73.184 groundwave field-strength curves',
+    '47 CFR §73.184 daytime groundwave contour study (M3 conductivity curves)',
+    '47 CFR §73.183 interference field strength protection analysis (D/U ratios)',
     '47 CFR §73.182 nighttime NIF/RSS interference study',
     'RF safety / OET-65 review',
     'ASR / FAA / zoning review',
@@ -5290,9 +5290,9 @@ async function scoreCandidate(pt, ctx, warnings){
           form:        'Form 301-AM — Exhibit B',
           exhibit:     'Groundwave field-intensity study (§73.184)',
           status:      'REQUIRED',
-          rule:        '47 CFR §73.183 / §73.184',
+          rule:        '47 CFR §73.184',
           responsible: 'Licensed broadcast engineer',
-          note:        `FCC M3-zone conductivity σ=${sigma_msm} mS/m used for screening. Exhibit B requires groundwave distance/field table at compass bearings per §73.184. Actual analysis must use FCC groundwave software or equivalent.`
+          note:        `FCC M3-zone conductivity σ=${sigma_msm} mS/m used for screening. Exhibit B requires groundwave distance/field table at compass bearings per §73.184 M3 curves. Actual analysis must use FCC groundwave software or equivalent.`
         },
         {
           id:          'LMS_COL_EXHIBIT',

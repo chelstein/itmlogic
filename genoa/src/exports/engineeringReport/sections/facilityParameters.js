@@ -60,8 +60,8 @@ export function buildFacilityParametersSection(exhibit){
     : ['Terrain source',
        ev.terrain?.source || (ev.terrain_haat_per_radial?.length ? 'per-radial DEM' : 'flat HAAT (CONSTANT_HAAT_ASSUMED)')];
 
-  // AM parameter vocabulary differs from FM/TV.  Per 47 CFR §73.183 /
-  // §73.184 an AM allocation is described by transmitter power (TPO),
+  // AM parameter vocabulary differs from FM/TV.  Per 47 CFR §73.184
+  // an AM allocation is described by transmitter power (TPO),
   // unattenuated RMS field at 1 km (inverse-distance reference field),
   // ground conductivity σ, and antenna mode (DA / NDA).  ERP and HAAT
   // are FM/TV terms and don't apply.  Field labels diverge accordingly.
