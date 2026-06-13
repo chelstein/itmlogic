@@ -42,8 +42,8 @@ export const FCC_CITES = Object.freeze({
   }),
   AM_GROUNDWAVE_SIGNALS: Object.freeze({
     rule: '§73.183',
-    caption: 'Groundwave signals',
-    subject: 'Groundwave propagation definitions; how groundwave field strength is determined for AM allocation work.',
+    caption: 'Groundwave field strength for interference',
+    subject: 'Groundwave field strength thresholds used to determine interference; daytime and nighttime protection levels (0.5 mV/m, 0.1 mV/m, etc.) for AM allocation.',
     verified_at: '2026-05-23'
   }),
   AM_GROUNDWAVE_GRAPHS: Object.freeze({

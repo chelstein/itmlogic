@@ -510,7 +510,7 @@ export function buildAppendixSections(exhibit){
   const tNested = ev.terrain?.dem || {};
   // For AM exhibits, §73.184 groundwave does not consume a DEM at all —
   // contour distances are derived from the FCC curve over assumed
-  // ground conductivity (§73.183 / §73.190 Fig. M3/R3).  Print the
+  // ground conductivity (§73.184 M3 conductivity maps / §73.190 Fig. R3).  Print the
   // regulatory rationale rather than a misleading em-dash that would
   // suggest a missing data source.
   const demNotApplicable = svc_c === 'AM' && !tDem.available;
