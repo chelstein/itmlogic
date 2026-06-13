@@ -4448,7 +4448,7 @@ async function scoreCandidate(pt, ctx, warnings){
         nif_complexity = 'VERY_HIGH';
         protection_class = `class_${fcc_class}_secondary_clear_channel`;
         key_constraint = `Class ${fcc_class} secondary on clear channel (${frequency_khz} kHz, §73.25): nighttime operation restricted — must not increase interference to dominant Class A protected contours (0.5 mV/m and 25 µV/m). Complex §73.182 NIF study required; authorization may be limited or denied.`;
-        nighttime_power_max_kw = fcc_class === 'B' ? 50 : fcc_class === 'C' ? 1 : 0.25; // C: §73.21(c); D night < 0.25 kW per §73.21(b)(2)
+        nighttime_power_max_kw = fcc_class === 'B' ? 50 : fcc_class === 'C' ? 1 : 0.5; // C: §73.21(c); D night ≤ 0.5 kW per §73.21(b)(2)
       } else if (isClassA){
         // Class A on regional channel.
         eligibility = 'YES';
@@ -4476,7 +4476,7 @@ async function scoreCandidate(pt, ctx, warnings){
         nif_complexity = 'MODERATE';
         protection_class = 'class_D_regional';
         key_constraint = `Class D secondary (${frequency_khz} kHz): daytime-only authorization is common. Nighttime requires §73.182 NIF demonstrating no interference — Class D nighttime is discretionary and may be denied.`;
-        nighttime_power_max_kw = 0.25; // §73.21(b)(2): Class D nighttime, where authorized, is < 0.25 kW
+        nighttime_power_max_kw = 0.5; // §73.21(b)(2): Class D nighttime, where authorized, is ≤ 0.5 kW
       }
 
       if (treaty_zone){
@@ -5479,7 +5479,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Class A: 50 kW (day and night)
       //   Class B: 50 kW (day), 50 kW (night local), 5 kW (night regional)
       //   Class C: 1 kW (day and night, §73.21(c))
-      //   Class D: 50 kW (day); nighttime < 0.25 kW where authorized (§73.21(b)(2))
+      //   Class D: 5 kW (day, §73.21(e)); nighttime ≤ 0.5 kW where authorized per §73.21(b)(2)
       const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 50 };
       const ceiling_kw = CLASS_CEILINGS[fcc_class] ?? 50;
       const headroom_kw = round2(ceiling_kw - tpo_kw);
@@ -6339,7 +6339,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Annual operating cost (power, maintenance, lease if applicable)
       const annualPowerKwh = Math.round(tpo_kw * 1000 * 24 * 365 * 0.55);  // ~55% efficiency
-      const annualPowerCost = Math.round(annualPowerKwh * 0.12 / 1000);     // $0.12/kWh
+      const annualPowerCost = Math.round(annualPowerKwh * 0.115 / 1000);    // $0.115/kWh (EIA 2024 US commercial average)
       const annualMaintLow  = isHighPow_ff ? 15000 : isMedPow_ff ? 6000 : 2500;
       const annualMaintHigh = isHighPow_ff ? 50000 : isMedPow_ff ? 20000 : 8000;
       const annualOpLow  = annualPowerCost + annualMaintLow  + leaseLow;
@@ -7007,7 +7007,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const i1 = (() => {
         if (coverage_pct == null) return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(i)', 'NOT_EVALUATED',
           'COL coverage not evaluated — no polygon or daytime reach data available.',
-          'Commission §73.183 coverage study with GIS polygon of principal community');
+          'Commission §73.184 groundwave coverage study with GIS polygon of principal community');
         if (coverage_pct >= COL_COVERAGE_HARD_FLOOR) return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(i)', 'PASS',
           `${(coverage_pct * 100).toFixed(0)}% of principal community receives ≥5 mV/m (floor: 80%).`);
         return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(i)', 'FAIL',
@@ -10730,7 +10730,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // 0.1 mV/m groundwave contour distance for NDA Class D:
       //   FCC AM groundwave curves (§73.184 Table 1): for 5 kW NDA at 780 kHz
       //   σ = 8 mS/m (average US conductivity): 0.1 mV/m contour ≈ 55–75 km from transmitter
-      //   σ = 4 mS/m (rocky terrain, Sedona area): 0.1 mV/m ≈ 40–55 km
+      //   σ = 4 mS/m (rocky terrain, lower conductivity): 0.1 mV/m ≈ 40–55 km
       const sigma_proxy_mSm     = sigma_msm ?? 8;   // mS/m conductivity estimate from score context
       const nighttime_0p1_km    = sigma_proxy_mSm >= 10 ? 75
                                  : sigma_proxy_mSm >= 6  ? 60
@@ -11119,7 +11119,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Is the candidate site higher than current site? (rough elevation proxy via sigma_msm or bearing)
       // sigma_msm correlates with terrain variability — higher sigma often means hillier terrain.
-      // A bearing from 0–90° in Sedona area (northeast) often means higher plateau terrain.
+      // Candidate sites with high conductivity often correspond to lower, flatter terrain.
       const bearing = pt.bearing_deg ?? 0;
       const elevated_site_likely = (sigma_msm ?? 8) > 12;   // σ > 12 dB/km → hilly terrain
       const translator_coverage_km = elevated_site_likely
@@ -11269,7 +11269,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Interference from nearby AM stations on adjacent / skywave channels:
       //   FCC §73.182 / §73.37: skywave and adjacent-channel interference handled elsewhere;
-      //   here we note CLEAR CHANNEL status: 780 kHz is clear channel → KKOB is dominant.
+      //   here we note CLEAR CHANNEL status: see CLEAR_DOMINANTS table for co-channel dominant station.
       const is_clear_channel_freq  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
 
       // Cost: noise floor measurement campaign (if needed — required before formal interference analysis)
@@ -15445,8 +15445,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const line_ext_low_usd  = round2(line_ext_miles * line_ext_cost_per_mile_low);
       const line_ext_high_usd = round2(line_ext_miles * line_ext_cost_per_mile_high);
 
-      // Monthly/annual power cost at flat EIA residential-commercial blended rate
-      const power_rate_per_kwh     = 0.12;
+      // Monthly/annual power cost at US commercial average rate (EIA 2024)
+      const power_rate_per_kwh     = 0.115;
       const monthly_power_cost_usd = round2(total_load_kw * 24 * 30 * power_rate_per_kwh);
       const annual_power_cost_usd  = round2(monthly_power_cost_usd * 12);
 
@@ -15924,7 +15924,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // GPS-disciplined oscillator (GPSDO): < 0.001 ppm = excellent margin
       const gpsdo_cost_low_usd  = 500;
       const gpsdo_cost_high_usd = 2000;
-      const gpsdo_accuracy_ppb  = 1;   // 1 ppb = 0.001 ppm = 0.00078 Hz at 780 kHz
+      const gpsdo_accuracy_ppb  = 1;   // 1 ppb = 0.001 ppm; error at AM broadcast frequencies: <0.002 Hz
 
       // Rubidium frequency standard (backup/holdover for GPS outages)
       const rubidium_cost_low_usd  = 1500;
@@ -16640,8 +16640,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const lat_gt = pt.lat, lon_gt = pt.lon;
 
       // ---- Frost penetration depth (USDA/ASCE 7-22 Figure C-26) ----
-      const is_desert_sw_gt = lon_gt > -115 && lat_gt < 37;
-      const frost_depth_in  = is_desert_sw_gt ? 0
+      // Arid sites (σ < 3 mS/m, south of 38°N): negligible frost; otherwise latitude-driven
+      const is_arid_site_gt = (sigma_msm ?? 8) < 3 && lat_gt < 38;
+      const frost_depth_in  = is_arid_site_gt ? 0
                             : lat_gt < 35     ? 0
                             : lat_gt < 38     ? 6
                             : lat_gt < 41     ? 18
@@ -16651,11 +16652,11 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ---- USCS soil class and allowable bearing capacity (simplified) ----
       let uscs_class, bearing_capacity_psf_low, bearing_capacity_psf_high, soil_description;
-      if (is_desert_sw_gt) {
+      if (is_arid_site_gt) {
         uscs_class = 'SM/SC (silty/clayey sand with caliche)';
         bearing_capacity_psf_low  = 2000;
         bearing_capacity_psf_high = 8000;
-        soil_description = 'Arid desert — caliche hardpan typical below 1–3 ft; excellent bearing when encountered';
+        soil_description = 'Arid site (σ<3 mS/m) — caliche hardpan typical below 1–3 ft; excellent bearing when encountered';
       } else if (lat_gt < 31 && lon_gt > -97) {
         uscs_class = 'CH/CL (high-plasticity clay)';
         bearing_capacity_psf_low  = 1000;
@@ -16797,7 +16798,8 @@ async function scoreCandidate(pt, ctx, warnings){
       }
 
       const sigma_current   = getSigma(current_site.lat, current_site.lon);
-      const sigma_candidate = getSigma(pt.lat, pt.lon);
+      // sigma_msm is the site-level FCC M3 value for this candidate; fall back to bucket lookup
+      const sigma_candidate = sigma_msm ?? getSigma(pt.lat, pt.lon);
       const freq_scale_ci   = round2(Math.sqrt(1000 / frequency_khz));
       const erp_factor      = Math.pow(tpo_kw, 0.4);
 
@@ -16861,7 +16863,7 @@ async function scoreCandidate(pt, ctx, warnings){
         dist_current_to_col_km, dist_candidate_to_col_km,
         col_in_current_contour, col_in_candidate_contour, col_field_improvement,
         verdict,
-        reference: 'FCC M3 ground conductivity map (zone-table screening proxy); ITU-R P.368-9 (groundwave propagation); 47 CFR §73.182 (AM coverage computation)',
+        reference: 'FCC M3 ground conductivity map (zone-table screening proxy); ITU-R P.368-9 (groundwave propagation); 47 CFR §73.184 (AM groundwave coverage computation / M3 conductivity method)',
         note: `Coverage vs current site: radius ${d_candidate_km} km (candidate) vs ${d_current_km} km (current) — ${coverage_radius_delta_pct >= 0 ? '+' : ''}${coverage_radius_delta_pct}% (${coverage_delta_km2 >= 0 ? '+' : ''}${coverage_delta_km2} km²). ${col_field_improvement}. Displacement: ${displacement_km} km at ${bearing_deg_ci}°. Verdict: ${verdict}.`
       };
     })(),
@@ -16937,29 +16939,19 @@ async function scoreCandidate(pt, ctx, warnings){
       // d(0.5 mV/m) ≈ K_ref(sigma) × (1000/f_kHz)^0.5 × ERP_kW^0.4
       //   where K_ref is calibrated at 1000 kHz from FCC Table M-3.
 
-      // ---- FCC M3 conductivity zone (simplified, CONUS) ----
-      const lat_sc = pt.lat;
-      const lon_sc = pt.lon;
-      let sigma_ms, conductivity_label, m3_zone;
-      if (lon_sc < -115 && lat_sc > 45) {
-        sigma_ms = 30; conductivity_label = 'Very high (Pacific NW)'; m3_zone = 'E';
-      } else if (lon_sc < -120 && lat_sc < 45) {
-        sigma_ms = 15; conductivity_label = 'High (Pacific Coast)'; m3_zone = 'D';
-      } else if (lat_sc < 31 && lon_sc > -97 && lon_sc < -80) {
-        sigma_ms = 15; conductivity_label = 'High (Gulf Coast)'; m3_zone = 'D';
-      } else if (lon_sc > -90) {
-        sigma_ms = 8;  conductivity_label = 'Moderate-high (Eastern US)'; m3_zone = 'C';
-      } else if (lon_sc > -100 && lat_sc > 38) {
-        sigma_ms = 5;  conductivity_label = 'Moderate (Northern Plains)'; m3_zone = 'B';
-      } else if (lon_sc > -100) {
-        sigma_ms = 5;  conductivity_label = 'Moderate (Southern Plains)'; m3_zone = 'B';
-      } else if (lon_sc > -115 && lat_sc < 37) {
-        sigma_ms = 2;  conductivity_label = 'Low (Desert SW)'; m3_zone = 'A';
-      } else if (lon_sc > -115) {
-        sigma_ms = 3;  conductivity_label = 'Low-moderate (Mountain West)'; m3_zone = 'A';
-      } else {
-        sigma_ms = 5;  conductivity_label = 'Moderate (continental default)'; m3_zone = 'B';
-      }
+      // ---- FCC M3 conductivity zone — use site sigma_msm from outer context ----
+      // sigma_msm is the FCC M3 zone-table or measured value for this candidate site
+      const sigma_ms = sigma_msm ?? 8;   // default 8 mS/m (FCC general continental unlisted-zone default)
+      const m3_zone  = sigma_ms < 1  ? 'E'
+                     : sigma_ms < 3  ? 'D'
+                     : sigma_ms < 10 ? 'C'
+                     : sigma_ms < 30 ? 'B'
+                     : 'A';
+      const conductivity_label = sigma_ms >= 30 ? `Very high (σ=${sigma_ms} mS/m, FCC Zone A)`
+                               : sigma_ms >= 10 ? `High (σ=${sigma_ms} mS/m, FCC Zone B)`
+                               : sigma_ms >= 3  ? `Average (σ=${sigma_ms} mS/m, FCC Zone C)`
+                               : sigma_ms >= 1  ? `Below-average (σ=${sigma_ms} mS/m, FCC Zone D)`
+                               :                  `Low (σ=${sigma_ms} mS/m, FCC Zone E)`;
 
       // ---- K_ref at 1000 kHz by conductivity (calibrated to FCC curves) ----
       const K_BY_SIGMA = { 0.5: 12, 1: 15, 2: 18, 3: 20, 5: 23, 8: 27, 15: 30, 30: 35 };
@@ -16995,7 +16987,7 @@ async function scoreCandidate(pt, ctx, warnings){
         sigma_ms, conductivity_label, m3_zone,
         freq_scale, d_05_mvm_km, coverage_area_km2,
         d_ref_avg_km, coverage_delta_pct, ground_advisory,
-        reference: 'FCC M3 ground conductivity map (FCC OST R-6506); ITU-R P.368-9 (groundwave propagation curves); FCC AM coverage curves (FCC 73.182 / OET Bulletin 73-1)',
+        reference: 'FCC M3 ground conductivity map (FCC OST R-6506); ITU-R P.368-9 (groundwave propagation curves); 47 CFR §73.184 (AM groundwave propagation method / M3 conductivity maps); OET Bulletin 73-1',
         note: `Candidate site: FCC M3 Zone ${m3_zone}, σ≈${sigma_ms} mS/m (${conductivity_label}). Est. daytime 0.5 mV/m contour: ${d_05_mvm_km} km radius, ${coverage_area_km2.toLocaleString()} km² area (vs ${d_ref_avg_km} km at US average σ=5 mS/m — ${Math.abs(coverage_delta_pct)}% ${coverage_delta_pct >= 0 ? 'better' : 'worse'}). ${ground_advisory}`
       };
     })(),
@@ -17525,8 +17517,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // to Class A/B dominant stations (§73.21, §73.25)
       const is_secondary = (fcc_class === 'D' || fcc_class === 'C') && is_clear_ch_int;
 
-      // Class D nighttime, where authorized, is less than 0.25 kW per §73.21(b)(2)
-      const night_power_limit_kw = (fcc_class === 'D' && is_clear_ch_int) ? 0.25 : null;
+      // Class D nighttime, where authorized, is ≤ 0.5 kW per §73.21(b)(2) (or sign-off)
+      const night_power_limit_kw = (fcc_class === 'D' && is_clear_ch_int) ? 0.5 : null;
 
       // Co-channel D/U protection ratios per §73.182 (daytime)
       // Class A ↔ Class A: 20 dB; Class D secondary → cannot raise interference
@@ -19322,7 +19314,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Class D loc (1 kW): ~40 km / ~24 km
       //
       // Signal enhancement from elevation: every +100m AGL gain ≈ +3% range.
-      // Sedona AZ (34.86°N) is mesa/canyon terrain → ROUGH category.
+      // Canyon/mesa terrain → ROUGH category; open plains → SMOOTH.
 
       const isDA_terr        = /^DA/i.test(pattern_mode);
       const is_clear_ch_terr = CLEAR_CHANNEL_KHZ.has(frequency_khz);
@@ -20568,10 +20560,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Above 5λ/8: base current distribution inverts → coverage decreases
       //   - Coverage radius ∝ E_ground ∝ √(TPO / Rr) × antenna_gain_factor(h)
       //
-      // KAZM physics: 780 kHz → λ = 384.6 m
-      //   λ/8 = 48 m (157 ft), λ/4 = 96 m (315 ft), λ/2 = 192 m (630 ft), 5λ/8 = 240 m (787 ft)
+      // Physics summary (computed dynamically below for any frequency):
+      //   λ/8, λ/4, λ/2, 5λ/8 heights in meters and feet; 5λ/8 maximizes radiation resistance
       //
-      // Class D NDA: 5 kW TPO, current site = λ/4 (315 ft tower)
+      // Standard NDA: TPO at λ/4 is a common initial height (lowest-cost resonance)
       // Antenna gain (relative to isotropic ground wave) varies with electrical height θ (degrees):
       //   G(θ) ≈ field_ratio relative to λ/4 standard (ITU-R BS.346-1, Table 1)
       //   θ = 90°  (λ/4)   → G = 1.000 (baseline)
@@ -22259,7 +22251,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - AM transmitter heat dissipation ≈ (1 - efficiency) × input power
       //   - At 36% efficiency, 5 kW TPO → 14 kW input → 9 kW (≈ 0.75 tons) heat dissipation
       //   - Add solar gain through walls: +0.5–1.0 tons for a 240 sq ft building in warm climate
-      //   - Total HVAC cooling load for KAZM class D at 5 kW: 1.5–2.0 tons (18,000–24,000 BTU/hr)
+      //   - Total HVAC cooling load for Class D at 5 kW: 1.5–2.0 tons (18,000–24,000 BTU/hr) in warm climates
       //   - Must maintain interior ≤85°F for transmitter reliability; most manufacturers rate to 122°F ambient
       //
       // Building construction standards:
@@ -22279,7 +22271,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const transmitter_efficiency = 0.36;
       const tx_input_kw = Math.round(tpo_kw_num / transmitter_efficiency);
       const heat_dissipation_kw = tx_input_kw - tpo_kw_num;
-      const solar_gain_kw = 3; // typical solar gain for small building in AZ climate
+      // Solar gain per ASHRAE: higher at lower latitudes; ASCE 7-22 climate zones
+      const solar_gain_kw = (pt.lat ?? 35) > 44 ? 1.5 : (pt.lat ?? 35) > 38 ? 2.0 : 3.0;
       const total_heat_kw = heat_dissipation_kw + solar_gain_kw;
       const hvac_tons = Math.ceil((total_heat_kw * 3412) / 12000 * 10) / 10; // kW to BTU/hr to tons, 1 sig fig
 
@@ -22444,7 +22437,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // Generator sizing for AM transmitter sites:
       //   - Size to cover: full transmitter load + HVAC + lighting + EAS + control systems
-      //   - For 5 kW TPO (KAZM class D): 25–35 kW generator adequate
+      //   - For 5 kW TPO (Class D): 25–35 kW generator adequate
       //   - Automatic Transfer Switch (ATS): required for unattended generator start
       //   - Fuel capacity: enough for 72 hours minimum without refueling (NFPA 110 Level 2)
       //   - FCC prefers stations stay on-air during power outages to provide EAS alerting capability
@@ -22530,7 +22523,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - 37–43°N: Zone III (nominal 25mm radial ice; mid-US, Pacific NW)
       //   - > 43°N: Zone IV (nominal 38mm+ radial ice; northern tier, New England)
       //
-      // KAZM is at ~34.86°N (Sedona/Cottonwood AZ area) → Zone II; deicing usually not required
+      // Zone II (30–37°N): trace ice — deicing generally not required; monitor during unusual ice events
       // but icing events occur; monitoring recommended.
       //
       // Deicing systems for AM towers:
@@ -23362,10 +23355,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // §74.432: RPU requires either a Part 74 license or, for short-term events, a Part 74 Subpart H STA.
 
       // Distance from candidate site to assumed studio location
-      // For KAZM-style analysis: studio is assumed near city of license (same lat/lon as current_site proxy)
-      // Real implementation would use studio coordinates from FCC record; we approximate here.
-      const studio_lat = pt.lat ?? 34.9;  // proxy: candidate site lat as studio reference
-      const studio_lon = pt.lon ?? -111.8;
+      // Studio coordinates from FCC record; approximate here with current_site as proxy
+      const studio_lat = current_site?.lat ?? pt.lat ?? 35;  // proxy: current site lat as studio reference
+      const studio_lon = current_site?.lon ?? pt.lon ?? -98;
       const dx_deg = (pt.lon - studio_lon) || 0;
       const dy_deg = (pt.lat - studio_lat) || 0;
       const dist_km_rpu = round2(Math.sqrt((dx_deg * 111.32) ** 2 + (dy_deg * 110.57) ** 2));
@@ -23724,9 +23716,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_daytime_only = isClearCh_dto && fcc_class.toUpperCase() === 'D';
 
       // Average daylight hours by latitude (using candidate site latitude)
-      // Phoenix AZ area (KAZM reference): latitude ~34.9°N
-      // Summer: ~14 hrs; Winter: ~10 hrs; Average: ~12 hrs/day
-      const lat = pt.lat ?? 34.9;
+      // Summer: ~14 hrs at 35°N; Winter: ~10 hrs; average ~12 hrs/day
+      const lat = pt.lat ?? 35;
       const lat_factor = Math.max(0.7, Math.min(1.3, 1 - (lat - 35) * 0.01));
       const estimated_hours_summer = round2(Math.min(16, 12 + lat_factor * 2));
       const estimated_hours_winter = round2(Math.max(8, 12 - lat_factor * 2));
@@ -25070,7 +25061,7 @@ async function scoreCandidate(pt, ctx, warnings){
         blanket_area_km2:     blanketAreaKm2,
         render_spec:          renderSpec,
         reference: '47 CFR §73.24(i) (COL 5 mV/m); §73.24(g) (blanket 1000 mV/m); §73.182 (0.5 mV/m protected); FCC M3 groundwave propagation curves',
-        note: 'Contour radii are FCC groundwave screening estimates assuming flat terrain and uniform soil conductivity. Actual contour shapes vary with terrain and σ variation. Use §73.183 contour computation software for filing-grade coverage maps.'
+        note: 'Contour radii are FCC groundwave screening estimates assuming flat terrain and uniform soil conductivity. Actual contour shapes vary with terrain and σ variation. Use §73.184 groundwave propagation software for filing-grade coverage maps.'
       };
     })(),
 
@@ -25285,7 +25276,7 @@ async function scoreCandidate(pt, ctx, warnings){
             { id: 'spacing_study',    task: '§73.37 spacing analysis (all channels)', days: 10, rule: '§73.37', note: 'Must clear co-channel, first-adjacent, and second-adjacent for all class pairs.' },
             { id: 'nif_study',        task: `§73.182 NIF study (${isClear_cpt ? 'clear channel' : 'regional'})`, days: isClear_cpt ? 30 : 15, rule: '§73.182', note: 'Skywave NIF must cover all domestic and international stations within protection distance.' },
             { id: 'da_pattern',       task: isDA_cpt ? 'Directional antenna pattern design + §73.150(a) HRP (72 radials)' : 'Non-directional antenna design', days: isDA_cpt ? 21 : 7, rule: '§73.150', note: isDA_cpt ? '72-radial HRP at 5° increments per §73.150(a); suppression ≥ 28.3 dB per §73.182 NIF analysis. (§73.207 is the FM D/U rule; not applicable to AM.)' : 'Non-DA antenna design simpler but confirm vertical radiation pattern.' },
-            { id: 'coverage_map',     task: '§73.183 coverage map (groundwave contour)', days: 7, rule: '§73.183', note: 'Required Schedule D exhibit for Form 301-AM.' },
+            { id: 'coverage_map',     task: '§73.184 groundwave coverage map (service contour)', days: 7, rule: '§73.184', note: 'Required Schedule D exhibit for Form 301-AM.' },
             { id: 'env_assessment',   task: 'Environmental assessment (§1.1301–§1.1319)', days: 14, rule: '§1.1301', note: 'Required for towers > 450 ft AGL or in environmentally sensitive areas.' },
             { id: 'asr_filing',       task: 'ASR registration (FCC Form 854)', days: 7, rule: '§17.7', note: 'Required for structures ≥ 61m AGL. Must be registered before CP issuance.' }
           ]
@@ -25298,7 +25289,7 @@ async function scoreCandidate(pt, ctx, warnings){
             { id: 'schedule_a',       task: 'Schedule A: Legal/ownership', days: 7, rule: '§73.3533', note: 'Legal certifications; ownership disclosure.' },
             { id: 'schedule_b',       task: 'Schedule B: Technical (antenna, pattern, ERP)', days: 7, rule: '§73.3533', note: isDA_cpt ? 'DA pattern data: HRP table, field ratio, phase, monitoring points.' : 'NDA antenna: height, radiation pattern, TPO.' },
             { id: 'schedule_c',       task: 'Schedule C: Transmitter', days: 3, rule: '§73.3533', note: 'FCC-certified transmitter model. Must match TPO.' },
-            { id: 'schedule_d',       task: 'Schedule D: Coverage map + §73.183 contour', days: 5, rule: '§73.183', note: 'Exhibit: daytime groundwave service contour map.' },
+            { id: 'schedule_d',       task: 'Schedule D: Coverage map + §73.184 groundwave contour', days: 5, rule: '§73.184', note: 'Exhibit: daytime groundwave service contour map.' },
             { id: 'schedule_e',       task: 'Schedule E: Environmental compliance', days: 5, rule: '§1.1301', note: 'NEPA, NHPA §106, migratory bird assessment.' },
             { id: 'fcc_filing',       task: 'LMS filing + fee payment', days: 1, rule: '§73.3533', note: 'FCC application fee per Schedule of Application Fees (47 U.S.C. §158); submit via LMS.' }
           ]
