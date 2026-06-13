@@ -193,7 +193,7 @@ export function buildValidationVerdictSection(exhibit){
   // Terrain source
   //
   // §73.184 AM groundwave is by definition a flat-earth FCC curve over
-  // assumed conductivity (47 CFR §73.183 / §73.190 Figure M3 / R3) —
+  // assumed conductivity (47 CFR §73.184 M3 conductivity maps / §73.190 Figure R3) —
   // terrain elevation is NOT an input to the AM contour calculation.
   // So for AM exhibits, "no terrain attached" is the expected outcome,
   // not a warning condition.  Report it as SKIP with the regulatory

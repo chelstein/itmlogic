@@ -10,7 +10,7 @@ const SERVICES = [
   { v: 'FM',   label: 'FM full-service' },
   { v: 'LPFM', label: 'LPFM (§73.811)'  },
   { v: 'FX',   label: 'FM translator (§74.1204)' },
-  { v: 'AM',   label: 'AM (§73.183 groundwave)' }
+  { v: 'AM',   label: 'AM (§73.184 groundwave)' }
 ];
 // FCC class options vary by service — AM gets A/B/C/D, FM gets the
 // alphabet soup.  Showing the FM list to an AM operator means an AM
