@@ -3493,7 +3493,7 @@ const DEMO_RESULT = {
           { measure: 'Fire suppression (FM-200 preferred)', threshold_c: null, action: 'Automatic release at detector activation' }
         ],
         reference: 'ASHRAE 2021 Thermal Guidelines for Data Processing Environments; NFPA 70 §430; FCC §73.49; EIA/TIA-569-D',
-        note: 'Transmitter heat: 1.76 kW (74% efficiency, Nautel/GatesAir spec); total facility heat: 2.41 kW (8,223 BTU/h). HVAC capacity: 0.86 tons (3.01 kW at 125% design margin). Est. annual HVAC cost: $989 (0.94 kW × 8,760 h × $0.12/kWh).'
+        note: 'Transmitter heat: 1.76 kW (74% efficiency, Nautel/GatesAir spec); total facility heat: 2.41 kW (8,223 BTU/h). HVAC capacity: 0.86 tons (3.01 kW at 125% design margin). Est. annual HVAC cost: $947 (0.94 kW × 8,760 h × $0.115/kWh, EIA 2024 national commercial avg).'
       },
       zoning_land_use_compatibility_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -3837,7 +3837,7 @@ const DEMO_RESULT = {
         skywave_contour: { field_mvm: 0.025, label: '25 µV/m skywave (§73.182 Class D secondary)' },
         skywave_dist_50pct_km: 70.7, skywave_dist_10pct_km: 91.9, skywave_dist_1pct_km: 120.2,
         nif_required: true, nif_study_type: 'FULL_CLEAR_CHANNEL_NIF',
-        nighttime_da_note: 'Non-directional; nighttime protection based on omnidirectional ERP and §73.182 spacing. FCC Class D maximum is 0.5 kW (§73.24); this analysis models 0.25 kW actual operation for improved NIF margin.',
+        nighttime_da_note: 'Non-directional; nighttime protection based on omnidirectional ERP and §73.182 spacing. FCC Class D maximum is 0.5 kW (§73.21(b)(2)); this analysis models 0.25 kW actual operation for improved NIF margin.',
         protection_levels: [
           { id: 'class_a_protected', field_mvm: 0.5,   basis: '§73.182: Class A 0.5 mV/m daytime GW',          applies_to_us: false },
           { id: 'class_b_protected', field_mvm: 0.25,  basis: '§73.182: Class B 0.25 mV/m daytime GW',         applies_to_us: false },
