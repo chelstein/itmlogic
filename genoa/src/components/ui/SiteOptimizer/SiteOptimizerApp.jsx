@@ -818,7 +818,7 @@ const DEMO_RESULT = {
   limitations_global: [
     'Screening-grade output only; engineer-grade NIF / §73.182 / DA-N analysis is required for any filing.',
     'Population sub-score uses a population-density proxy (groundwave reach × density model), not a Census-block sum.',
-    'Wildfire / fuel-risk scoring is a placeholder until USFS FIA / LANDFIRE integration lands.',
+    'Wildfire / fuel-risk scoring is not yet active — USFS FIA / LANDFIRE data layer integration is pending; all candidates scored with wildfire weight = 0.',
     'Parcel / zoning availability is not checked — engineer must verify each site is leasable / buildable.',
     'No skywave (§73.182) interference analysis is performed at this stage.'
   ],
@@ -4042,7 +4042,7 @@ const DEMO_RESULT = {
           { goal: 'maximize_population', label: 'Population reach', enabled: true, weight: 28, raw_metric: 36.8, raw_unit: 'km (0.5 mV/m radius)', formula: '(reach / reach_scale)² × 100 → clamp 0–100', sub_score: 72.4, weighted_pts: 28.8, data_source: 'FCC groundwave curve (σ, ERP, freq)', limiting_factor: null },
           { goal: 'minimize_blanket_population', label: 'Blanket Pop.', enabled: false, weight: 0, raw_metric: 0.5, raw_unit: '% of metro within 1 mV/m', formula: '100 − 50×blanket_pct → clamp 0–100', sub_score: 75.0, weighted_pts: 0, data_source: 'FCC groundwave curve (1 mV/m contour)', limiting_factor: 'Goal not enabled — weight = 0' },
           { goal: 'prefer_high_conductivity', label: 'Conductivity', enabled: true, weight: 7, raw_metric: 9.0, raw_unit: 'mS/m', formula: 'sqrt(σ / 8) × 100 → clamp 0–100', sub_score: 100.0, weighted_pts: 10.0, data_source: 'FCC conductivity zone map', limiting_factor: null },
-          { goal: 'avoid_wildfire_risk', label: 'Wildfire risk avoidance', enabled: false, weight: 0, raw_metric: null, raw_unit: 'N/A', formula: 'NOT EVALUATED (placeholder)', sub_score: null, weighted_pts: 0, data_source: 'USFS/NIFC risk layer (not yet integrated)', limiting_factor: 'Goal not enabled — weight = 0' },
+          { goal: 'avoid_wildfire_risk', label: 'Wildfire risk avoidance', enabled: false, weight: 0, raw_metric: null, raw_unit: 'N/A', formula: 'NOT EVALUATED — goal disabled; USFS/NIFC integration pending', sub_score: null, weighted_pts: 0, data_source: 'USFS/NIFC risk layer (integration pending)', limiting_factor: 'Goal not enabled — weight = 0' },
           { goal: 'minimize_int_treaty_zone', label: 'Treaty zone margin', enabled: false, weight: 0, raw_metric: null, raw_unit: 'km to nearest border', formula: '(dist / 320 km) × 100 → clamp 0–100', sub_score: null, weighted_pts: 0, data_source: 'FCC/ISED treaty zone geometry', limiting_factor: 'Goal not enabled — weight = 0' }
         ],
         note: 'candidate_scoring_audit exposes every step of the scoring pipeline — sub-score per goal, weight, normalization factor, weighted contribution, and confidence dampening — for full explainability.'
@@ -4607,8 +4607,9 @@ const DEMO_COLOCATION_RESULT = {
       infrastructure_ref: {
         id: 'ASR-UNKNOWN',
         kind: 'TOWER',
-        name: 'Existing guyed tower near 34.88°N 111.85°W [verify in FCC ASR database]',
-        owner: '[owner — verify via FCC ASR lookup]',
+        name: 'Existing guyed tower near 34.88°N 111.85°W',
+        owner: null,
+        _lookup_note: 'Owner and ASR number must be confirmed via FCC Antenna Structure Registration database (towers.fcc.gov) geosearch at 34.88°N 111.85°W before any site contact or filing.',
         lat: 34.88, lon: -111.85,
         height_m: 122,
         structure_type: 'GUYED',
@@ -4620,7 +4621,7 @@ const DEMO_COLOCATION_RESULT = {
       colocation_analysis: {
         distance_to_host_m: 0,
         host_kind: 'TOWER',
-        host_owner: '[verify via ASR database]',
+        host_owner: null,
         host_height_m: 122,
         tower_loading_advisory: 'Loading study required — antenna mass + wind area must be re-computed for the added array.',
         same_band_interference_risk: 'MEDIUM',
@@ -4651,8 +4652,9 @@ const DEMO_COLOCATION_RESULT = {
       infrastructure_ref: {
         id: 'AM-SITE-34.81-111.78',
         kind: 'AM_SITE',
-        name: 'Existing AM transmitter site near 34.81°N 111.78°W [verify in FCC LMS]',
-        owner: '[licensee — verify via FCC LMS facility search]',
+        name: 'Existing AM transmitter site near 34.81°N 111.78°W',
+        owner: null,
+        _lookup_note: 'Licensee name, callsign, and frequency must be confirmed via FCC Licensing and Management System (LMS) facility search at 34.81°N 111.78°W before any site contact or filing.',
         lat: 34.81, lon: -111.78,
         height_m: 90,
         structure_type: 'SERIES_FED',
@@ -4664,7 +4666,7 @@ const DEMO_COLOCATION_RESULT = {
       colocation_analysis: {
         distance_to_host_m: 0,
         host_kind: 'AM_SITE',
-        host_owner: '[verify via FCC LMS]',
+        host_owner: null,
         host_height_m: 90,
         tower_loading_advisory: 'Series-fed tower — diplexer + isolator engineering required.',
         same_band_interference_risk: 'HIGH',
