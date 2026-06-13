@@ -15418,7 +15418,7 @@ it('KAZM distance to WBBM (dominant on 780 kHz) and skywave protection complianc
   assert.strictEqual(g.dominant_interference_compliant ?? g.kkob_interference_compliant, true, 'KAZM at Sedona-area sites must be WBBM-compliant at 5 kW (skywave << 50 µV/m at 2200 km)');
 });
 
-it('KAZM skywave estimate below 50 µV/m at KKOB distance', async () => {
+it('KAZM skywave estimate below 50 µV/m at WBBM (dominant on 780 kHz, ~2200 km) distance', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nighttime_nif_service_contour_analysis_guide;
   assert.ok(g.sky_uVm > 0, 'skywave estimate must be positive');
