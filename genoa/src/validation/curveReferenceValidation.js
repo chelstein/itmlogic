@@ -194,7 +194,7 @@ export async function runCurveReferenceValidation({ fixturePath = null } = {}){
   const out = {
     name:             fixture.name || 'genoa-curve-golden',
     description:      fixture.description || null,
-    method:           fixture.method || '47 CFR §73.333 + §73.183/§73.184',
+    method:           fixture.method || '47 CFR §73.333 + §73.184 AM groundwave M3',
     schema_version:   fixture.$schema || null,
     curve_dataset: {
       version:     fixture.curve_dataset?.version  || manifest.version,
