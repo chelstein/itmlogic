@@ -3477,7 +3477,7 @@ const DEMO_RESULT = {
         n_hvac_options: 3,
         recommended_hvac: { id: 'SPLIT_SYSTEM', label: 'Mini-split or split system', suitable_kw_max: 10, suitable: true, cooling_cop: 3.2, power_kw: 0.94 },
         n_plus_one_redundancy: { strategy: 'N+1 redundancy', n_units: 2, each_unit_tons: 0.86, note: 'N+1: each unit sized at full design capacity so either unit alone handles 100% of design load' },
-        annual_hvac_cost_usd: 989,
+        annual_hvac_cost_usd: 947,
         maintenance_schedule: [
           { interval: 'Monthly', task: 'Check filter condition and replace if ΔP > 0.25 in. H2O' },
           { interval: 'Monthly', task: 'Verify supply/return air temperatures meet ASHRAE targets' },
@@ -3631,8 +3631,8 @@ const DEMO_RESULT = {
           'Ground conductivity σ=9 mS/m; permittivity ε=25',
           'Polarization: vertical (AM §73.150); climate: continental_temperate'
         ],
-        fcc_method: '§73.182 groundwave curves; §73.184 terrain correction; ITM (Longley-Rice) for mountainous terrain',
-        reference: '47 CFR §73.182; §73.184; FCC OET Supplement B (ITM v7.0); Longley-Rice (NTIA Report 82-100); Hufford (1995)',
+        fcc_method: '§73.184 groundwave curves (M3 conductivity); §73.184 terrain correction (Δh ITM); ITM (Longley-Rice) for mountainous terrain',
+        reference: '47 CFR §73.184; §73.183; FCC OET Supplement B (ITM v7.0); Longley-Rice (NTIA Report 82-100); Hufford (1995)',
         note: 'ITM terrain path loss analysis for 780 kHz at 5 kW. Flat terrain — smooth-earth FCC curves apply directly.'
       },
       antenna_height_optimization: {

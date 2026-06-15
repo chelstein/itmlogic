@@ -26046,7 +26046,7 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     terrain_path_loss_analysis: (() => {
-      // AM groundwave path loss with terrain correction per §73.182/§73.183
+      // AM groundwave path loss with terrain correction per §73.184
       // FCC uses Irregular Terrain Model (ITM / Longley-Rice) for AM propagation
       // Beyond-smooth-earth correction expressed as additional path loss (dB)
 
@@ -26159,8 +26159,8 @@ async function scoreCandidate(pt, ctx, warnings){
         effective_2mvm_coverage_km:  effectiveCoverageKm,
         propagation_study_required,
         propagation_notes,
-        fcc_method:                  '§73.182 groundwave curves; §73.183 terrain correction; ITM (Longley-Rice) for mountainous terrain',
-        reference: '47 CFR §73.182; §73.183; FCC OET Supplement B (ITM v7.0); Longley-Rice (NTIA Report 82-100); Hufford (1995)',
+        fcc_method:                  '§73.184 groundwave curves (M3 conductivity); §73.184 terrain correction (Δh ITM); ITM (Longley-Rice) for mountainous terrain',
+        reference: '47 CFR §73.184; §73.183; FCC OET Supplement B (ITM v7.0); Longley-Rice (NTIA Report 82-100); Hufford (1995)',
         note: `ITM terrain path loss analysis for ${frequency_khz} kHz at ${tpo_kw} kW. Terrain correction adds ~${terrainClass_tp.path_loss_extra_db} dB excess loss vs. smooth-earth FCC curves.`
       };
     })(),
