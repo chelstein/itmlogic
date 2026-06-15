@@ -3990,7 +3990,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div><b style={{ color: '#a1a1aa' }}>Est. NIF Area:</b> {g.nif_fraction_pct_low}–{g.nif_fraction_pct_high}% of nighttime contour</div>
                 <div><b style={{ color: '#a1a1aa' }}>Clear Channel dominant:</b> {g.dominant_station || '—'}</div>
                 <div style={{ gridColumn: '1 / -1', borderTop: `1px solid ${compliantColor}40`, marginTop: 4, paddingTop: 6, color: '#a1a1aa' }}>
-                  <b>NIF Study Cost:</b> ${fmt(g.nif_study_low_usd)}–${fmt(g.nif_study_high_usd)} (§73.182 M3 skywave analysis required at filing)
+                  <b>NIF Study Cost:</b> ${fmt(g.nif_study_low_usd)}–${fmt(g.nif_study_high_usd)} (§73.182 skywave NIF analysis required at filing)
                 </div>
               </div>
             </div>
