@@ -19288,8 +19288,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
     rf_propagation_terrain_roughness_guide: (() => {
       // Estimates terrain roughness impact on AM groundwave propagation
-      // using ITM/Longley-Rice model principles and FCC §73.183/§73.184
-      // field intensity prediction methodology.
+      // using ITM/Longley-Rice model principles and FCC §73.184
+      // groundwave field intensity prediction methodology (M3 conductivity curves).
       //
       // FCC R(50,50) and R(50,10) groundwave field strength curves assume
       // smooth earth. Actual propagation is modified by terrain roughness

@@ -12,7 +12,7 @@
 //
 //     FM F(50,50)          — 47 CFR §73.333 service contour  (mode='50,50')
 //     FM F(50,10)          — 47 CFR §73.333 interfering contour (mode='50,10' — used by §74.1204)
-//     AM groundwave        — 47 CFR §73.183 / §73.184 (fccAmDistanceKm)
+//     AM groundwave        — 47 CFR §73.184 M3 conductivity curves (fccAmDistanceKm)
 //     FM F(50,50) inverse  — fccFieldDbuAtDistance round-trip
 //     FM F(50,10) inverse  — fccFieldDbuAtDistance round-trip
 //     AM groundwave inverse— fccAmFieldMvmAtDistance round-trip

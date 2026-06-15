@@ -163,8 +163,8 @@
       ]
     },
     {
-      "rule": "47 CFR §73.183",
-      "title": "AM Groundwave Field Strength",
+      "rule": "47 CFR §73.184",
+      "title": "AM Groundwave Field Strength (M3 Conductivity Curves)",
       "service": ["AM"],
       "inputs": [
         "station_inputs.power_day_kw",
