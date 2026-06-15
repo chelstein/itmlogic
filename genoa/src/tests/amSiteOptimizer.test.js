@@ -6610,7 +6610,7 @@ test('fcc_license_modification_guide uses Form 301-AM with correct filing fee', 
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].fcc_license_modification_guide;
   assert.strictEqual(g.fcc_form, '301-AM', 'AM CP form must be 301-AM');
-  assert.strictEqual(g.filing_fee_usd, 325, 'AM CP filing fee must be $325');
+  assert.strictEqual(g.filing_fee_usd, 4200, 'AM CP major-change CP filing fee must be $4,200 (§1.1102 FY2024)');
   assert.strictEqual(g.cp_term_years, 3, 'CP term must be 3 years');
   assert.strictEqual(g.extension_available, true, 'extension must be available');
 });

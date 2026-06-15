@@ -22208,9 +22208,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.3539: CP expires if construction not completed within 3 years of grant
       // §73.3598(b): no routine extensions — the 3-year period tolls only for specified events (litigation, international coordination, acts of God)
       //
-      // Filing fee (FCC Schedule of Application Fees, as of 2024):
-      //   - AM CP (major modification): $325 filing fee
-      //   - Some applications fee-exempt if filed with waiver request
+      // Filing fee (§1.1102 FY2024 schedule):
+      //   - Form 301-AM major change CP (site relocation): $4,200 flat (all classes)
+      //   - Minor modification: $1,015; fee exempt only for certain waiver/emergency filings
 
       const isDA_lm = /^DA/i.test(pattern_mode);
 
@@ -22231,7 +22231,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const n_required_exhibits = required_exhibits.length;
 
       const FCC_PROCESSING_STEPS = [
-        { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $325 filing fee electronically', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
+        { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $4,200 major-change CP filing fee electronically (§1.1102 FY2024)', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
         { step: 2, action: 'FCC issues public notice (PNOH)', detail: 'FCC Public Notice of Hearing or Application — 30-day window for petitions to deny (major modifications)', timeline: '30-day public comment period', cfr: '§73.3580' },
         { step: 3, action: 'FCC engineering review', detail: 'FCC Media Bureau AM engineers review technical exhibits, interference analysis, and DA proof if applicable', timeline: '3–18 months (NDA faster; DA longer)', cfr: '§73.3533' },
         { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3598; §73.3526(e)(1)' },
@@ -22244,7 +22244,7 @@ async function scoreCandidate(pt, ctx, warnings){
         is_directional: isDA_lm,
         fcc_form: '301-AM',
         fcc_system: 'FCC LMS (lms.fcc.gov)',
-        filing_fee_usd: 325,   // AM CP modification filing fee
+        filing_fee_usd: 4200,  // Form 301-AM major change CP (site relocation) per §1.1102 FY2024
         required_exhibits,
         n_required_exhibits,
         all_exhibits: REQUIRED_EXHIBITS,
@@ -22261,9 +22261,9 @@ async function scoreCandidate(pt, ctx, warnings){
           da_optimistic_months: 9,
           da_conservative_months: 18
         },
-        relocation_note: `File FCC Form 301-AM via LMS. ${n_required_exhibits} required exhibits including interference analysis, contour map, FAA determination, and ASR number. $325 filing fee. ${isDA_lm ? 'DA station requires horizontal radiation pattern table per §73.150(a) (72 radials at 5°). Processing: 9–18 months.' : 'NDA station. Processing: 3–9 months.'} CP valid for 3 years; 6-month extension available.`,
-        reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3580; §73.150 (AM DA); §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
-        note: `Form 301-AM via FCC LMS. ${n_required_exhibits} required exhibits. Filing fee: $325. CP term: 3 years + 6-month extension. Processing: ${isDA_lm ? '9–18' : '3–9'} months. Public notice triggers 30-day petition window for major changes.`
+        relocation_note: `File FCC Form 301-AM via LMS. ${n_required_exhibits} required exhibits including interference analysis, contour map, FAA determination, and ASR number. $4,200 major-change CP filing fee (§1.1102 FY2024). ${isDA_lm ? 'DA station requires horizontal radiation pattern table per §73.150(a) (72 radials at 5°). Processing: 9–18 months.' : 'NDA station. Processing: 3–9 months.'} CP valid for 3 years; 6-month extension available.`,
+        reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3580; §73.150 (AM DA); §17.7; §1.1301; FCC LMS (lms.fcc.gov); §1.1102 FY2024 fee schedule',
+        note: `Form 301-AM via FCC LMS. ${n_required_exhibits} required exhibits. Filing fee: $4,200 major-change CP (§1.1102 FY2024). CP term: 3 years + 6-month extension. Processing: ${isDA_lm ? '9–18' : '3–9'} months. Public notice triggers 30-day petition window for major changes.`
       };
     })(),
 
@@ -24724,7 +24724,7 @@ async function scoreCandidate(pt, ctx, warnings){
           form: 'FCC Form 301-AM (Major Change)',
           timeline_months_optimistic: 18,
           timeline_months_conservative: 36,
-          filing_fee_usd_approx: 1015,   // FCC Form 301-AM application processing fee (DA 23-864 FY2024, flat for all classes)
+          filing_fee_usd_approx: 4200,   // Form 301-AM major change CP fee per §1.1102 FY2024 (class upgrade = major change)
           engineering_cost_usd_approx_low: 15000,
           engineering_cost_usd_approx_high: 50000,
           note: 'Class D→B upgrade is a major modification. The station must demonstrate it meets Class B minimum power (≥0.25 kW) and the new Class B §73.37 spacing table in all directions. FCC staff review typically takes 12–24 months after filing.'
@@ -25386,7 +25386,7 @@ async function scoreCandidate(pt, ctx, warnings){
         phases,
         critical_path_milestone_ids: criticalPath,
         n_critical_path:           criticalPath.length,
-        filing_fee_major_change_usd: 1015,  // Form 301-AM application processing fee (DA 23-864 FY2024, flat all classes)
+        filing_fee_major_change_usd: 4200,  // Form 301-AM major change CP fee per §1.1102 FY2024 (relocation = major change)
         reference: '47 CFR §73.3533; §73.3598; §73.3580; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
         note: `CP timeline for ${fcc_class} class ${isDA_cpt ? 'directional' : 'non-directional'} AM relocation. Optimistic: ${totalOptimisticWeeks} weeks (~${round2(totalOptimisticWeeks / 4.33)} months). Conservative: ${totalConservativeWeeks} weeks (~${round2(totalConservativeWeeks / 4.33)} months).`
       };
@@ -27871,8 +27871,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower height estimate: class-aware design height per §73.150.
       // 5/8λ for Class A/B (FCC optimum); 3/8λ for Class C/D (standard planning height).
       //
-      // Form 301-AM filing fee: $1,015 flat (FY2024, FCC DA 23-864).
-      // Form 302-AM (license to cover) fee: $1,015 flat (FY2024, FCC DA 23-864).
+      // Form 301-AM filing fee: $4,200 major change CP (site relocation per §73.3533) per §1.1102 FY2024.
+      // Form 302-AM (license to cover) fee: $435 per §1.1102 FY2024.
 
       const isDA = /^DA/i.test(pattern_mode);
 
@@ -27915,8 +27915,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const prep_cost_low  = base_cost_low  + Math.round(da_increment * 0.8) + Math.round(ea_increment * 0.75) + Math.round(nif_increment * 0.8);
       const prep_cost_high = base_cost_high + da_increment + ea_increment + nif_increment + 2000;
 
-      // Filing fee per FCC DA 23-864 (FY2024): Form 301-AM flat fee $1,015, all classes.
-      const fcc_filing_fee_usd = 1015;
+      // Filing fee: Form 301-AM major change CP (site relocation under §73.3533) per §1.1102 FY2024.
+      const fcc_filing_fee_usd = 4200;
 
       return {
         fcc_class, frequency_khz, tpo_kw,
