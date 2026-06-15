@@ -16233,14 +16233,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // Quantifies the ongoing annual regulatory cost burden for the AM broadcast station,
       // independent of candidate location (driven by station class and power).
 
-      // FCC Annual Regulatory Fee (FY 2024 schedule, 47 CFR §1.1152).
+      // FCC Annual Regulatory Fee (FY 2023 schedule, 47 CFR §1.1102).
       // AM fees are assessed per station; rate differs by class.
-      // Class A: typically $4,300–$6,500; Class B: $2,100–$3,800;
-      // Class C/D small market: $585; Class C/D large market: $1,225.
-      // Using class as primary driver; assume non-dominant market for Class C/D.
-      const annual_fcc_fee_usd = fcc_class === 'A' ? 5400
-        : fcc_class === 'B' ? 3000
-        : 585;   // Class C or D
+      // Class A: $7,265; Class B: $5,020; Class C/D: $2,195 (§1.1102 FY2023).
+      const annual_fcc_fee_usd = fcc_class === 'A' ? 7265
+        : fcc_class === 'B' ? 5020
+        : 2195;   // Class C or D
 
       // License renewal cycle (47 CFR §73.1020): 8-year term, Form 303-S filing
       const license_renewal_cycle_years = 8;
@@ -16286,7 +16284,7 @@ async function scoreCandidate(pt, ctx, warnings){
         total_annual_compliance_high_usd,
         pv_10yr_low_usd,
         pv_10yr_high_usd,
-        reference: '47 CFR §1.1152 (annual regulatory fees); §73.1020 (license term — 8 years); §73.3539 (Form 303-S renewal application); §11.61 (EAS testing); §73.3526 (public file); FCC Schedule of Fees FY 2024 (AM Class D: $585; Class A: $5,400)',
+        reference: '47 CFR §1.1102 (annual regulatory fees); §73.1020 (license term — 8 years); §73.3539 (Form 303-S renewal application); §11.61 (EAS testing); §73.3526 (public file); FCC Schedule of Regulatory Fees FY 2023 §1.1102 (AM Class D/C: $2,195; Class B: $5,020; Class A: $7,265)',
         note: `Annual regulatory burden for Class ${fcc_class} AM station at ${frequency_khz} kHz: FCC fee $${annual_fcc_fee_usd}/yr; renewal amortized $${renewal_amortized_annual_usd}/yr (8-yr cycle, $${renewal_fee_usd} fee); EAS testing $${eas_testing_annual_low_usd}–$${eas_testing_annual_high_usd}/yr; compliance counsel $${compliance_consultant_annual_low_usd}–$${compliance_consultant_annual_high_usd}/yr. Total: $${total_annual_compliance_low_usd.toLocaleString()}–$${total_annual_compliance_high_usd.toLocaleString()}/yr. 10-yr PV: $${pv_10yr_low_usd.toLocaleString()}–$${pv_10yr_high_usd.toLocaleString()}.`
       };
     })(),
