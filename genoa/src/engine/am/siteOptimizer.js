@@ -7038,15 +7038,15 @@ async function scoreCandidate(pt, ctx, warnings){
         : item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'PASS',
           `Class ${fcc_class} design height ${round2(designH_rc)} m at ${frequency_khz} kHz — below the 60.96 m (200 ft) §17.7 ASR threshold. ASR registration not required at standard height.`);
 
-      // 4. RF exposure (MPE) — §1.1310 / OET Bulletin 65
+      // 4. RF exposure (MPE) — §1.1307(b) (evaluation trigger) / §1.1310 (MPE limits) / OET Bulletin 65
       // §1.1307(b): AM broadcast ERP > 1 kW requires routine MPE evaluation (general pop/uncontrolled).
       // This checklist uses 5 kW as a conservative formal-exhibit flag; 1–5 kW stations must also evaluate.
       const mpeRequired_rc = tpo_kw >= MPE_ERP_THRESHOLD_KW;
       const i4 = mpeRequired_rc
-        ? item('mpe_evaluation', 'RF exposure MPE evaluation', '47 CFR §1.1310 / OET Bulletin 65', 'WARN',
+        ? item('mpe_evaluation', 'RF exposure MPE evaluation', '47 CFR §1.1307(b) / §1.1310 / OET Bulletin 65', 'WARN',
           `TPO = ${tpo_kw} kW ≥ 5 kW (formal exhibit threshold; §1.1307(b) Table 1 actual AM threshold is > 1 kW). Routine MPE evaluation required before license grant. General population/uncontrolled limits apply beyond the antenna base exclusion zone.`,
           'Compute uncontrolled MPE limit distance from antenna base; fence or post exclusion zone signage per OET-65 guidance.')
-        : item('mpe_evaluation', 'RF exposure MPE evaluation', '47 CFR §1.1310 / OET Bulletin 65', 'PASS',
+        : item('mpe_evaluation', 'RF exposure MPE evaluation', '47 CFR §1.1307(b) / §1.1310 / OET Bulletin 65', 'PASS',
           `TPO = ${tpo_kw} kW below 5 kW formal-exhibit threshold. ${tpo_kw > 1 ? '§1.1307(b) Table 1 requires evaluation (> 1 kW AM); retain OET-65 calculation on file.' : 'Categorically excluded per §1.1307(b) (≤ 1 kW).'}`);
 
       // 5. Nighttime NIF study — §73.182
@@ -16128,7 +16128,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const harmonic_test_low_usd  = 1500;
       const harmonic_test_high_usd = 3000;
 
-      // MPE survey: required at all AM broadcast stations (§1.1310)
+      // MPE survey: required at all AM broadcast stations (§1.1307(b) evaluation trigger)
       const mpe_evaluation_required = true;  // required for all AM broadcast stations
       const mpe_survey_low_usd  = 2000;
       const mpe_survey_high_usd = 4000;
@@ -25660,8 +25660,8 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     rf_exposure_mpe_analysis: (() => {
-      // RF Human Exposure evaluation per §1.1310, OET Bulletin 65 (Ed. 97-01), §73.1 (definitions)
-      // FCC §1.1310: all stations must evaluate RF exposure compliance
+      // RF Human Exposure evaluation per §1.1307(b), OET Bulletin 65 (Ed. 97-01), §73.1 (definitions)
+      // FCC §1.1307(b): evaluation trigger; §1.1310: MPE limit values
       // OET Bulletin 65: provides MPE limits and evaluation methods for broadcast stations
       // MPE limits (general population / uncontrolled) at AM frequencies:
       //   §1.1310 Table 1: For 0.3–3 MHz (MF/LF): E = 614 V/m, H = 163 A/m, Power density = 100 mW/cm²

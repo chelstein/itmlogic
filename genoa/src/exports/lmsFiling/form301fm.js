@@ -733,7 +733,7 @@ export const FORM_301_FM_META = Object.freeze({
   submission_checklist: Object.freeze([
     'Engineering Statement PDF signed by a qualified broadcast engineer (Mullaney-style declaration on the second page)',
     'PE signature / seal on the certification page (sealed exhibit via POST /api/exhibits/certify, or signed-and-stamped by hand)',
-    'OET-65 RF-exposure exhibit attached (controlled / uncontrolled MPE evaluation per §1.1310; OET Bulletin 65 Supplement A for broadcast)',
+    'OET-65 RF-exposure exhibit attached (evaluation required per §1.1307(b); MPE limits per §1.1310 Table 1; OET Bulletin 65 Supplement A for broadcast)',
     'Tower / antenna structure: ASR # (if >60.96 m AGL or otherwise required), FAA Form 7460-1 determination, marking & lighting per FCC Part 17',
     '§73.207 minimum-distance separations satisfied OR §73.215 contour-protection showing attached',
     'Community of license inside the predicted 70 dBµV/m (3.16 mV/m) F(50,50) principal-community contour per §73.315(a) — NCE reserved-band stations on channels 200-220 use the §73.515 principal-community contour values instead',

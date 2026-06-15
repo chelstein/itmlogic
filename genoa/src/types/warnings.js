@@ -483,12 +483,12 @@ export const WARNING_CODES = Object.freeze({
     description: 'Two inputs or evidence sources provide different values for the same engineering field and the conflict was not automatically resolved.  The engineer of record must identify the authoritative value and reconcile the conflict before filing.' },
 
   OET65_REQUIRED: { severity: 'warning', phase: 'engine',
-    title: 'OET-65 RF exposure evaluation required (47 CFR §1.1310)',
-    description: 'This station\'s ERP and frequency combination meets or exceeds the §1.1310 threshold requiring a formal RF exposure (MPE) evaluation per OET Bulletin 65.  The evaluation has not been performed or has not been attached to this exhibit.  A signed OET-65 compliance study is required for filing.' },
+    title: 'OET-65 RF exposure evaluation required (47 CFR §1.1307(b))',
+    description: 'This station\'s ERP and frequency combination meets or exceeds the §1.1307(b) threshold requiring a formal RF exposure (MPE) evaluation per OET Bulletin 65 (MPE limits per §1.1310 Table 1).  The evaluation has not been performed or has not been attached to this exhibit.  A signed OET-65 compliance study is required for filing.' },
 
   OET65_MISSING: { severity: 'info', phase: 'engine',
     title: 'OET-65 RF exposure evaluation not attached',
-    description: 'No OET-65 RF exposure study is attached to this exhibit.  If the station\'s ERP and frequency place it above the §1.1310 evaluation threshold, an OET-65 study is required; otherwise this is advisory only.' },
+    description: 'No OET-65 RF exposure study is attached to this exhibit.  If the station\'s ERP and frequency place it above the §1.1307(b) evaluation threshold, an OET-65 study is required; otherwise this is advisory only.' },
 
   SDR_MISSING: { severity: 'info', phase: 'evidence',
     title: 'No SDR field-measurement captures attached',
