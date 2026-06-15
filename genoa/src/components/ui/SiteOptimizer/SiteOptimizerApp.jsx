@@ -1120,12 +1120,12 @@ const DEMO_RESULT = {
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
-        range_label: '$53,000 – $112,000',
-        total_soft_cost_low_usd: 52950, total_soft_cost_high_usd: 111950,
+        range_label: '$52,000 – $112,000',
+        total_soft_cost_low_usd: 52420, total_soft_cost_high_usd: 111420,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
-          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 175, cost_high_usd: 175 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application processing fee (DA 23-864 FY2024)', cost_low_usd: 1015, cost_high_usd: 1015 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM application processing fee (DA 23-864 FY2024)', cost_low_usd: 1015, cost_high_usd: 1015 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (144 m design height > 60.96 m §17.7)', cost_low_usd: 175, cost_high_usd: 175 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
@@ -1365,7 +1365,7 @@ const DEMO_RESULT = {
           label: 'Load AM_m3.tif GeoTIFF for filing-grade σ',
           note: 'Zone-table σ is the primary source of uncertainty. Installing the AM_m3.tif conductivity raster cuts uncertainty from ±35% to ±18% on field strength. This is the highest-impact single upgrade for this candidate.'
         },
-        reference: 'ITU-R P.527-5; FCC M3 zone table (§73.184); §73.190; OET Tech. Note 101',
+        reference: 'ITU-R P.527-5; FCC M3 zone table (§73.190 Figure M3); §73.190; OET Tech. Note 101',
         note: 'Confidence intervals are statistical estimates based on known σ source accuracy. Actual propagation may differ due to terrain, vegetation, moisture content, and near-field coupling.'
       },
       transmission_system_design_guide: {
@@ -1768,7 +1768,7 @@ const DEMO_RESULT = {
           { id: 'B2', section: 'B', title: 'Proposed ERP and TPO (kW)', required: true, cfr: '§73.21; §73.51' },
           { id: 'B3', section: 'B', title: 'Antenna height data (AMSL and AGL)', required: true, cfr: '§73.1020(b)' },
           { id: 'B4', section: 'B', title: 'Ground system design description', required: true, cfr: '§73.190' },
-          { id: 'B5', section: 'B', title: 'Soil conductivity (M3 value or measured)', required: true, cfr: '§73.184; §73.150' },
+          { id: 'B5', section: 'B', title: 'Soil conductivity (M3 value or measured)', required: true, cfr: '§73.190 Figure M3; §73.150' },
           { id: 'B6', section: 'B', title: 'Proposed operating schedule (day/night/critical hours)', required: true, cfr: '§73.99; §73.1740' },
           { id: 'C1', section: 'C', title: 'Co-channel groundwave interference analysis (§73.182)', required: true, cfr: '§73.182; §73.24' },
           { id: 'C2', section: 'C', title: 'Adjacent channel interference check (±10 kHz)', required: true, cfr: '§73.37; §73.182' },
@@ -3123,8 +3123,8 @@ const DEMO_RESULT = {
       },
       license_renewal_compliance_guide: {
         fcc_class: 'D', frequency_khz: 780,
-        renewal_cycle: { term_years: 8, form: 'FCC Form 303-S', filing_fee_usd: 345, filing_window_days_before_expiry: 120, publication_required: true, publication_cfr: '§73.3580', publication_notes: '3 consecutive weeks in newspaper of general circulation; OR 4 weeks on-air. Months 5–4 before expiry.', grace_period_days: 30 },
-        license_term_years: 8, renewal_form: 'FCC Form 303-S', renewal_filing_fee_usd: 345,
+        renewal_cycle: { term_years: 8, form: 'FCC Form 303-S', filing_fee_usd: 610, filing_window_days_before_expiry: 120, publication_required: true, publication_cfr: '§73.3580', publication_notes: '3 consecutive weeks in newspaper of general circulation; OR 4 weeks on-air. Months 5–4 before expiry.', grace_period_days: 30 },
+        license_term_years: 8, renewal_form: 'FCC Form 303-S', renewal_filing_fee_usd: 610,
         opif_requirements: [
           { id: 'LICENSE', label: 'FCC License and authorizations', update_freq: 'As issued', cfr: '§73.3526(e)(1)', required: true },
           { id: 'OWNERSHIP_REPORTS', label: 'FCC Form 323 Ownership Reports', update_freq: 'Biennial (every 2 years in even years)', cfr: '§73.3526(e)(3)', required: true },
@@ -3145,7 +3145,7 @@ const DEMO_RESULT = {
         ],
         n_calendar_actions: 4,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
-        note: 'AM Class D. 8-year license term. Form 303-S renewal filing fee $345. OPIF: 6 required items. EEO: 2 outreach initiatives/year if ≥5 FTE.'
+        note: 'AM Class D. 8-year license term. Form 303-S renewal filing fee $610 (FCC Schedule of Fees FY 2024). OPIF: 6 required items. EEO: 2 outreach initiatives/year if ≥5 FTE.'
       },
       nighttime_pattern_switching_guide: {
         fcc_class: 'D', frequency_khz: 780, pattern_mode: 'NDA',
@@ -3364,7 +3364,7 @@ const DEMO_RESULT = {
         applicable_techniques: [
           { id: 'RADIAL_EXTENSION', label: 'Extended radial count and length', sigma_impact: 'INDIRECT', applicable: true, cost_per_km2: 12000, max_improvement_pct: 15, description: 'Increasing radials from 60 to 120 reduces ground loss ~40%.', prerequisites: [], standard: '§73.150' },
           { id: 'COPPER_MESH', label: 'Copper mesh ground plane (short radials)', sigma_impact: 'EFFECTIVE', applicable: true, cost_per_km2: 45000, max_improvement_pct: 80, description: 'Dense copper mesh (#10 AWG, 1m grid) buried at 0.15m around tower base.', prerequisites: [], standard: 'FCC §73.150(b)(2)' },
-          { id: 'SALTWATER_PROXIMITY', label: 'Site selection near saltwater / high-sigma terrain', sigma_impact: 'SITE_DEPENDENT', applicable: true, cost_per_km2: 0, max_improvement_pct: 400, description: 'Best sigma improvement via site relocation.', prerequisites: [], standard: 'FCC §73.184' }
+          { id: 'SALTWATER_PROXIMITY', label: 'Site selection near saltwater / high-sigma terrain', sigma_impact: 'SITE_DEPENDENT', applicable: true, cost_per_km2: 0, max_improvement_pct: 400, description: 'Best sigma improvement via site relocation.', prerequisites: [], standard: 'FCC §73.190 Figure M3 (conductivity maps)' }
         ],
         n_all_techniques: 5, n_applicable_techniques: 3,
         sigma_after_improvement_msm: 9, coverage_gain_pct: 0,
@@ -4176,12 +4176,12 @@ const DEMO_RESULT = {
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
-        range_label: '$53,000 – $112,000',
-        total_soft_cost_low_usd: 52950, total_soft_cost_high_usd: 111950,
+        range_label: '$52,000 – $112,000',
+        total_soft_cost_low_usd: 52420, total_soft_cost_high_usd: 111420,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
-          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 175, cost_high_usd: 175 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application processing fee (DA 23-864 FY2024)', cost_low_usd: 1015, cost_high_usd: 1015 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM application processing fee (DA 23-864 FY2024)', cost_low_usd: 1015, cost_high_usd: 1015 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (144 m design height > 60.96 m §17.7)', cost_low_usd: 175, cost_high_usd: 175 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
@@ -4370,12 +4370,12 @@ const DEMO_RESULT = {
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
-        range_label: '$57,000 – $123,000',
-        total_soft_cost_low_usd: 56950, total_soft_cost_high_usd: 122950,
+        range_label: '$56,000 – $122,000',
+        total_soft_cost_low_usd: 56420, total_soft_cost_high_usd: 122420,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
-          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 175, cost_high_usd: 175 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application processing fee (DA 23-864 FY2024)', cost_low_usd: 1015, cost_high_usd: 1015 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM application processing fee (DA 23-864 FY2024)', cost_low_usd: 1015, cost_high_usd: 1015 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (144 m design height > 60.96 m §17.7)', cost_low_usd: 175, cost_high_usd: 175 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study at 5 kW (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 40000 },
@@ -4540,12 +4540,12 @@ const DEMO_RESULT = {
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'VERY_HIGH',
-        range_label: '$90,000 – $190,000',
-        total_soft_cost_low_usd: 89950, total_soft_cost_high_usd: 189950,
+        range_label: '$89,000 – $189,000',
+        total_soft_cost_low_usd: 89420, total_soft_cost_high_usd: 189420,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
-          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 175, cost_high_usd: 175 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application processing fee (DA 23-864 FY2024)', cost_low_usd: 1015, cost_high_usd: 1015 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM application processing fee (DA 23-864 FY2024)', cost_low_usd: 1015, cost_high_usd: 1015 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (144 m design height > 60.96 m §17.7)', cost_low_usd: 175, cost_high_usd: 175 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 45000 },

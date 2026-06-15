@@ -8239,7 +8239,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { item: `Radial length 0.35λ (${Math.round(radial_len_m * 3.28084)} ft at ${frequency_khz} kHz) per §73.189(b)(4) / NBS TN-24`, ref: '§73.189(b)(4)', required: true },
         { item: '#10 AWG bare copper wire, buried 6–12 inches minimum', ref: 'NBS Technical Note 24 (engineering practice)', required: true },
         { item: 'All radials bonded at tower base with low-resistance clamp', ref: '§73.189(b)(4)', required: true },
-        { item: 'Ground conductivity (M3 zone) verified per §73.184', ref: '§73.184; §73.190', required: true },
+        { item: 'Ground conductivity (M3 zone) verified per §73.190 Figure M3', ref: '§73.190 Figure M3; §73.184', required: true },
         { item: isDA_gs ? 'Separate full ground system per tower in DA array' : null, ref: '§73.189(b)(4)', required: true },
         { item: 'Base insulator clearance ≥ 3 ft from any buried conductor', ref: 'Engineering practice', required: true },
         { item: 'Optional: augmented radial count (>120) for low-conductivity sites', ref: '§73.189(b)(4)', required: false },
@@ -11095,7 +11095,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Cost basis (2024):
       //   FM translator equipment (250 W, antenna, transmission line): $15,000–$40,000
       //   Site lease for translator: $500–$2,000/yr
-      //   FCC application fee (Form 349, FM translator): ~$105 (commercial; §1.1102)
+      //   FCC application fee (Form 349, FM translator): $655 (FY2024, FCC DA 23-864; commercial)
       //   Construction permit (CP) for translator: $65–$225/hr engineering time
       //   Total translator buildout: $20,000–$60,000
 
@@ -13471,7 +13471,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const humid_region = (candidate_lon ?? 0) > -100;  // east of 100°W meridian
       const high_conductivity = (sigma_msm ?? 8) > 8;
       const probable_wetland = humid_region && high_conductivity;
-      const nepa_category = probable_wetland ? 'EA_LIKELY' : 'CATEGORICAL_EXCLUSION_PROBABLE';
+      const nepa_category = probable_wetland ? 'EA_LIKELY' : 'CATEGORICAL_EXCLUSION';
       const ea_required = nepa_category === 'EA_REQUIRED';
       // Phase 1 ESA: environmental site assessment (ASTM E1527-21)
       const phase1_esa_low_usd  = 2500;
@@ -13713,9 +13713,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower inspection (annual): $2,000–$5,000
       const tower_inspection_low  = 2000;
       const tower_inspection_high = 5000;
-      // FCC annual regulatory fee (Class D ~$1,050–$2,200):
-      const fcc_annual_fee_low  = 1050;
-      const fcc_annual_fee_high = 2200;
+      // FCC annual regulatory fee (§1.1102 FY2023): Class A $7,265; B $5,020; C/D $2,195.
+      const FCC_REG_FEE_BREAKDOWN = { A: 7265, B: 5020, C: 2195, D: 2195 };
+      const fcc_annual_fee_low  = FCC_REG_FEE_BREAKDOWN[fcc_class] ?? 2195;
+      const fcc_annual_fee_high = fcc_annual_fee_low;
       // Transmitter maintenance contract: $3,000–$8,000/yr
       const maintenance_low  = 3000;
       const maintenance_high = 8000;
@@ -14788,7 +14789,7 @@ async function scoreCandidate(pt, ctx, warnings){
       let nighttime_status, nighttime_power_kw_max;
       if (is_secondary && is_clear_channel) {
         nighttime_status       = 'secondary_limited_time';
-        nighttime_power_kw_max = round2(Math.min(tpo_kw, 0.5)); // §73.21(b)(2): Class D nighttime max 0.5 kW on clear channel
+        nighttime_power_kw_max = round2(Math.min(tpo_kw, 1.0)); // §73.21(b)(2)/§73.99: Class D nighttime max 1 kW on clear channel
       } else if (/^[AB]$/i.test(fcc_class)) {
         nighttime_status       = 'dominant_unlimited';
         nighttime_power_kw_max = tpo_kw;
@@ -14822,7 +14823,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Annual operating costs: power, maintenance, monitoring, engineering.
       // Power dominates for high-TPO stations; AC-to-RF efficiency ~65% means
       // actual wall-power draw is higher than TPO.
-      const power_rate_per_kwh = 0.115; // $/kWh, US commercial average (EIA 2024)
+      const power_rate_per_kwh = 0.12; // $/kWh, US commercial average (EIA 2024, ~$0.12/kWh)
       const power_factor       = 0.65; // typical solid-state AM transmitter efficiency
       const annual_power_kw_input = round2(tpo_kw / power_factor);
       const annual_kwh        = round2(annual_power_kw_input * 8760);
@@ -15450,8 +15451,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const line_ext_low_usd  = round2(line_ext_miles * line_ext_cost_per_mile_low);
       const line_ext_high_usd = round2(line_ext_miles * line_ext_cost_per_mile_high);
 
-      // Monthly/annual power cost at US commercial average rate (EIA 2024)
-      const power_rate_per_kwh     = 0.115;
+      // Monthly/annual power cost at US commercial average rate (EIA 2024, ~$0.12/kWh commercial average)
+      const power_rate_per_kwh     = 0.12;
       const monthly_power_cost_usd = round2(total_load_kw * 24 * 30 * power_rate_per_kwh);
       const annual_power_cost_usd  = round2(monthly_power_cost_usd * 12);
 
@@ -16532,8 +16533,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_app   = /^DA/i.test(pattern_mode);
 
       // FCC Schedule of Fees (FY 2024) — AM construction permit (Form 301-AM)
-      // Class A/B: $650; Class C/D: $610
-      const fcc_filing_fee_usd = ['A', 'B'].includes(fcc_class) ? 650 : 610;
+      // Flat fee $1,015 per DA 23-864 (FY2024); same for all classes, DA and NDA.
+      const fcc_filing_fee_usd = 1015;
 
       // Number of co-channel / adjacent-channel stations requiring interference check.
       // Clear channel: dominant (Class A) nighttime 0.1 mV/m skywave can span 500 km.
@@ -17264,9 +17265,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const annual_kwh_night = Math.round(night_draw_kw * daily_hrs_night * 365);
       const annual_kwh_total = annual_kwh_day + annual_kwh_night;
 
-      // Electricity cost: $0.08–$0.22/kWh (US commercial range; national avg $0.115/kWh EIA 2024)
-      const elec_cost_low_usd  = Math.round(annual_kwh_total * 0.08);
-      const elec_cost_high_usd = Math.round(annual_kwh_total * 0.22);
+      // Electricity cost: $0.10–$0.20/kWh (US commercial range; EIA 2024 avg $0.115/kWh)
+      const elec_cost_low_usd  = Math.round(annual_kwh_total * 0.10);
+      const elec_cost_high_usd = Math.round(annual_kwh_total * 0.20);
 
       // ---- Equipment maintenance ----
       // 5% of equipment value per year (from transmitter guide logic)
@@ -17276,11 +17277,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const equip_maint_low_usd  = Math.round(EQUIP_VALUE[power_class_aoc] * 0.04);
       const equip_maint_high_usd = Math.round(EQUIP_VALUE[power_class_aoc] * 0.08);
 
-      // ---- FCC license renewal fee ----
-      // Schedule of Regulatory Fees: AM stations pay annual regulatory fee
-      // by power class and market size; simplified flat estimate
-      const FCC_REGULATORY_FEE = { A: 6000, B: 4000, C: 2500, D: 1500 };
-      const fcc_annual_fee_usd = FCC_REGULATORY_FEE[fcc_class] ?? 2500;
+      // ---- FCC annual regulatory fee ----
+      // 47 CFR §1.1102 FY2023 schedule: Class A $7,265; Class B $5,020; Class C/D $2,195.
+      const FCC_REGULATORY_FEE = { A: 7265, B: 5020, C: 2195, D: 2195 };
+      const fcc_annual_fee_usd = FCC_REGULATORY_FEE[fcc_class] ?? 2195;
 
       // ---- Insurance ----
       // Annual premium estimate by class (from insurance guide logic)
@@ -17937,7 +17937,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Engineering and FCC filing costs
       const engineering_cost_low_usd  = fcc_class === 'A' ? 25000 : (fcc_class === 'B' ? 15000 : 8000);
       const engineering_cost_high_usd = fcc_class === 'A' ? 75000 : (fcc_class === 'B' ? 40000 : 20000);
-      const fcc_filing_fee_usd = 1055; // FCC schedule of fees (AM modification, 2024)
+      const fcc_filing_fee_usd = 1015; // FCC DA 23-864 (FY2024): Form 301-AM flat fee, all classes
 
       return {
         filing_type,
@@ -19928,7 +19928,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'B2', section: 'B', title: 'Proposed ERP and TPO (kW)', required: true, cfr: '§73.21; §73.51', notes: 'Separate day/night values for Class D on clear channel; transmitter type and model number' },
         { id: 'B3', section: 'B', title: 'Antenna height data (AMSL and AGL)', required: true, cfr: '§73.1020(b)', notes: 'Ground elevation AMSL + structure height AGL + radiation center AGL; must agree with ASR data' },
         { id: 'B4', section: 'B', title: 'Ground system design description', required: true, cfr: '§73.189(b)(4)', notes: 'Number of radials, length (0.35λ standard per §73.189(b)(4)), burial depth, wire gauge; minimum 120 radials for Class A, 60 for Class D screened as adequate' },
-        { id: 'B5', section: 'B', title: 'Soil conductivity (§73.184 M3 value or measured)', required: true, cfr: '§73.184; §73.150', notes: 'If using FCC M3 table value, state zone; if measured, include ASTM G57 or Wenner 4-electrode test data' },
+        { id: 'B5', section: 'B', title: 'Soil conductivity (§73.190 Figure M3 value or measured)', required: true, cfr: '§73.190 Figure M3; §73.150', notes: 'If using FCC M3 table value, state zone per §73.190 Figure M3; if measured, include ASTM G57 or Wenner 4-electrode test data' },
         { id: 'B6', section: 'B', title: 'Proposed operating schedule (day/night/critical hours)', required: isDA_ch || is_clear_ch, cfr: '§73.99; §73.1740', notes: 'For Class D on clear channel: sunrise/sunset hours; operating schedule changes if moving from current site' },
       ];
 
@@ -27892,8 +27892,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const prep_cost_low  = base_cost_low  + Math.round(da_increment * 0.8) + Math.round(ea_increment * 0.75) + Math.round(nif_increment * 0.8);
       const prep_cost_high = base_cost_high + da_increment + ea_increment + nif_increment + 2000;
 
-      // Filing fee per 47 CFR §1.1104 (2024 schedule)
-      const fcc_filing_fee_usd = 1705;
+      // Filing fee per FCC DA 23-864 (FY2024): Form 301-AM flat fee $1,015, all classes.
+      const fcc_filing_fee_usd = 1015;
 
       return {
         fcc_class, frequency_khz, tpo_kw,
@@ -29269,10 +29269,10 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       // ---- FCC filing fees (Form 302-AM) ----
-      // FCC Schedule of Application Fees (2023): AM License fee $345
+      // FCC DA 23-864 (FY2024): Form 302-AM (license to cover) flat fee $1,015, all classes.
       // STA (Form 700): $75 filing fee
       const fees = {
-        ltc_form_302_am_usd: 345,
+        ltc_form_302_am_usd: 1015,
         sta_form_700_usd:     75,
         total_ltc_soft_cost_low_usd:  3500,   // Engineering report + filing preparation
         total_ltc_soft_cost_high_usd: isDA_ltc ? 12000 : 6000  // DA proof-of-performance adds cost
