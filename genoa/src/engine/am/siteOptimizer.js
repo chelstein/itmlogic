@@ -1345,8 +1345,8 @@ export async function runSiteOptimizer(body = {}){
     bld_total_low_usd:          c.am_transmitter_building_and_studio_link_guide?.total_low_usd ?? null,
     bld_stl_type:               c.am_transmitter_building_and_studio_link_guide?.stl_type ?? null,
     bld_stl_low_usd:            c.am_transmitter_building_and_studio_link_guide?.stl_low_usd ?? null,
-    cp_total_nonrecurring_low:  c.am_fcc_construction_permit_and_license_guide?.total_nonrecurring_low_usd ?? null,
-    cp_fcc_filing_fee:          c.am_fcc_construction_permit_and_license_guide?.fcc_filing_fee_usd ?? null,
+    cp_total_nonrecurring_low:  c.am_fcc_construction_permit_and_license_guide?.form_301_total_low_usd ?? null,
+    cp_fcc_filing_fee:          c.am_fcc_construction_permit_and_license_guide?.form_301_am_usd ?? null,
     cp_review_months_high:      c.am_fcc_construction_permit_and_license_guide?.cp_review_months_high ?? null,
     cov_r_5mvm_km:              c.am_signal_contour_and_coverage_area_guide?.r_5mvm_km ?? null,
     cov_r_05mvm_km:             c.am_signal_contour_and_coverage_area_guide?.r_05mvm_km ?? null,
@@ -13682,7 +13682,7 @@ async function scoreCandidate(pt, ctx, warnings){
         conductivity_penalty_db_low, conductivity_penalty_db_high,
         terrain_study_low_usd, terrain_study_high_usd,
         study_tools,
-        reference: '47 CFR §73.184 (AM groundwave propagation method); §73.190 (AM groundwave conductivity certification); §73.190 Figure M3 (ground conductivity map); ITU-R P.368 (ground-wave propagation curves); USGS National Elevation Dataset; Rotheram (1992) terrain diffraction correction; ITU-R P.526 (diffraction loss)',
+        reference: '47 CFR §73.183 (groundwave service field strength contour definitions); §73.184 (AM groundwave propagation curves); §73.190 (AM groundwave conductivity certification); §73.190 Figure M3 (ground conductivity map); ITU-R P.368 (ground-wave propagation curves); USGS National Elevation Dataset; Rotheram (1992) terrain diffraction correction; ITU-R P.526 (diffraction loss)',
         note: `Candidate (${round2(candidate_lat)}°N, ${Math.abs(round2(candidate_lon))}°W): σ≈${sigma_terrain} mS/m (FCC M3 zone ${fcc_m3_zone}); conductivity range est. ${conductivity_ms_per_m_low}–${conductivity_ms_per_m_high} mS/m; penalty ${conductivity_penalty_db_low}–${conductivity_penalty_db_high} dB vs. ideal ground.${elev_proxy_m != null ? ` Elevation: ${elev_proxy_m} m.` : ''} Engineering study: $${terrain_study_low_usd.toLocaleString()}–$${terrain_study_high_usd.toLocaleString()}`
       };
     })(),
@@ -14368,8 +14368,14 @@ async function scoreCandidate(pt, ctx, warnings){
       // Process: file FCC Form 301-AM → receive CP → build → file Form 302-AM (license to cover).
       // Directional arrays also require antenna proof (§73.154) before license is granted.
       const isDA_cp    = /^DA/i.test(pattern_mode);
-      // FCC filing fee for Form 301-AM: FY2024 application processing fee per DA 23-864 — $1,015 flat (all classes, DA and NDA).
-      const fcc_filing_fee_usd = 1015;
+      // FCC Form 301-AM application processing fee: FY2024 flat rate per DA 23-864 — $1,015 (all classes, DA and NDA).
+      const form_301_am_usd = 1015;
+      // FCC Form 854 ASR tower registration fee: $175 (required when tower ≥ 200 ft per §17.7)
+      const fcc_asr_fee_usd = 175;
+      // FCC miscellaneous CP-related government costs (LMS/CORES filing, EAS registration): $120
+      const fcc_misc_usd = 120;
+      // Total FCC government filing fees for the CP process
+      const fcc_filing_fee_usd = form_301_am_usd + fcc_asr_fee_usd + fcc_misc_usd; // $1,310
       // FCC annual regulatory fee (§1.1102 FY2023): Class D/C $2,195; Class B $5,020; Class A $7,265.
       const annual_reg_fee_low  = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;
       const annual_reg_fee_high = annual_reg_fee_low;
@@ -14394,11 +14400,17 @@ async function scoreCandidate(pt, ctx, warnings){
       const construction_period_years = 3;
       const proof_to_license_months_low  = 3;
       const proof_to_license_months_high = 6;
+      // Total including ALL FCC government fees ($1,310)
       const total_nonrecurring_low_usd  = round2(fcc_filing_fee_usd + engineering_low_usd  + attorney_low_usd  + nepa_low_usd  + section106_low_usd);
       const total_nonrecurring_high_usd = round2(fcc_filing_fee_usd + engineering_high_usd + attorney_high_usd + nepa_high_usd + section106_high_usd);
+      // Comparison-table total uses only the Form 301-AM fee ($1,015) — excludes ASR/misc FCC costs
+      const form_301_total_low_usd  = round2(form_301_am_usd + engineering_low_usd  + attorney_low_usd  + nepa_low_usd  + section106_low_usd);
       return {
         frequency_khz, fcc_class, pattern_mode,
         isDA: isDA_cp,
+        form_301_am_usd,
+        fcc_asr_fee_usd,
+        fcc_misc_usd,
         fcc_filing_fee_usd,
         annual_reg_fee_low_usd: annual_reg_fee_low,
         annual_reg_fee_high_usd: annual_reg_fee_high,
@@ -14407,12 +14419,13 @@ async function scoreCandidate(pt, ctx, warnings){
         nepa_low_usd, nepa_high_usd,
         section106_low_usd, section106_high_usd,
         total_nonrecurring_low_usd, total_nonrecurring_high_usd,
+        form_301_total_low_usd,
         cp_review_months_low, cp_review_months_high,
         construction_period_years,
         proof_to_license_months_low, proof_to_license_months_high,
         filing_forms: ['FCC Form 301-AM (CP application)', 'FCC Form 302-AM (license to cover)', ...(isDA_cp ? ['Directional antenna proof exhibit'] : [])],
         reference: '47 CFR §73.3700 (AM revitalization); §73.24 (CP standards); §73.154 (DA proof); FCC Form 301-AM instructions; FCC Schedule of Regulatory Fees (2024); NEPA §106; 36 CFR §800',
-        note: `${isDA_cp ? 'DA' : 'NDA'} CP: $${fcc_filing_fee_usd} FCC fee + $${total_nonrecurring_low_usd.toLocaleString()}–$${total_nonrecurring_high_usd.toLocaleString()} total. Timeline: ${cp_review_months_low}–${cp_review_months_high} mo FCC review → ${construction_period_years}-yr build window → ${proof_to_license_months_low}–${proof_to_license_months_high} mo proof-to-license`
+        note: `${isDA_cp ? 'DA' : 'NDA'} CP: $${form_301_am_usd} Form 301-AM fee (DA 23-864 FY2024); $${fcc_filing_fee_usd} total FCC gov fees. Total project cost: $${total_nonrecurring_low_usd.toLocaleString()}–$${total_nonrecurring_high_usd.toLocaleString()}. Timeline: ${cp_review_months_low}–${cp_review_months_high} mo FCC review → ${construction_period_years}-yr build window → ${proof_to_license_months_low}–${proof_to_license_months_high} mo proof-to-license`
       };
     })(),
 

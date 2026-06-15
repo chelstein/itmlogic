@@ -960,12 +960,12 @@ const DEMO_RESULT = {
         evaluated_at_tpo_kw: 5
       },
       tower_cost_estimate: {
-        tower_height_m: 96.15, asr_lighting_required: true, cost_tier: 'MODERATE',
-        total_low_usd: 164000, total_high_usd: 404000,
-        range_label: '$164k–$404k (2024 USD, screening only)',
+        tower_height_m: 144.23, asr_lighting_required: true, cost_tier: 'LOW',
+        total_low_usd: 157000, total_high_usd: 312000,
+        range_label: '$157k–$312k (2024 USD, screening only)',
         breakdown: {
-          tower_steel:   { low: 5000,   high: 15000,  note: 'Guyed λ/4 monopole at 96.15 m' },
-          ground_system: { low: 80000,  high: 120000, note: '120-radial copper; σ=8 mS/m soil factor' },
+          tower_steel:   { low: 7000,   high: 22000,  note: 'Guyed 3/8λ monopole at 144 m (Class D design height: 0.375 × 384.62 m = 144.23 m)' },
+          ground_system: { low: 80000,  high: 80000,  note: '120-radial copper; σ=8 mS/m soil factor' },
           faa_lighting:  { low: 20000,  high: 60000,  note: 'ASR threshold exceeded (47 CFR §17.7)' },
           civil_work:    { low: 50000,  high: 150000, note: 'Grading, access road, fence, foundation' }
         },
@@ -1219,15 +1219,15 @@ const DEMO_RESULT = {
         asr_required: true, treaty_zone_present: false,
         critical_count: 4, high_count: 5, total_items: 11,
         items: [
-          { id: 'ZONING_VERIFICATION', category: 'Zoning & Land Use', priority: 'CRITICAL', action: 'Verify county/municipal zoning classification permits telecommunications tower and broadcast facility', what_to_check: 'Contact Yavapai County planning; AM towers may require conditional use permit.', timeline_weeks: [2, 6], notes: 'AM tower at 96.15 m may exceed local height limits — confirm variance process.' },
+          { id: 'ZONING_VERIFICATION', category: 'Zoning & Land Use', priority: 'CRITICAL', action: 'Verify county/municipal zoning classification permits telecommunications tower and broadcast facility', what_to_check: 'Contact Yavapai County planning; AM towers may require conditional use permit.', timeline_weeks: [2, 6], notes: 'AM tower at 144 m (3/8λ Class D design height) likely exceeds local height limits — confirm variance process.' },
           { id: 'TITLE_SEARCH', category: 'Title & Encumbrances', priority: 'CRITICAL', action: 'Commission title search and title insurance for parcel', what_to_check: 'Easements, deed restrictions, mineral rights. Buried utility easements in ground system area must be documented.', timeline_weeks: [2, 4], notes: null },
           { id: 'PARCEL_SIZE_ADEQUACY', category: 'Physical Requirements', priority: 'CRITICAL', action: 'Verify parcel ≥ 6.89 ha for FCC-standard 134.62-m radial system per §73.189(b)(4) (min ~148 m radius)', what_to_check: 'Map all fence lines and structures within 148 m of proposed tower base.', timeline_weeks: [1, 2], notes: null },
-          { id: 'ASR_COORD_AIRPORT', category: 'FAA & ASR', priority: 'CRITICAL', action: 'File FAA Form 7460-1 aeronautical study — λ/4 tower (96.15 m) exceeds §17.7 200-ft threshold', what_to_check: 'Identify airports within 20 km. Pre-screen at FAA OE/AAA online tool.', timeline_weeks: [6, 16], notes: 'FAA review can take 45–90 days.' },
+          { id: 'ASR_COORD_AIRPORT', category: 'FAA & ASR', priority: 'CRITICAL', action: 'File FAA Form 7460-1 aeronautical study — 3/8λ tower (144 m) exceeds §17.7 200-ft (60.96 m) threshold', what_to_check: 'Identify airports within 20 km. Pre-screen at FAA OE/AAA online tool.', timeline_weeks: [6, 16], notes: 'FAA review can take 45–90 days.' },
           { id: 'NEPA_DESKTOP_REVIEW', category: 'Environmental', priority: 'HIGH', action: 'Complete NEPA §1.1306 13-item environmental desktop checklist', what_to_check: 'Floodplain, wetlands, protected species, historic properties, wilderness.', timeline_weeks: [2, 6], notes: 'Yavapai County has high potential for archaeological sites — allow extra time for SHPO review.' },
           { id: 'NHPA_SECTION_106', category: 'Environmental', priority: 'HIGH', action: 'Initiate NHPA §106 historic properties review with Arizona SHPO', what_to_check: 'APE within 192 m of proposed tower. Run SHPO consultation if historic properties within APE.', timeline_weeks: [4, 16], notes: null },
           { id: 'UTILITY_ACCESS', category: 'Utilities & Infrastructure', priority: 'HIGH', action: 'Confirm electrical service availability (3-phase preferred)', what_to_check: 'Identify nearest transformer. Estimate service extension cost.', timeline_weeks: [2, 4], notes: null },
           { id: 'LEASE_TERM', category: 'Lease & Legal', priority: 'HIGH', action: 'Negotiate minimum 20-year lease with renewal options; include FCC CP approval contingency', what_to_check: 'CP grant typically 1–3 years. Lease must survive filing delay.', timeline_weeks: [4, 12], notes: null },
-          { id: 'SETBACKS_GUYWIRES', category: 'Physical Requirements', priority: 'HIGH', action: 'Verify guy wire anchors can be placed at 77–96.15 m from tower base', what_to_check: 'Standard guyed λ/4 monopole uses 3 guy sets. Each anchor needs 5–10 m clearance from property line.', timeline_weeks: [1, 2], notes: null },
+          { id: 'SETBACKS_GUYWIRES', category: 'Physical Requirements', priority: 'HIGH', action: 'Verify guy wire anchors can be placed at 115–144 m from tower base', what_to_check: 'Standard guyed 3/8λ monopole (144 m) uses 3–4 guy sets at ~58 m, ~101 m, ~130 m from base. Each anchor needs 5–10 m clearance from property line.', timeline_weeks: [1, 2], notes: null },
           { id: 'ACCESS_ROAD', category: 'Utilities & Infrastructure', priority: 'MEDIUM', action: 'Verify legal access road and easement — crane truck access required', what_to_check: 'Confirm all-weather road ≥4 m wide to tower base.', timeline_weeks: [1, 3], notes: null },
           { id: 'TREATY_SETBACK', category: 'Regulatory', priority: 'INFORMATIONAL', action: 'Verify site is outside international treaty coordination zone', what_to_check: 'No treaty zone detected at screening. Verify final coordinates.', timeline_weeks: [1, 2], notes: null }
         ],
