@@ -25809,7 +25809,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const easCost = 8000; // IPAWS-compatible EAS unit
 
       // 8. FCC fees and engineering
-      const fccFilingFee = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;  // §1.1102 FY2023 by class
+      // One-time application fees per §1.1102 FY2024: Form 301-AM major CP $4,200 + Form 302-AM $435
+      const fccFilingFee = 4635;   // $4,200 + $435, flat all classes (§1.1102 FY2024)
       const engineeringLow  = 25000;
       const engineeringHigh = 75000; // includes NIF study, spacing, DA pattern, proof of performance
 
@@ -25833,7 +25834,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'transmitter',  category: 'Transmitter equipment',        low: txCostLow,       high: txCostHigh,       note: `${tpo_kw} kW ${isDA_cost ? 'DA-capable' : 'NDA'} AM transmitter; cost assumes new unit.` },
         { id: 'phasor_atu',   category: isDA_cost ? 'Phasor + ATU' : 'Antenna tuning unit (ATU)', low: phasorCostLow, high: phasorCostHigh, note: isDA_cost ? 'DA phasor and ATU for directional antenna.' : 'Non-directional ATU.' },
         { id: 'eas',          category: 'EAS encoder/decoder (IPAWS)', low: easCost,          high: easCost,          note: 'IPAWS-compatible EAS unit per §11.35/§11.56.' },
-        { id: 'fcc_fees',     category: 'FCC filing fees',             low: fccFilingFee,     high: fccFilingFee,     note: 'FCC major change CP application fee per Schedule of Application Fees (47 U.S.C. §158).' },
+        { id: 'fcc_fees',     category: 'FCC filing fees',             low: fccFilingFee,     high: fccFilingFee,     note: 'One-time FCC application fees: Form 301-AM major change CP $4,200 + Form 302-AM license to cover $435 (§1.1102 FY2024, flat all classes).' },
         { id: 'engineering',  category: 'Engineering + proof-of-performance', low: engineeringLow, high: engineeringHigh, note: 'Spacing study, NIF study, DA pattern, §73.154 proof, FCC forms.' },
         { id: 'env_legal',    category: 'Environmental + legal + zoning', low: envLegalLow,   high: envLegalHigh,     note: 'NEPA §106, zoning CUP, FCC counsel.' },
         { id: 'contingency',  category: 'Contingency (15–20%)',         low: contingencyLow,  high: contingencyHigh,  note: 'Reserve for scope changes, cost escalation, permit delays.' }
