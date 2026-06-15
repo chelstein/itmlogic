@@ -27540,7 +27540,7 @@ async function scoreCandidate(pt, ctx, warnings){
         }
       ];
 
-      // §1.1310 evaluation triggers
+      // §1.1307(b) evaluation triggers (§1.1310 has MPE limits, not triggers)
       const EVALUATION_TRIGGERS = [
         { trigger: 'ERP > 1 kW', applicable: mpe_eval_required, note: 'AM broadcast categorical exclusion threshold per §1.1307(b) Table 1 (not §1.1310; 5 kW used as formal-exhibit threshold only)' },
         { trigger: 'New construction or modification', applicable: true, note: 'Any new CP or modification requires evaluation or categorical exclusion determination' },
