@@ -8601,7 +8601,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //     780, 820, 870, 880, 1020, 1100, 1120 kHz and others per §73.25(a).
       //
       // Interference calculation model (screening-grade):
-      //   FCC uses Midnight Summer groundwave + skywave propagation curves (M3/SkyWave).
+      //   FCC uses Midnight Summer groundwave (§73.184/M3 conductivity) + skywave (§73.190 SS-1) propagation curves.
       //   This guide uses a simplified proxy:
       //     D/U criterion: desired/undesired signal ratio at the reference contour.
       //       Co-channel: D/U ≥ 26 dB (20:1 field strength ratio per §73.182(r) / §73.37(a))
@@ -10700,9 +10700,9 @@ async function scoreCandidate(pt, ctx, warnings){
       }
       const dist_to_kkob_km = dist_to_dominant_km; // alias for downstream compat
 
-      // FCC M3 skywave field strength screening estimate (§73.182 / ITU-R f-curves):
+      // FCC skywave field strength screening estimate (§73.182 NIF / §73.190 SS-1 curves):
       //   F_sky ≈ 10·log10(P_kW) + 120 − 20·log10(d_km) − 40  [dBµV/m, rough free-space model]
-      //   This is a rough screening estimate (±10 dB) — actual M3 / FCC ITU f-curve
+      //   This is a rough screening estimate (±10 dB) — §73.190 Appendix A SS-1 curve
       //   computation is required for a formal NIF study.
       const tpo_dB      = 10 * Math.log10(tpo_kw);
       const sky_raw_dB  = dist_to_dominant_km != null
@@ -10744,7 +10744,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const nif_fraction_pct_high = d_nif > 500 ? 60 : (d_nif > 350 ? 45 : 30);
 
       // NIF study engineering cost:
-      //   Full NIF analysis requires M3 skywave model computation for all co-channel stations.
+      //   Full NIF analysis requires §73.190 SS-1 skywave curve computation for all co-channel stations.
       //   Typically performed with FCC-approved AMCD (AM Clear Channel Database) or
       //   commercial software (Nautel's AM analysis, BroadCast Broadcasting Software).
       const nif_study_low_usd  = 2000;
@@ -14268,7 +14268,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.182(k): For Class D stations, nighttime operation is secondary.
       // Class D stations may operate at night only if they do not cause interference to
       // dominant (Class A/B/C) co-channel or adjacent-channel stations' nighttime contours.
-      // The FCC uses skywave field-strength curves (M3 method) and the 50% skywave formula.
+      // The FCC uses skywave field-strength curves (§73.190 Appendix A, SS-1) and the 50% skywave formula.
       // Key thresholds per §73.182:
       //   - Dominant station 0.1 mV/m daytime protected contour
       //   - Nighttime: Class D must not increase ambient level by > 2 mV/m (§73.182(k)(1))
