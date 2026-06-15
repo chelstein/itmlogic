@@ -21322,7 +21322,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const upgrade_cost_usd     = Math.round(upgrade_wire_m * total_per_m * n_towers * (isDA_gr ? 0.70 : 1));
 
       // Copper price sensitivity note
-      const copper_lbs_total     = Math.round(total_wire_length_m * n_towers * 0.0099); // #10 AWG: 9.9 g/m → lbs
+      const copper_lbs_total     = Math.round(total_wire_length_m * n_towers * 0.1039); // #10 AWG: 47.1 g/m = 0.1039 lbs/m (π×1.294²mm² × 8.96 g/cm³)
       // 9.9 g/m × tower count × meter length
 
       return {

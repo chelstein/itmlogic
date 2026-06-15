@@ -2064,9 +2064,9 @@ const DEMO_RESULT = {
         per_tower_total_cost_usd: 64344,
         total_estimated_cost_usd: { low: 48265, typical: 64344, high: 96516 },
         half_wave_upgrade_cost_usd: 51264,
-        copper_lbs_total: 114,
-        fcc_minimum_radials: 120, radial_cfr: '47 CFR §73.190',
-        reference: '47 CFR §73.190 (AM ground system); FCC AM Engineering Handbook; Terman (1943) radial ground system efficiency; ARRL Antenna Book (copper wire specifications)',
+        copper_lbs_total: 1199,
+        fcc_minimum_radials: 120, radial_cfr: '47 CFR §73.189(b)(4)',
+        reference: '47 CFR §73.189(b)(4) (AM ground system standard — 120 × 0.35λ); §73.190 (conductivity certification); NBS Technical Note 24; FCC AM Engineering Handbook; Terman (1943) radial ground system efficiency; ARRL Antenna Book (#10 AWG copper specs)',
         note: '780 kHz, λ/4=96.15 m. Standard ground system: 120 radials × 96.15 m = 11,538 m total wire. Estimated cost: $48,265–$96,516 (typ. $64,344). Half-wave upgrade adds ~$51,264.'
       },
       frequency_coordination_with_adjacent_stations_guide: {
