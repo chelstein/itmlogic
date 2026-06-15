@@ -1215,13 +1215,13 @@ const DEMO_RESULT = {
       },
       site_acquisition_checklist: {
         frequency_khz: 780, fcc_class: 'D', lat: 34.91, lon: -111.79,
-        quarter_wave_m: 96.15, min_parcel_radius_m: 105.8, min_parcel_area_ha: 3.52,
+        quarter_wave_m: 96.15, min_parcel_radius_m: 148.1, min_parcel_area_ha: 6.89,
         asr_required: true, treaty_zone_present: false,
         critical_count: 4, high_count: 5, total_items: 11,
         items: [
           { id: 'ZONING_VERIFICATION', category: 'Zoning & Land Use', priority: 'CRITICAL', action: 'Verify county/municipal zoning classification permits telecommunications tower and broadcast facility', what_to_check: 'Contact Yavapai County planning; AM towers may require conditional use permit.', timeline_weeks: [2, 6], notes: 'AM tower at 96.15 m may exceed local height limits — confirm variance process.' },
           { id: 'TITLE_SEARCH', category: 'Title & Encumbrances', priority: 'CRITICAL', action: 'Commission title search and title insurance for parcel', what_to_check: 'Easements, deed restrictions, mineral rights. Buried utility easements in ground system area must be documented.', timeline_weeks: [2, 4], notes: null },
-          { id: 'PARCEL_SIZE_ADEQUACY', category: 'Physical Requirements', priority: 'CRITICAL', action: 'Verify parcel ≥ 3.52 ha for 96.15-m radial system (min ~106 m radius)', what_to_check: 'Map all fence lines and structures within 106 m of proposed tower base.', timeline_weeks: [1, 2], notes: null },
+          { id: 'PARCEL_SIZE_ADEQUACY', category: 'Physical Requirements', priority: 'CRITICAL', action: 'Verify parcel ≥ 6.89 ha for FCC-standard 134.62-m radial system per §73.189(b)(4) (min ~148 m radius)', what_to_check: 'Map all fence lines and structures within 148 m of proposed tower base.', timeline_weeks: [1, 2], notes: null },
           { id: 'ASR_COORD_AIRPORT', category: 'FAA & ASR', priority: 'CRITICAL', action: 'File FAA Form 7460-1 aeronautical study — λ/4 tower (96.15 m) exceeds §17.7 200-ft threshold', what_to_check: 'Identify airports within 20 km. Pre-screen at FAA OE/AAA online tool.', timeline_weeks: [6, 16], notes: 'FAA review can take 45–90 days.' },
           { id: 'NEPA_DESKTOP_REVIEW', category: 'Environmental', priority: 'HIGH', action: 'Complete NEPA §1.1306 13-item environmental desktop checklist', what_to_check: 'Floodplain, wetlands, protected species, historic properties, wilderness.', timeline_weeks: [2, 6], notes: 'Yavapai County has high potential for archaeological sites — allow extra time for SHPO review.' },
           { id: 'NHPA_SECTION_106', category: 'Environmental', priority: 'HIGH', action: 'Initiate NHPA §106 historic properties review with Arizona SHPO', what_to_check: 'APE within 192 m of proposed tower. Run SHPO consultation if historic properties within APE.', timeline_weeks: [4, 16], notes: null },
@@ -1303,7 +1303,7 @@ const DEMO_RESULT = {
       },
       financial_feasibility_summary: {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, pattern_mode: 'NDA',
-        quarter_wave_m: 96.15, min_parcel_area_ha: 3.52,
+        quarter_wave_m: 96.15, min_parcel_area_ha: 6.89,
         total_buy_low_usd: 435000, total_buy_high_usd: 1580000,
         total_lease_yr1_low_usd: 341000, total_lease_yr1_high_usd: 1009000,
         annual_lease_low_usd: 6000, annual_lease_high_usd: 24000,
