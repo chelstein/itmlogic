@@ -250,8 +250,8 @@ export const FORM_301_AM_FIELDS = Object.freeze([
     type: 'number', unit: 'mV/m at 1 km',
     source: 'genoa-auto',
     required: true,
-    cite: '47 CFR §73.184, §73.189',
-    notes: 'AM filings report groundwave field strength at 1 km — NOT ERP.  Computed from antenna efficiency and pattern rms per §73.189; groundwave propagation curves per §73.184.',
+    cite: '47 CFR §73.183, §73.184, §73.189',
+    notes: 'AM filings report groundwave field strength at 1 km — NOT ERP.  Radiation efficiency per §73.183; pattern rms per §73.189; groundwave propagation curves per §73.184.',
     derive: (exhibit) => firstNonEmptyPath(exhibit, [
       'station_inputs.rms_field_mv_m',
       'station_inputs.rms_groundwave_mv_m_at_1km',
