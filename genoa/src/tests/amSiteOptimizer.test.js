@@ -6123,7 +6123,7 @@ test('ground_radial_installation_cost_guide presence and structure', async () =>
   const g = c.ground_radial_installation_cost_guide;
   assert.strictEqual(g.frequency_khz, 780, 'frequency_khz mismatch');
   assert.strictEqual(g.fcc_class, 'D', 'fcc_class mismatch');
-  assert.strictEqual(g.n_radials, 120, 'FCC minimum is 120 radials (§73.190)');
+  assert.strictEqual(g.n_radials, 120, 'FCC standard is 120 radials (§73.189(b)(4))');
   assert.strictEqual(g.fcc_minimum_radials, 120, 'fcc_minimum_radials must be 120');
   assert.strictEqual(g.radial_cfr, '47 CFR §73.189(b)(4)', 'CFR reference must be §73.189(b)(4) (AM ground system — 120 × 0.35λ excellent standard)');
 });

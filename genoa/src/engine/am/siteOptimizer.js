@@ -12712,7 +12712,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Total copper wire: 120 × 0.35λ radials (#10 AWG solid bare: ~47 g/m per NBS TN-24)
       const total_copper_wire_m = round2(n_radials_std * radial_length_m);
       // Cost estimates (2024 USD)
-      const copper_wire_cost_per_m_usd = 1.85; // installed (trenching + AWG 12 wire)
+      const copper_wire_cost_per_m_usd = 4.45; // wire + burial combined: #10 AWG ~$0.95/m + trenching ~$3.50/m (EIA 2024 / RS Means 2024)
       const radial_install_low_usd   = Math.round(total_copper_wire_m * copper_wire_cost_per_m_usd * 0.80);
       const radial_install_high_usd  = Math.round(total_copper_wire_m * copper_wire_cost_per_m_usd * 1.40);
       const ground_ring_low_usd      = 4500;  // copper ground ring around base insulator
@@ -21321,8 +21321,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const upgrade_cost_usd     = Math.round(upgrade_wire_m * total_per_m * n_towers * (isDA_gr ? 0.70 : 1));
 
       // Copper price sensitivity note
-      const copper_lbs_total     = Math.round(total_wire_length_m * n_towers * 0.1039); // #10 AWG: 47.1 g/m = 0.1039 lbs/m (π×1.294²mm² × 8.96 g/cm³)
-      // 9.9 g/m × tower count × meter length
+      const copper_lbs_total     = Math.round(total_wire_length_m * n_towers * 0.1039); // #10 AWG solid bare: 5.261 mm² × 8.96 g/cm³ = 47.1 g/m = 0.1039 lbs/m (NBS TN-24)
 
       return {
         frequency_khz,
