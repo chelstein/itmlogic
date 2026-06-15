@@ -8506,7 +8506,7 @@ async function scoreCandidate(pt, ctx, warnings){
         {
           phase:       5,
           name:        'FCC application filing (Form 301-AM)',
-          description: 'Assemble and submit CP application: engineering exhibits, NIF study, site control letter, NEPA cert, ASR number, Form 301-AM fee ($1,015)',
+          description: 'Assemble and submit CP application: engineering exhibits, NIF study, site control letter, NEPA cert, ASR number, Form 301-AM major change CP fee ($4,200 per §1.1102 FY2024)',
           weeks_low:   2,
           weeks_high:  4,
           parallel:    false,
@@ -9018,7 +9018,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ── 9. FCC filing fees ──
       const is_da_pf        = /^DA/i.test(pattern_mode);
-      const fcc_fee_cp_pf   = 1015;   // Form 301-AM (FY2024 §1.1102)
+      const fcc_fee_cp_pf   = 4200;   // Form 301-AM major change CP (relocation) per §1.1102 FY2024
       const fcc_fee_asr_pf  = asr_req_pf ? 175 : 0;  // Form 854
       const fcc_fees_pf     = fcc_fee_cp_pf + fcc_fee_asr_pf;
 
@@ -9046,7 +9046,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { category: 'Transmitter building + HVAC',      low: bldg_low_pf,  high: bldg_high_pf,   notes: `${sqft_low_pf}–${sqft_high_pf} sqft; ${hvac_tons_pf}-ton HVAC` },
         { category: 'Tower lighting + painting',        low: ltg_low_pf,   high: ltg_high_pf,    notes: asr_req_pf ? `FAA marking required (${h_ft_pf} ft > 200 ft threshold)` : `No ASR required (${h_ft_pf} ft ≤ 200 ft)` },
         { category: 'RF/MPE safety fence + study',      low: mpe_low_pf,   high: mpe_high_pf,    notes: `GP exclusion r≈${r_gp_pf} m; ${fence_needed_pf ? `${Math.round(perim_ft_pf)} ft perimeter` : 'fence may not be required'}` },
-        { category: 'FCC filing fees',                  low: fcc_fees_pf,  high: fcc_fees_pf,    notes: `Form 301-AM $1,015${asr_req_pf ? ' + Form 854 $175' : ''}` },
+        { category: 'FCC filing fees',                  low: fcc_fees_pf,  high: fcc_fees_pf,    notes: `Form 301-AM major CP $4,200${asr_req_pf ? ' + Form 854 $175' : ''} (§1.1102 FY2024)` },
         { category: 'Soft costs (engineering + legal + NIF)', low: soft_low_pf, high: soft_high_pf, notes: `${is_da_pf ? 'DA' : 'NDA'} pathway; includes FCC counsel` },
         { category: 'Proof of performance (Form 302-AM)', low: pop_low_pf, high: pop_high_pf,    notes: `${is_da_pf ? '72-radial DA field survey' : '8-radial NDA inverse-distance traversal'}` }
       ];
@@ -14583,7 +14583,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // white/red strobes (L-856/L-864) for taller structures.
       const lighting_type   = tower_height_ft > 500 ? 'L-856/L-864 (red/white strobe)' : 'L-810 (steady red)';
       // ASR filing fee and engineering costs
-      const asr_fee_usd          = 130;   // FCC Schedule of Regulatory Fees (approximate)
+      const asr_fee_usd          = 175;   // FCC Form 854 (ASR registration) fee per §1.1102 FY2024
       const structural_study_low  = 2500;
       const structural_study_high = 8000;
       const environmental_review_low  = 1500;  // NEPA / Section 106 review
@@ -14994,7 +14994,7 @@ async function scoreCandidate(pt, ctx, warnings){
       }
       const faa_notice_cost_low_usd  = needs_faa_notice ? 1000 : 0;
       const faa_notice_cost_high_usd = needs_faa_notice ? 5000 : 0;
-      const asr_fee_usd              = needs_asr ? 125 : 0;
+      const asr_fee_usd              = needs_asr ? 175 : 0;  // Form 854 fee per §1.1102 FY2024
       const annual_maint_low_usd     = needs_faa_notice ? 500  : 0;
       const annual_maint_high_usd    = needs_faa_notice ? 2000 : 0;
       const total_install_low_usd  = round2(lighting_cost_low_usd  + faa_notice_cost_low_usd  + asr_fee_usd);
