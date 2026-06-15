@@ -1052,11 +1052,11 @@ const DEMO_RESULT = {
       },
       ground_system_design_specification: {
         frequency_khz: 780, sigma_msm: 8, soil_resistivity_ohm_m: 125, quarter_wave_m: 96.15,
-        ideal_radial_length_m: 96.15, practical_radial_length_m: 96.15, min_radial_length_m: 48.08,
+        ideal_radial_length_m: 134.62, practical_radial_length_m: 134.62, min_radial_length_m: 48.08,
         standard_design: {
-          n_radials: 120, radial_length_m: 96.15, wire_gauge: '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)',
-          burial_depth_mm: 150, R_g_estimated_ohm: 2.2, efficiency_pct: 94.3,
-          efficiency_tier: 'EXCELLENT (≥90%)', area_required_ha: 29.1
+          n_radials: 120, radial_length_m: 134.62, wire_gauge: '#10 AWG solid bare copper (2.59 mm diameter, ~3.3 Ω/km; NBS TN-24)',
+          burial_depth_mm: 150, R_g_estimated_ohm: 1.5, efficiency_pct: 95.8,
+          efficiency_tier: 'EXCELLENT (≥90%)', area_required_ha: 5.69
         },
         extended_design: {
           n_radials: 180, radial_length_m: 144.23, wire_gauge: '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)',
@@ -1697,8 +1697,8 @@ const DEMO_RESULT = {
         },
         certification_requirements: [
           'Soil resistivity survey (Wenner 4-electrode method) at proposed radial layout locations',
-          'Minimum 120 copper radials at λ/4 (96.15 m) length, buried 5–10 cm',
-          'Ground ring: solid copper conductor connecting all radial tips at 96.15 m radius',
+          'Minimum 120 copper radials at 0.35λ (134.62 m at 780 kHz) per §73.189(b)(4)/NBS TN-24, buried 5–10 cm',
+          'Ground ring: solid copper conductor connecting all radial tips at 134.62 m radius',
           'All radials bonded to tower base connection point',
           'Conductor specification: #10 AWG copper-clad steel or solid copper',
           'Antenna base current measurement before and after radial installation',
@@ -2505,7 +2505,7 @@ const DEMO_RESULT = {
           { id: 'ASSIGNMENT', label: 'Assignment and sublease rights', priority: 'CRITICAL', note: 'Lease must be freely assignable to FCC permittees and successors-in-interest without landlord consent', cfr: '§73.3533' },
           { id: 'CONDEMNATION', label: 'Condemnation proceeds', priority: 'HIGH', note: 'In the event of eminent domain taking, broadcaster receives share of condemnation award proportionate to lease value' },
           { id: 'FAA_ZONING', label: 'Landlord cooperation for FAA/zoning filings', priority: 'HIGH', note: 'Landlord must sign as property owner on FAA Form 7460-1 and local CUP applications' },
-          { id: 'GROUND_SYSTEM', label: 'Ground radial system easement', priority: 'HIGH', note: 'Ground radials must extend to 96m from tower base (λ/4 at 780 kHz). Easement must cover full radial sweep.' },
+          { id: 'GROUND_SYSTEM', label: 'Ground radial system easement', priority: 'HIGH', note: 'Ground radials extend to 134.62 m from tower base (0.35λ at 780 kHz, FCC standard per §73.189(b)(4)). Easement must cover full radial sweep.' },
           { id: 'ACCESS_ROAD', label: 'All-weather access road easement', priority: 'MEDIUM', note: 'Broadcaster needs 24/7 unobstructed access to transmitter site for maintenance; road must support equipment delivery trucks' },
           { id: 'EXPANSION', label: 'Right to expand tower or building', priority: 'MEDIUM', note: 'Broadcaster may need to add directional antenna elements, change tower height, or expand transmitter building during lease term' }
         ],
@@ -3533,7 +3533,7 @@ const DEMO_RESULT = {
         ],
         access_requirements: [
           { item: 'Permanent access road easement', required: true, width_m: 5, notes: 'FCC requires reliable access to transmitter site per §73.49' },
-          { item: 'Ground radial field easement', required: true, width_m: 96.15, notes: 'Radials extend ~96.15 m (λ/4 at 780 kHz); need easement or ownership' },
+          { item: 'Ground radial field easement', required: true, width_m: 134.62, notes: 'Radials extend ~134.62 m (0.35λ at 780 kHz per §73.189(b)(4)); need easement or ownership' },
           { item: 'Utility easement (power + telco)', required: true, width_m: 10, notes: 'Electrical service + STL/IP link easement' },
           { item: 'Fencing easement (§73.49 RF barrier)', required: true, width_m: 2, notes: 'FCC §73.49 requires locked fencing around tower base' }
         ],
@@ -4365,7 +4365,7 @@ const DEMO_RESULT = {
           { height_label: '5/8λ (electrical 225°)', X_base_j: 45, notes: 'Inductive — series cap or shunt network required' },
           { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
         ],
-        matching_network_complexity: 'LOW — σ=10 mS/m (EXCELLENT) gives low ground resistance ~6.1 Ω; standard 120-radial system at λ/4 adequate.',
+        matching_network_complexity: 'LOW — σ=10 mS/m (EXCELLENT) gives low ground resistance ~6.1 Ω; FCC-standard 120-radial × 0.35λ system per §73.189(b)(4) more than adequate.',
         design_note: 'FCC standard is 0.35λ=134.62 m per §73.189(b)(4). λ/4 (96.15 m) baseline: 120-radial system achieves ~85.7% radiation efficiency at σ=10 mS/m.'
       },
       permit_and_engineering_cost_estimate: {

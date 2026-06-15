@@ -2088,7 +2088,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div className="text-[9px] text-textDim/60 font-mono">Wire: {std.wire_gauge} · Burial: {std.burial_depth_mm} mm</div>
                 )}
                 {std?.area_required_ha != null && (
-                  <div className="text-[9px] text-textDim/50 font-mono">Site area needed: {std.area_required_ha} ha for full λ/4 radial field</div>
+                  <div className="text-[9px] text-textDim/50 font-mono">Site area needed: {std.area_required_ha} ha for FCC-standard 0.35λ radial field</div>
                 )}
                 <p className="text-[8px] text-textDim/40 leading-snug">{gs.note}</p>
               </div>
@@ -2425,7 +2425,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
-                <span>Radial length (λ/4): <b style={{ color: '#e2e8f0' }}>{grs.radial_length_m}m</b></span>
+                <span>Radial length (0.35λ): <b style={{ color: '#e2e8f0' }}>{grs.radial_length_m}m</b></span>
                 <span>Total wire (std): <b style={{ color: '#e2e8f0' }}>{rec?.total_wire_m?.toLocaleString()}m</b></span>
                 <span>Efficiency (std): <b style={{ color: '#4ade80' }}>{rec?.efficiency_pct}%</b></span>
                 <span>Ground loss (std): <b style={{ color: '#e2e8f0' }}>{rec?.r_loss_ohm}Ω</b></span>
@@ -3133,7 +3133,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               {/* Key metrics row */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10 }}>
                 <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
-                  <div style={{ color: '#6b7280' }}>λ/4 radial length</div>
+                  <div style={{ color: '#6b7280' }}>λ/4 tower height ref.</div>
                   <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{fmtFt(gs.quarter_wave_ft)}</div>
                 </div>
                 <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
@@ -4208,7 +4208,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             <div key="prl-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf7f2', borderRadius: 8, border: '2px solid #9a3412' }}>
               <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Site Lease &amp; Property Rights — ASTM E1527 / §73.49</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#7c2d12', marginBottom: 8 }}>
-                <span style={{ color: '#9a3412' }}>Radial reach:</span><span>{fmtF(g.radial_length_m, 1)} m (λ/4)</span>
+                <span style={{ color: '#9a3412' }}>Radial reach:</span><span>{fmtF(g.radial_length_m, 1)} m (0.35λ FCC std)</span>
                 <span style={{ color: '#9a3412' }}>Min. site area:</span><span style={{ fontWeight: 700 }}>{fmtF(g.site_area_required_acres, 1)} acres</span>
                 <span style={{ color: '#9a3412' }}>Lease tier:</span><span style={{ textTransform: 'capitalize' }}>{g.lease_tier}</span>
                 <span style={{ color: '#9a3412' }}>Annual lease:</span><span>${fmt(g.lease_annual_low_usd)} – ${fmt(g.lease_annual_high_usd)}/yr</span>
@@ -5169,7 +5169,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ fontWeight: 700, color: '#064e3b', marginBottom: 6, fontSize: 13 }}>Ground Radial System Design (§73.190)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#065f46' }}>
                 <span>Wavelength (λ):</span><span>{g.wavelength_m != null ? `${g.wavelength_m} m` : '—'}</span>
-                <span>Radial length (λ/4):</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? `${g.radial_length_m} m` : '—'})` : '—'}</span>
+                <span>Radial length (0.35λ):</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? `${g.radial_length_m} m` : '—'})` : '—'}</span>
                 <span>Radials (ideal / min):</span><span>{g.num_radials_ideal} / {g.num_radials_min}</span>
                 <span>Total wire length:</span><span>{g.total_radial_length_mi != null ? `${g.total_radial_length_mi} mi (${g.total_radial_length_ft != null ? `${g.total_radial_length_ft.toLocaleString()} ft` : '—'})` : '—'}</span>
                 <span>Copper wire:</span><span>{fmt(g.copper_low_usd)} – {fmt(g.copper_high_usd)}</span>
@@ -5850,7 +5850,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Ground System (Radials)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
                 <span>Frequency:</span><span>{g.frequency_khz != null ? `${g.frequency_khz} kHz` : '—'}</span>
-                <span>λ/4 radial:</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? g.radial_length_m.toFixed(1) : '—'} m)` : '—'}</span>
+                <span>0.35λ radial (FCC std):</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? g.radial_length_m.toFixed(1) : '—'} m)` : '—'}</span>
                 <span>Radials:</span><span>{g.recommended_radials ?? '—'} {g.is_da ? '(DA enhanced)' : '(standard)'}</span>
                 <span>Total wire:</span><span>{g.total_ft_standard != null ? `${Math.round(g.total_ft_standard).toLocaleString()} ft` : '—'}</span>
                 <span>Wire:</span><span>{fmt(g.wire_low_usd)} – {fmt(g.wire_high_usd)}</span>
@@ -6655,7 +6655,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <span>Tower elements</span>
                 <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA)' : ' (NDA)'}</span>
                 <span>Radial count</span>
-                <span style={{ fontWeight: 600 }}>{g.n_radials} buried (λ/4 each)</span>
+                <span style={{ fontWeight: 600 }}>{g.n_radials} buried (0.35λ each per §73.189(b)(4))</span>
                 <span>Radiation resistance</span>
                 <span style={{ fontWeight: 600 }}>{g.radiation_resistance_ohm}Ω</span>
                 <span>Ground loss (R_g)</span>
@@ -7074,7 +7074,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#78350f' }}>
                 <span>Radials</span>
-                <span style={{ fontWeight: 600 }}>{g.n_radials} × {g.radial_length_m}m (λ/4 = {g.radial_length_m}m)</span>
+                <span style={{ fontWeight: 600 }}>{g.n_radials} × {g.radial_length_m}m (0.35λ per §73.189(b)(4))</span>
                 <span>Tower elements</span>
                 <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA array)' : ' (NDA)'}</span>
                 <span>Wire gauge</span>
@@ -8326,7 +8326,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div style={{ fontSize: 10, color: '#64748b' }}>${(lowCost || 0).toLocaleString()}–${(highCost || 0).toLocaleString()}</div>
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>λ/4 Radial Length</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>λ/4 Tower Height Ref.</div>
                   <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 15 }}>{g.lambda_quarter_m}m</div>
                   <div style={{ fontSize: 10, color: '#64748b' }}>λ/2 = {g.lambda_half_m}m</div>
                 </div>
@@ -9055,7 +9055,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
                   <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Ground Radial Radius</div>
-                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.ground_radial_radius_m}m (λ/4 at {g.frequency_khz} kHz)</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.ground_radial_radius_m}m (0.35λ per §73.189(b)(4) at {g.frequency_khz} kHz)</div>
                 </div>
               </div>
               {g.key_provisions && (
@@ -13853,7 +13853,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               {/* Key dimensions */}
               <div className="grid grid-cols-3 gap-1 mb-2">
                 {[
-                  { label: 'Optimal radial (λ/4)', value: `${gs.optimal_radial_length_m} m` },
+                  { label: 'FCC std radial (0.35λ)', value: `${gs.optimal_radial_length_m} m` },
                   { label: 'Min radial (λ/8)',      value: `${gs.minimum_radial_length_m} m` },
                   { label: 'Burial depth',           value: gs.burial_depth_recommended }
                 ].map(m => (
