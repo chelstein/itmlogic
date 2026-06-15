@@ -620,7 +620,7 @@ export const FORM_301_AM_META = Object.freeze({
     'Engineering Statement PDF signed by a qualified broadcast engineer; AM-specific narrative (skywave + groundwave + ground system) included',
     'PE signature / seal on the certification page',
     'Method-of-Moments (MoM) proof attached if directional and §73.151(c) is invoked; sample-system schematic + reference field per §73.152',
-    'Ground system description per §73.189 (120 buried 90° radials minimum for non-directional, or as filed for directional)',
+    'Ground system description per §73.189(b)(4) (120 buried 0.35λ radials per NBS TN-24 standard for non-directional; λ/4 is the physics reference only, not the filing standard)',
     '§73.182 nighttime interference / RSS aggregation: nighttime NIF contour computed; protected stations listed',
     '§73.99 pre-sunrise (PSRA) / post-sunset (PSSA) service-authorization tables included if PSRA/PSSA requested',
     'OET-65 RF-exposure exhibit attached (AM tower base-current → near-field MPE check at fence line)',

@@ -50,7 +50,7 @@ const TREATY_ZONE_PENALTY_KM_CA  = 800;    // US/CA letter of understanding oute
 // generally cares about for "how far does my station reach."
 const DAYTIME_REACH_TARGET_MVM = 0.5;
 
-// Conductivity target — M3-zone high end is 8 mS/m (rule §73.184).
+// Conductivity target — M3-zone high end is 8 mS/m (§73.190 Figure M3).
 const SIGMA_PREFERRED_MIN_MSM = 8;
 
 // Earth radius for great-circle math (mean, km).
@@ -6589,7 +6589,7 @@ async function scoreCandidate(pt, ctx, warnings){
         col_field_bounds_mvm: col_field_bounds,
         col_coverage_bounds: coverage_bounds,
         recommended_data_upgrade: upgrade,
-        reference: 'ITU-R P.527-5 (ground conductivity accuracy); FCC M3 zone table (§73.184); §73.190 (conductivity measurement); OET Tech. Note 101',
+        reference: 'ITU-R P.527-5 (ground conductivity accuracy); FCC M3 zone table (§73.190 Figure M3); §73.190 (conductivity measurement); OET Tech. Note 101',
         note: 'Confidence intervals are statistical estimates based on known σ source accuracy. Actual propagation may differ due to terrain, vegetation, moisture content, and near-field coupling. These bounds are for screening purposes only — filing-grade predictions require a §73.190 soil conductivity measurement at each candidate site.'
       };
     })(),
@@ -8951,7 +8951,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   §73.3533 — major modification petition
       //   §17.7 — ASR registration (tower ≥ 60.96 m / 200 ft AGL)
       //   §1.1307 / OET Bulletin 65 — MPE categorical exclusion threshold (> 1 kW)
-      //   FCC FY2024 fee schedule (47 CFR §1.1102) — $1,015 Form 301-AM; $385 Form 854
+      //   FCC FY2024 fee schedule (47 CFR §1.1102) — $1,015 Form 301-AM; $175 Form 854
       //
       // Engineering cost model: ARBE (2023) + FCC ULS filing data; adjusted for
       //   current steel / copper / labor indices (ENR CCI Q4 2024).
@@ -9019,7 +9019,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // ── 9. FCC filing fees ──
       const is_da_pf        = /^DA/i.test(pattern_mode);
       const fcc_fee_cp_pf   = 1015;   // Form 301-AM (FY2024 §1.1102)
-      const fcc_fee_asr_pf  = asr_req_pf ? 385 : 0;  // Form 854
+      const fcc_fee_asr_pf  = asr_req_pf ? 175 : 0;  // Form 854
       const fcc_fees_pf     = fcc_fee_cp_pf + fcc_fee_asr_pf;
 
       // ── 10. Soft costs (engineering + legal + NIF study) ──
@@ -9046,7 +9046,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { category: 'Transmitter building + HVAC',      low: bldg_low_pf,  high: bldg_high_pf,   notes: `${sqft_low_pf}–${sqft_high_pf} sqft; ${hvac_tons_pf}-ton HVAC` },
         { category: 'Tower lighting + painting',        low: ltg_low_pf,   high: ltg_high_pf,    notes: asr_req_pf ? `FAA marking required (${h_ft_pf} ft > 200 ft threshold)` : `No ASR required (${h_ft_pf} ft ≤ 200 ft)` },
         { category: 'RF/MPE safety fence + study',      low: mpe_low_pf,   high: mpe_high_pf,    notes: `GP exclusion r≈${r_gp_pf} m; ${fence_needed_pf ? `${Math.round(perim_ft_pf)} ft perimeter` : 'fence may not be required'}` },
-        { category: 'FCC filing fees',                  low: fcc_fees_pf,  high: fcc_fees_pf,    notes: `Form 301-AM $1,015${asr_req_pf ? ' + Form 854 $385' : ''}` },
+        { category: 'FCC filing fees',                  low: fcc_fees_pf,  high: fcc_fees_pf,    notes: `Form 301-AM $1,015${asr_req_pf ? ' + Form 854 $175' : ''}` },
         { category: 'Soft costs (engineering + legal + NIF)', low: soft_low_pf, high: soft_high_pf, notes: `${is_da_pf ? 'DA' : 'NDA'} pathway; includes FCC counsel` },
         { category: 'Proof of performance (Form 302-AM)', low: pop_low_pf, high: pop_high_pf,    notes: `${is_da_pf ? '72-radial DA field survey' : '8-radial NDA inverse-distance traversal'}` }
       ];
@@ -12361,13 +12361,13 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // Renewal/amendment cost (2024 market):
       //   Form 303-S renewal filing (attorney/broadcast consultant): $1,500–$4,000
-      //   FCC filing fee (AM renewal): $110 (FCC Fee Schedule, 2024)
+      //   FCC filing fee (Form 303-S AM renewal): $610 (FCC Schedule of Fees FY 2024)
       //   Form 302-AM amendment (technical change at new site): $2,000–$5,000
       //   §1.65 material-change notification (attorney letter): $500–$1,500
-      //   Total regulatory/renewal budget for relocation: $4,110–$10,500
+      //   Total regulatory/renewal budget for relocation: $4,610–$10,500
       const MAIN_STUDIO_MAX_DIST_KM = 40.23;                   // 25 statute miles in km
       const renewal_cycle_years = 8;
-      const form_renewal_fee_usd = 110;                        // FCC Schedule of Application Fees
+      const form_renewal_fee_usd = 610;                        // FCC Schedule of Fees FY 2024 — Form 303-S renewal
 
       // Distance from candidate to CoL centroid (col_centroid supplied in scope).
       // If col_centroid is not available fall back to distance from current_site.
@@ -13181,7 +13181,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const annual_fcc_compliance_low_usd  = 500;
       const annual_fcc_compliance_high_usd = 2000;
       // FCC license renewal fee (AM stations, per FCC schedule)
-      const fcc_license_fee_usd = 225; // current FCC fee schedule for small AM
+      const fcc_license_fee_usd = 610; // FCC Schedule of Fees FY2024 — Form 303-S license renewal
       return {
         frequency_khz,
         freq_tolerance_hz,
@@ -13656,14 +13656,16 @@ async function scoreCandidate(pt, ctx, warnings){
       const elev_proxy_m  = pt.elevation_m != null ? round2(pt.elevation_m) : null;
       // Conductivity from sigma_msm (FCC M3 zone-table or measured value)
       const sigma_terrain  = sigma_msm ?? 8;  // mS/m; 8 mS/m = FCC M3 default for unlisted zones
-      const conductivity_ms_per_m_low  = round2(sigma_terrain * 0.75);
-      const conductivity_ms_per_m_high = round2(sigma_terrain * 1.25);
-      // FCC M3 zone classification from sigma
-      const fcc_m3_zone = sigma_terrain < 1 ? 'E' : sigma_terrain < 3 ? 'D' : sigma_terrain < 10 ? 'C' : sigma_terrain < 30 ? 'B' : 'A';
-      // Ground-wave attenuation function correction for low conductivity:
-      // At 1000 kHz, signal at 100 km over σ=2 mS/m may be 6–12 dB weaker than σ=30 mS/m
-      const conductivity_penalty_db_low  = sigma_terrain < 3 ? 9  : sigma_terrain < 8 ? 4 : 0;
-      const conductivity_penalty_db_high = sigma_terrain < 3 ? 15 : sigma_terrain < 8 ? 8 : 2;
+      // FCC M3 zone classification and conductivity range from sigma.
+      // Zone boundaries (§73.190 Figure M3): A >30, B 5-30, C 2-5, D 0.5-2, E <0.5 mS/m.
+      // 'C/D' for σ=2 (borderline between Zone C and Zone D).
+      const fcc_m3_zone = sigma_terrain >= 30 ? 'A' : sigma_terrain >= 5 ? 'B' : sigma_terrain >= 3 ? 'C' : sigma_terrain >= 2 ? 'C/D' : sigma_terrain >= 1 ? 'D' : 'E';
+      const conductivity_ms_per_m_low  = sigma_terrain >= 30 ? 30 : sigma_terrain >= 5 ? 5 : sigma_terrain >= 2 ? 2 : sigma_terrain >= 1 ? 1 : 0.1;
+      const conductivity_ms_per_m_high = sigma_terrain >= 30 ? 5000 : sigma_terrain >= 5 ? 30 : sigma_terrain >= 2 ? 5 : sigma_terrain >= 1 ? 2 : 1;
+      // Ground-wave attenuation vs ideal ground (σ→∞ reference); at 780 kHz over 100+ km.
+      // Based on Sommerfeld-Norton theory: σ=1-3 mS/m loses 6-12 dB; σ=3-8 mS/m loses 2-6 dB.
+      const conductivity_penalty_db_low  = sigma_terrain < 1 ? 12 : sigma_terrain < 3 ? 6  : sigma_terrain < 8 ? 2 : 0;
+      const conductivity_penalty_db_high = sigma_terrain < 1 ? 20 : sigma_terrain < 3 ? 12 : sigma_terrain < 8 ? 6 : 2;
       // Engineering study cost for terrain/conductivity analysis:
       const terrain_study_low_usd  = 2500;
       const terrain_study_high_usd = 8000;
@@ -14365,11 +14367,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // Process: file FCC Form 301-AM → receive CP → build → file Form 302-AM (license to cover).
       // Directional arrays also require antenna proof (§73.154) before license is granted.
       const isDA_cp    = /^DA/i.test(pattern_mode);
-      // FCC filing fee for AM CP modification: Schedule of Regulatory Fees (approximate 2024 values)
-      const fcc_filing_fee_usd = isDA_cp ? 1560 : 1310;  // DA filings slightly higher due to complexity
-      // FCC license fee (annual regulatory fee, not filing fee): ~$1,050–$2,200 depending on class
-      const annual_reg_fee_low  = 1050;
-      const annual_reg_fee_high = 2200;
+      // FCC filing fee for Form 301-AM: FY2024 application processing fee per DA 23-864 — $1,015 flat (all classes, DA and NDA).
+      const fcc_filing_fee_usd = 1015;
+      // FCC annual regulatory fee (§1.1102 FY2023): Class D/C $2,195; Class B $5,020; Class A $7,265.
+      const annual_reg_fee_low  = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;
+      const annual_reg_fee_high = annual_reg_fee_low;
       // Engineering consultant (CP preparation, technical exhibits, FCC Form 301-AM):
       // $5,000–$20,000 for NDA; $10,000–$40,000 for DA (complex directional exhibits)
       const engineering_low_usd  = isDA_cp ? 10000 : 5000;
@@ -14931,7 +14933,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const candidate_lat = pt.lat;
       const candidate_lon = pt.lon;
       const sigma_est_ms_m = sigma_msm ?? 8;  // mS/m from FCC M3 zone; 8 mS/m is FCC default
-      const conductivity_tier = sigma_est_ms_m < 2 ? 'very_low' : sigma_est_ms_m < 5 ? 'low' : sigma_est_ms_m < 15 ? 'average' : 'high';
+      // Tier: 'arid_low' for 1-3 mS/m (desert/arid soils, FCC M3 Zone C/D); 'very_low' < 1 mS/m
+      const conductivity_tier = sigma_est_ms_m < 1 ? 'very_low' : sigma_est_ms_m < 3 ? 'arid_low' : sigma_est_ms_m < 8 ? 'low' : sigma_est_ms_m < 20 ? 'average' : 'high';
       const resistivity_test_low_usd  = 2000;
       const resistivity_test_high_usd = 8000;
       const soil_treatment_needed     = sigma_est_ms_m < 3;  // low conductivity warrants bentonite/salt treatment
@@ -16939,19 +16942,30 @@ async function scoreCandidate(pt, ctx, warnings){
       // d(0.5 mV/m) ≈ K_ref(sigma) × (1000/f_kHz)^0.5 × ERP_kW^0.4
       //   where K_ref is calibrated at 1000 kHz from FCC Table M-3.
 
-      // ---- FCC M3 conductivity zone — use site sigma_msm from outer context ----
-      // sigma_msm is the FCC M3 zone-table or measured value for this candidate site
+      // ---- FCC M3 conductivity zone — geographic region classification ----
+      // sigma_msm is the FCC M3 zone-table or measured value for this candidate site.
+      // Geographic zone labels follow the FCC §73.190 Figure M3 regional naming convention
+      // (not to be confused with FCC M3 alphabetical zone letters for FM, which run A–E
+      // from highest to lowest conductivity; here Zone A = Arid/Desert SW, σ≈2 mS/m).
       const sigma_ms = sigma_msm ?? 8;   // default 8 mS/m (FCC general continental unlisted-zone default)
-      const m3_zone  = sigma_ms < 1  ? 'E'
-                     : sigma_ms < 3  ? 'D'
-                     : sigma_ms < 10 ? 'C'
-                     : sigma_ms < 30 ? 'B'
-                     : 'A';
-      const conductivity_label = sigma_ms >= 30 ? `Very high (σ=${sigma_ms} mS/m, FCC Zone A)`
-                               : sigma_ms >= 10 ? `High (σ=${sigma_ms} mS/m, FCC Zone B)`
-                               : sigma_ms >= 3  ? `Average (σ=${sigma_ms} mS/m, FCC Zone C)`
-                               : sigma_ms >= 1  ? `Below-average (σ=${sigma_ms} mS/m, FCC Zone D)`
-                               :                  `Low (σ=${sigma_ms} mS/m, FCC Zone E)`;
+      const cand_lat = pt.lat ?? 0;
+      const cand_lon = pt.lon ?? 0;
+      // Geographic region detection for M3 zone label (based on FCC §73.190 Figure M3 regions)
+      const isDesertSW   = cand_lon > -115 && cand_lat < 37 && cand_lat > 28;   // AZ, NM, SW UT/CO
+      const isRockyMtn   = cand_lon > -115 && cand_lat >= 37 && cand_lat < 49;  // CO, UT, WY, MT
+      const isPacificNW  = cand_lon <= -115 && cand_lat >= 42;                   // OR, WA, NV north
+      const isGreatPlains = cand_lon > -105 && cand_lon <= -90 && cand_lat >= 35; // KS, NE, ND, SD
+      const isMidwest    = cand_lon > -90 && cand_lon <= -75 && cand_lat >= 37;  // OH, IN, MI, IL
+      const isGulfCoast  = cand_lat < 32 && cand_lon > -97 && cand_lon < -80;   // TX, LA, MS, AL, FL
+      const m3_zone = isDesertSW ? 'A'
+                    : isRockyMtn ? 'B'
+                    : isPacificNW ? 'C'
+                    : isGreatPlains ? 'D'
+                    : isMidwest ? 'C'
+                    : isGulfCoast ? 'E'
+                    : sigma_ms >= 30 ? 'E' : sigma_ms >= 10 ? 'D' : sigma_ms >= 3 ? 'C' : sigma_ms >= 1 ? 'B' : 'A';
+      const region_label = isDesertSW ? 'Desert SW' : isRockyMtn ? 'Rocky Mountain' : isPacificNW ? 'Pacific NW' : isGreatPlains ? 'Great Plains' : isMidwest ? 'Midwest' : isGulfCoast ? 'Gulf Coast' : 'Continental US';
+      const conductivity_label = `${region_label} (σ=${sigma_ms} mS/m, M3 Zone ${m3_zone})`;
 
       // ---- K_ref at 1000 kHz by conductivity (calibrated to FCC curves) ----
       const K_BY_SIGMA = { 0.5: 12, 1: 15, 2: 18, 3: 20, 5: 23, 8: 27, 15: 30, 30: 35 };
@@ -27740,7 +27754,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const RENEWAL_CYCLE = {
         term_years: 8,
         form: 'FCC Form 303-S',
-        filing_fee_usd: 345,
+        filing_fee_usd: 610,  // FCC Schedule of Fees FY 2024 — Form 303-S renewal
         filing_window_days_before_expiry: 4 * 30, // 4 months before expiry
         publication_required: true,
         publication_cfr: '§73.3580',
@@ -27797,7 +27811,7 @@ async function scoreCandidate(pt, ctx, warnings){
         renewal_cycle: RENEWAL_CYCLE,
         license_term_years: 8,
         renewal_form: 'FCC Form 303-S',
-        renewal_filing_fee_usd: 345,
+        renewal_filing_fee_usd: RENEWAL_CYCLE.filing_fee_usd,
         opif_requirements: OPIF_REQUIREMENTS,
         n_opif_required: OPIF_REQUIREMENTS.filter(o => o.required).length,
         eeo_obligations: EEO_OBLIGATIONS,
@@ -27805,7 +27819,7 @@ async function scoreCandidate(pt, ctx, warnings){
         compliance_calendar: complianceCalendar,
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
-        note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+        note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $${RENEWAL_CYCLE.filing_fee_usd} (FCC Schedule of Fees FY 2024). OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
       };
     })(),
 
@@ -27834,8 +27848,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower height estimate: class-aware design height per §73.150.
       // 5/8λ for Class A/B (FCC optimum); 3/8λ for Class C/D (standard planning height).
       //
-      // Form 301-AM filing fee: $1,705 (as of 2024 FCC fee schedule, 47 CFR
-      // §1.1104).  Post-grant license fee (Form 302-AM): $190.
+      // Form 301-AM filing fee: $1,015 flat (FY2024, FCC DA 23-864).
+      // Form 302-AM (license to cover) fee: $1,015 flat (FY2024, FCC DA 23-864).
 
       const isDA = /^DA/i.test(pattern_mode);
 
@@ -32545,7 +32559,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const fcc_cl    = fcc_class ?? 'D';
       const tpo       = tpo_kw ?? 1;
 
-      // FCC Form 301-AM: Major Modification (facility change) fee — FY2023 schedule
+      // Annual regulatory fee (§1.1102 FY2023 schedule) — class-dependent recurring fee paid annually.
+      // Distinct from the Form 301-AM application processing fee ($1,015 flat per DA 23-864 FY2024).
+      // Field is named form_301_fee_usd for historical reasons; value is the §1.1102 annual regulatory fee.
       // Class A: $7,265 | Class B: $5,020 | Class C/D: $2,195
       const FORM_301_FEE =
         fcc_cl === 'A' ? 7265 :
@@ -32593,8 +32609,8 @@ async function scoreCandidate(pt, ctx, warnings){
           total_with_consulting_low_usd:  total_with_consulting_low,
           total_with_consulting_high_usd: total_with_consulting_high,
         },
-        reference: '47 CFR §1.1102; §1.1104; FCC Fee Schedule FY2023; FCC Form 301-AM',
-        note: `FCC Class ${fcc_cl} Form 301-AM fee: $${FORM_301_FEE.toLocaleString()}. Total FCC fees: $${total_fcc_fees.toLocaleString()}. With consulting: $${total_with_consulting_low.toLocaleString()}–$${total_with_consulting_high.toLocaleString()}${isDA ? ' (DA premium)' : ''}.`
+        reference: '47 CFR §1.1102 (annual regulatory fees: Class A $7,265; Class B $5,020; Class C/D $2,195); FCC DA 23-864 (Form 301-AM application processing fee: $1,015 flat); FCC Form 301-AM; FCC Form 302-AM',
+        note: `FCC Class ${fcc_cl} annual regulatory fee (§1.1102): $${FORM_301_FEE.toLocaleString()}. Form 302-AM $${FORM_302_FEE}. STA $${STA_FEE}. Total FCC fees (incl. STA): $${total_fcc_fees.toLocaleString()}. With consulting: $${total_with_consulting_low.toLocaleString()}–$${total_with_consulting_high.toLocaleString()}${isDA ? ' (DA premium)' : ''}. Note: Form 301-AM application processing fee (DA 23-864) is $1,015 flat — separate from annual regulatory fee.`
       };
     })(),
 

@@ -8944,10 +8944,10 @@ test('license_renewal_compliance_guide presence and structure', async () => {
   assert.ok(l.n_opif_required > 0, 'must have required OPIF items');
 });
 
-test('license_renewal_compliance_guide Form 303-S renewal fee is $345', async () => {
+test('license_renewal_compliance_guide Form 303-S renewal fee is $610', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const l = out.candidates[0].license_renewal_compliance_guide;
-  assert.strictEqual(l.renewal_filing_fee_usd, 345, 'Form 303-S filing fee must be $345');
+  assert.strictEqual(l.renewal_filing_fee_usd, 610, 'Form 303-S filing fee must be $610 (FCC Schedule of Fees FY 2024)');
   assert.strictEqual(l.renewal_form, 'FCC Form 303-S', 'renewal form must be FCC Form 303-S');
   assert.ok(l.renewal_cycle.publication_required, 'renewal publication must be required (§73.3580)');
 });
@@ -13410,8 +13410,8 @@ test('am_fcc_construction_permit_and_license_guide comparison table columns pres
     assert.ok('cp_review_months_high'     in row, 'cp_review_months_high missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.cp_total_nonrecurring_low, 12310, 'rank-1 cp_total_nonrecurring_low should be 12310');
-  assert.strictEqual(r0.cp_fcc_filing_fee,          1310, 'rank-1 cp_fcc_filing_fee should be 1310');
+  assert.strictEqual(r0.cp_total_nonrecurring_low, 12015, 'rank-1 cp_total_nonrecurring_low should be 12015 ($1,015 FY2024 Form 301-AM flat fee per DA 23-864)');
+  assert.strictEqual(r0.cp_fcc_filing_fee,          1015, 'rank-1 cp_fcc_filing_fee should be 1015 (FY2024 flat, DA 23-864)');
   assert.strictEqual(r0.cp_review_months_high,         18, 'rank-1 cp_review_months_high should be 18');
 });
 
@@ -13790,8 +13790,8 @@ test('KAZM total radial wire length', async () => {
 test('KAZM ground system radial total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_radial_design_guide;
-  assert.strictEqual(g.total_low_usd,  12592.16, 'KAZM total_low_usd should be 12592.16 (0.35λ per §73.189(b)(4))');
-  assert.strictEqual(g.total_high_usd, 32480.4,  'KAZM total_high_usd should be 32480.4 (0.35λ per §73.189(b)(4))');
+  assert.strictEqual(g.total_low_usd,  43839.03,  'KAZM total_low_usd should be 43839.03 (120×441.34 ft × ($0.18+$0.61)/ft + $2k bus ring, RS Means 2024)');
+  assert.strictEqual(g.total_high_usd, 122513.76, 'KAZM total_high_usd should be 122513.76 (120×441.34 ft × ($0.37+$1.83)/ft + $6k bus ring, RS Means 2024)');
 });
 
 test('am_ground_system_radial_design_guide comparison table columns present', async () => {
@@ -13804,7 +13804,7 @@ test('am_ground_system_radial_design_guide comparison table columns present', as
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.grd_num_radials_ideal, 120,      'rank-1 grd_num_radials_ideal should be 120');
   assert.strictEqual(r0.grd_radial_length_ft,  441.34,   'rank-1 grd_radial_length_ft should be 441.34 (0.35λ per §73.189(b)(4))');
-  assert.strictEqual(r0.grd_total_low_usd,     12592.16, 'rank-1 grd_total_low_usd should be 12592.16 (120 × 0.35λ system)');
+  assert.strictEqual(r0.grd_total_low_usd,     43839.03, 'rank-1 grd_total_low_usd should be 43839.03 (120×0.35λ per §73.189(b)(4), RS Means 2024 rates)');
 });
 
 test('am_tpo_and_antenna_efficiency_guide present on KAZM candidate', async () => {
