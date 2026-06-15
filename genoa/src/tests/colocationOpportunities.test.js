@@ -4035,7 +4035,7 @@ test('am_fcc_application_filing_cost_and_timeline_guide present across colocatio
   for (const c of out.candidates) {
     const g = c.am_fcc_application_filing_cost_and_timeline_guide;
     assert.ok(g !== undefined && g !== null, `candidate missing am_fcc_application_filing_cost_and_timeline_guide`);
-    assert.strictEqual(g.total_fcc_fees, 2030, 'total_fcc_fees must be $2,030');
+    assert.strictEqual(g.total_fcc_fees, 1450, 'total_fcc_fees must be $1,450 (301-AM $1,015 + 302-AM $435 per §1.1102 FY2024)');
     assert.ok(g.filing_sequence.length >= 6, 'filing_sequence must have >= 6 steps');
     assert.ok(g.total_timeline_days_low > 0, 'total_timeline_days_low must be positive');
   }
