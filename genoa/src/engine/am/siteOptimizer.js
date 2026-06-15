@@ -3819,23 +3819,23 @@ async function scoreCandidate(pt, ctx, warnings){
       const line_items = [];
 
       // 1. FCC Form 301-AM (construction permit application)
-      // FY2024 application processing fee per FCC DA 23-864: $1,015 flat (all classes).
+      // Site relocation = major change under §73.3533 → Form 301-AM major change CP fee: $4,200 (§1.1102 FY2024).
       // Distinct from the annual regulatory fee (§1.1102): Class A $7,265, B $5,020, C/D $2,195.
-      const fcc_301_fee = 1015;
+      const fcc_301_fee = 4200;
       line_items.push({
         id: 'FCC_FORM_301',
-        label: 'FCC Form 301-AM application processing fee',
+        label: 'FCC Form 301-AM major change CP fee (site relocation)',
         low_usd: fcc_301_fee, high_usd: fcc_301_fee,
-        note: `FCC DA 23-864 (FY2024): $1,015 application processing fee — flat, all AM classes. Separate from annual §1.1102 regulatory fees.`
+        note: `Form 301-AM major change CP per §1.1102 FY2024: $4,200 flat (all AM classes). Site relocation under §73.3533 is always a major change. Separate from annual §1.1102 regulatory fees.`
       });
 
       // 2. FCC Form 302-AM (license to cover)
-      // FY2024 application processing fee per FCC DA 23-864: $1,015 flat.
+      // FY2024 fee per §1.1102: $435 flat (all classes).
       line_items.push({
         id: 'FCC_FORM_302',
         label: 'FCC Form 302-AM license-to-cover processing fee',
-        low_usd: 1015, high_usd: 1015,
-        note: 'FCC DA 23-864 (FY2024): $1,015 application processing fee; filed after construction completion.'
+        low_usd: 435, high_usd: 435,
+        note: 'Form 302-AM (license to cover) per §1.1102 FY2024: $435 flat (all classes); filed after construction completion.'
       });
 
       // 3. ASR registration (Form 854)
@@ -9099,13 +9099,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //     notice to file.  Contested applications take 12–24+ months.
       //   §73.3598: Period of construction — licensee has 3 years from CP issuance
       //     to complete construction and file for license. Extensions possible for cause.
-      //   47 CFR §1.1102 / FCC FY 2024 Fee Schedule (DA 23-864):
+      //   47 CFR §1.1102 / FCC FY 2024 Fee Schedule:
       //     AM station application fees (FY2024):
-      //       Form 301-AM (major modification CP): $1,015 (minor/standard change; $4,200 major change)
+      //       Form 301-AM major change CP (site relocation under §73.3533): $4,200
       //       Form 302-AM (license to cover CP): $435 per §1.1102 FY2024
       //       Form 303-S (renewal of license, not applicable to relocation)
       //     Note: FCC fee schedule updates annually in October.
-      //     Actual FY2024 fee per DA 23-864 (Sep 2023): 301-AM $1,015; 302-AM $435.
       //   §73.3571(e): Non-substantial (minor) modification — faster processing
       //     (30–60 days) vs. major modification (6–18 months).
       //   §73.3580: Public notice requirement — 30-day petition window triggered
@@ -9129,8 +9128,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA = /^DA/i.test(pattern_mode);
 
-      // FCC filing fees (FY2024 per §1.1102 / DA 23-864)
-      const fee_301_am  = 1015;   // Form 301-AM standard modification CP
+      // FCC filing fees (FY2024 per §1.1102)
+      const fee_301_am  = 4200;   // Form 301-AM major change CP (site relocation under §73.3533)
       const fee_302_am  = 435;    // Form 302-AM license to cover
       const total_fcc_fees = fee_301_am + fee_302_am;
 
@@ -14369,14 +14368,14 @@ async function scoreCandidate(pt, ctx, warnings){
       // Process: file FCC Form 301-AM → receive CP → build → file Form 302-AM (license to cover).
       // Directional arrays also require antenna proof (§73.154) before license is granted.
       const isDA_cp    = /^DA/i.test(pattern_mode);
-      // FCC Form 301-AM application processing fee: FY2024 flat rate per DA 23-864 — $1,015 (all classes, DA and NDA).
-      const form_301_am_usd = 1015;
+      // Form 301-AM major change CP fee per §1.1102 FY2024: $4,200 (site relocation = major change under §73.3533).
+      const form_301_am_usd = 4200;
       // FCC Form 854 ASR tower registration fee: $175 (required when tower ≥ 200 ft per §17.7)
       const fcc_asr_fee_usd = 175;
       // FCC miscellaneous CP-related government costs (LMS/CORES filing, EAS registration): $120
       const fcc_misc_usd = 120;
       // Total FCC government filing fees for the CP process
-      const fcc_filing_fee_usd = form_301_am_usd + fcc_asr_fee_usd + fcc_misc_usd; // $1,310
+      const fcc_filing_fee_usd = form_301_am_usd + fcc_asr_fee_usd + fcc_misc_usd; // $4,495
       // FCC annual regulatory fee (§1.1102 FY2024): Class D/C $2,195; Class B $5,020; Class A $7,265.
       const annual_reg_fee_low  = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;
       const annual_reg_fee_high = annual_reg_fee_low;
@@ -14404,7 +14403,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Total including ALL FCC government fees ($1,310)
       const total_nonrecurring_low_usd  = round2(fcc_filing_fee_usd + engineering_low_usd  + attorney_low_usd  + nepa_low_usd  + section106_low_usd);
       const total_nonrecurring_high_usd = round2(fcc_filing_fee_usd + engineering_high_usd + attorney_high_usd + nepa_high_usd + section106_high_usd);
-      // Comparison-table total uses only the Form 301-AM fee ($1,015) — excludes ASR/misc FCC costs
+      // Comparison-table total uses only the Form 301-AM major change CP fee ($4,200) — excludes ASR/misc FCC costs
       const form_301_total_low_usd  = round2(form_301_am_usd + engineering_low_usd  + attorney_low_usd  + nepa_low_usd  + section106_low_usd);
       return {
         frequency_khz, fcc_class, pattern_mode,
@@ -29292,10 +29291,10 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       // ---- FCC filing fees (Form 302-AM) ----
-      // FCC DA 23-864 (FY2024): Form 302-AM (license to cover) flat fee $1,015, all classes.
+      // §1.1102 FY2024: Form 302-AM (license to cover) flat fee $435, all classes.
       // STA (Form 700): $75 filing fee
       const fees = {
-        ltc_form_302_am_usd: 1015,
+        ltc_form_302_am_usd: 435,
         sta_form_700_usd:     75,
         total_ltc_soft_cost_low_usd:  3500,   // Engineering report + filing preparation
         total_ltc_soft_cost_high_usd: isDA_ltc ? 12000 : 6000  // DA proof-of-performance adds cost

@@ -13382,15 +13382,15 @@ test('KAZM NDA CP: correct FCC fee and engineering cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
   assert.strictEqual(g.isDA,              false, 'KAZM pattern_mode NDA so isDA should be false');
-  assert.strictEqual(g.fcc_filing_fee_usd, 1310, 'NDA CP FCC fee should be 1310');
+  assert.strictEqual(g.fcc_filing_fee_usd, 4495, 'NDA CP FCC fee should be 4495 (Form 301-AM $4,200 + ASR $175 + misc $120)');
   assert.strictEqual(g.engineering_low_usd, 5000, 'NDA engineering low should be 5000');
 });
 
 test('KAZM CP total nonrecurring cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
-  assert.strictEqual(g.total_nonrecurring_low_usd,  12310, 'KAZM total_nonrecurring_low should be 12310');
-  assert.strictEqual(g.total_nonrecurring_high_usd, 49310, 'KAZM total_nonrecurring_high should be 49310');
+  assert.strictEqual(g.total_nonrecurring_low_usd,  15495, 'KAZM total_nonrecurring_low should be 15495 (FCC $4,495 + eng $5k + atty $3k + NEPA $2k + §106 $1k)');
+  assert.strictEqual(g.total_nonrecurring_high_usd, 52495, 'KAZM total_nonrecurring_high should be 52495 (FCC $4,495 + eng $20k + atty $15k + NEPA $8k + §106 $5k)');
 });
 
 test('KAZM CP timeline values correct', async () => {
@@ -13410,8 +13410,8 @@ test('am_fcc_construction_permit_and_license_guide comparison table columns pres
     assert.ok('cp_review_months_high'     in row, 'cp_review_months_high missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.cp_total_nonrecurring_low, 12015, 'rank-1 cp_total_nonrecurring_low should be 12015 ($1,015 FY2024 Form 301-AM flat fee per DA 23-864)');
-  assert.strictEqual(r0.cp_fcc_filing_fee,          1015, 'rank-1 cp_fcc_filing_fee should be 1015 (FY2024 flat, DA 23-864)');
+  assert.strictEqual(r0.cp_total_nonrecurring_low, 15200, 'rank-1 cp_total_nonrecurring_low should be 15200 (Form 301-AM $4,200 major CP + eng $5k + atty $3k + NEPA $2k + §106 $1k)');
+  assert.strictEqual(r0.cp_fcc_filing_fee,          4200, 'rank-1 cp_fcc_filing_fee should be 4200 (Form 301-AM major change CP per §1.1102 FY2024)');
   assert.strictEqual(r0.cp_review_months_high,         18, 'rank-1 cp_review_months_high should be 18');
 });
 
@@ -16155,12 +16155,12 @@ test('KAZM 780 kHz: am_fcc_application_filing_cost_and_timeline_guide present on
   }
 });
 
-test('KAZM NDA: FCC fees are $1,450 and NDA flag is false', async () => {
+test('KAZM NDA: FCC fees are $4,635 and NDA flag is false', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_application_filing_cost_and_timeline_guide;
-  assert.strictEqual(g.fee_form_301_am, 1015, 'Form 301-AM fee must be $1,015 (FY2024 §1.1102)');
+  assert.strictEqual(g.fee_form_301_am, 4200, 'Form 301-AM major change CP fee must be $4,200 (§1.1102 FY2024; relocation = major change under §73.3533)');
   assert.strictEqual(g.fee_form_302_am, 435, 'Form 302-AM fee must be $435 (FY2024 §1.1102)');
-  assert.strictEqual(g.total_fcc_fees, 1450, 'total_fcc_fees must be $1,450 (301-AM $1,015 + 302-AM $435)');
+  assert.strictEqual(g.total_fcc_fees, 4635, 'total_fcc_fees must be $4,635 (301-AM $4,200 + 302-AM $435)');
   assert.strictEqual(g.is_directional, false, 'NDA pattern must flag is_directional false');
 });
 
@@ -16189,7 +16189,7 @@ test('candidate_comparison_table fcc columns present and valid for KAZM', async 
     assert.ok('fcc_total_timeline_days_low' in row, 'fcc_total_timeline_days_low missing');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.fcc_total_fcc_fees, 1450, 'fcc_total_fcc_fees must be $1,450 (301-AM $1,015 + 302-AM $435 per §1.1102 FY2024)');
+  assert.strictEqual(r0.fcc_total_fcc_fees, 4635, 'fcc_total_fcc_fees must be $4,635 (301-AM $4,200 major change CP + 302-AM $435 per §1.1102 FY2024)');
   assert.strictEqual(r0.fcc_processing_days_low, 180, 'fcc_processing_days_low must be 180');
 });
 
