@@ -151,7 +151,7 @@ export function amRadialTable({
             sigma_source:   src,
             dielectric:     Number(r.inputs.dielectric),
             frequency_khz_grid: Number(r.inputs.frequency_khz_grid),
-            regulation:     '47 CFR §73.184 / Figure M3 (σ ∈ {1..8} mS/m integer grid)'
+            regulation:     '47 CFR §73.184 (groundwave field strength graphs); §73.190 Figure M3 (σ ∈ {1..8} mS/m integer grid)'
           };
         }
       } catch (e){
@@ -238,7 +238,7 @@ export function amGroundConstants({ frequency_khz, conductivity_msm, dielectric 
     sigma_source:   src,
     dielectric:     Number(dielectric),
     frequency_khz_grid: Number.isFinite(Number(frequency_khz)) ? Math.round(Number(frequency_khz) / 10) * 10 : null,
-    regulation:     '47 CFR §73.184 / Figure M3 (σ ∈ {1..8} mS/m integer grid)'
+    regulation:     '47 CFR §73.184 (groundwave field strength graphs); §73.190 Figure M3 (σ ∈ {1..8} mS/m integer grid)'
   };
 }
 

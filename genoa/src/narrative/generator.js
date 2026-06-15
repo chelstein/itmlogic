@@ -233,7 +233,7 @@ function section_inputs(s){
          ? `RMS field @1 km: ${fmt(s.rms_field_1km)} mV/m (filed)`
          : `RMS field @1 km: — (derived from TPO + pattern)`)
       : `HAAT (input):    ${fmt(s.haat_m_input)} m`,
-    // AM has no HAAT (groundwave propagation per §73.184 Figure M3 is
+    // AM has no HAAT (groundwave propagation per §73.184 / §73.190 Figure M3 is
     // distance/conductivity/frequency-keyed, not antenna-height-keyed).
     // Render an explicit n/a label so the standard summary keeps the
     // same shape across services; the txt exporter already does this.

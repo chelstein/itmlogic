@@ -66,7 +66,7 @@ export function buildMethodologySection(exhibit){
   const engineLabel = mv.curve_engine
     || (isAm ? 'gwave.js (vendored FCC §73.184 grid)' : '—');
   // For AM exhibits, HAAT-along interpolation isn't applicable (the
-  // engine reads §73.184 Figure M3 curves keyed on σ × distance), and
+  // engine reads §73.184 curves keyed on §73.190 Figure M3 σ × distance), and
   // there's no terrain elevation model in the pipeline either.  Show
   // band-appropriate rows instead of "n/a" / "—" sprawl.
   const baseRows = [
@@ -81,7 +81,7 @@ export function buildMethodologySection(exhibit){
     baseRows.push(['Interpolation — field', ip.along_field || mv.interpolation || '—']);
   }
   const heightRows = isAm
-    ? [['Interpolation — σ',       'bivariate over (σ × distance) per §73.184 Figure M3']]
+    ? [['Interpolation — σ',       'bivariate over (σ × distance) per §73.184 (groundwave graphs) / §73.190 Figure M3 conductivity']]
     : [['Interpolation — HAAT',    ip.along_haat || '—']];
   const terrainRows = isAm
     ? []        // AM doesn't use a DEM; skip the rows entirely

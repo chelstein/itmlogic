@@ -1189,7 +1189,7 @@ const DEMO_RESULT = {
         min_tpo_for_col_kw: null,
         upgrade_path: [
           'No daytime power upgrade available — Class D maximum is 5 kW per §73.21(e)',
-          'Nighttime upgrade path: 0 → 0.5 kW (clear-channel Class D nighttime maximum per §73.24)',
+          'Nighttime upgrade path: 0 → 0.5 kW (clear-channel Class D nighttime maximum per §73.21(b)(2))',
           'DA-N nighttime pattern required for nighttime authorization (§73.150 + §73.182 NIF study)'
         ],
         upgrade_feasibility: 'NONE',
@@ -1796,11 +1796,11 @@ const DEMO_RESULT = {
           { type: 'SOLID_STATE', label: 'Modern solid-state',   example_models: 'Nautel NX5, GatesAir FAX-5',  efficiency_low_pct: 65, efficiency_high_pct: 75, _efficiency_source: 'Nautel NX5 datasheet: ~75% overall efficiency at rated power (nautel.com). GatesAir Flexiva FAX-5 datasheet: ~74% efficiency (gatesair.com). Range 65–75% accounts for partial-load derating and installation variation.', input_power_low_kw: 6.67,  input_power_high_kw: 7.69,  hvac_load_est_kw: 0.46, total_facility_low_kw: 8.00,  total_facility_high_kw: 9.25, annual_kwh_low: 70080, annual_kwh_high: 81030, annual_cost_low_usd: 7008, annual_cost_high_usd: 12965 }
         ],
         recommended_type: 'SOLID_STATE',
-        solid_state_annual_cost_low_usd: 7280, solid_state_annual_cost_high_usd: 12965,
-        annual_savings_vs_tube_usd: 6337, solid_state_tx_upgrade_cost_usd: 18000, upgrade_payback_years: 2.8,
+        solid_state_annual_cost_low_usd: 7008, solid_state_annual_cost_high_usd: 12965,
+        annual_savings_vs_tube_usd: 5376, solid_state_tx_upgrade_cost_usd: 18000, upgrade_payback_years: 3.4,
         power_factor_uncorrected: 0.78, apparent_power_kva: 10.65,
         reference: '47 CFR §73.1590; DOE EIA Commercial Electricity Rates (2024); Nautel NX5 Technical Specification Sheet (Rev 2024, nautel.com); GatesAir Flexiva FAX-5 Datasheet (gatesair.com); ITU-R BS.2101',
-        note: '780 kHz 5 kW facility (modern solid-state): total load ~8.00–9.25 kW; estimated annual electricity $7,008–$12,965 at 2024 commercial rates (DOE EIA avg $0.10–$0.16/kWh commercial). Tube-to-solid-state upgrade saves ~$6,100/yr; payback ≈ 3 yr on a $18,000 transmitter. Efficiency 65–75% per Nautel/GatesAir published datasheets.'
+        note: '780 kHz 5 kW facility (modern solid-state): total load ~8.00–9.25 kW; estimated annual electricity $7,008–$12,965 at 2024 commercial rates (DOE EIA avg $0.10–$0.16/kWh commercial). Tube-to-solid-state upgrade saves ~$5,400/yr (avg of low/high cost scenarios); payback ≈ 3.4 yr on a $18,000 transmitter. Efficiency 65–75% per Nautel/GatesAir published datasheets.'
       },
       antenna_base_impedance_and_atu_design_guide: {
         frequency_khz: 780, f_hz: 780000, lambda_m: 384.62, lambda_quarter_m: 96.15, tpo_kw: 5, pattern_mode: 'NDA',
@@ -1875,7 +1875,7 @@ const DEMO_RESULT = {
           { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$435', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b))' }
         ],
         reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.3598 (CP construction period/lapse); §1.1102 (filing fees); FCC Form 301; FCC Form 302-AM',
-        note: '780 kHz Class D (NDA) — current 5 kW TPO. No daytime upgrade available — 5 kW IS the Class D ceiling per §73.21(e). Nighttime upgrade path: 0 → 0.5 kW maximum (Class D clear channel nighttime ceiling per §73.24); requires DA-N directional antenna pattern + §73.182 NIF skywave study. Total project cost for nighttime authorization: $31,135–$65,135.'
+        note: '780 kHz Class D (NDA) — current 5 kW TPO. No daytime upgrade available — 5 kW IS the Class D ceiling per §73.21(e). Nighttime upgrade path: 0 → 0.5 kW maximum (Class D clear channel nighttime ceiling per §73.21(b)(2)); requires DA-N directional antenna pattern + §73.182 NIF skywave study. Total project cost for nighttime authorization: $31,135–$65,135.'
       },
       am_coverage_optimization_by_tower_height_guide: {
         frequency_khz: 780, wavelength_m: 384.62,
@@ -3150,7 +3150,7 @@ const DEMO_RESULT = {
       nighttime_pattern_switching_guide: {
         fcc_class: 'D', frequency_khz: 780, pattern_mode: 'NDA',
         is_clear_channel: true, is_da_pattern: false,
-        nighttime_obligation: { power_reduction_required: true, pattern_switch_required: false, night_operation: 'Secondary to Class A; nighttime power reduced or DA-N required to protect dominant station', cfr: '§73.24' },
+        nighttime_obligation: { power_reduction_required: true, pattern_switch_required: false, night_operation: 'Secondary to Class A; nighttime power reduced to ≤0.5 kW or DA-N required to protect dominant station', cfr: '§73.21(b)(2)' },
         power_reduction_required: true, pattern_switch_required: false,
         operating_schedule: [
           { id: 'SUNRISE_TRANSITION', label: 'Sunrise pattern switch (NDA → DA-D or power increase)', cfr: '§73.99(a)', trigger: 'Local sunrise at transmitter site ± 30 min', automation: 'ASID timer or automatic transmission system' },
@@ -4467,10 +4467,10 @@ const DEMO_RESULT = {
         eligibility: 'RESTRICTED',
         nif_complexity: 'VERY_HIGH',
         protection_class: 'Clear channel — Class A dominant (§73.25)',
-        key_constraint: '780 kHz clear channel + US-MX treaty zone: FCC IB pre-coordination required before any nighttime operation. FCC Class D limit is 0.5 kW per §73.24; treaty coordination may impose further pattern or power restrictions.',
+        key_constraint: '780 kHz clear channel + US-MX treaty zone: FCC IB pre-coordination required before any nighttime operation. FCC Class D nighttime limit is 0.5 kW per §73.21(b)(2); treaty coordination may impose further pattern or power restrictions.',
         nighttime_power_max_kw: 0.5,
         nif_study_required: true,
-        rule: '47 CFR §73.24 / §73.182 / §73.25'
+        rule: '47 CFR §73.21(b)(2) / §73.182 / §73.25'
       },
       da_gain_potential: {
         applicable: true,

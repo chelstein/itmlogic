@@ -13678,7 +13678,7 @@ async function scoreCandidate(pt, ctx, warnings){
         conductivity_penalty_db_low, conductivity_penalty_db_high,
         terrain_study_low_usd, terrain_study_high_usd,
         study_tools,
-        reference: '47 CFR §73.184 (AM groundwave propagation method); §73.190 (AM groundwave conductivity certification); ITU-R P.368 (ground-wave propagation curves); FCC M3 ground conductivity map; USGS National Elevation Dataset; Rotheram (1992) terrain diffraction correction; ITU-R P.526 (diffraction loss)',
+        reference: '47 CFR §73.184 (AM groundwave propagation method); §73.190 (AM groundwave conductivity certification); §73.190 Figure M3 (ground conductivity map); ITU-R P.368 (ground-wave propagation curves); USGS National Elevation Dataset; Rotheram (1992) terrain diffraction correction; ITU-R P.526 (diffraction loss)',
         note: `Candidate (${round2(candidate_lat)}°N, ${Math.abs(round2(candidate_lon))}°W): σ≈${sigma_terrain} mS/m (FCC M3 zone ${fcc_m3_zone}); conductivity range est. ${conductivity_ms_per_m_low}–${conductivity_ms_per_m_high} mS/m; penalty ${conductivity_penalty_db_low}–${conductivity_penalty_db_high} dB vs. ideal ground.${elev_proxy_m != null ? ` Elevation: ${elev_proxy_m} m.` : ''} Engineering study: $${terrain_study_low_usd.toLocaleString()}–$${terrain_study_high_usd.toLocaleString()}`
       };
     })(),
@@ -27678,7 +27678,7 @@ async function scoreCandidate(pt, ctx, warnings){
         A: { power_reduction_required: false, pattern_switch_required: false, night_operation: 'Full power; nighttime skywave protection as dominant Class A station', cfr: '§73.21' },
         B: { power_reduction_required: true, pattern_switch_required: isDA_ntps, night_operation: 'Must reduce power and/or switch to DA-N; see licensed nighttime ERP in CP', cfr: '§73.21(b)' },
         C: { power_reduction_required: false, pattern_switch_required: false, night_operation: 'Local channel; full power at all times; no nighttime protection required', cfr: '§73.23' },
-        D: { power_reduction_required: isClearCh, pattern_switch_required: isDA_ntps && isClearCh, night_operation: isClearCh ? 'Secondary to Class A; nighttime power reduced or DA-N required to protect dominant station' : 'Regional operation; check licensed night authorization', cfr: '§73.24' }
+        D: { power_reduction_required: isClearCh, pattern_switch_required: isDA_ntps && isClearCh, night_operation: isClearCh ? 'Secondary to Class A; nighttime power reduced to ≤0.5 kW or DA-N required to protect dominant station' : 'Regional operation; check licensed night authorization', cfr: '§73.21(b)(2)' }
       };
 
       const myObligation = NIGHTTIME_OBLIGATIONS[fcc_class.toUpperCase()] ?? NIGHTTIME_OBLIGATIONS['D'];

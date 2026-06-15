@@ -41,7 +41,7 @@ export function buildFacilityParametersSection(exhibit){
     : '—';
 
   // AM stations use ground conductivity (σ, mS/m), not HAAT — the
-  // groundwave engine reads §73.184 Figure M3 curves keyed on σ.  FM/FX
+  // groundwave engine reads §73.184 curves keyed on §73.190 Figure M3 σ.  FM/FX
   // stations use HAAT per §73.313.  Building one section that prints
   // both fields for both services would just be lying.
   const isAm = String(s.service || '').toUpperCase() === 'AM';

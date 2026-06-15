@@ -227,7 +227,7 @@ export const AM_NIGHTTIME_BASIS = Object.freeze([
 export const AM_DAYTIME_BASIS = Object.freeze([
   FCC_CITES.AM_ALLOCATION_STANDARDS,    // §73.182 — classes
   FCC_CITES.AM_GROUNDWAVE_SIGNALS,      // §73.183 — groundwave definitions
-  FCC_CITES.AM_GROUNDWAVE_GRAPHS,       // §73.184 — Figure M3
+  FCC_CITES.AM_GROUNDWAVE_GRAPHS,       // §73.184 — groundwave graphs (uses §73.190 Figure M3 conductivity)
   FCC_CITES.AM_INTERFERING_SIGNAL,      // §73.185 — interfering signal math
   FCC_CITES.AM_DAYTIME_RADIATION_LIMIT  // §73.187 — daytime-radiation limits
 ]);

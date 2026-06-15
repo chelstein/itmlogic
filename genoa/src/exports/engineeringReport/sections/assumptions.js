@@ -36,7 +36,7 @@ export function buildAssumptionsSection(exhibit){
   // Coordinate / propagation method line — service-specific second sentence.
   const coordLine = `Coordinate datum is ${datum} decimal degrees.  All spacing distances are great-circle per §73.208 using the Karney 2013 WGS-84 geodesic.`;
   const propLine  = isAm
-    ? `Field-strength predictions follow ${propMethod}.  Contour distances are computed by §73.184 grid inversion (bivariate σ × distance interpolation per Figure M3) at ${radialStep}° radial steps.`
+    ? `Field-strength predictions follow ${propMethod}.  Contour distances are computed by §73.184 grid inversion (bivariate σ × distance interpolation per §73.190 Figure M3) at ${radialStep}° radial steps.`
     : (function(){
         const interpField = ip.along_field || 'logarithmic';
         const interpHaat  = ip.along_haat  || 'linear';
