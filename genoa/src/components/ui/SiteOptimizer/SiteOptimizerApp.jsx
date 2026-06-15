@@ -1121,11 +1121,11 @@ const DEMO_RESULT = {
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
         range_label: '$53,000 – $112,000',
-        total_soft_cost_low_usd: 53405, total_soft_cost_high_usd: 112405,
+        total_soft_cost_low_usd: 52950, total_soft_cost_high_usd: 111950,
         line_items: [
           { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 175, cost_high_usd: 175 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
@@ -1319,7 +1319,7 @@ const DEMO_RESULT = {
           { id: 'TRANSMITTER', label: 'Transmitter (5 kW)', low_usd: 25000, high_usd: 100000, note: 'Primary + backup transmitters; includes installation and initial alignment' },
           { id: 'TRANSMISSION_LINE', label: 'Transmission line + ATU', low_usd: 6000, high_usd: 25000, note: 'Heliax from transmitter building to tower base + antenna tuning unit' },
           { id: 'ENGINEERING', label: 'Broadcast + structural engineering', low_usd: 20000, high_usd: 70000, note: '§73.182 NIF study, §73.154 proof design, structural PE' },
-          { id: 'FCC_FILING', label: 'FCC Form 301-AM filing + fees', low_usd: 9000, high_usd: 22000, note: 'FCC application fee $6,465 (major change CP per §1.1102) + FCC counsel / legal costs ($2,500–$15,500)' },
+          { id: 'FCC_FILING', label: 'FCC Form 301-AM filing + fees', low_usd: 4695, high_usd: 17695, note: 'FCC application processing fee $2,195 (Class D §1.1102 FY2023 regulatory fee) + FCC counsel / legal costs ($2,500–$15,500)' },
           { id: 'ENVIRONMENTAL', label: 'NEPA/NHPA environmental', low_usd: 5000, high_usd: 30000, note: 'NEPA desktop, §106 SHPO consultation, EA if required' },
           { id: 'SITE_PREP', label: 'Site preparation', low_usd: 30000, high_usd: 120000, note: 'Grading, access road, fence, electrical service, transmitter building' },
           { id: 'CONTINGENCY', label: 'Contingency (15%)', low_usd: 26250, high_usd: 96750, note: 'Industry standard 15% contingency on hard construction costs' }
@@ -1448,8 +1448,8 @@ const DEMO_RESULT = {
             new_power_max_kw: 50, new_protected_contour_mvm: 0.5, new_nif_study_required: true,
             nif_study_type: 'FULL_CLEAR_CHANNEL_NIF', form: 'FCC Form 301-AM (Major Change)',
             timeline_months_optimistic: 18, timeline_months_conservative: 36,
-            filing_fee_usd_approx: 6465, engineering_cost_usd_approx_low: 15000, engineering_cost_usd_approx_high: 50000,
-            note: 'Class D→B upgrade is a major modification. Must demonstrate Class B §73.37 spacing in all directions.' }
+            filing_fee_usd_approx: 5020, engineering_cost_usd_approx_low: 15000, engineering_cost_usd_approx_high: 50000,
+            note: 'Class D→B upgrade is a major modification. Must demonstrate Class B §73.37 spacing in all directions. FCC fee: $5,020 (Class B §1.1102 FY2023).' }
         ],
         upgrade_filing_steps: [
           { step: 1, action: 'Engineering study', detail: 'Full §73.37 spacing analysis at the TARGET class. Spacing failure ends the process.', estimated_days: 15 },
@@ -1750,7 +1750,7 @@ const DEMO_RESULT = {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
         is_directional: false, is_clear_channel: true, tower_height_ft: 315.5, asr_required: true,
         n_exhibits_total: 24, n_exhibits_required: 22, n_exhibits_da_specific: 0,
-        filing_fee_usd: 6465, filing_system: 'FCC LMS (Licensing Management System)',
+        filing_fee_usd: 2195, filing_system: 'FCC LMS (Licensing Management System)',
         n_deficiency_risks: 5,
         deficiency_triggers: [
           { rank: 1, issue: 'Missing nighttime skywave analysis', cfr: '§73.182', how_to_avoid: 'Run §73.182 skywave NIF contour analysis before filing; include FCC SKYWAVE tool output as exhibit' },
@@ -1784,7 +1784,7 @@ const DEMO_RESULT = {
           { id: 'F3', section: 'F', title: 'Filing fee payment', required: true, cfr: '§1.1102' }
         ],
         reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301 Instructions (2024); OET Bulletin 65',
-        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 315.5 ft / 96.15 m). Filing fee: $6,465 (FCC Schedule of Application Fees, major change CP).'
+        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 315.5 ft / 96.15 m). Filing fee: $2,195 (FCC §1.1102 FY2023 Class D annual regulatory fee).'
       },
       electrical_power_consumption_guide: {
         frequency_khz: 780, tpo_kw: 5, hours_per_year: 8760,
@@ -1819,22 +1819,22 @@ const DEMO_RESULT = {
       },
       station_total_project_cost_pro_forma_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
-        tower_height_m: 96.15, tower_height_ft: 315.5, n_radials: 120, radial_length_m: 96.15,
+        tower_height_m: 96.15, tower_height_ft: 315.5, n_radials: 120, radial_length_m: 134.62,
         n_cost_categories: 9,
         cost_categories: [
-          { category: 'FCC Regulatory Fees',            low_usd: 7560,   high_usd: 7560,   notes: 'Form 301 CP ($6,465) + Form 302-AM ($435) + annual fee ($660, §1.1152)' },
+          { category: 'FCC Regulatory Fees',            low_usd: 4225,   high_usd: 4225,   notes: 'Form 301-AM application fee ($1,015 FY2024 DA 23-864) + Form 302-AM application fee ($1,015) + first-year annual regulatory fee ($2,195 Class D §1.1102 FY2023)' },
           { category: 'Professional Services',           low_usd: 30000,  high_usd: 60000,  notes: 'Broadcast attorney + engineer; NDA simplifies attorney scope' },
           { category: 'Site Acquisition (excl. land)',   low_usd: 8500,   high_usd: 31000,  notes: 'Title search, survey, Phase I ESA, NEPA §1.1307, local permits' },
           { category: 'Tower Construction',              low_usd: 107100, high_usd: 252000, notes: 'λ/4 guyed monopole 96.15 m (315.5 ft); foundation, base insulator, guys, ASR' },
-          { category: 'Ground Radial System',            low_usd: 21888,  high_usd: 61488,  notes: '120 radials × 96.15 m; AWG-10 copper wire + burial/bonding labor; §73.190' },
+          { category: 'Ground Radial System',            low_usd: 30634,  high_usd: 86079,  notes: '120 radials × 134.62 m (0.35λ per §73.189(b)(4)); AWG-10 copper wire + burial/bonding labor' },
           { category: 'Transmitter & ATU Equipment',     low_usd: 25000,  high_usd: 68000,  notes: '5 kW transmitter + ATU + hardline + base current monitoring' },
           { category: 'Transmitter Building',            low_usd: 83000,  high_usd: 235000, notes: '1000 sq ft + HVAC + 200A electrical + 50 kW generator + security' },
           { category: 'STL System',                      low_usd: 11000,  high_usd: 33000,  notes: 'Microwave or IP studio-transmitter link; equipment + installation' },
           { category: 'Proof of Performance',            low_usd: 8000,   high_usd: 20000,  notes: '8-radial NDA field intensity traversal (§73.154(b)) + report + FCC exhibit' }
         ],
-        subtotal_low_usd: 302048, subtotal_high_usd: 768048,
-        contingency_pct: 15, contingency_low_usd: 45307, contingency_high_usd: 115207,
-        total_project_low_usd: 347355, total_project_high_usd: 883255, total_project_typ_usd: 615305,
+        subtotal_low_usd: 307459, subtotal_high_usd: 789304,
+        contingency_pct: 15, contingency_low_usd: 46119, contingency_high_usd: 118396,
+        total_project_low_usd: 353578, total_project_high_usd: 907700, total_project_typ_usd: 630639,
         total_timeline_months_low: 18, total_timeline_months_high: 30,
         timeline_milestones: [
           { milestone: 'Engineering study + Form 301 filed',      month_start: 0,  month_end: 2,  parallel: false },
@@ -1852,7 +1852,7 @@ const DEMO_RESULT = {
           { source: 'Seller financing', max_usd: null, term_years: null, notes: 'If acquiring existing AM facility; negotiate CP contingency clause' }
         ],
         reference: '47 CFR §73.21; §73.154; §73.182; §73.190; §1.1102; §1.1307; NHPA §106; SBA 7(a)/504 program guidelines',
-        note: 'Complete relocation budget for 780 kHz Class D (NDA) 5 kW: estimated $344,750–$881,410 (typical $613,080), including 15% contingency. Excludes land purchase price. Timeline: 18–30 months from CP filing to new license. All figures are 2024 screening-grade estimates.'
+        note: 'Complete relocation budget for 780 kHz Class D (NDA) 5 kW: estimated $353,578–$907,700 (typical $630,639), including 15% contingency. Excludes land purchase price. Timeline: 18–30 months from CP filing to new license. Ground radials use FCC standard 120 × 0.35λ = 134.62 m per §73.189(b)(4). FCC fees per §1.1102 FY2023 + DA 23-864. All figures are 2024 screening-grade estimates.'
       },
       transmitter_power_upgrade_pathway_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
@@ -1860,7 +1860,7 @@ const DEMO_RESULT = {
         day_headroom_kw: 0, can_upgrade_day_power: false, upgraded_tpo_kw: 5,
         coverage_radius_factor: 1.0, coverage_gain_pct: 0,
         is_directional: false, night_upgrade_requires_da_n: true,
-        form301_fee_usd: 6465, form302_fee_usd: 435,
+        form301_fee_usd: 2195, form302_fee_usd: 365,
         transmitter_cost_low_usd: 15000, transmitter_cost_high_usd: 45000,
         installation_cost_usd: 7500,
         engineering_cost_low_usd: 4000, engineering_cost_high_usd: 8000,
@@ -1869,10 +1869,10 @@ const DEMO_RESULT = {
         n_upgrade_steps: 5,
         upgrade_steps: [
           { step: 1, action: 'Interference analysis', form: null, cost_range_usd: '$4,000–$8,000', timeline: '2–4 weeks', notes: '§73.182 co-channel/adjacent-channel analysis; NDA — no pattern proof needed' },
-          { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$6,465', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307)' },
+          { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$2,195', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307). FCC regulatory fee: $2,195 Class D §1.1102 FY2023.' },
           { step: 3, action: 'FCC processing / CP grant', form: null, cost_range_usd: 'included', timeline: '6–18 months', notes: 'CP grants construction authority; must be constructed within 3 years (§73.3598) — file Form 302-AM for license before CP lapses' },
           { step: 4, action: 'Procure and install DA-N nighttime antenna system', form: null, cost_range_usd: '$22,500–$52,500', timeline: '4–12 weeks', notes: 'Directional nighttime (DA-N) antenna array + phasor network + installation. Class D daytime ceiling is already reached (5 kW per §73.21); nighttime upgrade to 0.5 kW requires DA-N pattern + §73.182 NIF study.' },
-          { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$435', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b))' }
+          { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$365', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b)). Form 302 annual regulatory fee: $365 (§1.1102 FY2023).' }
         ],
         reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.3598 (CP construction period/lapse); §1.1102 (filing fees); FCC Form 301; FCC Form 302-AM',
         note: '780 kHz Class D (NDA) — current 5 kW TPO. No daytime upgrade available — 5 kW IS the Class D ceiling per §73.21(e). Nighttime upgrade path: 0 → 0.5 kW maximum (Class D clear channel nighttime ceiling per §73.21(b)(2)); requires DA-N directional antenna pattern + §73.182 NIF skywave study. Total project cost for nighttime authorization: $31,135–$65,135.'
@@ -3433,7 +3433,7 @@ const DEMO_RESULT = {
           { id: 'NIF_STUDY', phase: 'PRE_FILING', form: 'Engineering study', required: true, description: 'Nighttime interference/protection study. REQUIRED — 780 kHz is a §73.25 clear channel; full §73.182 NIF study required at new site.' }
         ],
         fcc_forms: [
-          { id: 'FORM_301_AM', phase: 'FCC_APPLICATION', form: 'FCC Form 301-AM', required: true, fee_usd: 6465, description: 'Application for construction permit — major change of facility.' },
+          { id: 'FORM_301_AM', phase: 'FCC_APPLICATION', form: 'FCC Form 301-AM', required: true, fee_usd: 2195, description: 'Application for construction permit — major change of facility. §1.1102 FY2023 Class D regulatory fee.' },
           { id: 'FORM_603', phase: 'FCC_APPLICATION', form: 'FCC Form 603 (if transfer)', required: false, fee_usd: 820, description: 'Transfer of control / assignment of license.' },
           { id: 'FORM_301_EXH', phase: 'FCC_APPLICATION', form: 'Form 301-AM Exhibit A', required: false, description: 'Directional antenna pattern exhibit. Not required (NDA).' },
           { id: 'FORM_301_HRP', phase: 'FCC_APPLICATION', form: 'Form 301-AM HRP', required: false, description: 'Horizontal radiation pattern table. Not required (NDA).' },
@@ -3452,7 +3452,7 @@ const DEMO_RESULT = {
         ],
         n_total_filings: 18,
         n_required_filings: 12,
-        total_required_fees_usd: 6465,
+        total_required_fees_usd: 2195,
         filings_by_phase: [
           { phase: 'PRE_FILING', required_count: 5, filings: [] },
           { phase: 'FCC_APPLICATION', required_count: 2, filings: [] },
@@ -3461,7 +3461,7 @@ const DEMO_RESULT = {
           { phase: 'ONGOING', required_count: 1, filings: [] }
         ],
         reference: '47 CFR §73.150; §73.154; §73.182; §73.1212; §1.1307; §17.7; FCC Form 301-AM instructions; FCC Media Bureau AM processing guide 2024',
-        note: '12 required filings for Class D NDA at 780 kHz (clear channel). Total FCC fees: $6,465. DA proof required: false. ASR/FAA: true. NIF study required (§73.182 clear channel).'
+        note: '12 required filings for Class D NDA at 780 kHz (clear channel). Total FCC fees: $2,195 (Class D §1.1102 FY2023). DA proof required: false. ASR/FAA: true. NIF study required (§73.182 clear channel).'
       },
       transmitter_cooling_hvac_guide: {
         frequency_khz: 780, tpo_kw: 5, fcc_class: 'D',
@@ -3734,7 +3734,7 @@ const DEMO_RESULT = {
           { id: 'transmitter', category: 'Transmitter equipment',                 low: 20000,  high: 55000,  note: '5 kW NDA AM transmitter; new unit.' },
           { id: 'phasor_atu',  category: 'Antenna tuning unit (ATU)',             low: 5000,   high: 12000,  note: 'Non-directional ATU.' },
           { id: 'eas',         category: 'EAS encoder/decoder (IPAWS)',           low: 8000,   high: 8000,   note: 'IPAWS-compatible EAS unit per §11.35/§11.56.' },
-          { id: 'fcc_fees',    category: 'FCC filing fees',                       low: 6465,   high: 6465,   note: 'FCC Schedule of Application Fees — major change CP application fee.' },
+          { id: 'fcc_fees',    category: 'FCC filing fees',                       low: 2195,   high: 2195,   note: 'FCC §1.1102 FY2023 Class D annual regulatory fee — Form 301-AM major change CP.' },
           { id: 'engineering', category: 'Engineering + proof-of-performance',    low: 25000,  high: 75000,  note: 'Spacing, NIF, §73.154 proof, FCC forms.' },
           { id: 'env_legal',   category: 'Environmental + legal + zoning',        low: 15000,  high: 60000,  note: 'NEPA §106, zoning CUP, FCC counsel.' },
           { id: 'contingency', category: 'Contingency (15–20%)',                  low: 71913,  high: 247234, note: 'Reserve for scope changes, cost escalation, permit delays.' }
@@ -3891,7 +3891,7 @@ const DEMO_RESULT = {
         total_milestones: 22, n_phases: 6,
         critical_path_milestone_ids: ['spacing_study','nif_study','da_pattern','asr_filing','fcc_review','cp_grant'],
         n_critical_path: 6,
-        filing_fee_major_change_usd: 6465,
+        filing_fee_major_change_usd: 2195,
         phases: [
           { id: 'pre_engineering',  label: 'Pre-Engineering & Site Control',  weeks_optimistic: 4,  weeks_conservative: 12,  milestones: [
             { id: 'site_option',    task: 'Execute site option or purchase agreement', days: 30, rule: null },
@@ -4177,11 +4177,11 @@ const DEMO_RESULT = {
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
         range_label: '$53,000 – $112,000',
-        total_soft_cost_low_usd: 53405, total_soft_cost_high_usd: 112405,
+        total_soft_cost_low_usd: 52950, total_soft_cost_high_usd: 111950,
         line_items: [
           { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 175, cost_high_usd: 175 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
@@ -4371,11 +4371,11 @@ const DEMO_RESULT = {
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
         range_label: '$57,000 – $123,000',
-        total_soft_cost_low_usd: 57405, total_soft_cost_high_usd: 123405,
+        total_soft_cost_low_usd: 56950, total_soft_cost_high_usd: 122950,
         line_items: [
           { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 175, cost_high_usd: 175 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study at 5 kW (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 40000 },
@@ -4541,11 +4541,11 @@ const DEMO_RESULT = {
       permit_and_engineering_cost_estimate: {
         cost_tier: 'VERY_HIGH',
         range_label: '$90,000 – $190,000',
-        total_soft_cost_low_usd: 90405, total_soft_cost_high_usd: 190405,
+        total_soft_cost_low_usd: 89950, total_soft_cost_high_usd: 189950,
         line_items: [
           { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
           { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
-          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 175, cost_high_usd: 175 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
           { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 45000 },

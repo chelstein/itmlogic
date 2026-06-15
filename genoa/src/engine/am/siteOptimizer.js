@@ -3819,20 +3819,23 @@ async function scoreCandidate(pt, ctx, warnings){
       const line_items = [];
 
       // 1. FCC Form 301-AM (construction permit application)
-      const fcc_301_fee = fcc_class === 'A' ? 660 : fcc_class === 'C' ? 330 : 490;
+      // FY2024 application processing fee per FCC DA 23-864: $1,015 flat (all classes).
+      // Distinct from the annual regulatory fee (§1.1102): Class A $7,265, B $5,020, C/D $2,195.
+      const fcc_301_fee = 1015;
       line_items.push({
         id: 'FCC_FORM_301',
-        label: 'FCC Form 301-AM construction permit',
+        label: 'FCC Form 301-AM application processing fee',
         low_usd: fcc_301_fee, high_usd: fcc_301_fee,
-        note: `FCC Schedule of Regulatory Fees (2024). Class ${fcc_class} AM station.`
+        note: `FCC DA 23-864 (FY2024): $1,015 application processing fee — flat, all AM classes. Separate from annual §1.1102 regulatory fees.`
       });
 
       // 2. FCC Form 302-AM (license to cover)
+      // FY2024 application processing fee per FCC DA 23-864: $1,015 flat.
       line_items.push({
         id: 'FCC_FORM_302',
-        label: 'FCC Form 302-AM license to cover',
-        low_usd: 330, high_usd: 330,
-        note: 'Filed after construction completion; flat fee regardless of class.'
+        label: 'FCC Form 302-AM license-to-cover processing fee',
+        low_usd: 1015, high_usd: 1015,
+        note: 'FCC DA 23-864 (FY2024): $1,015 application processing fee; filed after construction completion.'
       });
 
       // 3. ASR registration (Form 854)
