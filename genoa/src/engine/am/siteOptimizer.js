@@ -7788,9 +7788,9 @@ async function scoreCandidate(pt, ctx, warnings){
         night_operation_type = 'FULL_POWER';
         nighttime_constraint = 'Class A dominant — may operate full power nights; receives §73.182 50 µV/m skywave protection from co-channel secondaries';
       } else if (isClearCh_sw && fcc_class === 'D') {
-        night_power_limit_kw = Math.min(tpo_kw, 1.0);
-        night_operation_type = 'LIMITED_1KW_OR_DAN';
-        nighttime_constraint = 'Class D on clear channel — §73.21(b)(2): nighttime power restricted (or DA-N pattern required); may need Sunset-to-Sunrise authorization';
+        night_power_limit_kw = Math.min(tpo_kw, 0.5);
+        night_operation_type = 'LIMITED_0_5KW_OR_DAN';
+        nighttime_constraint = 'Class D on clear channel — §73.21(b)(2): nighttime power capped at 0.5 kW max (or DA-N pattern required); may need Sunset-to-Sunrise authorization';
       } else if (isClearCh_sw && fcc_class === 'B') {
         night_power_limit_kw = Math.min(tpo_kw, 2.5);
         night_operation_type = 'LIMITED_2_5KW_OR_DAN';
@@ -14777,13 +14777,13 @@ async function scoreCandidate(pt, ctx, warnings){
     am_nighttime_operation_and_skywave_classification_guide: (() => {
       // At night, AM groundwave reach shrinks but skywave extends thousands of miles.
       // Class D secondary stations on clear channels must protect Class A dominant stations;
-      // many are restricted to 1 kW night or daytime-only operation.
+      // many are restricted to 0.5 kW max nighttime or daytime-only operation (§73.21(b)(2)).
       const is_clear_channel = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const is_secondary     = fcc_class === 'D';
       let nighttime_status, nighttime_power_kw_max;
       if (is_secondary && is_clear_channel) {
         nighttime_status       = 'secondary_limited_time';
-        nighttime_power_kw_max = round2(Math.min(tpo_kw, 1.0)); // max 1 kW at night on clear channel
+        nighttime_power_kw_max = round2(Math.min(tpo_kw, 0.5)); // §73.21(b)(2): Class D nighttime max 0.5 kW on clear channel
       } else if (/^[AB]$/i.test(fcc_class)) {
         nighttime_status       = 'dominant_unlimited';
         nighttime_power_kw_max = tpo_kw;
