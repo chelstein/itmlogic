@@ -87,7 +87,7 @@ export function buildReferencesSection(exhibit){
   if (mv.dataset){
     if (isAm){
       cite(`FCC groundwave field-strength curves — ${mv.dataset}`,
-           `Curve table dataset (SHA256 ${(mv.dataset_meta_sha256 || '').slice(0, 16)}…) digitized from §73.184 Figure M3 groundwave conductivity-distance grids.  Bit-exact replay verified against FCC distance.json reference samples.`);
+           `Curve table dataset (SHA256 ${(mv.dataset_meta_sha256 || '').slice(0, 16)}…) digitized from §73.184 groundwave field-strength graphs parameterized by §73.190 Figure M3 conductivity zones.  Bit-exact replay verified against FCC distance.json reference samples.`);
     } else {
       cite(`FCC propagation charts — ${mv.dataset}`,
            `Curve table dataset (SHA256 ${(mv.dataset_meta_sha256 || '').slice(0, 16)}…) digitized from §73.333 Figures 1A–1B (F(50,50)) and 1A2–1B2 (F(50,10)).  Bit-exact replay verified against FCC distance.json reference samples.`);
