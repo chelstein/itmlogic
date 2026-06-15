@@ -1120,11 +1120,11 @@ const DEMO_RESULT = {
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
-        range_label: '$58,000 – $117,000',
-        total_soft_cost_low_usd: 58000, total_soft_cost_high_usd: 117000,
+        range_label: '$53,000 – $112,000',
+        total_soft_cost_low_usd: 53405, total_soft_cost_high_usd: 112405,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
-          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
           { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
@@ -4176,11 +4176,11 @@ const DEMO_RESULT = {
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
-        range_label: '$58,000 – $117,000',
-        total_soft_cost_low_usd: 58000, total_soft_cost_high_usd: 117000,
+        range_label: '$53,000 – $112,000',
+        total_soft_cost_low_usd: 53405, total_soft_cost_high_usd: 112405,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
-          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
           { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
@@ -4370,11 +4370,11 @@ const DEMO_RESULT = {
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
-        range_label: '$62,000 – $128,000',
-        total_soft_cost_low_usd: 62000, total_soft_cost_high_usd: 128000,
+        range_label: '$57,000 – $123,000',
+        total_soft_cost_low_usd: 57405, total_soft_cost_high_usd: 123405,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
-          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
           { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
@@ -4540,11 +4540,11 @@ const DEMO_RESULT = {
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'VERY_HIGH',
-        range_label: '$95,000 – $195,000',
-        total_soft_cost_low_usd: 95000, total_soft_cost_high_usd: 195000,
+        range_label: '$90,000 – $190,000',
+        total_soft_cost_low_usd: 90405, total_soft_cost_high_usd: 190405,
         line_items: [
-          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 6465, cost_high_usd: 6465 },
-          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee (Class D §1.1102 FY2023)', cost_low_usd: 2195, cost_high_usd: 2195 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee (§1.1102 FY2023)', cost_low_usd: 365, cost_high_usd: 365 },
           { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96.15 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
           { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
           { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },

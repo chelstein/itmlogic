@@ -24687,7 +24687,7 @@ async function scoreCandidate(pt, ctx, warnings){
           form: 'FCC Form 301-AM (Major Change)',
           timeline_months_optimistic: 18,
           timeline_months_conservative: 36,
-          filing_fee_usd_approx: 6465,   // FCC Form 301-AM major change fee (2023 schedule)
+          filing_fee_usd_approx: 5020,   // FCC Form 301-AM major change fee for Class B (§1.1102 FY2023)
           engineering_cost_usd_approx_low: 15000,
           engineering_cost_usd_approx_high: 50000,
           note: 'Class D→B upgrade is a major modification. The station must demonstrate it meets Class B minimum power (≥0.25 kW) and the new Class B §73.37 spacing table in all directions. FCC staff review typically takes 12–24 months after filing.'
@@ -25349,7 +25349,7 @@ async function scoreCandidate(pt, ctx, warnings){
         phases,
         critical_path_milestone_ids: criticalPath,
         n_critical_path:           criticalPath.length,
-        filing_fee_major_change_usd: 6465,
+        filing_fee_major_change_usd: fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195,  // §1.1102 FY2023 by class (A/$7265, B/$5020, C/D/$2195)
         reference: '47 CFR §73.3533; §73.3598; §73.3580; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
         note: `CP timeline for ${fcc_class} class ${isDA_cpt ? 'directional' : 'non-directional'} AM relocation. Optimistic: ${totalOptimisticWeeks} weeks (~${round2(totalOptimisticWeeks / 4.33)} months). Conservative: ${totalConservativeWeeks} weeks (~${round2(totalConservativeWeeks / 4.33)} months).`
       };
@@ -25772,7 +25772,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const easCost = 8000; // IPAWS-compatible EAS unit
 
       // 8. FCC fees and engineering
-      const fccFilingFee = 6465;  // major change filing fee per §1.1102 FCC fee schedule
+      const fccFilingFee = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;  // §1.1102 FY2023 by class
       const engineeringLow  = 25000;
       const engineeringHigh = 75000; // includes NIF study, spacing, DA pattern, proof of performance
 
@@ -26645,7 +26645,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // FCC application forms
       const FCC_FORMS = [
-        { id: 'FORM_301_AM',  phase: 'FCC_APPLICATION',  form: 'FCC Form 301-AM',         required: true,  fee_usd: 6465, description: 'Application for construction permit — major change of facility. Required for site relocation.' },
+        { id: 'FORM_301_AM',  phase: 'FCC_APPLICATION',  form: 'FCC Form 301-AM',         required: true,  fee_usd: fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195, description: 'Application for construction permit — major change of facility. Required for site relocation. Fee per §1.1102 FY2023 schedule by class.' },
         { id: 'FORM_603',     phase: 'FCC_APPLICATION',  form: 'FCC Form 603 (if transfer)', required: false, fee_usd: 820, description: 'Transfer of control / assignment of license. Required if ownership changes at same time as relocation.' },
         { id: 'FORM_301_EXH', phase: 'FCC_APPLICATION',  form: 'Form 301-AM Exhibit A',   required: isDA_rc, description: 'Directional antenna pattern exhibit. Required for DA stations. Includes theoretical radiation pattern and tower coordinates.' },
         { id: 'FORM_301_HRP', phase: 'FCC_APPLICATION',  form: 'Form 301-AM HRP',         required: isDA_rc, description: 'Horizontal radiation pattern table (72 radials, 5° increments). Required for DA CP applications.' },
