@@ -32571,8 +32571,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // STA (Special Temporary Authority) — needed if construction begins before CP grant
       const STA_FEE = 340;
 
-      // License to cover (Form 302-AM) after construction
-      const FORM_302_FEE = 365;
+      // License to cover (Form 302-AM) after construction — FCC DA 23-864 FY2024: $1,015 flat
+      const FORM_302_FEE = 1015;
 
       // Amendment fee (if CP must be amended mid-construction)
       const AMENDMENT_FEE = 585;

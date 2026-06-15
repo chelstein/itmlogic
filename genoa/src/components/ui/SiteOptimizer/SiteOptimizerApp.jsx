@@ -1856,15 +1856,15 @@ const DEMO_RESULT = {
       },
       transmitter_power_upgrade_pathway_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
-        current_tpo_kw: 5, day_max_tpo_kw: 5, night_max_tpo_kw: 0.5,
+        current_tpo_kw: 5, day_max_tpo_kw: 5, night_max_tpo_kw: 1,
         day_headroom_kw: 0, can_upgrade_day_power: false, upgraded_tpo_kw: 5,
         coverage_radius_factor: 1.0, coverage_gain_pct: 0,
         is_directional: false, night_upgrade_requires_da_n: true,
-        form301_fee_usd: 2195, form302_fee_usd: 365,
+        form301_fee_usd: 1015, form302_fee_usd: 1015,
         transmitter_cost_low_usd: 15000, transmitter_cost_high_usd: 45000,
         installation_cost_usd: 7500,
         engineering_cost_low_usd: 4000, engineering_cost_high_usd: 8000,
-        total_project_low_usd: 31135, total_project_high_usd: 65135,
+        total_project_low_usd: 28530, total_project_high_usd: 62530,
         cp_processing_months_low: 6, cp_processing_months_high: 18,
         n_upgrade_steps: 5,
         upgrade_steps: [
@@ -1875,7 +1875,7 @@ const DEMO_RESULT = {
           { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$1,015', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b)). Form 302-AM application processing fee: $1,015 (DA 23-864 FY2024).' }
         ],
         reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.3598 (CP construction period/lapse); §1.1102 (filing fees); FCC Form 301; FCC Form 302-AM',
-        note: '780 kHz Class D (NDA) — current 5 kW TPO. No daytime upgrade available — 5 kW IS the Class D ceiling per §73.21(e). Nighttime upgrade path: 0 → 0.5 kW maximum (Class D clear channel nighttime ceiling per §73.21(b)(2)); requires DA-N directional antenna pattern + §73.182 NIF skywave study. Total project cost for nighttime authorization: $31,135–$65,135.'
+        note: '780 kHz Class D (NDA) — current 5 kW TPO. No daytime upgrade available — 5 kW IS the Class D ceiling per §73.21(e). Nighttime upgrade path: 0 → 1 kW maximum (Class D clear channel nighttime ceiling per §73.21(b)(2)/§73.99); requires DA-N directional antenna pattern + §73.182 NIF skywave study. Total project cost for nighttime authorization: $28,530–$62,530 (FCC fees: $1,015 Form 301-AM + $1,015 Form 302-AM per DA 23-864 FY2024).'
       },
       am_coverage_optimization_by_tower_height_guide: {
         frequency_khz: 780, wavelength_m: 384.62,
