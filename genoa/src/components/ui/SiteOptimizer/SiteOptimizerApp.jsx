@@ -4024,7 +4024,7 @@ const DEMO_RESULT = {
             { id: 'blanket',  label: 'Blanket 1000 mV/m', color: '#ef4444' }
           ]
         },
-        reference: '47 CFR §73.24(g); §73.24(i); §73.182; FCC groundwave curves',
+        reference: '47 CFR §73.24(g); §73.24(i); §73.182; §73.184 FCC M3 groundwave curves',
         note: 'Radii computed via FCC groundwave curves at σ = 9 mS/m. Render as concentric circles using deck.gl ScatterplotLayer or MapLibre fill-circle layers.'
       },
       candidate_scoring_audit: {

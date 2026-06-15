@@ -6010,7 +6010,7 @@ async function scoreCandidate(pt, ctx, warnings){
         }
         risks.push('No buried ground radial system possible — counterpoise or elevated radials required with efficiency penalty');
         risks.push('Building RF re-radiation and structural coupling requires extensive near-field measurements');
-        risks.push('§73.182 groundwave curves assume a flat, unobstructed earth — building-mounted predictions unreliable');
+        risks.push('§73.184 groundwave curves (FCC M3) assume a flat, unobstructed earth — building-mounted predictions unreliable');
         risks.push('Structural loading, lightning protection, and lease access constraints significant');
         if (!isLowPow) { risks.push(`TPO ${tpo_kw} kW from rooftop antenna creates §73.24(g) blanket zone inside building — MPE compliance and RF safety study essential`); }
         if (isClear_cc) { score -= 15; risks.push('Clear channel skywave analysis with building-mounted antenna is non-standard — FCC may require alternative site study'); }
