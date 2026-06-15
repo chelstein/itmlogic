@@ -20421,7 +20421,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_pu      = /^DA/i.test(pattern_mode);
 
       // Daytime TPO ceiling per §73.21.
-      // Class A/B/D: up to 50 kW day.  Class C (local channels): 1 kW (§73.21(c)).
+      // Class A/B: up to 50 kW day. Class D: 5 kW day (§73.21(e)). Class C: 1 kW (§73.21(c)).
       const day_max_kw = is_local_ch       ? 1
                        : fcc_class === 'A' ? 50
                        : fcc_class === 'B' ? 50

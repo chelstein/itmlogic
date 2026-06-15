@@ -9619,19 +9619,19 @@ test('transmitter_power_upgrade_pathway_guide KAZM 780 kHz Class D NDA daytime h
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
   assert.strictEqual(g.current_tpo_kw, 5, 'current_tpo_kw must be 5 (KAZM)');
-  assert.strictEqual(g.day_max_tpo_kw, 50, 'day_max_tpo_kw must be 50 (Class D daytime max per §73.21(b))');
-  assert.strictEqual(g.day_headroom_kw, 45, 'day_headroom_kw must be 45');
-  assert.strictEqual(g.can_upgrade_day_power, true, 'can_upgrade_day_power must be true');
-  assert.strictEqual(g.upgraded_tpo_kw, 50, 'upgraded_tpo_kw must be 50 (class ceiling)');
+  assert.strictEqual(g.day_max_tpo_kw, 5, 'Class D daytime ceiling is 5 kW per §73.21(e); not 50 kW');
+  assert.strictEqual(g.day_headroom_kw, 0, 'KAZM at 5 kW = Class D ceiling; headroom = 0');
+  assert.strictEqual(g.can_upgrade_day_power, false, 'KAZM at Class D ceiling cannot increase day power');
+  assert.strictEqual(g.upgraded_tpo_kw, 5, 'upgraded_tpo_kw = ceiling = 5 kW (no headroom)');
 });
 
-test('transmitter_power_upgrade_pathway_guide KAZM coverage gain ~216% at class-ceiling power', async () => {
+test('transmitter_power_upgrade_pathway_guide KAZM coverage gain at Class D ceiling (no headroom)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
-  // 5 kW → 50 kW: radius factor = √(50/5) = √10 ≈ 3.162
-  assert.ok(g.coverage_radius_factor > 3.15 && g.coverage_radius_factor < 3.17,
-    `coverage_radius_factor must be ~√10 ≈ 3.162, got ${g.coverage_radius_factor}`);
-  assert.strictEqual(g.coverage_gain_pct, 216, 'coverage_gain_pct must be 216');
+  // KAZM at 5 kW = Class D daytime ceiling (§73.21(e)): no power upgrade possible, coverage factor = 1.0
+  assert.ok(Math.abs(g.coverage_radius_factor - 1.0) < 0.01,
+    `coverage_radius_factor must be 1.0 (no upgrade available at Class D ceiling), got ${g.coverage_radius_factor}`);
+  assert.strictEqual(g.coverage_gain_pct, 0, 'coverage_gain_pct must be 0 (KAZM at ceiling, no power increase possible)');
 });
 
 test('transmitter_power_upgrade_pathway_guide costs and upgrade steps', async () => {
