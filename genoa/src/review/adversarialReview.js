@@ -322,8 +322,8 @@ export function buildAdversarialReview(exhibit) {
         reviewer_question: 'For this AM station, what §73.182 nighttime skywave interference analysis was performed? What are the NIF contour results?',
         why_it_matters:    'AM CP applications require §73.182 nighttime skywave analysis and §73.183 groundwave contour analysis. These are absent from the engineering reasoning report, leaving the AM-specific filing basis unexplained.',
         current_evidence:  `${reasoning.conclusions?.length ?? 0} reasoning conclusion(s) — AM rules not evaluated`,
-        gap:               'No AM-specific reasoning conclusions (§73.182 NIF, §73.183 groundwave, §73.184 power limits)',
-        recommended_fix:   'Document AM groundwave contour (§73.183) and nighttime skywave interference analysis (§73.182) results explicitly in the exhibit; note this is a current engine limitation'
+        gap:               'No AM-specific reasoning conclusions (§73.182 NIF, §73.183 groundwave interference thresholds, §73.184 groundwave field strength curves)',
+        recommended_fix:   'Document AM groundwave contour per §73.184 curves / §73.183 interference thresholds and nighttime skywave NIF analysis per §73.182 results explicitly in the exhibit; note this is a current engine limitation'
       }));
     }
 

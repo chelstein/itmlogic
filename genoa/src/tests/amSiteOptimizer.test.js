@@ -4828,9 +4828,9 @@ test('fcc_class_power_ceiling_analysis has correct class ceiling for Class D', a
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
   const pa = out.candidates[0].fcc_class_power_ceiling_analysis;
   assert.equal(pa.fcc_class, 'D', 'fcc_class must be D');
-  assert.equal(pa.class_power_ceiling_kw, 50, 'Class D ceiling must be 50 kW');
+  assert.equal(pa.class_power_ceiling_kw, 5, 'Class D daytime ceiling is 5 kW per §73.21(e)');
   assert.equal(pa.current_tpo_kw, 5, 'current_tpo_kw must be 5');
-  assert.ok(pa.headroom_kw > 0, 'headroom_kw must be positive for 5 kW / 50 kW ceiling');
+  assert.equal(pa.headroom_kw, 0, 'KAZM at 5 kW = Class D ceiling (5 kW) so headroom is 0');
 });
 
 test('fcc_class_power_ceiling_analysis utilization_pct is correct', async () => {
@@ -4838,8 +4838,8 @@ test('fcc_class_power_ceiling_analysis utilization_pct is correct', async () => 
   const pa = out.candidates[0].fcc_class_power_ceiling_analysis;
   assert.ok(pa.power_utilization_pct > 0, 'utilization_pct must be positive');
   assert.ok(pa.power_utilization_pct <= 100, 'utilization_pct must be <= 100');
-  // 5 kW / 50 kW = 10%
-  assert.ok(Math.abs(pa.power_utilization_pct - 10) < 1, `expected ~10% utilization, got ${pa.power_utilization_pct}`);
+  // 5 kW / 5 kW (Class D ceiling per §73.21(e)) = 100%
+  assert.ok(Math.abs(pa.power_utilization_pct - 100) < 1, `expected ~100% utilization (KAZM at Class D ceiling), got ${pa.power_utilization_pct}`);
 });
 
 test('fcc_class_power_ceiling_analysis upgrade_feasibility is valid', async () => {
@@ -13872,8 +13872,8 @@ test('KAZM 780 kHz Class D clear channel allocation', async () => {
 test('KAZM Class D power relative to class maximum', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
-  assert.strictEqual(g.tpo_pct_of_max,       10, 'KAZM 5 kW / 50 kW Class D max = 10% (§73.21(b))');
-  assert.strictEqual(g.upgrade_potential_kw,  45, 'Class D at 5 kW has 45 kW daytime headroom');
+  assert.strictEqual(g.tpo_pct_of_max,       100, 'KAZM 5 kW / 5 kW Class D ceiling = 100% (§73.21(e))');
+  assert.strictEqual(g.upgrade_potential_kw,    0, 'Class D at 5 kW is at ceiling (§73.21(e)); upgrade potential = 0');
 });
 
 test('KAZM frequency allocation reference and note fields', async () => {
@@ -18024,8 +18024,8 @@ test('#122 MAJOR modification costs more and takes longer than MINOR', async () 
   const major = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', tpo_kw: 50,  candidate_limit: 1 });
   const gMinor = minor.candidates[0].am_licensed_power_class_upgrade_guide;
   const gMajor = major.candidates[0].am_licensed_power_class_upgrade_guide;
-  // Class D at 50 kW is at ceiling, so modification_type should not be MINOR
-  assert.ok(gMajor.modification_type !== 'MINOR' || gMajor.headroom_kw === 0, 'Class D at 50 kW should not be MINOR');
+  // Class D passed at 50 kW exceeds Class D ceiling (5 kW per §73.21(e)); engine returns headroom ≤ 0
+  assert.ok(gMajor.modification_type !== 'MINOR' || gMajor.headroom_kw <= 0, 'Class D above ceiling (50 kW > 5 kW max) should not be MINOR modification');
   assert.ok(gMinor.cost_estimates.total_low_usd <= gMajor.cost_estimates.total_low_usd || gMinor.modification_type === 'MINOR', 'MINOR should not cost more than MAJOR');
 });
 
