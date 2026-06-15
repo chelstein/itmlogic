@@ -3839,8 +3839,8 @@ const DEMO_RESULT = {
         nif_required: true, nif_study_type: 'FULL_CLEAR_CHANNEL_NIF',
         nighttime_da_note: 'Non-directional; nighttime protection based on omnidirectional ERP and §73.182 spacing. FCC Class D maximum is 0.5 kW (§73.21(b)(2)); this analysis models 0.25 kW actual operation for improved NIF margin.',
         protection_levels: [
-          { id: 'class_a_protected', field_mvm: 0.5,   basis: '§73.182: Class A 0.5 mV/m daytime GW',          applies_to_us: false },
-          { id: 'class_b_protected', field_mvm: 0.25,  basis: '§73.182: Class B 0.25 mV/m daytime GW',         applies_to_us: false },
+          { id: 'class_a_protected', field_mvm: 0.5,   basis: '§73.183: Class A 0.5 mV/m daytime GW interference threshold',  applies_to_us: false },
+          { id: 'class_b_protected', field_mvm: 0.25,  basis: '§73.183: Class B 0.25 mV/m daytime GW interference threshold', applies_to_us: false },
           { id: 'skywave_50pct',     field_mvm: 0.05,  basis: '§73.182: skywave 50 µV/m, 50% time, 50% locs',  applies_to_us: true },
           { id: 'skywave_10pct',     field_mvm: 0.05,  basis: '§73.182: skywave 50 µV/m, 10% time',            applies_to_us: true },
           { id: 'skywave_1pct',      field_mvm: 0.025, basis: '§73.182: NIF skywave (1% time)',                 applies_to_us: true }

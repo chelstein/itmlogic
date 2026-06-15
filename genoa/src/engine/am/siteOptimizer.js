@@ -14319,7 +14319,7 @@ async function scoreCandidate(pt, ctx, warnings){
     am_signal_contour_and_coverage_area_guide: (() => {
       // Simplified inverse-distance ground-wave formula for AM:
       //   E(mV/m) = (k * sqrt(P_kW)) / d_km   (very rough; actual uses M3 map tables / Groundwave Assistant)
-      // FCC §73.184 uses M3 ground conductivity maps; here we use theoretical free-space approximation
+      // FCC §73.184 uses §73.190 Figure M3 conductivity values; here we use theoretical free-space approximation
       // suitable only for planning comparison. k ≈ 1000 * sqrt(1) for 1 kW at 1 km reference.
       // More accurately: E_1kW_1km ≈ 300 mV/m for AM ground wave (ITU-R P.368).
       // Radiated power: apply efficiency for ground system (typ. 80–95% for NDA, 70–85% for DA base).
@@ -25488,8 +25488,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Key §73.182 protection distances (nominal, from FCC tables)
       const protectionLevels = [
-        { id: 'class_a_protected', field_mvm: 0.5,  basis: '§73.182: Class A 0.5 mV/m daytime GW', applies_to_us: fcc_class === 'A' },
-        { id: 'class_b_protected', field_mvm: 0.25, basis: '§73.182: Class B 0.25 mV/m daytime GW', applies_to_us: fcc_class === 'B' },
+        { id: 'class_a_protected', field_mvm: 0.5,  basis: '§73.183: Class A 0.5 mV/m daytime GW interference threshold', applies_to_us: fcc_class === 'A' },
+        { id: 'class_b_protected', field_mvm: 0.25, basis: '§73.183: Class B 0.25 mV/m daytime GW interference threshold', applies_to_us: fcc_class === 'B' },
         { id: 'skywave_50pct',     field_mvm: 0.05, basis: '§73.182: skywave 50 µV/m, 50% time, 50% locs', applies_to_us: true },
         { id: 'skywave_10pct',     field_mvm: 0.05, basis: '§73.182: skywave 50 µV/m, 10% time', applies_to_us: true },
         { id: 'skywave_1pct',      field_mvm: 0.025, basis: '§73.182: NIF skywave (1% time)', applies_to_us: nifRequiredSw }
