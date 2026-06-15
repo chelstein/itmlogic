@@ -12709,9 +12709,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const rho_soil_ohm_m = round2(1000 / sigma_local); // Ω·m from mS/m
       // CP need: high soil corrosivity if ρ < 300 Ω·m (σ > 3.3 mS/m) or pH issues
       const cp_recommended = rho_soil_ohm_m < 300;
-      // Total copper wire needed for 120 × 0.35λ radials (AWG #10 stranded, ~1.4 kg/m)
+      // Total copper wire: 120 × 0.35λ radials (#10 AWG solid bare: ~47 g/m per NBS TN-24)
       const total_copper_wire_m = round2(n_radials_std * radial_length_m);
-      const copper_wire_kg = round2(total_copper_wire_m * 0.35 / 1000); // AWG #12, ~0.35 kg/100m
       // Cost estimates (2024 USD)
       const copper_wire_cost_per_m_usd = 1.85; // installed (trenching + AWG 12 wire)
       const radial_install_low_usd   = Math.round(total_copper_wire_m * copper_wire_cost_per_m_usd * 0.80);
