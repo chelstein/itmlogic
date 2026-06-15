@@ -3173,7 +3173,7 @@ async function scoreCandidate(pt, ctx, warnings){
   const blockers = flags.filter(f => f.includes('§73.24')).map(f => ({ code: 'COMPLIANCE_FAIL', message: f }));
   const required_next_studies = [
     '47 CFR §73.184 daytime groundwave contour study (M3 conductivity curves)',
-    '47 CFR §73.183 interference field strength protection analysis (D/U ratios)',
+    '47 CFR §73.183 (interference field strength levels); §73.182 Table 1 (D/U protection ratios)',
     '47 CFR §73.182 nighttime NIF/RSS interference study',
     'RF safety / OET-65 review',
     'ASR / FAA / zoning review',

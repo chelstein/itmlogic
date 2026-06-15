@@ -65,7 +65,7 @@ export default function AmNightNifPreview({
     }
     if (!fcc_class){
       setState({ loading: false, study: null,
-        error: 'AM class (A/B/C/D) required — §73.183 D/U ratios are class-dependent.' });
+        error: 'AM class (A/B/C/D) required — §73.182 Table 1 D/U ratios and §73.183 protected-contour levels are class-dependent.' });
       return undefined;
     }
 
