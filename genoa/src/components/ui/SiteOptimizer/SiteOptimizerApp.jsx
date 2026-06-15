@@ -1313,9 +1313,9 @@ const DEMO_RESULT = {
         payback_years_optimistic: 0.5, payback_years_conservative: 9.5,
         overall_feasibility: 'SIGNIFICANT_INVESTMENT',
         line_items: [
-          { id: 'LAND_PURCHASE', label: 'Land acquisition', low_usd: 80000, high_usd: 250000, note: '3.52 ha min for 90-radial ground system (105 m radius)' },
+          { id: 'LAND_PURCHASE', label: 'Land acquisition', low_usd: 80000, high_usd: 250000, note: '~5.7 ha min for FCC-standard 120-radial system at 134.62 m radius (0.35λ at 780 kHz per §73.189(b)(4))' },
           { id: 'TOWER_CONSTRUCTION', label: 'Tower (guyed monopole)', low_usd: 80000, high_usd: 300000, note: '96.15 m guyed monopole exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.' },
-          { id: 'GROUND_SYSTEM', label: 'Ground system (90 radials × 87 m)', low_usd: 35000, high_usd: 100000, note: '§73.190 buried copper radial system; includes trenching and conductivity survey' },
+          { id: 'GROUND_SYSTEM', label: 'Ground system (120 radials × 134.62 m, §73.189(b)(4))', low_usd: 72000, high_usd: 145000, note: 'FCC standard: 120 radials × 0.35λ = 134.62 m at 780 kHz (16,154 m total); #10 AWG copper wire + burial/bonding labor; §73.190 soil resistivity survey included' },
           { id: 'TRANSMITTER', label: 'Transmitter (5 kW)', low_usd: 25000, high_usd: 100000, note: 'Primary + backup transmitters; includes installation and initial alignment' },
           { id: 'TRANSMISSION_LINE', label: 'Transmission line + ATU', low_usd: 6000, high_usd: 25000, note: 'Heliax from transmitter building to tower base + antenna tuning unit' },
           { id: 'ENGINEERING', label: 'Broadcast + structural engineering', low_usd: 20000, high_usd: 70000, note: '§73.182 NIF study, §73.154 proof design, structural PE' },
@@ -1678,21 +1678,21 @@ const DEMO_RESULT = {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
         sigma_msm: 9, soil_resistivity_ohm_m: 111.11,
         soil_conductivity_class: 'GOOD',
-        soil_note: 'Good conductivity. Standard 120-radial system (λ/4) achieves near-ideal efficiency. FCC M3 zone meets §73.190 screening threshold.',
-        wavelength_m: 384.62, optimal_radial_length_m: 96.15, minimum_radial_length_m: 48.08,
+        soil_note: 'Good conductivity. FCC standard 120-radial system (0.35λ = 134.62 m per §73.189(b)(4)) achieves near-ideal efficiency. FCC M3 zone meets §73.190 screening threshold.',
+        wavelength_m: 384.62, optimal_radial_length_m: 134.62, minimum_radial_length_m: 48.08,
         burial_depth_recommended: '5–10 cm',
         conductor_specification: '#10 AWG copper-clad steel or solid copper',
         scenarios: [
-          { label: 'Standard (120 radials)', radial_count: 120, radial_length_m: 96.15, ground_loss_ohm: 1.53, antenna_efficiency_pct: 96.0, effective_tpo_kw: 4.8, suitable_for: 'Preferred for all AM stations. Required for §73.190 certification without soil survey waiver.' },
-          { label: 'Reduced (60 radials)', radial_count: 60, radial_length_m: 96.15, ground_loss_ohm: 3.06, antenna_efficiency_pct: 92.3, effective_tpo_kw: 4.6, suitable_for: 'Acceptable for temporary operations or land-constrained sites. §73.190 soil survey waiver application may be required.' },
+          { label: 'Standard (120 radials)', radial_count: 120, radial_length_m: 134.62, ground_loss_ohm: 1.28, antenna_efficiency_pct: 96.6, effective_tpo_kw: 4.8, suitable_for: 'FCC standard per §73.189(b)(4): 120 radials × 0.35λ. Required for §73.190 ground system certification without soil survey waiver.' },
+          { label: 'Reduced (60 radials)', radial_count: 60, radial_length_m: 134.62, ground_loss_ohm: 2.56, antenna_efficiency_pct: 93.4, effective_tpo_kw: 4.7, suitable_for: 'Below FCC standard (60 vs. 120 radials). Acceptable for temporary operations or land-constrained sites. §73.190 soil survey waiver application may be required.' },
           { label: 'Urban-constrained (30 radials)', radial_count: 30, radial_length_m: 48.08, ground_loss_ohm: 6.11, antenna_efficiency_pct: 85.7, effective_tpo_kw: 4.3, suitable_for: 'Absolute minimum for urban/rooftop sites. Significant efficiency reduction. §73.190 variance required.' }
         ],
         staging_phase1: { radial_count: 60, description: 'Phase 1 (60 radials): minimum viable system for initial operation while Phase 2 radials are installed in stages.' },
         staging_phase2: { radial_count: 120, description: 'Phase 2 (120 radials): complete standard system for §73.190 certification.' },
         wenner_survey: {
           method: 'Wenner 4-electrode (equal-spacing) soil resistivity measurement',
-          electrode_spacing_m: 96.15,
-          measurement_locations: 'Minimum 4 traverses at 0°, 45°, 90°, 135° from tower base to 96.15 m radius.',
+          electrode_spacing_m: 134.62,
+          measurement_locations: 'Minimum 4 traverses at 0°, 45°, 90°, 135° from tower base to 134.62 m radius (0.35λ FCC standard radial length at 780 kHz).',
           interpretation: 'Measured ρ (Ω·m) → σ (mS/m) = 1000/ρ. Compare to M3 zone value (9 mS/m). If measured σ differs > ±30%, update groundwave reach and coverage calculations.'
         },
         certification_requirements: [
