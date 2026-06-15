@@ -16155,12 +16155,12 @@ test('KAZM 780 kHz: am_fcc_application_filing_cost_and_timeline_guide present on
   }
 });
 
-test('KAZM NDA: FCC fees are $2,030 and NDA flag is false', async () => {
+test('KAZM NDA: FCC fees are $1,450 and NDA flag is false', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_application_filing_cost_and_timeline_guide;
-  assert.strictEqual(g.fee_form_301_am, 1015, 'Form 301-AM fee must be $1,015 (FY2024)');
-  assert.strictEqual(g.fee_form_302_am, 1015, 'Form 302-AM fee must be $1,015 (FY2024)');
-  assert.strictEqual(g.total_fcc_fees, 2030, 'total_fcc_fees must be $2,030');
+  assert.strictEqual(g.fee_form_301_am, 1015, 'Form 301-AM fee must be $1,015 (FY2024 §1.1102)');
+  assert.strictEqual(g.fee_form_302_am, 435, 'Form 302-AM fee must be $435 (FY2024 §1.1102)');
+  assert.strictEqual(g.total_fcc_fees, 1450, 'total_fcc_fees must be $1,450 (301-AM $1,015 + 302-AM $435)');
   assert.strictEqual(g.is_directional, false, 'NDA pattern must flag is_directional false');
 });
 
@@ -16189,7 +16189,7 @@ test('candidate_comparison_table fcc columns present and valid for KAZM', async 
     assert.ok('fcc_total_timeline_days_low' in row, 'fcc_total_timeline_days_low missing');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.fcc_total_fcc_fees, 2030, 'fcc_total_fcc_fees must be $2,030');
+  assert.strictEqual(r0.fcc_total_fcc_fees, 1450, 'fcc_total_fcc_fees must be $1,450 (301-AM $1,015 + 302-AM $435 per §1.1102 FY2024)');
   assert.strictEqual(r0.fcc_processing_days_low, 180, 'fcc_processing_days_low must be 180');
 });
 

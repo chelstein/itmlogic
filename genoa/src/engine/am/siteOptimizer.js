@@ -9101,11 +9101,11 @@ async function scoreCandidate(pt, ctx, warnings){
       //     to complete construction and file for license. Extensions possible for cause.
       //   47 CFR §1.1102 / FCC FY 2024 Fee Schedule (DA 23-864):
       //     AM station application fees (FY2024):
-      //       Form 301-AM (major modification CP): $1,015
-      //       Form 302-AM (license to cover CP): $1,015
+      //       Form 301-AM (major modification CP): $1,015 (minor/standard change; $4,200 major change)
+      //       Form 302-AM (license to cover CP): $435 per §1.1102 FY2024
       //       Form 303-S (renewal of license, not applicable to relocation)
       //     Note: FCC fee schedule updates annually in October.
-      //     Actual FY2024 fee: $1,015 per filing per FCC DA 23-864 (Sep 2023).
+      //     Actual FY2024 fee per DA 23-864 (Sep 2023): 301-AM $1,015; 302-AM $435.
       //   §73.3571(e): Non-substantial (minor) modification — faster processing
       //     (30–60 days) vs. major modification (6–18 months).
       //   §73.3580: Public notice requirement — 30-day petition window triggered
@@ -9129,9 +9129,9 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA = /^DA/i.test(pattern_mode);
 
-      // FCC filing fees (FY2024)
-      const fee_301_am  = 1015;   // Form 301-AM
-      const fee_302_am  = 1015;   // Form 302-AM
+      // FCC filing fees (FY2024 per §1.1102 / DA 23-864)
+      const fee_301_am  = 1015;   // Form 301-AM standard modification CP
+      const fee_302_am  = 435;    // Form 302-AM license to cover
       const total_fcc_fees = fee_301_am + fee_302_am;
 
       // Attorney cost
@@ -20288,10 +20288,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const n_radials   = 120;                          // standard AM ground system
       const radial_len_m = Math.round(lambda_m * 0.35); // 0.35λ per §73.189(b)(4) / NBS TN-24
 
-      // 1. FCC Filing and Regulatory Fees (DA 23-864 FY2024 + §1.1102 FY2023).
-      const fcc_form301     = 1015;   // Form 301-AM application processing fee (DA 23-864 FY2024, flat)
-      const fcc_form302am   = 1015;   // Form 302-AM license-to-cover fee (DA 23-864 FY2024, flat)
-      // Annual regulatory fee (§1.1102 FY2023): Class A $7,265; B $5,020; C/D $2,195
+      // 1. FCC Filing and Regulatory Fees (§1.1102 FY2024 schedule).
+      const fcc_form301     = 1015;   // Form 301-AM application processing fee (§1.1102 FY2024, flat)
+      const fcc_form302am   = 435;    // Form 302-AM license-to-cover fee (§1.1102 FY2024)
+      // Annual regulatory fee (§1.1102 FY2024): Class A $7,265; B $5,020; C/D $2,195
       const fcc_annual_fee  = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;
       const fcc_low  = fcc_form301 + fcc_form302am + fcc_annual_fee;
       const fcc_high = fcc_low; // fees are fixed; no range
@@ -20366,7 +20366,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Build cost category table.
       const cost_categories = [
-        { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: `Form 301-AM ($1,015 DA 23-864) + Form 302-AM ($1,015 DA 23-864) + annual fee ($${fcc_annual_fee} §1.1102 FY2023)` },
+        { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: `Form 301-AM ($1,015 §1.1102 FY2024) + Form 302-AM ($435 §1.1102 FY2024) + annual fee ($${fcc_annual_fee} §1.1102 FY2024)` },
         { category: 'Professional Services',             low_usd: prof_low,          high_usd: prof_high,         notes: `Broadcast attorney + engineer; ${isDA_pf ? 'DA adds pattern modeling & §73.182 night analysis' : 'NDA simplifies attorney scope'}` },
         { category: 'Site Acquisition (excl. land)',     low_usd: site_acq_low,      high_usd: site_acq_high,     notes: 'Title search, survey, Phase I ESA, NEPA §1.1307 / §106 consultation, local permits' },
         { category: 'Tower Construction',                low_usd: tower_low,         high_usd: tower_high,        notes: `${h_frac_pf}λ guyed monopole at ${frequency_khz} kHz = ${Math.round(lambda_q_m)} m (${tower_ft} ft); foundation, base insulator, guys, ASR reg.` },
@@ -26682,7 +26682,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // FCC application forms
       const FCC_FORMS = [
-        { id: 'FORM_301_AM',  phase: 'FCC_APPLICATION',  form: 'FCC Form 301-AM',         required: true,  fee_usd: fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195, description: 'Application for construction permit — major change of facility. Required for site relocation. Fee per §1.1102 FY2023 schedule by class.' },
+        { id: 'FORM_301_AM',  phase: 'FCC_APPLICATION',  form: 'FCC Form 301-AM',         required: true,  fee_usd: 4200, description: 'Application for construction permit — major change of facility. Required for site relocation. Fee per §1.1102 FY2024 schedule (major AM CP: $4,200, flat all classes).' },
         { id: 'FORM_603',     phase: 'FCC_APPLICATION',  form: 'FCC Form 603 (if transfer)', required: false, fee_usd: 820, description: 'Transfer of control / assignment of license. Required if ownership changes at same time as relocation.' },
         { id: 'FORM_301_EXH', phase: 'FCC_APPLICATION',  form: 'Form 301-AM Exhibit A',   required: isDA_rc, description: 'Directional antenna pattern exhibit. Required for DA stations. Includes theoretical radiation pattern and tower coordinates.' },
         { id: 'FORM_301_HRP', phase: 'FCC_APPLICATION',  form: 'Form 301-AM HRP',         required: isDA_rc, description: 'Horizontal radiation pattern table (72 radials, 5° increments). Required for DA CP applications.' },
@@ -26698,7 +26698,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Post-construction / license filings
       const POST_CONSTRUCTION = [
-        { id: 'FORM_302_AM',   phase: 'POST_CONSTRUCTION', form: 'FCC Form 302-AM',       required: true,  fee_usd: 0, description: 'License to cover construction permit. Filed after construction; must include field strength measurements per §73.154.' },
+        { id: 'FORM_302_AM',   phase: 'POST_CONSTRUCTION', form: 'FCC Form 302-AM',       required: true,  fee_usd: 435, description: 'License to cover construction permit. Filed after construction; must include field strength measurements per §73.154. Fee: $435 per §1.1102 FY2024.' },
         { id: 'DA_PROOF',      phase: 'POST_CONSTRUCTION', form: 'DA Proof of Performance', required: isDA_rc, description: 'DA field strength traversal (72 radials × 8 measurement points each per §73.154). Must be within 6 months of CP grant.' },
         { id: 'MPE_STUDY',     phase: 'POST_CONSTRUCTION', form: 'MPE Exhibit (Form 302)', required: tpo_kw > 1, description: `RF exposure MPE analysis per OET Bulletin 65. Required per §1.1307(b) for AM ERP > 1 kW. ${tpo_kw >= 5 ? 'REQUIRED (≥ 5 kW — formal exhibit).' : tpo_kw > 1 ? 'REQUIRED (> 1 kW per §1.1307(b)); retain OET-65 on file.' : 'Categorically excluded (≤ 1 kW).'}` },
         { id: 'ANNUAL_EAS',    phase: 'ONGOING',            form: 'EAS Compliance Review', required: true,  description: 'Annual EAS compliance review per §11.61. Document LP sources, RWT/RMT/NAT test logs, and IPAWS connectivity.' }
@@ -32592,8 +32592,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // STA (Special Temporary Authority) — needed if construction begins before CP grant
       const STA_FEE = 340;
 
-      // License to cover (Form 302-AM) after construction — FCC DA 23-864 FY2024: $1,015 flat
-      const FORM_302_FEE = 1015;
+      // License to cover (Form 302-AM) after construction — §1.1102 FY2024: $435
+      const FORM_302_FEE = 435;
 
       // Amendment fee (if CP must be amended mid-construction)
       const AMENDMENT_FEE = 585;
