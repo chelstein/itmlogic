@@ -8697,7 +8697,7 @@ async function scoreCandidate(pt, ctx, warnings){
         nif_study_cost_low_usd:     nif_cost_low,
         nif_study_cost_high_usd:    nif_cost_high,
         da_night_operation_likely_required: da_night_likely,
-        reference: '47 CFR §73.182 (AM engineering standards / NIF); §73.37 (minimum separations); §73.25 (clear channel dominant stations); §73.21 (AM station classes); FCC M3 / SkyWave propagation curves; OET Bulletin No. 73 (AM propagation)',
+        reference: '47 CFR §73.182 (AM engineering standards / NIF); §73.37 (minimum separations); §73.25 (clear channel dominant stations); §73.21 (AM station classes); §73.184 (groundwave M3 conductivity curves); §73.190 SS-1 (skywave propagation curves); OET Bulletin No. 73 (AM propagation)',
         note: `${isClear ? `CLEAR CHANNEL (${frequency_khz} kHz) — full §73.182 NIF study required. D/U margin screening: ${nif_ok_screen ? `PASS (${du_margin_db} dB margin)` : `FLAG (${du_margin_db} dB — may require DA night authorization)`}.` : `${isRegional ? 'REGIONAL' : 'LOCAL'} channel — ${nif_complexity} NIF study. Min co-channel sep: ${min_sep_co_channel_km} km.`} DA night operation: ${da_night_likely ? 'LIKELY REQUIRED for clear-channel NDA' : 'Not required by this screening'}.`
       };
     })(),
@@ -14921,8 +14921,8 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_soil_conductivity_and_ground_loss_assessment_guide: (() => {
-      // FCC AM propagation uses M3 ground conductivity maps (σ in mS/m).
-      // On-site four-electrode (Wenner) resistivity testing refines FCC M3 assumptions;
+      // FCC AM propagation uses §73.190 Figure M3 ground conductivity maps (σ in mS/m).
+      // On-site four-electrode (Wenner) resistivity testing refines FCC §73.190 Figure M3 assumptions;
       // poor-conductivity sites may benefit from chemical or bentonite soil treatment.
       // Use sigma_msm from the site scoring context (FCC M3 zone-table lookup or measured value).
       const candidate_lat = pt.lat;
@@ -24996,7 +24996,7 @@ async function scoreCandidate(pt, ctx, warnings){
     // service), and 1000 mV/m (blanket). Each contour includes radius_km, color, and
     // regulatory meaning for direct use by the Maplibre/Deck.gl UI layer.
     coverage_service_area_map_spec: (() => {
-      // Compute groundwave contour distances using the FCC M3 propagation curves.
+      // Compute groundwave contour distances using the FCC §73.184 groundwave curves (§73.190 Figure M3 conductivity).
       const contourDefs = [
         { id: 'col_min',    mvm: 5.0,    label: 'COL Minimum Service (§73.24(i))',     color: '#22c55e', fill_opacity: 0.12, stroke_width: 2,   priority: 1 },
         { id: 'standard',   mvm: 2.0,    label: 'Standard Service (2 mV/m)',           color: '#3b82f6', fill_opacity: 0.08, stroke_width: 1.5, priority: 2 },
@@ -25059,7 +25059,7 @@ async function scoreCandidate(pt, ctx, warnings){
         primary_area_km2:     primaryAreaKm2,
         blanket_area_km2:     blanketAreaKm2,
         render_spec:          renderSpec,
-        reference: '47 CFR §73.24(i) (COL 5 mV/m); §73.24(g) (blanket 1000 mV/m); §73.182 (0.5 mV/m protected); FCC M3 groundwave propagation curves',
+        reference: '47 CFR §73.24(i) (COL 5 mV/m); §73.24(g) (blanket 1000 mV/m); §73.182 (0.5 mV/m protected); §73.184 (groundwave field strength curves); §73.190 Figure M3 (ground conductivity)',
         note: 'Contour radii are FCC groundwave screening estimates assuming flat terrain and uniform soil conductivity. Actual contour shapes vary with terrain and σ variation. Use §73.184 groundwave propagation software for filing-grade coverage maps.'
       };
     })(),
