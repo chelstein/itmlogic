@@ -1648,9 +1648,8 @@ test('form_301_checklist is present and contains required FCC filing items', asy
 });
 
 test('form_301_checklist includes SKYWAVE_NIF for clear_channel or HIGH skywave stations', async () => {
-  // KAZM (1490 kHz) is a regional channel, Class B — skywave risk depends on the
-  // buildProtectionAdvisory logic.  Clear channel stations always include it.
-  // We test that a clear channel station (e.g. 640 kHz — KFI clear) gets the item.
+  // KAZM defaults (780 kHz, Class D) spread with frequency_khz: 640 (clear channel — KFI).
+  // Clear channel stations always require SKYWAVE_NIF in the form_301_checklist.
   const clearChannelInputs = { ...KAZM, frequency_khz: 640 };
   const out = await runSiteOptimizer({ ...clearChannelInputs, candidate_limit: 5 });
   assert.equal(out.available, true);

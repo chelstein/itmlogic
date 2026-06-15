@@ -2066,8 +2066,8 @@ test('colocation GRID candidates have transmitter_power_upgrade_pathway_guide', 
   for (const c of out.candidates) {
     const g = c.transmitter_power_upgrade_pathway_guide;
     assert.ok(g != null, `rank ${c.rank} missing transmitter_power_upgrade_pathway_guide`);
-    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (5 kW → 50 kW Class D ceiling per §73.21(b))`);
-    assert.strictEqual(g.coverage_gain_pct, 216, `rank ${c.rank} coverage_gain_pct must be 216 (√10 at the 50 kW ceiling)`);
+    assert.strictEqual(g.can_upgrade_day_power, false, `rank ${c.rank} can_upgrade_day_power must be false (KAZM at 5 kW = Class D ceiling per §73.21(e))`);
+    assert.strictEqual(g.coverage_gain_pct, 0, `rank ${c.rank} coverage_gain_pct must be 0 (no power upgrade possible at Class D ceiling)`);
   }
 });
 
