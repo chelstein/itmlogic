@@ -1116,7 +1116,7 @@ const DEMO_RESULT = {
           { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
         ],
         matching_network_complexity: 'LOW — λ/4 tower presents near-unity VSWR to 50 Ω transmitter output; base ATU rarely required beyond coarse trimming.',
-        design_note: 'Standard 120-radial ground system at 96.15 m length achieves ~82% radiation efficiency at σ=5 mS/m. Extending to 180 radials at 144.23 m (3λ/8) gains ~9 pts efficiency.'
+        design_note: 'FCC standard: 120 radials × 0.35λ = 134.52 m per §73.189(b)(4). λ/4 (96.15 m) yields ~82% efficiency at σ=5 mS/m; 0.35λ achieves modestly higher efficiency. Extending to 180 radials at 144.23 m (3λ/8) vs λ/4 baseline gains ~9 pts efficiency.'
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
@@ -2056,18 +2056,18 @@ const DEMO_RESULT = {
         frequency_khz: 780, fcc_class: 'D',
         pattern_mode: 'NDA', is_da: false, n_towers: 1,
         wavelength_m: 384.62, lambda_quarter_m: 96.15, lambda_half_m: 192.31,
-        n_radials: 120, radial_length_m: 96.15, total_wire_length_m: 11538,
+        n_radials: 120, radial_length_m: 134.62, total_wire_length_m: 16154,
         copper_cost_per_m: 0.95, trench_cost_per_m: 3.5,
         ground_ring_cost_usd: 3500, bonding_testing_cost_usd: 2000,
         engineering_supervision_cost_usd: 3500, equipment_rental_cost_usd: 4000,
-        per_tower_wire_cost_usd: 10961, per_tower_trench_cost_usd: 40383, per_tower_fixed_cost_usd: 13000,
-        per_tower_total_cost_usd: 64344,
-        total_estimated_cost_usd: { low: 48265, typical: 64344, high: 96516 },
-        half_wave_upgrade_cost_usd: 51264,
-        copper_lbs_total: 1199,
+        per_tower_wire_cost_usd: 15346, per_tower_trench_cost_usd: 56539, per_tower_fixed_cost_usd: 13000,
+        per_tower_total_cost_usd: 84885,
+        total_estimated_cost_usd: { low: 63664, typical: 84885, high: 127328 },
+        half_wave_upgrade_cost_usd: 30806,
+        copper_lbs_total: 1678,
         fcc_minimum_radials: 120, radial_cfr: '47 CFR §73.189(b)(4)',
         reference: '47 CFR §73.189(b)(4) (AM ground system standard — 120 × 0.35λ); §73.190 (conductivity certification); NBS Technical Note 24; FCC AM Engineering Handbook; Terman (1943) radial ground system efficiency; ARRL Antenna Book (#10 AWG copper specs)',
-        note: '780 kHz, λ/4=96.15 m. Standard ground system: 120 radials × 96.15 m = 11,538 m total wire. Estimated cost: $48,265–$96,516 (typ. $64,344). Half-wave upgrade adds ~$51,264.'
+        note: '780 kHz, λ/4=96.15 m, 0.35λ=134.62 m (FCC standard per §73.189(b)(4)). Standard ground system: 120 radials × 134.62 m = 16,154 m total wire. Estimated cost: $63,664–$127,328 (typ. $84,885). Half-wave upgrade adds ~$30,806.'
       },
       frequency_coordination_with_adjacent_stations_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -4172,7 +4172,7 @@ const DEMO_RESULT = {
           { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
         ],
         matching_network_complexity: 'LOW — λ/4 tower presents near-unity VSWR; σ=6 mS/m ground gives slightly better efficiency than rank 1.',
-        design_note: 'Standard 120-radial ground system at 96.15 m length achieves ~85% radiation efficiency at σ=6 mS/m.'
+        design_note: 'FCC standard is 0.35λ=134.62 m per §73.189(b)(4). λ/4 (96.15 m) baseline: 120-radial system achieves ~85% radiation efficiency at σ=6 mS/m.'
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
@@ -4366,7 +4366,7 @@ const DEMO_RESULT = {
           { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
         ],
         matching_network_complexity: 'LOW — σ=10 mS/m (EXCELLENT) gives low ground resistance ~6.1 Ω; standard 120-radial system at λ/4 adequate.',
-        design_note: 'Standard 120-radial ground system at 96.15 m achieves ~85.7% radiation efficiency at σ=10 mS/m.'
+        design_note: 'FCC standard is 0.35λ=134.62 m per §73.189(b)(4). λ/4 (96.15 m) baseline: 120-radial system achieves ~85.7% radiation efficiency at σ=10 mS/m.'
       },
       permit_and_engineering_cost_estimate: {
         cost_tier: 'HIGH',
@@ -4407,7 +4407,7 @@ const DEMO_RESULT = {
       blanket_1000mvm_km: 0.6, minimum_tpo_for_compliance_kw: 4.2, minimum_tpo_for_col_coverage_kw: 47.8,
       ground_sigma_mS_m: 1.5, ground_sigma_quality: 'POOR', ground_sigma_filing_grade: 'screening',
       ground_sigma_source: 'FCC M3 zone table',
-      ground_radial_advisory: 'POOR conductivity (σ=1.5 mS/m): §73.190 extended ground system likely required — consider deep-driven ground rods or buried copper grid in addition to standard 120 radials. Site soil resistivity survey strongly recommended before committing to this location.',
+      ground_radial_advisory: 'POOR conductivity (σ=1.5 mS/m): extended ground system beyond §73.189(b)(4) standard (120 × 0.35λ) likely required — consider deep-driven ground rods or buried copper grid in addition to standard radials. Site soil resistivity survey per §73.190 strongly recommended before committing to this location.',
       score_confidence: 'LOW', field_at_col_centroid_mvm: 0.31,
       estimated_daytime_population_served: 54000,
       treaty_zone: 'US-MX advisory',
