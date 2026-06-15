@@ -17259,7 +17259,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Other classes: near-continuous (23h/day accounting for maintenance windows)
       const daily_hrs_day   = is_clear_ch_aoc && fcc_class === 'D' ? 13 : 23;
       const daily_hrs_night = is_clear_ch_aoc && fcc_class === 'D' ? 3 : 1;   // Class D clr: brief night auth or sign-off; assume ~3 h avg
-      const night_draw_kw   = is_clear_ch_aoc && fcc_class === 'D' ? round2(Math.min(tpo_kw, 0.5) / tx_system_efficiency) : 0; // ≤0.5 kW night per §73.21(b)(2)
+      const night_draw_kw   = is_clear_ch_aoc && fcc_class === 'D' ? round2(Math.min(tpo_kw, 1.0) / tx_system_efficiency) : 0; // ≤1 kW night per §73.21(b)(2)/§73.99
 
       const annual_kwh_day   = Math.round(tx_draw_kw   * daily_hrs_day   * 365);
       const annual_kwh_night = Math.round(night_draw_kw * daily_hrs_night * 365);
@@ -20003,10 +20003,10 @@ async function scoreCandidate(pt, ctx, warnings){
         required_exhibits,
         deficiency_triggers,
         n_deficiency_risks:     deficiency_triggers.length,
-        filing_fee_usd:         4200,
+        filing_fee_usd:         1015,
         filing_system:          'FCC LMS (Licensing Management System)',
         reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301-AM Instructions (2024); OET Bulletin 65; NHPA §106',
-        note: `FCC Form 301-AM ${isDA_ch ? `DA (${pattern_mode})` : 'NDA'} application for ${frequency_khz} kHz Class ${fcc_class}: ${n_required} required exhibits across ${isDA_ch ? 7 : 6} sections. Top deficiency risk: ${deficiency_triggers[0].issue}. ${asr_required_ch ? `ASR registration required (tower ≈ ${tower_ft_ch} ft). ` : ''}Filing fee: $4,200.`
+        note: `FCC Form 301-AM ${isDA_ch ? `DA (${pattern_mode})` : 'NDA'} application for ${frequency_khz} kHz Class ${fcc_class}: ${n_required} required exhibits across ${isDA_ch ? 7 : 6} sections. Top deficiency risk: ${deficiency_triggers[0].issue}. ${asr_required_ch ? `ASR registration required (tower ≈ ${tower_ft_ch} ft). ` : ''}Filing fee: $1,015 (DA 23-864 FY2024).`
       };
     })(),
 
@@ -20267,12 +20267,13 @@ async function scoreCandidate(pt, ctx, warnings){
       const n_radials   = 120;                          // standard AM ground system
       const radial_len_m = Math.round(lambda_m * 0.35); // 0.35λ per §73.189(b)(4) / NBS TN-24
 
-      // 1. FCC Regulatory Fees (§1.1102, 2024 schedule).
-      const fcc_form301     = 4200;   // major change CP, AM commercial
-      const fcc_form302am   = 435;    // license to cover
-      const fcc_annual_fee  = 660;    // Class D annual regulatory fee (first year)
+      // 1. FCC Filing and Regulatory Fees (DA 23-864 FY2024 + §1.1102 FY2023).
+      const fcc_form301     = 1015;   // Form 301-AM application processing fee (DA 23-864 FY2024, flat)
+      const fcc_form302am   = 1015;   // Form 302-AM license-to-cover fee (DA 23-864 FY2024, flat)
+      // Annual regulatory fee (§1.1102 FY2023): Class A $7,265; B $5,020; C/D $2,195
+      const fcc_annual_fee  = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;
       const fcc_low  = fcc_form301 + fcc_form302am + fcc_annual_fee;
-      const fcc_high = fcc_low + 660; // NEPA categorical exclusion review, if triggered
+      const fcc_high = fcc_low; // fees are fixed; no range
 
       // 2. Professional Services (attorney + engineer).
       // NDA is simpler than DA; DA adds pattern modeling + §73.182 night analysis.
@@ -20344,7 +20345,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Build cost category table.
       const cost_categories = [
-        { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: 'Form 301 CP ($4,200) + Form 302-AM ($435) + annual fee ($660); §1.1102' },
+        { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: `Form 301-AM ($1,015 DA 23-864) + Form 302-AM ($1,015 DA 23-864) + annual fee ($${fcc_annual_fee} §1.1102 FY2023)` },
         { category: 'Professional Services',             low_usd: prof_low,          high_usd: prof_high,         notes: `Broadcast attorney + engineer; ${isDA_pf ? 'DA adds pattern modeling & §73.182 night analysis' : 'NDA simplifies attorney scope'}` },
         { category: 'Site Acquisition (excl. land)',     low_usd: site_acq_low,      high_usd: site_acq_high,     notes: 'Title search, survey, Phase I ESA, NEPA §1.1307 / §106 consultation, local permits' },
         { category: 'Tower Construction',                low_usd: tower_low,         high_usd: tower_high,        notes: `${h_frac_pf}λ guyed monopole at ${frequency_khz} kHz = ${Math.round(lambda_q_m)} m (${tower_ft} ft); foundation, base insulator, guys, ASR reg.` },
@@ -20461,9 +20462,9 @@ async function scoreCandidate(pt, ctx, warnings){
         : 1.0;
       const coverage_gain_pct = Math.round((coverage_radius_factor - 1) * 100);
 
-      // FCC filing fees (47 CFR §1.1102, 2024 schedule).
-      const form301_fee_usd  = 4200;   // major change CP, AM commercial
-      const form302_fee_usd  = 435;    // license to cover
+      // FCC filing fees (DA 23-864 FY2024): Form 301-AM and 302-AM are $1,015 flat.
+      const form301_fee_usd  = 1015;   // Form 301-AM application processing fee (DA 23-864 FY2024)
+      const form302_fee_usd  = 1015;   // Form 302-AM license-to-cover fee (DA 23-864 FY2024)
 
       // Transmitter cost: 10 kW AM (2024 market).
       // Low: refurbished Harris DX-10, Continental 312F, or Nautel NA-10.
@@ -22222,7 +22223,7 @@ async function scoreCandidate(pt, ctx, warnings){
         is_directional: isDA_lm,
         fcc_form: '301-AM',
         fcc_system: 'FCC LMS (lms.fcc.gov)',
-        filing_fee_usd: 325,
+        filing_fee_usd: 1015,  // DA 23-864 FY2024 flat fee
         required_exhibits,
         n_required_exhibits,
         all_exhibits: REQUIRED_EXHIBITS,
@@ -24702,7 +24703,7 @@ async function scoreCandidate(pt, ctx, warnings){
           form: 'FCC Form 301-AM (Major Change)',
           timeline_months_optimistic: 18,
           timeline_months_conservative: 36,
-          filing_fee_usd_approx: 5020,   // FCC Form 301-AM major change fee for Class B (§1.1102 FY2023)
+          filing_fee_usd_approx: 1015,   // FCC Form 301-AM application processing fee (DA 23-864 FY2024, flat for all classes)
           engineering_cost_usd_approx_low: 15000,
           engineering_cost_usd_approx_high: 50000,
           note: 'Class D→B upgrade is a major modification. The station must demonstrate it meets Class B minimum power (≥0.25 kW) and the new Class B §73.37 spacing table in all directions. FCC staff review typically takes 12–24 months after filing.'
@@ -25364,7 +25365,7 @@ async function scoreCandidate(pt, ctx, warnings){
         phases,
         critical_path_milestone_ids: criticalPath,
         n_critical_path:           criticalPath.length,
-        filing_fee_major_change_usd: fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195,  // §1.1102 FY2023 by class (A/$7265, B/$5020, C/D/$2195)
+        filing_fee_major_change_usd: 1015,  // Form 301-AM application processing fee (DA 23-864 FY2024, flat all classes)
         reference: '47 CFR §73.3533; §73.3598; §73.3580; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
         note: `CP timeline for ${fcc_class} class ${isDA_cpt ? 'directional' : 'non-directional'} AM relocation. Optimistic: ${totalOptimisticWeeks} weeks (~${round2(totalOptimisticWeeks / 4.33)} months). Conservative: ${totalConservativeWeeks} weeks (~${round2(totalConservativeWeeks / 4.33)} months).`
       };

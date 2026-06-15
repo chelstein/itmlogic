@@ -1448,8 +1448,8 @@ const DEMO_RESULT = {
             new_power_max_kw: 50, new_protected_contour_mvm: 0.5, new_nif_study_required: true,
             nif_study_type: 'FULL_CLEAR_CHANNEL_NIF', form: 'FCC Form 301-AM (Major Change)',
             timeline_months_optimistic: 18, timeline_months_conservative: 36,
-            filing_fee_usd_approx: 5020, engineering_cost_usd_approx_low: 15000, engineering_cost_usd_approx_high: 50000,
-            note: 'Class D→B upgrade is a major modification. Must demonstrate Class B §73.37 spacing in all directions. FCC fee: $5,020 (Class B §1.1102 FY2023).' }
+            filing_fee_usd_approx: 1015, engineering_cost_usd_approx_low: 15000, engineering_cost_usd_approx_high: 50000,
+            note: 'Class D→B upgrade is a major modification. Must demonstrate Class B §73.37 spacing in all directions. FCC Form 301-AM fee: $1,015 (DA 23-864 FY2024); §1.1102 annual regulatory fee for Class B: $5,020.' }
         ],
         upgrade_filing_steps: [
           { step: 1, action: 'Engineering study', detail: 'Full §73.37 spacing analysis at the TARGET class. Spacing failure ends the process.', estimated_days: 15 },
@@ -1750,7 +1750,7 @@ const DEMO_RESULT = {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
         is_directional: false, is_clear_channel: true, tower_height_ft: 315.5, asr_required: true,
         n_exhibits_total: 24, n_exhibits_required: 22, n_exhibits_da_specific: 0,
-        filing_fee_usd: 2195, filing_system: 'FCC LMS (Licensing Management System)',
+        filing_fee_usd: 1015, filing_system: 'FCC LMS (Licensing Management System)',
         n_deficiency_risks: 5,
         deficiency_triggers: [
           { rank: 1, issue: 'Missing nighttime skywave analysis', cfr: '§73.182', how_to_avoid: 'Run §73.182 skywave NIF contour analysis before filing; include FCC SKYWAVE tool output as exhibit' },
@@ -2334,7 +2334,7 @@ const DEMO_RESULT = {
         is_directional: false,
         fcc_form: '301-AM',
         fcc_system: 'FCC LMS (lms.fcc.gov)',
-        filing_fee_usd: 325,
+        filing_fee_usd: 1015,
         n_required_exhibits: 9,
         required_exhibits: [
           { id: 'SITE_COORDS', label: 'Site coordinates (NAD83 lat/lon)', cfr: '§73.3533; §73.25', required: true, note: 'Must be NAD83 datum; GPS survey with sub-meter accuracy required' },
