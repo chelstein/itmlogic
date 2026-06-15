@@ -618,13 +618,13 @@ export function buildValidationVerdictSection(exhibit){
     // parity check hits (geo.fcc.gov) is FM-only — it exposes the FM
     // tvfm_curves engine.  AM exhibits have no equivalent public
     // distance endpoint; the FCC AM toolset is groundwave conductivity
-    // graphs (§73.183/§73.184) and NIF/RSS skywave (§73.190), not a
+    // graphs (§73.184) and NIF/RSS skywave (§73.190), not a
     // distance API.  So the "engineer of record should re-run with the
     // live parity check" guidance is FM-specific; for AM the engine-
     // reference computation IS the canonical record.
     const svc = String(exhibit.station_inputs?.service || '').toUpperCase();
     if (svc === 'AM'){
-      interpretation = 'Genoa\'s computed groundwave / NIF results pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  No FCC public distance endpoint exists for AM (§73.183/§73.184 groundwave and §73.190 skywave are graph-based, not distance-API-based), so engine-reference computation is the canonical record for AM exhibits at tier-3.';
+      interpretation = 'Genoa\'s computed groundwave / NIF results pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  No FCC public distance endpoint exists for AM (§73.184 groundwave field strength graphs and §73.190 skywave curves are graph-based, not distance-API-based), so engine-reference computation is the canonical record for AM exhibits at tier-3.';
     } else {
       interpretation = 'Genoa\'s computed contour distances pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  The live geo.fcc.gov parity check fell back to tier-3 code-identity verification (curve dataset SHA-256 matches upstream fcc/contours-api-node commit).  Code-identity is strong evidence of parity but is NOT a live cross-check; engineer of record should re-run with the live parity check before filing if definitive cross-verification is required.';
     }
