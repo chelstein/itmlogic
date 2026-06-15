@@ -11,7 +11,7 @@
 //   1. MW Radio Propagation — groundwave vs skywave, why σ matters
 //   2. Soil-conductivity reference (FCC 1939 Table B verbatim)
 //   3. Blanketing Contours — what §73.24(g) is for
-//   4. Ground System — why 120 buried radials at quarter-wavelength
+//   4. Ground System — why 120 buried radials at 0.35λ (§73.189(b)(4))
 //   5. Maintenance Recommendations — for existing_facility_review intent
 //
 // All rendered as PARAGRAPHS sections (no schema change required) so

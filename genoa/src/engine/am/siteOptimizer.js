@@ -33002,19 +33002,19 @@ function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
 
   // Standard radial length per §73.189(b)(4) / NBS TN-24: 0.35λ for optimum ground system.
   const lambda_m   = frequency_khz ? round2(300000 / frequency_khz) : null;
-  const qw_radial_m = lambda_m ? round2(lambda_m * 0.35) : null;  // 0.35λ per §73.189(b)(4) / NBS TN-24
+  const fcc_std_radial_m = lambda_m ? round2(lambda_m * 0.35) : null;  // 0.35λ per §73.189(b)(4) / NBS TN-24
 
   // Standard system: 120 radials at 0.35λ length buried ≥5 cm (§73.189(b)(4) / NBS TN-24).
   // Extended system: 120–180 radials at 0.35λ–0.5λ, + deep-driven rods, for poor σ.
-  // Copper weight: 120 × radial_length × AWG #10 wire (4.66 g/m) for rough cost estimate.
-  // AWG #10 is commonly used; #8 is preferred for high-power installations.
-  const aWireGPerM = 4.66;  // AWG #10 copper, g/m
+  // Copper weight: 120 × radial_length × AWG #10 solid bare wire (47.1 g/m) for material estimate.
+  // #10 AWG: 5.261 mm² × 8.96 g/cm³ = 47.1 g/m = 0.1039 lbs/m (NBS TN-24).
+  const aWireGPerM = 47.1;  // AWG #10 solid bare copper, g/m
   const copperKg = (count, lenM) => round2(count * lenM * aWireGPerM / 1000);
 
   const stdCount   = 120;
   const extCount   = 180;
-  const stdLen     = qw_radial_m;                           // 0.35λ = standard per §73.189(b)(4)
-  const extLen     = qw_radial_m ? round2(qw_radial_m * 1.43) : null; // ~0.5λ for poor σ
+  const stdLen     = fcc_std_radial_m;                                    // 0.35λ per §73.189(b)(4)
+  const extLen     = fcc_std_radial_m ? round2(fcc_std_radial_m * 1.43) : null; // ~0.5λ for poor σ
 
   const stdCopperKg = stdLen ? copperKg(stdCount, stdLen) : null;
   const extCopperKg = extLen ? copperKg(extCount, extLen) : null;
