@@ -13892,20 +13892,21 @@ async function scoreCandidate(pt, ctx, warnings){
       // Total copper wire length:
       const total_radial_length_ft   = round2(num_radials_ideal * radial_length_ft);
       const total_radial_length_mi   = round2(total_radial_length_ft / 5280);
-      // #10 AWG bare copper wire: ~$0.10–$0.20/ft installed (material + burial)
-      const copper_low_per_ft  = 0.10;
-      const copper_high_per_ft = 0.20;
+      // #10 AWG bare copper wire: ~$0.18–$0.37/ft material (EIA 2024; ~$0.60–$1.20/m)
+      const copper_low_per_ft  = 0.18;
+      const copper_high_per_ft = 0.37;
       const copper_low_usd     = round2(total_radial_length_ft * copper_low_per_ft);
       const copper_high_usd    = round2(total_radial_length_ft * copper_high_per_ft);
-      // Buried vs. surface: buried adds $0.10–$0.30/ft for trenching
-      const burial_low_per_ft  = 0.10;
-      const burial_high_per_ft = 0.30;
+      // Burial: mechanical trenching adds ~$0.61–$1.83/ft ($2–$6/m; RS Means 2024)
+      const burial_low_per_ft  = 0.61;
+      const burial_high_per_ft = 1.83;
       const burial_low_usd     = round2(total_radial_length_ft * burial_low_per_ft);
       const burial_high_usd    = round2(total_radial_length_ft * burial_high_per_ft);
-      // Ground bus ring and connections:
+      // Ground bus ring and connections (material only; use GRIC for full installed cost):
       const bus_ring_low_usd  = 2000;
       const bus_ring_high_usd = 6000;
-      // Total installed cost:
+      // Material + burial subtotal (excludes contractor overhead, engineering, equipment rental;
+      // see ground_radial_installation_cost_guide for full installed cost estimate):
       const total_low_usd  = round2(copper_low_usd  + burial_low_usd  + bus_ring_low_usd);
       const total_high_usd = round2(copper_high_usd + burial_high_usd + bus_ring_high_usd);
       return {
