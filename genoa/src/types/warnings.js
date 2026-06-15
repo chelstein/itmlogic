@@ -330,7 +330,7 @@ export const WARNING_CODES = Object.freeze({
     description: 'The engine resolved to SHA "uncommitted" because no Docker .build_sha, GIT_COMMIT_SHA env-var, or .git/HEAD was found at startup.  The build_attestation.sha field is non-unique; two exhibits with different code may share the same "uncommitted" SHA.  Deploy via Docker or set GIT_COMMIT_SHA to fix.' },
 
   SIGMA_CLAMP: { severity: 'warning', phase: 'engine',
-    title: 'AM σ rounded or clamped to FCC M3 grid (47 CFR §73.184)',
+    title: 'AM σ rounded or clamped to FCC M3 conductivity grid (47 CFR §73.190 Figure M3)',
     description: 'The §73.184 groundwave grid is keyed on integer σ ∈ {1..8} mS/m (§73.190 Figure M3).  The typed conductivity was rounded to the nearest grid value, or clamped to the 1 / 8 mS/m boundary for out-of-range soils (wet/marine commonly ≥10 mS/m).  Distances reflect the boundary curve, not the typed σ.  See exhibit.evidence.ground_constants for the input vs. used values.' },
 
   // ─── AM nighttime NIF (§73.182) warning codes ────────────────────────────
