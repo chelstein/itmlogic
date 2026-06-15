@@ -13714,7 +13714,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower inspection (annual): $2,000–$5,000
       const tower_inspection_low  = 2000;
       const tower_inspection_high = 5000;
-      // FCC annual regulatory fee (§1.1102 FY2023): Class A $7,265; B $5,020; C/D $2,195.
+      // FCC annual regulatory fee (§1.1102 FY2024): Class A $7,265; B $5,020; C/D $2,195.
       const FCC_REG_FEE_BREAKDOWN = { A: 7265, B: 5020, C: 2195, D: 2195 };
       const fcc_annual_fee_low  = FCC_REG_FEE_BREAKDOWN[fcc_class] ?? 2195;
       const fcc_annual_fee_high = fcc_annual_fee_low;
@@ -14377,7 +14377,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const fcc_misc_usd = 120;
       // Total FCC government filing fees for the CP process
       const fcc_filing_fee_usd = form_301_am_usd + fcc_asr_fee_usd + fcc_misc_usd; // $1,310
-      // FCC annual regulatory fee (§1.1102 FY2023): Class D/C $2,195; Class B $5,020; Class A $7,265.
+      // FCC annual regulatory fee (§1.1102 FY2024): Class D/C $2,195; Class B $5,020; Class A $7,265.
       const annual_reg_fee_low  = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;
       const annual_reg_fee_high = annual_reg_fee_low;
       // Engineering consultant (CP preparation, technical exhibits, FCC Form 301-AM):
@@ -16260,7 +16260,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // FCC Annual Regulatory Fee (FY 2023 schedule, 47 CFR §1.1102).
       // AM fees are assessed per station; rate differs by class.
-      // Class A: $7,265; Class B: $5,020; Class C/D: $2,195 (§1.1102 FY2023).
+      // Class A: $7,265; Class B: $5,020; Class C/D: $2,195 (§1.1102 FY2024).
       const annual_fcc_fee_usd = fcc_class === 'A' ? 7265
         : fcc_class === 'B' ? 5020
         : 2195;   // Class C or D
@@ -17299,7 +17299,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const equip_maint_high_usd = Math.round(EQUIP_VALUE[power_class_aoc] * 0.08);
 
       // ---- FCC annual regulatory fee ----
-      // 47 CFR §1.1102 FY2023 schedule: Class A $7,265; Class B $5,020; Class C/D $2,195.
+      // 47 CFR §1.1102 FY2024 schedule: Class A $7,265; Class B $5,020; Class C/D $2,195.
       const FCC_REGULATORY_FEE = { A: 7265, B: 5020, C: 2195, D: 2195 };
       const fcc_annual_fee_usd = FCC_REGULATORY_FEE[fcc_class] ?? 2195;
 
@@ -17958,7 +17958,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Engineering and FCC filing costs
       const engineering_cost_low_usd  = fcc_class === 'A' ? 25000 : (fcc_class === 'B' ? 15000 : 8000);
       const engineering_cost_high_usd = fcc_class === 'A' ? 75000 : (fcc_class === 'B' ? 40000 : 20000);
-      const fcc_filing_fee_usd = 1015; // FCC DA 23-864 (FY2024): Form 301-AM flat fee, all classes
+      const fcc_filing_fee_usd = 4200; // Form 301-AM major change CP per §1.1102 FY2024 (relocation = major change)
 
       return {
         filing_type,
@@ -20289,7 +20289,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const radial_len_m = Math.round(lambda_m * 0.35); // 0.35λ per §73.189(b)(4) / NBS TN-24
 
       // 1. FCC Filing and Regulatory Fees (§1.1102 FY2024 schedule).
-      const fcc_form301     = 1015;   // Form 301-AM application processing fee (§1.1102 FY2024, flat)
+      const fcc_form301     = 4200;   // Form 301-AM major change CP fee (§1.1102 FY2024); relocation = major change
       const fcc_form302am   = 435;    // Form 302-AM license-to-cover fee (§1.1102 FY2024)
       // Annual regulatory fee (§1.1102 FY2024): Class A $7,265; B $5,020; C/D $2,195
       const fcc_annual_fee  = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;
@@ -20366,7 +20366,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Build cost category table.
       const cost_categories = [
-        { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: `Form 301-AM ($1,015 §1.1102 FY2024) + Form 302-AM ($435 §1.1102 FY2024) + annual fee ($${fcc_annual_fee} §1.1102 FY2024)` },
+        { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: `Form 301-AM major CP ($4,200 §1.1102 FY2024) + Form 302-AM ($435 §1.1102 FY2024) + annual fee ($${fcc_annual_fee} §1.1102 FY2024)` },
         { category: 'Professional Services',             low_usd: prof_low,          high_usd: prof_high,         notes: `Broadcast attorney + engineer; ${isDA_pf ? 'DA adds pattern modeling & §73.182 night analysis' : 'NDA simplifies attorney scope'}` },
         { category: 'Site Acquisition (excl. land)',     low_usd: site_acq_low,      high_usd: site_acq_high,     notes: 'Title search, survey, Phase I ESA, NEPA §1.1307 / §106 consultation, local permits' },
         { category: 'Tower Construction',                low_usd: tower_low,         high_usd: tower_high,        notes: `${h_frac_pf}λ guyed monopole at ${frequency_khz} kHz = ${Math.round(lambda_q_m)} m (${tower_ft} ft); foundation, base insulator, guys, ASR reg.` },
@@ -32582,7 +32582,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const fcc_cl    = fcc_class ?? 'D';
       const tpo       = tpo_kw ?? 1;
 
-      // Annual regulatory fee (§1.1102 FY2023 schedule) — class-dependent recurring fee paid annually.
+      // Annual regulatory fee (§1.1102 FY2024 schedule) — class-dependent recurring fee paid annually.
       // Distinct from the Form 301-AM application processing fee ($1,015 flat per DA 23-864 FY2024).
       // Field is named form_301_fee_usd for historical reasons; value is the §1.1102 annual regulatory fee.
       // Class A: $7,265 | Class B: $5,020 | Class C/D: $2,195
