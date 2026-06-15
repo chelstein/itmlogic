@@ -8165,7 +8165,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // require engineering justification and may degrade efficiency by 5–15%.
       //
       // Ground system conductivity (σ) determines antenna efficiency.
-      // The M3 conductivity map (§73.184) governs the expected ground
+      // The M3 conductivity map (§73.190 Figure M3) governs the expected ground
       // conductivity at the candidate site; poor ground (σ < 2 mS/m) can
       // reduce daytime groundwave coverage by 20–35% relative to σ = 8 mS/m.
       //
@@ -14352,7 +14352,7 @@ async function scoreCandidate(pt, ctx, warnings){
         r_05mvm_km,    r_05mvm_mi,
         r_0025mvm_km,  r_0025mvm_mi: round2(r_0025mvm_km * 0.621371),
         area_5mvm_km2, area_05mvm_km2,
-        reference: 'ITU-R P.368 (ground-wave propagation); 47 CFR §73.182 (AM service contours); §73.184 (groundwave propagation method, M3 conductivity maps); FCC M3 ground conductivity map; simplified planning formula only — use Groundwave Assistant for precise contours',
+        reference: 'ITU-R P.368 (ground-wave propagation); 47 CFR §73.182 (AM service contours); §73.184 (groundwave propagation method); §73.190 Figure M3 (ground conductivity maps); simplified planning formula only — use Groundwave Assistant for precise contours',
         note: `${tpo_kw} kW ${isDA_sc ? 'DA' : 'NDA'}: 5 mV/m radius ≈ ${r_5mvm_km} km (${r_5mvm_mi} mi); 0.5 mV/m ≈ ${r_05mvm_km} km (${r_05mvm_mi} mi). Simplified planning estimate only.`
       };
     })(),
@@ -16862,7 +16862,7 @@ async function scoreCandidate(pt, ctx, warnings){
         dist_current_to_col_km, dist_candidate_to_col_km,
         col_in_current_contour, col_in_candidate_contour, col_field_improvement,
         verdict,
-        reference: 'FCC M3 ground conductivity map (zone-table screening proxy); ITU-R P.368-9 (groundwave propagation); 47 CFR §73.184 (AM groundwave coverage computation / M3 conductivity method)',
+        reference: 'FCC M3 ground conductivity map (§73.190 Figure M3, zone-table screening proxy); ITU-R P.368-9 (groundwave propagation); 47 CFR §73.184 (AM groundwave coverage computation)',
         note: `Coverage vs current site: radius ${d_candidate_km} km (candidate) vs ${d_current_km} km (current) — ${coverage_radius_delta_pct >= 0 ? '+' : ''}${coverage_radius_delta_pct}% (${coverage_delta_km2 >= 0 ? '+' : ''}${coverage_delta_km2} km²). ${col_field_improvement}. Displacement: ${displacement_km} km at ${bearing_deg_ci}°. Verdict: ${verdict}.`
       };
     })(),
@@ -16986,7 +16986,7 @@ async function scoreCandidate(pt, ctx, warnings){
         sigma_ms, conductivity_label, m3_zone,
         freq_scale, d_05_mvm_km, coverage_area_km2,
         d_ref_avg_km, coverage_delta_pct, ground_advisory,
-        reference: 'FCC M3 ground conductivity map (FCC OST R-6506); ITU-R P.368-9 (groundwave propagation curves); 47 CFR §73.184 (AM groundwave propagation method / M3 conductivity maps); OET Bulletin 73-1',
+        reference: 'FCC §73.190 Figure M3 ground conductivity map (FCC OST R-6506); ITU-R P.368-9 (groundwave propagation curves); 47 CFR §73.184 (AM groundwave propagation method); OET Bulletin 73-1',
         note: `Candidate site: FCC M3 Zone ${m3_zone}, σ≈${sigma_ms} mS/m (${conductivity_label}). Est. daytime 0.5 mV/m contour: ${d_05_mvm_km} km radius, ${coverage_area_km2.toLocaleString()} km² area (vs ${d_ref_avg_km} km at US average σ=5 mS/m — ${Math.abs(coverage_delta_pct)}% ${coverage_delta_pct >= 0 ? 'better' : 'worse'}). ${ground_advisory}`
       };
     })(),
@@ -26999,7 +26999,7 @@ async function scoreCandidate(pt, ctx, warnings){
           max_improvement_pct: 400, // sigma jump from 1→4+ mS/m
           description:   'Best sigma improvement is site relocation to coastal marsh, lakeside, or agricultural bottomland. Sigma 8–30 mS/m vs. 0.5–2 mS/m in desert/rocky.',
           prerequisites: ['Available land near water', 'No EPA wetland restriction'],
-          standard:      'FCC §73.184 M3 conductivity maps; Salat & Ziegler (1991) ITT Reference Data'
+          standard:      'FCC §73.190 Figure M3 conductivity maps; §73.184 (groundwave field strength graphs); Salat & Ziegler (1991) ITT Reference Data'
         }
       ];
 
@@ -27039,7 +27039,7 @@ async function scoreCandidate(pt, ctx, warnings){
         coverage_gain_pct:           Math.max(coverageGainPct, 0),
         treatment_area_km2:          siteAreaKm2,
         improvement_budget_usd:      improvementBudget,
-        reference: '47 CFR §73.150; §73.184 (M3 conductivity maps); IEEE Std 80-2013 ground electrode systems; Terman (1950) Radio Engineers Handbook; Belrose (1966) IRE; ERITECH GCP-35',
+        reference: '47 CFR §73.150; §73.184 (groundwave field strength graphs); §73.190 Figure M3 (conductivity maps); IEEE Std 80-2013 ground electrode systems; Terman (1950) Radio Engineers Handbook; Belrose (1966) IRE; ERITECH GCP-35',
         note: `Baseline σ=${sigma_gci} mS/m (${isHighConductivity ? 'preferred — no improvement needed' : isLowConductivity ? 'low — improvement recommended' : 'moderate — improvement beneficial'}). Est. σ after improvement: ${sigmaAfterImprovement} mS/m (+${Math.max(coverageGainPct, 0)}% coverage).`
       };
     })(),
