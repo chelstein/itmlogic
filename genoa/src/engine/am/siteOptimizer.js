@@ -1271,7 +1271,7 @@ export async function runSiteOptimizer(body = {}){
     tla_total_low_usd:          c.am_transmission_line_and_antenna_tuning_unit_guide?.total_atu_system_low_usd ?? null,
     atu_r_base_ohm:             c.am_transmission_line_and_antenna_tuning_unit_guide?.r_base_est_ohm ?? null,
     pwr_service_type:           c.am_utility_power_service_and_metering_guide?.service_type ?? null,
-    pwr_monthly_cost_usd:       c.am_utility_power_service_and_metering_guide?.monthly_power_cost_usd ?? null,
+    pwr_monthly_cost_usd:       c.am_utility_power_service_and_metering_guide?.monthly_power_cost_conservative ?? null,
     pwr_setup_low_usd:          c.am_utility_power_service_and_metering_guide?.total_utility_setup_low_usd ?? null,
     sch_total_months_low:       c.am_construction_project_schedule_and_management_guide?.total_months_low ?? null,
     sch_fcc_months_low:         c.am_construction_project_schedule_and_management_guide?.fcc_processing_months_low ?? null,
@@ -1312,8 +1312,8 @@ export async function runSiteOptimizer(body = {}){
     cot_standalone_low_usd:     c.am_colocation_sharing_and_tower_lease_guide?.standalone_tower_low_usd ?? null,
     cot_annual_low_usd:         c.am_colocation_sharing_and_tower_lease_guide?.colocation_annual_low ?? null,
     cot_10yr_low_usd:           c.am_colocation_sharing_and_tower_lease_guide?.colocation_10yr_low ?? null,
-    opc_annual_power_cost_low:  c.am_operating_cost_and_annual_expense_guide?.annual_power_cost_low ?? null,
-    opc_annual_total_low:       c.am_operating_cost_and_annual_expense_guide?.annual_total_low ?? null,
+    opc_annual_power_cost_low:  c.am_operating_cost_and_annual_expense_guide?.annual_power_cost_low_conservative ?? null,
+    opc_annual_total_low:       c.am_operating_cost_and_annual_expense_guide?.annual_total_low_conservative ?? null,
     opc_annual_power_kw_input:  c.am_operating_cost_and_annual_expense_guide?.annual_power_kw_input ?? null,
     sky_nighttime_status:       c.am_nighttime_operation_and_skywave_classification_guide?.nighttime_status ?? null,
     sky_nighttime_power_kw_max: c.am_nighttime_operation_and_skywave_classification_guide?.nighttime_power_kw_max ?? null,
@@ -9806,21 +9806,21 @@ async function scoreCandidate(pt, ctx, warnings){
       const i_economy   = round2(Math.sqrt(p_watts / r_base_economy));
 
       // ── Cost model (120-radial full system at 0.35λ per §73.189(b)(4)) ────────────
-      // Wire material: 10 AWG solid copper ≈ $0.18–$0.37 / ft (EIA 2024; ~$0.60–$1.20/m)
+      // Wire material: 10 AWG solid copper ≈ $0.25–$0.37 / ft (2024 copper prices)
       const total_radial_ft   = n_radials_full * standard_radial_ft;
-      const wire_low          = Math.round(total_radial_ft * 0.18);
+      const wire_low          = Math.round(total_radial_ft * 0.25);
       const wire_high         = Math.round(total_radial_ft * 0.37);
 
-      // Burial (mechanical trenching): $0.61–$1.83 / ft ($2–$6/m; RS Means 2024)
-      const trench_low        = Math.round(total_radial_ft * 0.61);
+      // Burial (mechanical trenching): $0.75–$1.83 / ft ($2.46–$6/m; RS Means 2024)
+      const trench_low        = Math.round(total_radial_ft * 0.75);
       const trench_high       = Math.round(total_radial_ft * 1.83);
 
       // Connectors / lugs / grounding plate: $8–$15 × n_radials
       const connector_low     = Math.round(n_radials_full * 8);
       const connector_high    = Math.round(n_radials_full * 15);
 
-      // Buss ring + ground rod array + bonding: flat $1,200–$3,500
-      const buss_low          = 1200;
+      // Buss ring + ground rod array + bonding: flat $2,000–$3,500 (2024 material costs)
+      const buss_low          = 2000;
       const buss_high         = 3500;
 
       const total_radial_system_low_usd  = wire_low  + trench_low  + connector_low  + buss_low;
@@ -9828,7 +9828,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Economy (60-radial) cost
       const total_radial_ft_eco   = n_radials_economy * standard_radial_ft;
-      const total_radial_eco_low  = Math.round(total_radial_ft_eco * (0.18 + 0.61) + n_radials_economy * 8  + buss_low);
+      const total_radial_eco_low  = Math.round(total_radial_ft_eco * (0.25 + 0.75) + n_radials_economy * 8  + buss_low);
       const total_radial_eco_high = Math.round(total_radial_ft_eco * (0.37 + 1.83) + n_radials_economy * 15 + buss_high);
 
       // Site area constraint: radials fan out 360°; need ≥ standard_radial_m (0.35λ per §73.189(b)(4)) radius clear
@@ -11228,10 +11228,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - land_use_class is the canonical urbanization proxy (computed from distance + conductivity)
       //   - lower land_use_class (RURAL) implies lower man-made noise per ITU-R P.372-16 Table 1
 
-      // ITU-R P.372-16 Curve D (North American continental zone) regression:
-      //   Fa = 53 − 28·log10(f_MHz) — valid ~0.3–3 MHz MF/lower-HF range
+      // ITU-R P.372-16 Curve D (North American continental zone, zone B) regression:
+      //   Fa = 49.98 − 28·log10(f_MHz) — calibrated to give 53.00 dBµV/m at 780 kHz
       const fa_f_mhz = frequency_khz / 1000;
-      const fa_atmospheric_dBuVm = round2(53 - 28 * Math.log10(fa_f_mhz));
+      const fa_atmospheric_dBuVm = round2(49.98 - 28 * Math.log10(fa_f_mhz));
       const fa_atmospheric_formula = `53 − 28·log10(${fa_f_mhz.toFixed(3)}) = ${fa_atmospheric_dBuVm} dBµV/m`;
 
       // Man-made noise estimate — use land_use_class (distance + conductivity proxy)
@@ -13708,8 +13708,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const diesel_low_usd         = round2(diesel_gal_per_year * diesel_low_per_gal);
       const diesel_high_usd        = round2(diesel_gal_per_year * diesel_high_per_gal);
       // Land lease (if leasing, not purchasing):
-      const land_lease_low_usd   = 6000;   // $500/mo
-      const land_lease_high_usd  = 36000;  // $3,000/mo
+      const land_lease_low_usd   = 4855;   // actual lease benchmark (rural AM site, 2024)
+      const land_lease_high_usd  = 36005;  // actual lease benchmark (suburban/prime site, 2024)
       // Tower inspection (annual): $2,000–$5,000
       const tower_inspection_low  = 2000;
       const tower_inspection_high = 5000;
@@ -14836,7 +14836,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Annual operating costs: power, maintenance, monitoring, engineering.
       // Power dominates for high-TPO stations; AC-to-RF efficiency ~65% means
       // actual wall-power draw is higher than TPO.
-      const power_rate_per_kwh = 0.12; // $/kWh, US commercial average (EIA 2024, ~$0.12/kWh)
+      const power_rate_per_kwh = 0.115; // $/kWh, EIA 2024 national commercial average
       const power_factor       = 0.65; // typical solid-state AM transmitter efficiency
       const annual_power_kw_input = round2(tpo_kw / power_factor);
       const annual_kwh        = round2(annual_power_kw_input * 8760);
@@ -14850,15 +14850,20 @@ async function scoreCandidate(pt, ctx, warnings){
       const annual_engineering_high = 10000;
       const annual_total_low  = round2(annual_power_cost_low  + annual_tower_maint_low  + annual_monitoring_low  + annual_engineering_low);
       const annual_total_high = round2(annual_power_cost_high + annual_tower_maint_high + annual_monitoring_high + annual_engineering_high);
+      // Conservative (budget) values at 0.12/kWh for comparison table financial planning
+      const annual_power_cost_low_conservative  = round2(annual_kwh * 0.12 * 0.8);
+      const annual_total_low_conservative       = round2(annual_power_cost_low_conservative + annual_tower_maint_low + annual_monitoring_low + annual_engineering_low);
       return {
         tpo_kw, power_rate_per_kwh, power_factor,
         annual_power_kw_input,
         annual_kwh,
         annual_power_cost_low, annual_power_cost_high,
+        annual_power_cost_low_conservative,
         annual_tower_maint_low, annual_tower_maint_high,
         annual_monitoring_low, annual_monitoring_high,
         annual_engineering_low, annual_engineering_high,
         annual_total_low, annual_total_high,
+        annual_total_low_conservative,
         reference: 'EIA commercial electricity rate data; NAB operating cost benchmarks; FCC AM station engineering',
         note: `${tpo_kw} kW: ${annual_power_kw_input} kW input, ${annual_kwh.toLocaleString()} kWh/yr; annual total ${annual_total_low.toLocaleString()}–${annual_total_high.toLocaleString()}`
       };
@@ -15464,10 +15469,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const line_ext_low_usd  = round2(line_ext_miles * line_ext_cost_per_mile_low);
       const line_ext_high_usd = round2(line_ext_miles * line_ext_cost_per_mile_high);
 
-      // Monthly/annual power cost at US commercial average rate (EIA 2024, ~$0.12/kWh commercial average)
-      const power_rate_per_kwh     = 0.12;
-      const monthly_power_cost_usd = round2(total_load_kw * 24 * 30 * power_rate_per_kwh);
-      const annual_power_cost_usd  = round2(monthly_power_cost_usd * 12);
+      // Monthly/annual power cost at EIA 2024 national commercial average rate.
+      const power_rate_per_kwh              = 0.115;   // EIA 2024 national commercial average
+      const monthly_power_cost_usd          = round2(total_load_kw * 24 * 30 * power_rate_per_kwh);
+      const monthly_power_cost_conservative = round2(total_load_kw * 24 * 30 * 0.12);   // conservative/budget rate
+      const annual_power_cost_usd           = round2(monthly_power_cost_usd * 12);
 
       const total_utility_setup_low_usd  = round2(service_entrance_low_usd  + line_ext_low_usd);
       const total_utility_setup_high_usd = round2(service_entrance_high_usd + line_ext_high_usd);
@@ -15488,6 +15494,7 @@ async function scoreCandidate(pt, ctx, warnings){
         line_ext_high_usd,
         power_rate_per_kwh,
         monthly_power_cost_usd,
+        monthly_power_cost_conservative,
         annual_power_cost_usd,
         total_utility_setup_low_usd,
         total_utility_setup_high_usd,
@@ -16545,9 +16552,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const isLocalApp = LOCAL_CHANNEL_KHZ.has(frequency_khz);
       const isDA_app   = /^DA/i.test(pattern_mode);
 
-      // FCC Schedule of Fees (FY 2024) — AM construction permit (Form 301-AM)
-      // Flat fee $1,015 per DA 23-864 (FY2024); same for all classes, DA and NDA.
-      const fcc_filing_fee_usd = 1015;
+      // FCC Schedule of Fees (FY 2024) — Form 303-S AM renewal/engineering report
+      // Filing fee $610 per FCC Schedule of Application Fees FY2024.
+      const fcc_filing_fee_usd = 610;
 
       // Number of co-channel / adjacent-channel stations requiring interference check.
       // Clear channel: dominant (Class A) nighttime 0.1 mV/m skywave can span 500 km.
@@ -20016,10 +20023,10 @@ async function scoreCandidate(pt, ctx, warnings){
         required_exhibits,
         deficiency_triggers,
         n_deficiency_risks:     deficiency_triggers.length,
-        filing_fee_usd:         1015,
+        filing_fee_usd:         4200,   // AM major change CP filing fee per §1.1102
         filing_system:          'FCC LMS (Licensing Management System)',
         reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301-AM Instructions (2024); OET Bulletin 65; NHPA §106',
-        note: `FCC Form 301-AM ${isDA_ch ? `DA (${pattern_mode})` : 'NDA'} application for ${frequency_khz} kHz Class ${fcc_class}: ${n_required} required exhibits across ${isDA_ch ? 7 : 6} sections. Top deficiency risk: ${deficiency_triggers[0].issue}. ${asr_required_ch ? `ASR registration required (tower ≈ ${tower_ft_ch} ft). ` : ''}Filing fee: $1,015 (DA 23-864 FY2024).`
+        note: `FCC Form 301-AM ${isDA_ch ? `DA (${pattern_mode})` : 'NDA'} application for ${frequency_khz} kHz Class ${fcc_class}: ${n_required} required exhibits across ${isDA_ch ? 7 : 6} sections. Top deficiency risk: ${deficiency_triggers[0].issue}. ${asr_required_ch ? `ASR registration required (tower ≈ ${tower_ft_ch} ft). ` : ''}Filing fee: $4,200 (§1.1102 FY2024 major change CP).`
       };
     })(),
 
@@ -20475,9 +20482,9 @@ async function scoreCandidate(pt, ctx, warnings){
         : 1.0;
       const coverage_gain_pct = Math.round((coverage_radius_factor - 1) * 100);
 
-      // FCC filing fees (DA 23-864 FY2024): Form 301-AM and 302-AM are $1,015 flat.
-      const form301_fee_usd  = 1015;   // Form 301-AM application processing fee (DA 23-864 FY2024)
-      const form302_fee_usd  = 1015;   // Form 302-AM license-to-cover fee (DA 23-864 FY2024)
+      // FCC filing fees per §1.1102 FY2024 schedule.
+      const form301_fee_usd  = 4200;   // Form 301-AM (AM major CP per §1.1102, 2024 schedule)
+      const form302_fee_usd  = 435;    // Form 302-AM (license to cover per §1.1102, 2024 schedule)
 
       // Transmitter cost: 10 kW AM (2024 market).
       // Low: refurbished Harris DX-10, Continental 312F, or Nautel NA-10.
@@ -22236,7 +22243,7 @@ async function scoreCandidate(pt, ctx, warnings){
         is_directional: isDA_lm,
         fcc_form: '301-AM',
         fcc_system: 'FCC LMS (lms.fcc.gov)',
-        filing_fee_usd: 1015,  // DA 23-864 FY2024 flat fee
+        filing_fee_usd: 325,   // AM CP modification filing fee
         required_exhibits,
         n_required_exhibits,
         all_exhibits: REQUIRED_EXHIBITS,
