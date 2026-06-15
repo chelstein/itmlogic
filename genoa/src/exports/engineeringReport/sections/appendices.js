@@ -510,7 +510,7 @@ export function buildAppendixSections(exhibit){
   const tNested = ev.terrain?.dem || {};
   // For AM exhibits, §73.184 groundwave does not consume a DEM at all —
   // contour distances are derived from the FCC curve over assumed
-  // ground conductivity (§73.184 M3 conductivity maps / §73.190 Fig. R3).  Print the
+  // ground conductivity (§73.190 Fig. M3 conductivity maps).  Print the
   // regulatory rationale rather than a misleading em-dash that would
   // suggest a missing data source.
   const demNotApplicable = svc_c === 'AM' && !tDem.available;
@@ -1003,7 +1003,7 @@ export function buildAppendixSections(exhibit){
     } else {
       const fmtNum = (v, dp = 6) =>
         Number.isFinite(Number(v)) ? Number(v).toFixed(dp) : '—';
-      const sigmaSrc = inp.sigma_source === 'default' ? '  (default per §73.190 Fig. R3)' : '';
+      const sigmaSrc = inp.sigma_source === 'default' ? '  (default per §73.190 Fig. M3)' : '';
       const eprSrc   = inp.epr_source   === 'default' ? '  (default — NEC average soil)' : '';
       const timeSec  = Number.isFinite(Number(sum.time_seconds))
         ? `${Number(sum.time_seconds).toFixed(4)} s` : '—';

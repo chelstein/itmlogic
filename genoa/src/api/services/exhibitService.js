@@ -1439,7 +1439,7 @@ export async function computeExhibit(req){
   }
 
   // ---- 6c. Live ground conductivity (AM only) ----
-  // §73.190 / Figure R3 σ is required for honest AM groundwave compute
+  // §73.190 / Figure M3 σ is required for honest AM groundwave compute
   // AND the NEC Sommerfeld real-ground antenna model.  Resolution chain
   // — every tier is real authority data, no guessing:
   //   1. operator-supplied inputs.ground_sigma_mS_m  (highest priority)

@@ -55,7 +55,7 @@ test('DEFAULT_EPR is 15 (NEC average-soil convention)', () => {
   assert.equal(DEFAULT_EPR, 15);
 });
 
-test('DEFAULT_GROUND_SIGMA_MS_M is 8 mS/m (§73.190 Figure R3 default)', () => {
+test('DEFAULT_GROUND_SIGMA_MS_M is 8 mS/m (§73.190 Figure M3 default)', () => {
   assert.equal(DEFAULT_GROUND_SIGMA_MS_M, 8);
 });
 

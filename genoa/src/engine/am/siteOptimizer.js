@@ -1967,7 +1967,7 @@ export async function runSiteOptimizer(body = {}){
       statements,
       caveats: [
         'This is a SCREENING-GRADE analysis only — field measurements, §73.182 NIF study, and full engineering design are required before filing.',
-        'Candidate scores use FCC M3 groundwave curves and population proxies; actual coverage contours must be computed per §73.183/§73.184.',
+        'Candidate scores use FCC M3 groundwave curves and population proxies; actual coverage contours must be computed per §73.184 (groundwave field strength graphs); interference protection evaluated per §73.183.',
         'Parcel availability, lease feasibility, zoning, and environmental review are outside the scope of this analysis.'
       ]
     };
@@ -8262,7 +8262,7 @@ async function scoreCandidate(pt, ctx, warnings){
         install_weeks_high,
         ground_efficiency_note,
         design_items,
-        reference: '47 CFR §73.189(b)(4) (AM ground system standard — 120 × 0.35λ); §73.184 (groundwave conductivity map); §73.51 (direct method power); NBS Technical Note 24',
+        reference: '47 CFR §73.189(b)(4) (AM ground system standard — 120 × 0.35λ); §73.184 (groundwave field strength graphs); §73.51 (direct method power); NBS Technical Note 24',
         note: `Standard AM ground system: ${radials_standard} radials × ${Math.round(radial_len_m * 3.28084)} ft (0.35λ) = ${wire_length_per_tower_ft.toLocaleString()} LF per tower. DA: ${da_tower_est_gs} tower estimate × = ${Math.round(total_wire_ft).toLocaleString()} LF total. Installed cost: $${ground_cost_low_usd.toLocaleString()}–$${ground_cost_high_usd.toLocaleString()}.`
       };
     })(),
@@ -25512,7 +25512,7 @@ async function scoreCandidate(pt, ctx, warnings){
         nighttime_da_note:      nighttimeDA_note,
         protection_levels:      protectionLevels,
         n_protection_levels:    protectionLevels.length,
-        reference: '47 CFR §73.182; §73.21; §73.25; §73.27; FCC skywave propagation curves (M3/M3a); ITU-R P.1147',
+        reference: '47 CFR §73.182; §73.21; §73.25; §73.27; FCC skywave propagation curves (§73.190 Appendix A, SS-1); ITU-R P.1147',
         note: `Nighttime skywave at ${actualNightPower_kw} kW: 50% time ≈ ${sky50pct_km} km; 10% ≈ ${sky10pct_km} km; NIF 1% ≈ ${sky1pct_km} km. NIF study: ${nifRequiredSw ? nifStudyType_sw : 'NOT REQUIRED'}.`
       };
     })(),
@@ -25855,10 +25855,10 @@ async function scoreCandidate(pt, ctx, warnings){
         acceptance_criterion: 'S/N ≥ 50 dB for acceptable AM service; noise floor ≤ −40 dBm/Hz at operating frequency'
       };
 
-      // FCC complaint process per §73.184
+      // FCC interference complaint process (Part 15 / §15.5 — Part 15 devices must not cause harmful interference)
       const fccComplaintProcess = [
-        { step: 1, action: 'Document interference with spectrum analyzer screenshots and field strength measurements', rule: '§73.184(a)' },
-        { step: 2, action: 'Notify power company / BPL operator in writing; allow 30 days to resolve', rule: '§73.184(b)', note: 'FCC requires good-faith effort before complaint.' },
+        { step: 1, action: 'Document interference with spectrum analyzer screenshots and field strength measurements', rule: '§15.5(b)' },
+        { step: 2, action: 'Notify power company / BPL operator in writing; allow 30 days to resolve', rule: '§15.5(c)', note: 'FCC requires good-faith effort before formal complaint.' },
         { step: 3, action: 'File FCC Form 2000D (Part 15 interference complaint) if unresolved', rule: '§15.5(c)', note: 'Include measurement data, correspondence, and site coordinates.' },
         { step: 4, action: 'FCC investigates; may issue Notice of Apparent Liability to Part 15 operator', rule: '§15.5(c)' }
       ];
@@ -31241,7 +31241,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // ENGINEERING EXHIBITS REQUIRED (MODIFICATION APPLICATION)
       // ──────────────────────────────────────────────────────────
       //   1. Antenna system description (tower coordinates, height, base impedance)
-      //   2. Predicted contour map at proposed power (§73.183/§73.184)
+      //   2. Predicted contour map at proposed power (§73.184 groundwave curves; interference protection per §73.183)
       //   3. Co-channel interference study (new proposed contours vs. existing)
       //   4. Adjacent channel interference study (±10/20 kHz separations)
       //   5. DA pattern data if directional antenna is proposed

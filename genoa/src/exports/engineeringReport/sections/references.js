@@ -46,7 +46,7 @@ export function buildReferencesSection(exhibit){
     cite('47 CFR §73.183',
          'Groundwave field strength used to determine interference; D/U protection thresholds (0.5 mV/m daytime, 0.1 mV/m nighttime) for AM interference analysis.');
     cite('47 CFR §73.184',
-         'AM groundwave field-strength graphs; §73.184 Figure M3 conductivity-zone basis.');
+         'AM groundwave field-strength graphs; conductivity zones per §73.190 Figure M3.');
     cite('47 CFR §73.187',
          'AM limitation on daytime radiation; international protection of Class A 0.1 mV/m contours.');
     cite('47 CFR §73.190',

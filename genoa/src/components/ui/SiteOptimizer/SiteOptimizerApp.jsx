@@ -3846,7 +3846,7 @@ const DEMO_RESULT = {
           { id: 'skywave_1pct',      field_mvm: 0.025, basis: '§73.182: NIF skywave (1% time)',                 applies_to_us: true }
         ],
         n_protection_levels: 5,
-        reference: '47 CFR §73.182; §73.21; §73.25; §73.27; FCC skywave propagation curves (M3/M3a); ITU-R P.1147',
+        reference: '47 CFR §73.182; §73.21; §73.25; §73.27; FCC skywave propagation curves (§73.190 Appendix A, SS-1); ITU-R P.1147',
         note: 'Nighttime skywave at 0.25 kW (est. actual night power; Class D max ≤0.5 kW per §73.21(b)(2)): 50% time ≈ 70.7 km; 10% ≈ 91.9 km; NIF 1% ≈ 120.2 km. NIF study: FULL_CLEAR_CHANNEL_NIF.'
       },
       radial_system_engineering_guide: {

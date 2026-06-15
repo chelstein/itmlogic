@@ -83,7 +83,7 @@ r.post('/am/physics/somnec', express.json({ limit: '64kb' }), asyncHandler(async
   }
 
   // Conductivity: accept S/m directly or mS/m (Genoa schema native).
-  // Default to §73.190 Figure R3 average soil (8 mS/m) when neither is
+  // Default to §73.190 Figure M3 average soil (8 mS/m) when neither is
   // supplied — the evidence block records the source explicitly.
   let sig_s_m  = Number(body.sig_s_m);
   let sigma_ms_m = Number(body.sigma_ms_m);
