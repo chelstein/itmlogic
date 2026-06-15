@@ -32608,9 +32608,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const total_with_consulting_low  = round2(total_fcc_fees + CONSULTING_LOW);
       const total_with_consulting_high = round2(total_fcc_fees + CONSULTING_HIGH);
 
-      // Fee items list
+      // Fee items list.
+      // FORM_301_FEE here is the §1.1102 annual regulatory fee (class-dependent);
+      // the Form 301-AM major-change CP application fee is $4,200 flat (§1.1102 FY2024).
       const fee_items = [
-        { item: 'Form 301-AM Major Modification', fee_usd: FORM_301_FEE, required: true },
+        { item: `FCC Annual Regulatory Fee (§1.1102, Class ${fcc_cl})`, fee_usd: FORM_301_FEE, required: true },
+        { item: 'Form 301-AM Major Change CP (application processing)', fee_usd: 4200, required: true },
         { item: 'Form 302-AM License to Cover',   fee_usd: FORM_302_FEE, required: true },
         { item: 'Special Temporary Authority (STA, if needed)', fee_usd: STA_FEE, required: false },
         { item: 'Amendment fee (if CP amended)',  fee_usd: AMENDMENT_FEE, required: false },
@@ -32633,7 +32636,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_with_consulting_high_usd: total_with_consulting_high,
         },
         reference: '47 CFR §1.1102 (annual regulatory fees: Class A $7,265; Class B $5,020; Class C/D $2,195); FCC DA 23-864 (Form 301-AM application processing fee: $1,015 flat); FCC Form 301-AM; FCC Form 302-AM',
-        note: `FCC Class ${fcc_cl} annual regulatory fee (§1.1102): $${FORM_301_FEE.toLocaleString()}. Form 302-AM $${FORM_302_FEE}. STA $${STA_FEE}. Total FCC fees (incl. STA): $${total_fcc_fees.toLocaleString()}. With consulting: $${total_with_consulting_low.toLocaleString()}–$${total_with_consulting_high.toLocaleString()}${isDA ? ' (DA premium)' : ''}. Note: Form 301-AM application processing fee (DA 23-864) is $1,015 flat — separate from annual regulatory fee.`
+        note: `FCC Class ${fcc_cl} annual regulatory fee (§1.1102): $${FORM_301_FEE.toLocaleString()}/yr. Form 301-AM major change CP application fee: $4,200 (§1.1102 FY2024, flat all classes). Form 302-AM $${FORM_302_FEE}. STA $${STA_FEE}. Annual + one-time FCC outlay: $${(FORM_301_FEE + 4200 + FORM_302_FEE).toLocaleString()} (year 1). With consulting: $${total_with_consulting_low.toLocaleString()}–$${total_with_consulting_high.toLocaleString()}${isDA ? ' (DA premium)' : ''}.`
       };
     })(),
 
