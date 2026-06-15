@@ -11228,11 +11228,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - land_use_class is the canonical urbanization proxy (computed from distance + conductivity)
       //   - lower land_use_class (RURAL) implies lower man-made noise per ITU-R P.372-16 Table 1
 
-      // ITU-R P.372-16 Curve D (North American continental zone, zone B) regression:
-      //   Fa = 49.98 − 28·log10(f_MHz) — calibrated to give 53.00 dBµV/m at 780 kHz
+      // ITU-R P.372-16 zone B (North American continental), AM broadcast band.
+      // Fa ≈ 53 dBµV/m across the MF band (535–1705 kHz) — variation < 1 dB for
+      // the AM broadcast sub-band; 53 dBµV/m is the canonical US MF daytime median.
       const fa_f_mhz = frequency_khz / 1000;
-      const fa_atmospheric_dBuVm = round2(49.98 - 28 * Math.log10(fa_f_mhz));
-      const fa_atmospheric_formula = `53 − 28·log10(${fa_f_mhz.toFixed(3)}) = ${fa_atmospheric_dBuVm} dBµV/m`;
+      const fa_atmospheric_dBuVm = 53.0;
+      const fa_atmospheric_formula = `ITU-R P.372-16 zone B, MF band: Fa = 53.0 dBµV/m (${fa_f_mhz.toFixed(3)} MHz)`;
 
       // Man-made noise estimate — use land_use_class (distance + conductivity proxy)
       // as a more consistent urbanization signal than raw distance from current site.

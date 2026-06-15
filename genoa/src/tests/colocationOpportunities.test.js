@@ -3891,8 +3891,9 @@ test('am_nighttime_nif_service_contour_analysis_guide present across colocation 
   for (const c of out.candidates) {
     const g = c.am_nighttime_nif_service_contour_analysis_guide;
     assert.ok(g !== undefined && g !== null, `candidate missing am_nighttime_nif_service_contour_analysis_guide`);
-    assert.strictEqual(g.protection_threshold_uVm, 50, 'Class D clear channel protection threshold must be 50 µV/m');
-    assert.ok(g.dist_to_kkob_km > 0, 'dist_to_kkob_km must be positive');
+    assert.strictEqual(g.protection_threshold_uVm, 50, 'NIF protection threshold must be 50 µV/m');
+    // dist_to_kkob_km is null for non-clear-channel frequencies (790 kHz has no §73.25 dominant)
+    assert.ok(g.dist_to_kkob_km === null || g.dist_to_kkob_km > 0, 'dist_to_kkob_km must be null (no dominant) or positive');
     assert.ok(g.total_nif_low_usd >= 2000, 'NIF study cost must be ≥$2,000');
   }
 });
