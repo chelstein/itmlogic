@@ -1535,13 +1535,13 @@ test('regulatory_compliance_summary.blanket_pop.status is FAIL when blanket_popu
 });
 
 test('regulatory_compliance_summary.class_power.ceiling matches FCC §73.21 for the station class', async () => {
-  // Class B max = 50 kW per §73.21; KAZM is Class B.
+  // Class D daytime max = 5 kW per §73.21(e); KAZM is Class D.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   assert.equal(out.available, true);
   for (const c of out.candidates){
     const rcs = c.regulatory_compliance_summary;
-    assert.equal(rcs.class_power.ceiling, 50,
-      `Class B ceiling must be 50 kW per §73.21; rank ${c.rank} got ${rcs.class_power.ceiling}`);
+    assert.equal(rcs.class_power.ceiling, 5,
+      `Class D daytime ceiling is 5 kW per §73.21(e); rank ${c.rank} got ${rcs.class_power.ceiling}`);
     assert.ok(rcs.class_power.value > 0,
       `class_power.value (tpo_kw) must be positive; rank ${c.rank} got ${rcs.class_power.value}`);
   }
@@ -1553,9 +1553,9 @@ test('power_class_ceiling_kw is stamped on every candidate and matches §73.21 c
   for (const c of out.candidates){
     assert.ok(c.power_class_ceiling_kw != null,
       `power_class_ceiling_kw must be non-null; rank ${c.rank}`);
-    // KAZM is Class B → ceiling 50 kW per §73.21.
-    assert.equal(c.power_class_ceiling_kw, 50,
-      `KAZM Class B ceiling must be 50 kW; rank ${c.rank} got ${c.power_class_ceiling_kw}`);
+    // KAZM is Class D → daytime ceiling 5 kW per §73.21(e).
+    assert.equal(c.power_class_ceiling_kw, 5,
+      `KAZM Class D daytime ceiling is 5 kW per §73.21(e); rank ${c.rank} got ${c.power_class_ceiling_kw}`);
     // consistency with regulatory_compliance_summary
     assert.equal(c.regulatory_compliance_summary.class_power.ceiling, c.power_class_ceiling_kw,
       `power_class_ceiling_kw must match regulatory_compliance_summary.class_power.ceiling (rank ${c.rank})`);
@@ -1949,9 +1949,9 @@ test('antenna_system_summary present on every candidate with correct structure',
     assert.ok(s.efficiency_range_db.min_db <= s.efficiency_range_db.max_db,
       `efficiency min_db must be ≤ max_db (rank ${c.rank})`);
     assert.ok(typeof s.efficiency_range_db.label === 'string', `efficiency_range_db.label must be a string (rank ${c.rank})`);
-    // KAZM is Class B ceiling 50 kW; headroom = 50 - tpo_kw >= 0
+    // KAZM is Class D ceiling 5 kW; headroom = 5 - tpo_kw = 0 (at ceiling)
     assert.ok(s.tpo_headroom_to_class_max_kw != null && s.tpo_headroom_to_class_max_kw >= 0,
-      `tpo_headroom must be non-negative for Class B station (rank ${c.rank})`);
+      `tpo_headroom must be non-negative for Class D station at ceiling (rank ${c.rank})`);
   }
 });
 
