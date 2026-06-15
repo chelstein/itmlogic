@@ -1314,12 +1314,12 @@ const DEMO_RESULT = {
         overall_feasibility: 'SIGNIFICANT_INVESTMENT',
         line_items: [
           { id: 'LAND_PURCHASE', label: 'Land acquisition', low_usd: 80000, high_usd: 250000, note: '~5.7 ha min for FCC-standard 120-radial system at 134.62 m radius (0.35λ at 780 kHz per §73.189(b)(4))' },
-          { id: 'TOWER_CONSTRUCTION', label: 'Tower (guyed monopole)', low_usd: 80000, high_usd: 300000, note: '96.15 m guyed monopole exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.' },
+          { id: 'TOWER_CONSTRUCTION', label: 'Tower (guyed monopole)', low_usd: 80000, high_usd: 300000, note: '144.13 m (3/8λ, 473 ft) guyed monopole for Class D at 780 kHz; exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.' },
           { id: 'GROUND_SYSTEM', label: 'Ground system (120 radials × 134.62 m, §73.189(b)(4))', low_usd: 72000, high_usd: 145000, note: 'FCC standard: 120 radials × 0.35λ = 134.62 m at 780 kHz (16,154 m total); #10 AWG copper wire + burial/bonding labor; §73.190 soil resistivity survey included' },
           { id: 'TRANSMITTER', label: 'Transmitter (5 kW)', low_usd: 25000, high_usd: 100000, note: 'Primary + backup transmitters; includes installation and initial alignment' },
           { id: 'TRANSMISSION_LINE', label: 'Transmission line + ATU', low_usd: 6000, high_usd: 25000, note: 'Heliax from transmitter building to tower base + antenna tuning unit' },
           { id: 'ENGINEERING', label: 'Broadcast + structural engineering', low_usd: 20000, high_usd: 70000, note: '§73.182 NIF study, §73.154 proof design, structural PE' },
-          { id: 'FCC_FILING', label: 'FCC Form 301-AM filing + fees', low_usd: 4695, high_usd: 17695, note: 'FCC application processing fee $2,195 (Class D §1.1102 FY2023 regulatory fee) + FCC counsel / legal costs ($2,500–$15,500)' },
+          { id: 'FCC_FILING', label: 'FCC Form 301-AM filing + fees', low_usd: 3515, high_usd: 16515, note: 'FCC Form 301-AM application processing fee $1,015 (DA 23-864 FY2024) + FCC counsel / legal costs ($2,500–$15,500). Separate §1.1102 Class D annual regulatory fee $2,195/yr not included here.' },
           { id: 'ENVIRONMENTAL', label: 'NEPA/NHPA environmental', low_usd: 5000, high_usd: 30000, note: 'NEPA desktop, §106 SHPO consultation, EA if required' },
           { id: 'SITE_PREP', label: 'Site preparation', low_usd: 30000, high_usd: 120000, note: 'Grading, access road, fence, electrical service, transmitter building' },
           { id: 'CONTINGENCY', label: 'Contingency (15%)', low_usd: 26250, high_usd: 96750, note: 'Industry standard 15% contingency on hard construction costs' }
@@ -1784,7 +1784,7 @@ const DEMO_RESULT = {
           { id: 'F3', section: 'F', title: 'Filing fee payment', required: true, cfr: '§1.1102' }
         ],
         reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301 Instructions (2024); OET Bulletin 65',
-        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 315.5 ft / 96.15 m). Filing fee: $2,195 (FCC §1.1102 FY2023 Class D annual regulatory fee).'
+        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 473 ft / 144 m design height, 3/8λ Class D). Filing fee: $1,015 (DA 23-864 FY2024). §1.1102 Class D annual regulatory fee ($2,195) is a separate annual obligation.'
       },
       electrical_power_consumption_guide: {
         frequency_khz: 780, tpo_kw: 5, hours_per_year: 8760,
@@ -1869,10 +1869,10 @@ const DEMO_RESULT = {
         n_upgrade_steps: 5,
         upgrade_steps: [
           { step: 1, action: 'Interference analysis', form: null, cost_range_usd: '$4,000–$8,000', timeline: '2–4 weeks', notes: '§73.182 co-channel/adjacent-channel analysis; NDA — no pattern proof needed' },
-          { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$2,195', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307). FCC regulatory fee: $2,195 Class D §1.1102 FY2023.' },
+          { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$1,015', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307). FCC Form 301-AM application processing fee: $1,015 (DA 23-864 FY2024). Separate §1.1102 annual regulatory fee (Class D: $2,195) is due annually.' },
           { step: 3, action: 'FCC processing / CP grant', form: null, cost_range_usd: 'included', timeline: '6–18 months', notes: 'CP grants construction authority; must be constructed within 3 years (§73.3598) — file Form 302-AM for license before CP lapses' },
           { step: 4, action: 'Procure and install DA-N nighttime antenna system', form: null, cost_range_usd: '$22,500–$52,500', timeline: '4–12 weeks', notes: 'Directional nighttime (DA-N) antenna array + phasor network + installation. Class D daytime ceiling is already reached (5 kW per §73.21); nighttime upgrade to 0.5 kW requires DA-N pattern + §73.182 NIF study.' },
-          { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$365', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b)). Form 302 annual regulatory fee: $365 (§1.1102 FY2023).' }
+          { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$1,015', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b)). Form 302-AM application processing fee: $1,015 (DA 23-864 FY2024).' }
         ],
         reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.3598 (CP construction period/lapse); §1.1102 (filing fees); FCC Form 301; FCC Form 302-AM',
         note: '780 kHz Class D (NDA) — current 5 kW TPO. No daytime upgrade available — 5 kW IS the Class D ceiling per §73.21(e). Nighttime upgrade path: 0 → 0.5 kW maximum (Class D clear channel nighttime ceiling per §73.21(b)(2)); requires DA-N directional antenna pattern + §73.182 NIF skywave study. Total project cost for nighttime authorization: $31,135–$65,135.'
@@ -2348,7 +2348,7 @@ const DEMO_RESULT = {
           { id: 'TECH_PARAMS', label: 'Technical parameters (frequency, power, pattern, class)', cfr: '§73.21; §73.182', required: true, note: 'ERP, TPO, antenna system parameters, and authorized power class must be filed and consistent' }
         ],
         fcc_processing_steps: [
-          { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $325 filing fee electronically', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
+          { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $1,015 filing fee electronically (DA 23-864 FY2024)', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
           { step: 2, action: 'FCC issues public notice (PNOH)', detail: 'FCC Public Notice of Hearing or Application — 30-day window for petitions to deny (major modifications)', timeline: '30-day public comment period', cfr: '§73.3580' },
           { step: 3, action: 'FCC engineering review', detail: 'FCC Media Bureau AM engineers review technical exhibits, interference analysis, and DA proof if applicable', timeline: '3–18 months (NDA faster; DA longer)', cfr: '§73.3533' },
           { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3533; §73.3526(e)(1)' },
@@ -2361,9 +2361,9 @@ const DEMO_RESULT = {
         major_change_radius_km: 3.2,
         major_change_radius_miles: 2,
         processing_time_estimate: { nda_optimistic_months: 3, nda_conservative_months: 9, da_optimistic_months: 9, da_conservative_months: 18 },
-        relocation_note: 'File FCC Form 301-AM via LMS. 9 required exhibits including interference analysis, contour map, FAA determination, and ASR number. $325 filing fee. NDA station. Processing: 3–9 months. CP valid for 3 years; 6-month extension available.',
+        relocation_note: 'File FCC Form 301-AM via LMS. 9 required exhibits including interference analysis, contour map, FAA determination, and ASR number. $1,015 filing fee (DA 23-864 FY2024). NDA station. Processing: 3–9 months. CP valid for 3 years; 6-month extension available.',
         reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3539; §73.3580; §73.150; §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
-        note: 'Form 301-AM via FCC LMS. 9 required exhibits. Filing fee: $325. CP term: 3 years + 6-month extension. Processing: 3–9 months. Public notice triggers 30-day petition window for major changes.'
+        note: 'Form 301-AM via FCC LMS. 9 required exhibits. Filing fee: $1,015 (DA 23-864 FY2024). CP term: 3 years + 6-month extension. Processing: 3–9 months. Public notice triggers 30-day petition window for major changes.'
       },
       transmitter_building_design_guide: {
         frequency_khz: 780, fcc_class: 'D',
@@ -3461,7 +3461,7 @@ const DEMO_RESULT = {
           { phase: 'ONGOING', required_count: 1, filings: [] }
         ],
         reference: '47 CFR §73.150; §73.154; §73.182; §73.1212; §1.1307; §17.7; FCC Form 301-AM instructions; FCC Media Bureau AM processing guide 2024',
-        note: '12 required filings for Class D NDA at 780 kHz (clear channel). Total FCC fees: $2,195 (Class D §1.1102 FY2023). DA proof required: false. ASR/FAA: true. NIF study required (§73.182 clear channel).'
+        note: '12 required filings for Class D NDA at 780 kHz (clear channel). Form 301-AM application fee: $1,015 (DA 23-864 FY2024); annual regulatory fee: $2,195/yr (Class D §1.1102 FY2023). DA proof required: false. ASR/FAA: true. NIF study required (§73.182 clear channel).'
       },
       transmitter_cooling_hvac_guide: {
         frequency_khz: 780, tpo_kw: 5, fcc_class: 'D',
