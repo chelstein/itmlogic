@@ -306,7 +306,7 @@ export const FORM_301_AM_FIELDS = Object.freeze([
     required: true,
     cite: '47 CFR §73.189',
     mapping: null,
-    notes: 'Number and physical length of buried-copper radials per tower (typically 120 radials × 0.25λ for full ground system).'
+    notes: 'Number and physical length of buried-copper radials per tower (FCC standard: 120 radials × 0.35λ per §73.189(b)(4) / NBS TN-24; λ/4 = 0.25λ is only the physics reference for R_rad calculation).'
   },
 
   // ── 3C — §73.182 / §73.187 protection (AM allocation) ────────

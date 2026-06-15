@@ -8812,7 +8812,7 @@ test('rf_exposure_compliance_guide MPE evaluation required at 5 kW threshold', a
   const out1  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, candidate_limit: 1 });
   const r5 = out5.candidates[0].rf_exposure_compliance_guide;
   const r1 = out1.candidates[0].rf_exposure_compliance_guide;
-  assert.strictEqual(r5.mpe_evaluation_required, true,  '5 kW must require MPE evaluation (§1.1310 threshold)');
+  assert.strictEqual(r5.mpe_evaluation_required, true,  '5 kW must require MPE evaluation (§1.1307(b) trigger; §1.1310 has MPE limits)');
   assert.strictEqual(r1.mpe_evaluation_required, false, '1 kW must not require MPE evaluation');
 });
 

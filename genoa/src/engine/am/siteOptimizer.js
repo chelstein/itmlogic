@@ -9763,14 +9763,14 @@ async function scoreCandidate(pt, ctx, warnings){
       // Physics model:
       //   FCC standard radial length = 0.35λ per §73.189(b)(4) / NBS TN-24
       //   (legacy NEC/Sevick benchmark used λ/4 = c / (4 × f_kHz × 1000) [metres])
-      //   Copper #10 AWG mass per radial ≈ 3.14 g/m → lb/radial for material pricing
+      //   Copper #10 AWG bare solid: 5.261 mm² × 8.96 g/cm³ = 47.1 g/m (NBS TN-24)
       //   Ground system R_loss heuristic (Terman):
       //     R_loss ≈ 400 / (n_radials ^ 0.8)   [Ω]   (empirical, valid 20–240 radials)
       //   Effective R_base = R_rad + R_loss = 36.5 + R_loss
       //   Efficiency = R_rad / R_base  ∈ (0,1)
-      //   Cost model:
-      //     Trench labour   ≈ $4–$8 / linear ft × n_radials × radial_ft
-      //     Wire (10 AWG)   ≈ $0.12–$0.22 / ft
+      //   Cost model (2024 RS Means / EIA):
+      //     Wire (10 AWG)   ≈ $0.18–$0.37 / ft material (EIA 2024; $0.60–$1.20/m)
+      //     Burial (trench) ≈ $0.61–$1.83 / ft ($2–$6/m; RS Means 2024)
       //     Connectors      ≈ $8–$15 / radial
       //     Total installed ≈ sum above per 120-radial "full" system
 
@@ -9803,14 +9803,14 @@ async function scoreCandidate(pt, ctx, warnings){
       const i_economy   = round2(Math.sqrt(p_watts / r_base_economy));
 
       // ── Cost model (120-radial full system at 0.35λ per §73.189(b)(4)) ────────────
-      // Wire material: 10 AWG solid copper ≈ $0.12–$0.22 / ft
+      // Wire material: 10 AWG solid copper ≈ $0.18–$0.37 / ft (EIA 2024; ~$0.60–$1.20/m)
       const total_radial_ft   = n_radials_full * standard_radial_ft;
-      const wire_low          = Math.round(total_radial_ft * 0.12);
-      const wire_high         = Math.round(total_radial_ft * 0.22);
+      const wire_low          = Math.round(total_radial_ft * 0.18);
+      const wire_high         = Math.round(total_radial_ft * 0.37);
 
-      // Trenching labour: $4–$8 / linear ft
-      const trench_low        = Math.round(total_radial_ft * 4);
-      const trench_high       = Math.round(total_radial_ft * 8);
+      // Burial (mechanical trenching): $0.61–$1.83 / ft ($2–$6/m; RS Means 2024)
+      const trench_low        = Math.round(total_radial_ft * 0.61);
+      const trench_high       = Math.round(total_radial_ft * 1.83);
 
       // Connectors / lugs / grounding plate: $8–$15 × n_radials
       const connector_low     = Math.round(n_radials_full * 8);
@@ -9825,8 +9825,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Economy (60-radial) cost
       const total_radial_ft_eco   = n_radials_economy * standard_radial_ft;
-      const total_radial_eco_low  = Math.round(total_radial_ft_eco * (0.12 + 4) + n_radials_economy * 8  + buss_low);
-      const total_radial_eco_high = Math.round(total_radial_ft_eco * (0.22 + 8) + n_radials_economy * 15 + buss_high);
+      const total_radial_eco_low  = Math.round(total_radial_ft_eco * (0.18 + 0.61) + n_radials_economy * 8  + buss_low);
+      const total_radial_eco_high = Math.round(total_radial_ft_eco * (0.37 + 1.83) + n_radials_economy * 15 + buss_high);
 
       // Site area constraint: radials fan out 360°; need ≥ standard_radial_m (0.35λ per §73.189(b)(4)) radius clear
       const min_site_radius_m  = standard_radial_m;
@@ -27503,7 +27503,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Evaluation threshold for AM: 5 kW ERP
 
       const freq_mhz    = frequency_khz / 1000;
-      const mpe_eval_required = tpo_kw >= 5; // §1.1310 Table 1 threshold for AM
+      const mpe_eval_required = tpo_kw >= 5; // §1.1307(b) categorical exclusion — 5 kW used as formal-exhibit threshold; §1.1310 Table 1 has MPE limits (not triggers)
       const MPE_LIMIT_GP_mwcm2  = 100; // general population / uncontrolled (0.3–3 MHz)
       const MPE_LIMIT_OCC_mwcm2 = 900; // occupational / controlled (0.3–3 MHz) per OET-65 Table 1
 
