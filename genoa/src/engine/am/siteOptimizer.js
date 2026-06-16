@@ -9197,7 +9197,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fee_source:      'FCC Fee Schedule DA 23-864',
         rate_vintage:    '2023 market rates',
         refresh_cadence: 'annual',
-        reference: '47 CFR §73.3500 (applications); §73.3533 (major mod); §73.3584 (petitions to deny); §73.3580 (public notice); §73.3598 (CP period of construction — 3 years); FCC FY2024 Fee Schedule DA 23-864 ($1,015 per Form 301-AM / 302-AM)',
+        reference: '47 CFR §73.3500 (applications); §73.3533 (major mod); §73.3584 (petitions to deny); §73.3580 (public notice); §73.3598 (CP period of construction — 3 years); §1.1102 FY2024 (Form 301-AM major change CP $4,200; Form 302-AM $435)',
         note: `${isDA ? 'DA' : 'NDA'} ${fcc_class} station. FCC fees: $${total_fcc_fees.toLocaleString()} (FY2024). Soft costs (atty + eng, 2023 market rates): $${total_soft_low.toLocaleString()}–$${total_soft_high.toLocaleString()}. Timeline: ${total_timeline_low}–${total_timeline_high} days (excl. construction).`
       };
     })(),
@@ -32574,15 +32574,15 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_fcc_application_fee_budget_guide: (() => {
-      // FCC application fees per §1.1102 and §1.1104 fee schedule (FY 2023+).
-      // AM relocation requires: Form 301-AM (major modification) + potentially STA.
+      // FCC application fees per §1.1102 FY2024 fee schedule.
+      // AM relocation requires: Form 301-AM major change CP ($4,200) + potentially STA.
       // Fees last updated per FCC 20-75 (Annual Adjustment proceeding).
       const isDA      = /^DA/i.test(pattern_mode ?? '');
       const fcc_cl    = fcc_class ?? 'D';
       const tpo       = tpo_kw ?? 1;
 
       // Annual regulatory fee (§1.1102 FY2024 schedule) — class-dependent recurring fee paid annually.
-      // Distinct from the Form 301-AM application processing fee ($1,015 flat per DA 23-864 FY2024).
+      // Distinct from the Form 301-AM major change CP application fee ($4,200 flat per §1.1102 FY2024).
       // Field is named form_301_fee_usd for historical reasons; value is the §1.1102 annual regulatory fee.
       // Class A: $7,265 | Class B: $5,020 | Class C/D: $2,195
       const FORM_301_FEE =
@@ -32634,7 +32634,7 @@ async function scoreCandidate(pt, ctx, warnings){
           total_with_consulting_low_usd:  total_with_consulting_low,
           total_with_consulting_high_usd: total_with_consulting_high,
         },
-        reference: '47 CFR §1.1102 (annual regulatory fees: Class A $7,265; Class B $5,020; Class C/D $2,195); FCC DA 23-864 (Form 301-AM application processing fee: $1,015 flat); FCC Form 301-AM; FCC Form 302-AM',
+        reference: '47 CFR §1.1102 FY2024 (annual regulatory fees: Class A $7,265; Class B $5,020; Class C/D $2,195; Form 301-AM major change CP: $4,200 flat; Form 302-AM: $435 flat); FCC Form 301-AM; FCC Form 302-AM',
         note: `FCC Class ${fcc_cl} annual regulatory fee (§1.1102): $${FORM_301_FEE.toLocaleString()}/yr. Form 301-AM major change CP application fee: $4,200 (§1.1102 FY2024, flat all classes). Form 302-AM $${FORM_302_FEE}. STA $${STA_FEE}. Annual + one-time FCC outlay: $${(FORM_301_FEE + 4200 + FORM_302_FEE).toLocaleString()} (year 1). With consulting: $${total_with_consulting_low.toLocaleString()}–$${total_with_consulting_high.toLocaleString()}${isDA ? ' (DA premium)' : ''}.`
       };
     })(),

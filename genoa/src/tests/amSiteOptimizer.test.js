@@ -9256,8 +9256,8 @@ test('regulatory_filing_checklist total fees and filing counts', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r = out.candidates[0].regulatory_filing_checklist;
   assert.ok(r.total_required_fees_usd >= 0, 'total fees must be >= 0');
-  // Form 301-AM Class D fee ($2195 per §1.1102 FY2023) must be reflected in total
-  assert.ok(r.total_required_fees_usd >= 2195, 'total fees must include at least Form 301-AM fee ($2195 Class D)');
+  // Annual regulatory fee Class D ($2,195 per §1.1102 FY2024) must be reflected in total
+  assert.ok(r.total_required_fees_usd >= 2195, 'total fees must include at least Class D annual regulatory fee ($2,195 per §1.1102 FY2024)');
   assert.strictEqual(r.n_total_filings, r.all_filings.length, 'n_total_filings must match all_filings.length');
 });
 
@@ -12248,7 +12248,7 @@ test('am_annual_regulatory_compliance_and_fee_guide present on KAZM candidate', 
 test('am_annual_regulatory_compliance_and_fee_guide KAZM Class D FCC fee', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
-  assert.strictEqual(g.annual_fcc_fee_usd, 2195, 'Class D annual FCC regulatory fee should be $2,195 (§1.1102 FY2023)');
+  assert.strictEqual(g.annual_fcc_fee_usd, 2195, 'Class D annual FCC regulatory fee should be $2,195 (§1.1102 FY2024)');
   assert.strictEqual(g.license_renewal_cycle_years, 8, 'AM license renewal cycle should be 8 years');
   assert.strictEqual(g.renewal_fee_usd, 610, 'Renewal fee should be $610');
   assert.strictEqual(g.renewal_amortized_annual_usd, 76, 'Amortized renewal should be $76/yr');
@@ -12265,7 +12265,7 @@ test('am_annual_regulatory_compliance_and_fee_guide KAZM total annual compliance
 test('am_annual_regulatory_compliance_and_fee_guide KAZM 10yr present value', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
-  assert.strictEqual(g.pv_10yr_low_usd, 32167, '10-yr PV low should be $32,167 ($3,771 × pv_factor_10yr=8.53; §1.1102 FY2023 Class D $2,195/yr + renewal + EAS + counsel)');
+  assert.strictEqual(g.pv_10yr_low_usd, 32167, '10-yr PV low should be $32,167 ($3,771 × pv_factor_10yr=8.53; §1.1102 FY2024 Class D $2,195/yr + renewal + EAS + counsel)');
   assert.ok(g.pv_10yr_high_usd > g.pv_10yr_low_usd, '10-yr PV high must exceed low');
   assert.strictEqual(g.public_file_annual_cost_usd, 0, 'Digital public file should have zero cost');
 });
@@ -12278,7 +12278,7 @@ test('am_annual_regulatory_compliance_and_fee_guide comparison table columns pre
     assert.ok('reg_renewal_years'        in row, 'reg_renewal_years missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.reg_annual_fcc_fee_usd,   2195, 'rank-1 reg_annual_fcc_fee_usd should be $2,195 (Class D §1.1102 FY2023)');
+  assert.strictEqual(r0.reg_annual_fcc_fee_usd,   2195, 'rank-1 reg_annual_fcc_fee_usd should be $2,195 (Class D §1.1102 FY2024)');
   assert.strictEqual(r0.reg_total_annual_low_usd, 3771, 'rank-1 reg_total_annual_low_usd should be $3,771');
   assert.strictEqual(r0.reg_renewal_years,          8,  'rank-1 reg_renewal_years should be 8');
 });
