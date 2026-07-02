@@ -85,13 +85,14 @@ test('applyCalibration: RSSI to field via chain (default 107 conversion)', () =>
 });
 
 test('applyCalibration: RSSI to field via per-antenna factor', () => {
-  // RSSI = -50 dBm, LNA = 20, antenna_gain = 0 dBi, cable_loss = 2,
-  // antenna_factor_db_per_m = 12
-  // E_dBu = -50 - 20 - 0 + 2 + 12 = -56 dBu  (a quiet, deep-rural reading)
+  // RSSI = -50 dBm, LNA = 20, cable_loss = 2, antenna_factor_db_per_m = 12.
+  // Two-stage chain: dBm + 107 = dBµV (50 Ω), then + AF = dBµV/m.
+  // AF already encodes antenna gain, so gain is not subtracted on this path.
+  // E_dBu = -50 + 107 - 20 + 2 + 12 = 51 dBu
   const r = applyCalibration({ rssi_dbm: -50 },
     { calibrated: true, antenna_gain_dbi: 0, cable_loss_db: 2,
       lna_gain_db: 20, antenna_factor_db_per_m: 12 });
-  assert.equal(r.field_dBu, -56);
+  assert.equal(r.field_dBu, 51);
   assert.match(r.chain.conversion_basis, /per-antenna/);
 });
 

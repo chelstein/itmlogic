@@ -100,10 +100,12 @@ test('field_mvm_override converts via 20·log10(mV/m × 1000)', () => {
   assert.ok(Math.abs(meta.captures[0].field_dBu - 60) < 0.01);
 });
 
-test('antenna_factor_db_per_m overrides the 107 dB default', () => {
+test('antenna_factor_db_per_m adds to the 107 dB dBm→dBµV stage', () => {
   const meta = buildSigmfFromKiwiCapture({ ...KRDM, antenna_factor_db_per_m: 100 });
-  // chain: -73.5 - 20 - 0 + 1 + 100 = 7.5
-  assert.equal(meta.captures[0].field_dBu, 7.5);
+  // Two-stage chain: dBm + 107 = dBµV (50 Ω), then + AF = dBµV/m.
+  // AF encodes antenna gain, so gain is not subtracted on this path.
+  // chain: -73.5 + 107 - 20 + 1 + 100 = 114.5
+  assert.equal(meta.captures[0].field_dBu, 114.5);
   assert.match(meta.captures[0].field_basis, /antenna_factor_db_per_m/);
   assert.equal(meta.global['genoa:calibration_dB'], 100);
 });

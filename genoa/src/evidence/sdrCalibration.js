@@ -23,20 +23,18 @@
 // RECEIVER CALIBRATION CHAIN (per OET-69 / standard SDR practice)
 //
 //   E_received_dBu = RSSI_dBm
+//                  + 107                     // dBm→dBµV at 50 Ω (0 dBm = 107 dBµV)
 //                  - LNA_gain_dB
-//                  - antenna_gain_dBi
 //                  + cable_loss_dB
-//                  + 107                     // dBm→dBu conversion factor
-//                                            // (50Ω, 0 dBm = 107 dBu in
-//                                            // a matched antenna)
+//                  + AF_dB_per_m             // per-antenna factor: dBµV → dBµV/m
 //
-//   The +107 dB constant comes from the standard relationship
-//     P(dBm) = 10·log10(P_mW / 1 mW)
-//     E(dBu) = 20·log10(E_µV/m)
-//   for an isotropic receiver in 50Ω, 1 m².  A more accurate model
-//   uses the antenna factor AF (dB/m) supplied per-antenna; we
-//   accept it under calibration.antenna_factor_db_per_m and prefer
-//   it over the 107 default when present.
+//   The +107 dB constant is the 50 Ω power-to-voltage relationship
+//     V(dBµV) = P(dBm) + 10·log10(50) + 90 ≈ P(dBm) + 107.
+//   The antenna factor AF converts receiver voltage to field strength
+//   and already encodes antenna gain (AF = 20·log10(f_MHz) − G_dBi − 29.77
+//   at 50 Ω), so gain must not be subtracted again when AF is supplied.
+//   When no AF is available we fall back to dBm + 107 − gains + losses,
+//   which yields receiver dBµV as a field-strength approximation.
 //
 // CALIBRATION METADATA SHAPE (extracted from ZTR rich-station or
 // per-record overrides)
@@ -200,14 +198,19 @@ export function applyCalibration(capture, calibration){
     };
   }
   const cal = calibration || defaultCalibration('no calibration');
-  const conv = Number.isFinite(cal.antenna_factor_db_per_m)
-                 ? cal.antenna_factor_db_per_m
-                 : POWER_TO_FIELD_DB;
-  const field_dBu = rssi_dbm
-                  - (cal.lna_gain_db || 0)
-                  - (cal.antenna_gain_dbi || 0)
-                  + (cal.cable_loss_db || 0)
-                  + conv;
+  // Two-stage conversion: P(dBm) + 107 = V(dBµV) at 50 Ω, then E(dBµV/m) = V(dBµV) + AF.
+  // The antenna factor AF already encodes antenna gain (AF = 20·log10(f_MHz) − G_dBi − 29.77
+  // at 50 Ω), so gain must NOT be subtracted again on the AF path.
+  const hasAF = Number.isFinite(cal.antenna_factor_db_per_m);
+  const field_dBu = hasAF
+    ? rssi_dbm + POWER_TO_FIELD_DB
+      - (cal.lna_gain_db || 0)
+      + (cal.cable_loss_db || 0)
+      + cal.antenna_factor_db_per_m
+    : rssi_dbm + POWER_TO_FIELD_DB
+      - (cal.lna_gain_db || 0)
+      - (cal.antenna_gain_dbi || 0)
+      + (cal.cable_loss_db || 0);
   return {
     field_dBu: Number(field_dBu.toFixed(2)),
     source:    'rssi_to_field_chain',
@@ -215,11 +218,12 @@ export function applyCalibration(capture, calibration){
     chain: {
       rssi_dbm:                Number(rssi_dbm.toFixed(2)),
       lna_gain_db:             cal.lna_gain_db,
-      antenna_gain_dbi:        cal.antenna_gain_dbi,
+      antenna_gain_dbi:        hasAF ? null : cal.antenna_gain_dbi,   // AF path: gain lives inside AF
       cable_loss_db:           cal.cable_loss_db,
-      conversion_factor_db:    conv,
-      conversion_basis:        Number.isFinite(cal.antenna_factor_db_per_m)
-                                  ? 'antenna_factor_db_per_m (per-antenna)'
+      dbm_to_dbuv_db:          POWER_TO_FIELD_DB,
+      antenna_factor_db_per_m: hasAF ? cal.antenna_factor_db_per_m : null,
+      conversion_basis:        hasAF
+                                  ? `${POWER_TO_FIELD_DB} dB (dBm→dBµV, 50Ω) + antenna_factor_db_per_m (per-antenna)`
                                   : `${POWER_TO_FIELD_DB} dB (50Ω matched-antenna default)`
     }
   };

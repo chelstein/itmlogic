@@ -122,16 +122,20 @@ export function buildSigmfFromKiwiCapture({
     field_dBu   = +(20 * Math.log10(Math.max(mvm * 1000, 1e-9))).toFixed(2);
     field_basis = 'direct_field_strength_reading_mvm';
   } else if (Number.isFinite(rssi_dbm)){
-    const af = Number.isFinite(antenna_factor_db_per_m)
-                  ? Number(antenna_factor_db_per_m)
-                  : POWER_TO_FIELD_DB;
-    field_dBu   = +(Number(rssi_dbm)
-                  - Number(lna_gain_db || 0)
-                  - Number(antenna_gain_dbi || 0)
-                  + Number(cable_loss_db || 0)
-                  + af).toFixed(2);
-    field_basis = Number.isFinite(antenna_factor_db_per_m)
-                    ? 'rssi_to_field_chain (antenna_factor_db_per_m)'
+    // Two-stage conversion: dBm + 107 = dBµV at 50 Ω, then + AF = dBµV/m.
+    // AF already encodes antenna gain, so gain is not subtracted on the AF path.
+    const hasAF = Number.isFinite(antenna_factor_db_per_m);
+    field_dBu   = hasAF
+                  ? +(Number(rssi_dbm) + POWER_TO_FIELD_DB
+                    - Number(lna_gain_db || 0)
+                    + Number(cable_loss_db || 0)
+                    + Number(antenna_factor_db_per_m)).toFixed(2)
+                  : +(Number(rssi_dbm) + POWER_TO_FIELD_DB
+                    - Number(lna_gain_db || 0)
+                    - Number(antenna_gain_dbi || 0)
+                    + Number(cable_loss_db || 0)).toFixed(2);
+    field_basis = hasAF
+                    ? 'rssi_to_field_chain (107 dB dBm→dBµV + antenna_factor_db_per_m)'
                     : `rssi_to_field_chain (${POWER_TO_FIELD_DB} dB matched-antenna default)`;
   } else {
     throw new Error('buildSigmfFromKiwiCapture: must supply rssi_dbm OR field_dBu_override OR field_mvm_override');

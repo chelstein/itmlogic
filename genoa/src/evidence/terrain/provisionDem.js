@@ -160,8 +160,8 @@ export async function provisionDemForCoverage({
   }
 
   return {
-    available:    failed.length === 0 && missing.length > 0
-                  ? true
+    available:    failed.length === 0
+                  ? true                       // everything requested is provisioned or already staged
                   : (provisioned.length > 0),  // partial-success counts as available
     requested:    requested.length,
     skipped,

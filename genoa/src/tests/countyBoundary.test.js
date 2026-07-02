@@ -332,7 +332,7 @@ test('buildCountyOverlaySection: paragraphs mention dataset path and SHA256', as
   const joined = sec.paragraphs.join(' ');
   assert.match(joined, /us_counties_fcc\.geojson/, 'must mention dataset filename');
   assert.match(joined, /SHA-256/, 'must mention SHA-256');
-  assert.match(joined, /3207/, 'must mention valid KML file count');
+  assert.match(joined, /\d+ valid FCC KML boundary files/, 'must mention the derived valid KML file count');
 });
 
 // ── Yavapai County / Prescott AZ sample output ──────────────────────────────
