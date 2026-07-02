@@ -11,15 +11,18 @@
 //   formula that takes the station's daytime ERP, the nighttime
 //   skywave RSS contribution from each interfering station along the
 //   path, and a class-pair-specific protection ratio.  Reduced power
-//   is capped at 500 W (PSSA) / 500 W (PSRA, after midnight in some
-//   class combinations).
+//   is capped at 500 W for both PSRA and PSSA.
 //
-//   §73.99(d) — operating mode at any moment is one of:
+//   Operating mode at any moment is one of:
 //
 //     daytime    sunrise          → sunset                  full ERP
-//     pssa       sunset           → local 6 PM              §73.99 reduced power
-//     nighttime  local 6 PM       → next-day local 6 AM     0 W (or licensed night ERP for full-time stations)
-//     psra       local 6 AM       → next-day sunrise        §73.99 reduced power
+//     pssa       sunset           → sunset + 2 hours        §73.99 reduced power
+//     nighttime  sunset + 2 h     → next-day 6 AM local     0 W (or licensed night ERP for full-time stations)
+//     psra       local 6 AM       → sunrise                 §73.99 reduced power
+//
+//   PSRA commences at 6:00 a.m. LOCAL TIME regardless of how late
+//   sunrise is (§73.99 limits the POWER, not the window), and PSSA
+//   runs for two hours after sunset with no fixed-clock cap.
 //
 //   §73.99(e) — "Local time" means the standard time of the
 //   transmitter site's FCC timezone code.  FCC authorizations do NOT
@@ -42,8 +45,8 @@
 //   Sunrise/Sunset Authority panel without paying the FCCAM fan-out
 //   latency.
 
-const LOCAL_MORNING_BOUNDARY_HHMM = '06:00';   // §73.99(d) start of PSRA
-const LOCAL_EVENING_BOUNDARY_HHMM = '18:00';   // §73.99(d) end of PSSA
+const LOCAL_MORNING_BOUNDARY_HHMM = '06:00';   // §73.99 start of PSRA (6 a.m. local)
+const PSSA_DURATION_MINUTES       = 120;       // §73.99 PSSA: sunset → sunset + 2 hours
 
 /**
  * @param {string} hhmm   "HH:MM" 24-hour local time
@@ -101,35 +104,34 @@ export function buildPsraPssaWindows({ sunrise, sunset, timezone_label = null } 
     return { ok: false, error: `sunrise ${sunrise} must precede sunset ${sunset}` };
   }
   const morningBoundary = hhmmToMinutes(LOCAL_MORNING_BOUNDARY_HHMM);  // 360
-  const eveningBoundary = hhmmToMinutes(LOCAL_EVENING_BOUNDARY_HHMM);  // 1080
 
-  // PSRA: max( 6 AM local, sunrise − 2 h ) → local sunrise.
-  // 47 CFR §73.99(b)(1) caps the pre-sunrise window at 2 hours
-  // (120 minutes) before local sunrise — even when the regulatory
-  // 6 AM boundary would otherwise produce a longer window in high-
-  // latitude winter (e.g. Anchorage sunrise 09:30 local would yield
-  // a 3.5-hour 06:00→09:30 window, which is over-broad authority).
-  // The boundary is the LATER of 06:00 and (sunrise − 120 min).
-  const psraStart = Math.max(morningBoundary, srMin - 120);
+  // PSRA: 6 AM local → local sunrise (§73.99).  The window commences at
+  // 6:00 a.m. local time regardless of how late sunrise is — the rule
+  // limits the operating POWER, not the window length.  When sunrise is
+  // at/before 6 AM the window is empty (station is already in daytime).
+  const psraStart = morningBoundary;
   const psraEnd   = srMin;
   const psraDur   = Math.max(0, psraEnd - psraStart);
   const psraApplicable = psraDur > 0;
 
-  // PSSA: local sunset → min( 6 PM local, sunset + 2 h ).
-  // Same 2-hour §73.99(b)(2) cap on the post-sunset window;
-  // high-latitude winter sunset of 15:30 should NOT yield a
-  // 15:30→18:00 (2.5-hour) PSSA window.
+  // PSSA: local sunset → two hours after sunset (§73.99).  There is no
+  // fixed-clock (6 PM) cap; a 20:30 summer sunset yields a 20:30→22:30
+  // window.  End time may pass midnight at extreme latitudes; the HH:MM
+  // rendering wraps.
   const pssaStart = ssMin;
-  const pssaEnd   = Math.min(eveningBoundary, ssMin + 120);
-  const pssaDur   = Math.max(0, pssaEnd - pssaStart);
-  const pssaApplicable = pssaDur > 0;
+  const pssaEnd   = ssMin + PSSA_DURATION_MINUTES;
+  const pssaDur   = PSSA_DURATION_MINUTES;
+  const pssaApplicable = true;
 
   // Daytime: sunrise → sunset (full ERP).
   const dayDur = ssMin - srMin;
 
-  // Nighttime: 6 PM local → next-day 6 AM local.  Wraps midnight so
-  // we report it as two-arc; duration is straightforward.
-  const nightDur = (1440 - eveningBoundary) + morningBoundary;  // = 720
+  // Nighttime: end of PSSA (sunset + 2 h) → next-day 6 AM local (start
+  // of PSRA), or → sunrise when sunrise is at/before 6 AM.  Wraps
+  // midnight so we report it as two-arc; duration is straightforward.
+  const nightStart = pssaEnd % 1440;
+  const nightEnd   = Math.min(morningBoundary, srMin);
+  const nightDur   = ((nightEnd - nightStart) % 1440 + 1440) % 1440;
 
   return {
     ok:        true,
@@ -140,11 +142,10 @@ export function buildPsraPssaWindows({ sunrise, sunset, timezone_label = null } 
                    duration_minutes: dayDur },
       pssa:      { start: minutesToHhmm(pssaStart), end: minutesToHhmm(pssaEnd),
                    duration_minutes: pssaDur, applicable: pssaApplicable,
-                   note: pssaApplicable ? null
-                         : 'sunset is at/after 6 PM local — no PSSA window' },
-      nighttime: { start: minutesToHhmm(eveningBoundary), end: minutesToHhmm(morningBoundary),
+                   note: null },
+      nighttime: { start: minutesToHhmm(nightStart), end: minutesToHhmm(nightEnd),
                    duration_minutes: nightDur,
-                   wraps_midnight: true },
+                   wraps_midnight: nightStart > nightEnd },
       psra:      { start: minutesToHhmm(psraStart), end: minutesToHhmm(psraEnd),
                    duration_minutes: psraDur, applicable: psraApplicable,
                    note: psraApplicable ? null
@@ -179,28 +180,28 @@ export function classifyMode(windowsPayload, nowHhmm){
   const sr  = hhmmToMinutes(windowsPayload.sunrise);
   const ss  = hhmmToMinutes(windowsPayload.sunset);
   const mb  = hhmmToMinutes(LOCAL_MORNING_BOUNDARY_HHMM);
-  const eb  = hhmmToMinutes(LOCAL_EVENING_BOUNDARY_HHMM);
+  const pssaEnd = ss + PSSA_DURATION_MINUTES;   // may pass midnight at extreme latitudes
 
   // Daytime: sunrise ≤ now < sunset
   if (now >= sr && now < ss){
     return { mode: 'daytime', in_window: w.daytime, notes };
   }
-  // PSSA: sunset ≤ now < 6 PM  (only when sunset < 6 PM)
-  if (w.pssa.applicable && now >= ss && now < eb){
+  // PSSA: sunset ≤ now < sunset + 2 h (§73.99 — no fixed-clock cap).
+  // Handle the end-past-midnight case (pssaEnd > 1440) by also matching
+  // early-morning times before the wrapped end.
+  if (now >= ss && now < pssaEnd){
     return { mode: 'pssa', in_window: w.pssa, notes };
   }
-  // PSRA: 6 AM ≤ now < sunrise  (only when sunrise > 6 AM)
+  if (pssaEnd > 1440 && now < pssaEnd - 1440){
+    return { mode: 'pssa', in_window: w.pssa, notes };
+  }
+  // PSRA: 6 AM ≤ now < sunrise (only when sunrise is after 6 AM)
   if (w.psra.applicable && now >= mb && now < sr){
     return { mode: 'psra', in_window: w.psra, notes };
   }
-  // Nighttime: 6 PM ≤ now < 24:00  OR  00:00 ≤ now < 6 AM
-  if (now >= eb || now < mb){
-    return { mode: 'nighttime', in_window: w.nighttime, notes };
-  }
-  // Fall-through (shouldn't happen) — between sunrise and 6 AM, or
-  // between 6 PM and sunset when neither PSRA nor PSSA applies.
-  notes.push('time falls outside all §73.99 windows — operator should verify schedule by hand');
-  return { mode: 'unknown', in_window: null, notes };
+  // Nighttime: everything else — from sunset + 2 h to 6 AM (or sunrise
+  // when sunrise is at/before 6 AM), wrapping midnight.
+  return { mode: 'nighttime', in_window: w.nighttime, notes };
 }
 
 /**
@@ -252,7 +253,7 @@ export const PSRA_PSSA_PROVENANCE = Object.freeze({
   regulation:    '47 CFR §73.99 (Pre-Sunrise / Post-Sunset Authority) + §73.1209 (time references = local time; §73.1209(b) DST adjustment)',
   modeled: [
     'PSRA window (6 AM local → local sunrise), applicable test',
-    'PSSA window (local sunset → 6 PM local), applicable test',
+    'PSSA window (local sunset → sunset + 2 hours)',
     'Daytime + Nighttime windows with midnight-wrap accounting',
     'Current-mode classifier (daytime / psra / pssa / nighttime)',
     'Monthly 12-row schedule builder over the sun sidecar payload'

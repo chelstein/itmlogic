@@ -1535,13 +1535,13 @@ test('regulatory_compliance_summary.blanket_pop.status is FAIL when blanket_popu
 });
 
 test('regulatory_compliance_summary.class_power.ceiling matches FCC §73.21 for the station class', async () => {
-  // Class D daytime max = 5 kW per §73.21(e); KAZM is Class D.
+  // Class D daytime max = 50 kW per §73.21(b)(2); KAZM is Class D.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   assert.equal(out.available, true);
   for (const c of out.candidates){
     const rcs = c.regulatory_compliance_summary;
-    assert.equal(rcs.class_power.ceiling, 5,
-      `Class D daytime ceiling is 5 kW per §73.21(e); rank ${c.rank} got ${rcs.class_power.ceiling}`);
+    assert.equal(rcs.class_power.ceiling, 50,
+      `Class D daytime ceiling is 50 kW per §73.21(b)(2); rank ${c.rank} got ${rcs.class_power.ceiling}`);
     assert.ok(rcs.class_power.value > 0,
       `class_power.value (tpo_kw) must be positive; rank ${c.rank} got ${rcs.class_power.value}`);
   }
@@ -1553,9 +1553,9 @@ test('power_class_ceiling_kw is stamped on every candidate and matches §73.21 c
   for (const c of out.candidates){
     assert.ok(c.power_class_ceiling_kw != null,
       `power_class_ceiling_kw must be non-null; rank ${c.rank}`);
-    // KAZM is Class D → daytime ceiling 5 kW per §73.21(e).
-    assert.equal(c.power_class_ceiling_kw, 5,
-      `KAZM Class D daytime ceiling is 5 kW per §73.21(e); rank ${c.rank} got ${c.power_class_ceiling_kw}`);
+    // KAZM is Class D → daytime ceiling 50 kW per §73.21(b)(2).
+    assert.equal(c.power_class_ceiling_kw, 50,
+      `KAZM Class D daytime ceiling is 50 kW per §73.21(b)(2); rank ${c.rank} got ${c.power_class_ceiling_kw}`);
     // consistency with regulatory_compliance_summary
     assert.equal(c.regulatory_compliance_summary.class_power.ceiling, c.power_class_ceiling_kw,
       `power_class_ceiling_kw must match regulatory_compliance_summary.class_power.ceiling (rank ${c.rank})`);
@@ -2132,7 +2132,7 @@ test('coverage_feasibility_assessment present on every candidate with correct sh
 });
 
 test('coverage_feasibility_assessment.class_power_ceiling_kw matches §73.21 class table', async () => {
-  const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 5 };
+  const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 50 };  // D: 50 kW day per §73.21(b)(2)
   for (const [cls, ceil] of Object.entries(CLASS_CEILINGS)){
     const out = await runSiteOptimizer({ ...KAZM, fcc_class: cls, candidate_limit: 3 });
     assert.equal(out.available, true);
@@ -4827,9 +4827,9 @@ test('fcc_class_power_ceiling_analysis has correct class ceiling for Class D', a
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
   const pa = out.candidates[0].fcc_class_power_ceiling_analysis;
   assert.equal(pa.fcc_class, 'D', 'fcc_class must be D');
-  assert.equal(pa.class_power_ceiling_kw, 5, 'Class D daytime ceiling is 5 kW per §73.21(e)');
+  assert.equal(pa.class_power_ceiling_kw, 50, 'Class D daytime ceiling is 50 kW per §73.21(b)(2)');
   assert.equal(pa.current_tpo_kw, 5, 'current_tpo_kw must be 5');
-  assert.equal(pa.headroom_kw, 0, 'KAZM at 5 kW = Class D ceiling (5 kW) so headroom is 0');
+  assert.equal(pa.headroom_kw, 45, 'KAZM at 5 kW under the 50 kW Class D ceiling leaves 45 kW headroom');
 });
 
 test('fcc_class_power_ceiling_analysis utilization_pct is correct', async () => {
@@ -4837,8 +4837,8 @@ test('fcc_class_power_ceiling_analysis utilization_pct is correct', async () => 
   const pa = out.candidates[0].fcc_class_power_ceiling_analysis;
   assert.ok(pa.power_utilization_pct > 0, 'utilization_pct must be positive');
   assert.ok(pa.power_utilization_pct <= 100, 'utilization_pct must be <= 100');
-  // 5 kW / 5 kW (Class D ceiling per §73.21(e)) = 100%
-  assert.ok(Math.abs(pa.power_utilization_pct - 100) < 1, `expected ~100% utilization (KAZM at Class D ceiling), got ${pa.power_utilization_pct}`);
+  // 5 kW / 50 kW (Class D ceiling per §73.21(b)(2)) = 10%
+  assert.ok(Math.abs(pa.power_utilization_pct - 10) < 1, `expected ~10% utilization (KAZM 5 kW of 50 kW Class D ceiling), got ${pa.power_utilization_pct}`);
 });
 
 test('fcc_class_power_ceiling_analysis upgrade_feasibility is valid', async () => {
@@ -8300,7 +8300,7 @@ test('skywave_coverage_analysis NIF requirement for clear channel', async () => 
 test('skywave_coverage_analysis nighttime power limits enforced', async () => {
   const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
   const s = out.candidates[0].skywave_coverage_analysis;
-  // Class D max night power is 0.5 kW per §73.21(b)(2); TPO 5 kW should clamp to 0.5
+  // Class D night power is < 0.25 kW per §73.21(b)(2); TPO 5 kW clamps to 0.25
   assert.ok(s.actual_night_power_kw <= s.nighttime_power_max_kw, 'actual night power must not exceed class max');
   assert.ok(s.nighttime_power_max_kw > 0, 'nighttime power max must be positive');
 });
@@ -9618,19 +9618,19 @@ test('transmitter_power_upgrade_pathway_guide KAZM 780 kHz Class D NDA daytime h
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
   assert.strictEqual(g.current_tpo_kw, 5, 'current_tpo_kw must be 5 (KAZM)');
-  assert.strictEqual(g.day_max_tpo_kw, 5, 'Class D daytime ceiling is 5 kW per §73.21(e); not 50 kW');
-  assert.strictEqual(g.day_headroom_kw, 0, 'KAZM at 5 kW = Class D ceiling; headroom = 0');
-  assert.strictEqual(g.can_upgrade_day_power, false, 'KAZM at Class D ceiling cannot increase day power');
-  assert.strictEqual(g.upgraded_tpo_kw, 5, 'upgraded_tpo_kw = ceiling = 5 kW (no headroom)');
+  assert.strictEqual(g.day_max_tpo_kw, 50, 'Class D daytime ceiling is 50 kW per §73.21(b)(2)');
+  assert.strictEqual(g.day_headroom_kw, 45, 'KAZM at 5 kW under 50 kW Class D ceiling: 45 kW headroom');
+  assert.strictEqual(g.can_upgrade_day_power, true, 'KAZM below Class D ceiling can increase day power');
+  assert.strictEqual(g.upgraded_tpo_kw, 50, 'upgraded_tpo_kw = 50 kW Class D ceiling');
 });
 
-test('transmitter_power_upgrade_pathway_guide KAZM coverage gain at Class D ceiling (no headroom)', async () => {
+test('transmitter_power_upgrade_pathway_guide KAZM coverage gain to Class D ceiling', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
-  // KAZM at 5 kW = Class D daytime ceiling (§73.21(e)): no power upgrade possible, coverage factor = 1.0
-  assert.ok(Math.abs(g.coverage_radius_factor - 1.0) < 0.01,
-    `coverage_radius_factor must be 1.0 (no upgrade available at Class D ceiling), got ${g.coverage_radius_factor}`);
-  assert.strictEqual(g.coverage_gain_pct, 0, 'coverage_gain_pct must be 0 (KAZM at ceiling, no power increase possible)');
+  // KAZM 5 kW → 50 kW: coverage radius scales as sqrt(50/5) = sqrt(10) ≈ 3.162
+  assert.ok(Math.abs(g.coverage_radius_factor - Math.sqrt(10)) < 0.01,
+    `coverage_radius_factor must be sqrt(10) ≈ 3.162 for a 5→50 kW upgrade, got ${g.coverage_radius_factor}`);
+  assert.ok(g.coverage_gain_pct > 0, 'coverage_gain_pct must be positive (upgrade headroom exists)');
 });
 
 test('transmitter_power_upgrade_pathway_guide costs and upgrade steps', async () => {
@@ -10764,7 +10764,7 @@ test('am_daytime_interference_and_protection_guide KAZM clear channel secondary 
   // 780 kHz is a clear channel; Class D → secondary status
   assert.strictEqual(g.channel_type, 'CLEAR_CHANNEL', '780 kHz should be CLEAR_CHANNEL');
   assert.strictEqual(g.is_secondary, true, 'Class D on clear channel should be secondary');
-  assert.strictEqual(g.night_power_limit_kw, 0.5, 'Class D clear-channel night limit should be 0.5 kW per §73.21(b)(2)');
+  assert.strictEqual(g.night_power_limit_kw, 0.25, 'Class D clear-channel night limit is < 0.25 kW per §73.21(b)(2)');
   assert.strictEqual(g.co_channel_risk, 'HIGH', 'Class D on clear channel has HIGH co-channel risk');
 });
 
@@ -12940,18 +12940,18 @@ test('KAZM clear channel secondary status at night (780 kHz Class D)', async () 
   assert.strictEqual(g.nighttime_status,   'secondary_limited_time',  'Class D on clear channel = secondary_limited_time');
 });
 
-test('KAZM nighttime power limit (5 kW Class D → 1 kW max at night)', async () => {
+test('KAZM nighttime power limit (5 kW Class D → < 0.25 kW at night per §73.21(b)(2))', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nighttime_operation_and_skywave_classification_guide;
-  assert.strictEqual(g.nighttime_power_kw_max,    1,   'Class D on clear channel capped at 1 kW night');
-  assert.strictEqual(g.nighttime_power_fraction,  0.2, 'nighttime_power_fraction = 1/5 = 0.2');
-  assert.strictEqual(g.daytime_power_kw,          5,   'daytime_power_kw should equal tpo_kw=5');
+  assert.strictEqual(g.nighttime_power_kw_max,    0.25, 'Class D night power < 0.25 kW per §73.21(b)(2)');
+  assert.strictEqual(g.nighttime_power_fraction,  0.05, 'nighttime_power_fraction = 0.25/5 = 0.05');
+  assert.strictEqual(g.daytime_power_kw,          5,    'daytime_power_kw should equal tpo_kw=5');
 });
 
-test('KAZM effective power fraction (60% = average of 100% day + 20% night)', async () => {
+test('KAZM effective power fraction (average of 100% day + 5% night)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nighttime_operation_and_skywave_classification_guide;
-  assert.strictEqual(g.effective_power_fraction, 0.6, 'effective_power_fraction should be 0.6');
+  assert.strictEqual(g.effective_power_fraction, 0.53, 'effective_power_fraction = (1.0 + 0.05)/2 rounded');
   assert.strictEqual(g.daytime_hours_per_year,   4380, 'daytime_hours_per_year = 365×12 = 4380');
 });
 
@@ -12964,8 +12964,8 @@ test('am_nighttime_operation_and_skywave_classification_guide comparison table c
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.sky_nighttime_status,       'secondary_limited_time', 'rank-1 sky_nighttime_status mismatch');
-  assert.strictEqual(r0.sky_nighttime_power_kw_max,  1,                       'rank-1 sky_nighttime_power_kw_max should be 1');
-  assert.strictEqual(r0.sky_effective_power_pct,     0.6,                     'rank-1 sky_effective_power_pct should be 0.6');
+  assert.strictEqual(r0.sky_nighttime_power_kw_max,  0.25,                    'rank-1 sky_nighttime_power_kw_max should be 0.25 (§73.21(b)(2))');
+  assert.strictEqual(r0.sky_effective_power_pct,     0.53,                    'rank-1 sky_effective_power_pct should be 0.53');
 });
 
 test('am_broadcast_proof_of_performance_guide present on KAZM candidate', async () => {
@@ -13864,15 +13864,15 @@ test('KAZM 780 kHz Class D clear channel allocation', async () => {
   const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
   assert.strictEqual(g.channel_type,        'clear', '780 kHz should be clear channel type');
   assert.strictEqual(g.is_clear_channel,     true,   'is_clear_channel should be true');
-  assert.strictEqual(g.class_max_day_kw,     5,      'Class D max day power is 5 kW (§73.21(e))');
-  assert.strictEqual(g.class_max_night_kw,   0.5,    'Class D night ≤ 0.5 kW where authorized (§73.21(b)(2))');
+  assert.strictEqual(g.class_max_day_kw,     50,     'Class D max day power is 50 kW (§73.21(b)(2))');
+  assert.strictEqual(g.class_max_night_kw,   0.25,   'Class D night < 0.25 kW where authorized (§73.21(b)(2))');
 });
 
 test('KAZM Class D power relative to class maximum', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
-  assert.strictEqual(g.tpo_pct_of_max,       100, 'KAZM 5 kW / 5 kW Class D ceiling = 100% (§73.21(e))');
-  assert.strictEqual(g.upgrade_potential_kw,    0, 'Class D at 5 kW is at ceiling (§73.21(e)); upgrade potential = 0');
+  assert.strictEqual(g.tpo_pct_of_max,       10, 'KAZM 5 kW / 50 kW Class D ceiling = 10% (§73.21(b)(2))');
+  assert.strictEqual(g.upgrade_potential_kw,  45, 'Class D at 5 kW of 50 kW ceiling: 45 kW upgrade potential (§73.21(b)(2))');
 });
 
 test('KAZM frequency allocation reference and note fields', async () => {
@@ -13891,8 +13891,8 @@ test('am_frequency_allocation_class_and_channel_guide comparison table columns p
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.fac_channel_type,         'clear', 'rank-1 fac_channel_type should be clear');
-  assert.strictEqual(r0.fac_class_max_day_kw,      5,     'rank-1 fac_class_max_day_kw should be 5 kW (Class D, §73.21(e))');
-  assert.strictEqual(r0.fac_upgrade_potential_kw,  0,     'rank-1 fac_upgrade_potential_kw should be 0 (KAZM at 5 kW = Class D max)');
+  assert.strictEqual(r0.fac_class_max_day_kw,      50,    'rank-1 fac_class_max_day_kw should be 50 kW (Class D, §73.21(b)(2))');
+  assert.strictEqual(r0.fac_upgrade_potential_kw,  45,    'rank-1 fac_upgrade_potential_kw should be 45 (KAZM 5 kW of 50 kW Class D max)');
 });
 
 test('am_modulation_and_audio_processing_guide present on KAZM candidate', async () => {
@@ -18023,8 +18023,8 @@ test('#122 MAJOR modification costs more and takes longer than MINOR', async () 
   const major = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', tpo_kw: 50,  candidate_limit: 1 });
   const gMinor = minor.candidates[0].am_licensed_power_class_upgrade_guide;
   const gMajor = major.candidates[0].am_licensed_power_class_upgrade_guide;
-  // Class D passed at 50 kW exceeds Class D ceiling (5 kW per §73.21(e)); engine returns headroom ≤ 0
-  assert.ok(gMajor.modification_type !== 'MINOR' || gMajor.headroom_kw <= 0, 'Class D above ceiling (50 kW > 5 kW max) should not be MINOR modification');
+  // Class D at 50 kW is AT the §73.21(b)(2) ceiling; engine returns headroom ≤ 0
+  assert.ok(gMajor.modification_type !== 'MINOR' || gMajor.headroom_kw <= 0, 'Class D at the 50 kW ceiling should not be a MINOR modification with headroom');
   assert.ok(gMinor.cost_estimates.total_low_usd <= gMajor.cost_estimates.total_low_usd || gMinor.modification_type === 'MINOR', 'MINOR should not cost more than MAJOR');
 });
 

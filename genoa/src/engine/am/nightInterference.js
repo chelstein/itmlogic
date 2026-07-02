@@ -137,8 +137,7 @@ export function rssAggregate(interferers, opts = {}){
  * applicable to the station's class.
  *
  * D/U (Desired-to-Undesired) ratios per 47 CFR §73.182 / §73.183:
- *   - Class A clear (co-channel):  26 dB nighttime
- *   - Class B / D (co-channel):    20 dB nighttime
+ *   - Co-channel (all classes):    26 dB nighttime (20:1 field ratio)
  *   - 1st-adjacent (10 kHz):        0 dB
  *   - 2nd-adjacent (20 kHz):      -26 dB
  *   - 3rd-adjacent (30 kHz):      -50 dB
@@ -189,11 +188,13 @@ export function checkProtection(desired_uv_m, rss_uv_m, du_db){
 export function standardDuDb(subjectClass, relation){
   const cls = String(subjectClass || '').toUpperCase();
   const rel = normalizeRelation(relation);
+  // §73.182 nighttime co-channel protection is a 20:1 FIELD ratio = 26 dB for
+  // all classes (20 dB would be a 10:1 ratio — a ratio-vs-dB transcription error).
   const matrix = {
     A: { co_channel: 26, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
-    B: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
-    C: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
-    D: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: null }
+    B: { co_channel: 26, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
+    C: { co_channel: 26, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
+    D: { co_channel: 26, first_adjacent: 0,  second_adjacent: -26, third_adjacent: null }
   };
   const row = matrix[cls];
   if (!row) return null;

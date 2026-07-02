@@ -174,7 +174,7 @@ export function computePsraPssaPower(input){
         per_pair:        pairs,
         percent_time,
         ceiling_applied: false,
-        error:           `All ${pairs.length} protected pair(s) produced NaN power — upstream skywave fields are missing or non-positive.  §73.99(b)(1) ceiling NOT applied; reviewer must investigate.`
+        error:           `All ${pairs.length} protected pair(s) produced NaN power — the skywave field (e_actual_uv_m) or the protected station's §73.182(k) permissible-interference limit (e_max_allowed_uv_m) is missing or non-positive.  Supply e_max_pssa_uv_m / e_max_psra_uv_m from the protected station's nighttime-limit data.  §73.99(b)(1) ceiling NOT applied; reviewer must investigate.`
       };
     }
     if (valid.length === 0){

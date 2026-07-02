@@ -749,7 +749,7 @@ test('colocation GRID candidates have fcc_class_power_ceiling_analysis', async (
   assert.equal(out.available, true);
   for (const c of out.candidates) {
     assert.ok(c.fcc_class_power_ceiling_analysis != null, `rank ${c.rank} missing fcc_class_power_ceiling_analysis`);
-    assert.equal(c.fcc_class_power_ceiling_analysis.class_power_ceiling_kw, 5, `rank ${c.rank} Class D ceiling must be 5 kW (§73.21(e))`);
+    assert.equal(c.fcc_class_power_ceiling_analysis.class_power_ceiling_kw, 50, `rank ${c.rank} Class D daytime ceiling must be 50 kW (§73.21(b)(2))`);
     assert.ok(['NONE','LIMITED','SIGNIFICANT'].includes(c.fcc_class_power_ceiling_analysis.upgrade_feasibility),
       `rank ${c.rank} invalid upgrade_feasibility`);
   }
@@ -2066,8 +2066,8 @@ test('colocation GRID candidates have transmitter_power_upgrade_pathway_guide', 
   for (const c of out.candidates) {
     const g = c.transmitter_power_upgrade_pathway_guide;
     assert.ok(g != null, `rank ${c.rank} missing transmitter_power_upgrade_pathway_guide`);
-    assert.strictEqual(g.can_upgrade_day_power, false, `rank ${c.rank} can_upgrade_day_power must be false (KAZM at 5 kW = Class D ceiling per §73.21(e))`);
-    assert.strictEqual(g.coverage_gain_pct, 0, `rank ${c.rank} coverage_gain_pct must be 0 (no power upgrade possible at Class D ceiling)`);
+    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (KAZM 5 kW is under the 50 kW Class D ceiling per §73.21(b)(2))`);
+    assert.ok(g.coverage_gain_pct > 0, `rank ${c.rank} coverage_gain_pct must be positive (45 kW of headroom to the Class D ceiling)`);
   }
 });
 

@@ -110,21 +110,22 @@ export async function evaluateReceiver({
     return { ok: false, error: `proposed: ${desired.error}` };
   }
 
-  // §73.182(a) Class A SS-1 0.5 mV/m (500 µV/m) floor.  Clear-channel
-  // Class A nighttime service is defined down to the 0.5 mV/m 50% skywave
-  // contour, NOT the §73.182(d) Class B 2.5 mV/m level.  Without this
-  // floor a Class A station with a strong RSS sum from many distant
-  // co-channels would fail at radii well outside the regulatory
-  // protected service area, producing false-negative NIF failures for
-  // every Class A filing.  Apply the floor by clamping the desired
-  // field used for protection-ratio evaluation to at least the §73.182
-  // minimum protected SS-1 — receivers outside that contour are not
-  // protected anyway, so the §73.183 D/U requirement does not bind.
+  // §73.182(a) Class A SS-1 0.5 mV/m (500 µV/m) service-extent limit.
+  // Clear-channel Class A nighttime protection TERMINATES at the
+  // 0.5 mV/m 50% skywave contour — receivers beyond it are not part of
+  // the protected service area.  We implement this by flooring the
+  // REQUIRED field at 500 µV/m for Class A: a receiver passes only when
+  // the station's actual field meets BOTH the §73.182 D/U requirement
+  // (RSS × 10^(D/U/20)) AND the 0.5 mV/m service floor.  The NIF radius
+  // per azimuth therefore comes out as
+  //   min( r where desired = RSS·D/U,  r where desired = 0.5 mV/m ),
+  // matching §73.182(a).  (Clamping the DESIRED field up to 500 µV/m —
+  // the previous behavior — let the bisection chase an interferer-set
+  // locus that could lie far OUTSIDE the station's real 0.5 mV/m
+  // contour, overstating Class A service.)
   const isClassA = String(proposed?.fcc_class || '').toUpperCase() === 'A';
   const CLASS_A_SS1_FLOOR_UVM = 500; // 0.5 mV/m
-  const desiredFieldForProtection = isClassA
-    ? Math.max(Number(desired.field_uv_m) || 0, CLASS_A_SS1_FLOOR_UVM)
-    : Number(desired.field_uv_m) || 0;
+  const desiredRaw_uv_m = Number(desired.field_uv_m) || 0;
 
   // Interferer fields — one FCCAM call per interferer, ran in
   // parallel.  We do NOT batch across stations because each one has
@@ -167,7 +168,20 @@ export async function evaluateReceiver({
     const agg = rssAggregate(group, { thresholdUvm: receiverThresholdUvm });
     const du  = duDbByRelation?.[relation];
     if (!Number.isFinite(du)) continue;        // not protected for this combo
-    const verdict = checkProtection(desiredFieldForProtection, agg.rss_uv_m, du);
+    const duVerdict = checkProtection(desiredRaw_uv_m, agg.rss_uv_m, du);
+    // Class A: the binding requirement is the larger of the D/U-derived
+    // field and the 0.5 mV/m service-extent floor (§73.182(a)).
+    const required_uv_m = isClassA
+      ? Math.max(duVerdict.required_uv_m, CLASS_A_SS1_FLOOR_UVM)
+      : duVerdict.required_uv_m;
+    const floorBinds = isClassA && required_uv_m > duVerdict.required_uv_m;
+    const verdict = {
+      pass:          desiredRaw_uv_m >= required_uv_m && agg.rss_uv_m >= 0,
+      required_uv_m,
+      margin_db:     desiredRaw_uv_m > 0 && required_uv_m > 0
+                       ? 20 * Math.log10(desiredRaw_uv_m / required_uv_m)
+                       : null
+    };
     // Pre-compute the single strongest interferer in this pool so the
     // appendix's binding-interferer column has call + facility + relation
     // + contributed field at this receiver (per-azimuth attribution
@@ -180,9 +194,9 @@ export async function evaluateReceiver({
       du_db:          du,
       rss_uv_m:       agg.rss_uv_m,
       required_uv_m:  verdict.required_uv_m,
-      desired_uv_m:   desiredFieldForProtection,
-      desired_uv_m_raw: Number(desired.field_uv_m) || 0,
-      class_a_floor_applied: isClassA && desiredFieldForProtection > (Number(desired.field_uv_m) || 0),
+      desired_uv_m:   desiredRaw_uv_m,
+      desired_uv_m_raw: desiredRaw_uv_m,
+      class_a_floor_applied: floorBinds,
       margin_db:      verdict.margin_db,
       pass:           verdict.pass,
       contributing:   agg.contributing.map((x) => x.station_id || x.call || null),
