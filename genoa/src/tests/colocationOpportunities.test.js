@@ -3294,7 +3294,7 @@ test('am_annual_operating_cost_breakdown_guide present across colocation candida
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_annual_operating_cost_breakdown_guide missing`);
     assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
     assert.ok(g.kwh_per_year > 0, `rank ${c.rank}: kwh_per_year must be positive`);
-    assert.ok(g.electricity_draw_kw >= 3, `rank ${c.rank}: electricity_draw_kw must be >= 3 (3× TPO min 1 kW)`);
+    assert.ok(g.electricity_draw_kw >= 1.4, `rank ${c.rank}: electricity_draw_kw must be >= 1.4 (1.4× TPO min 1 kW)`);
   }
 });
 
@@ -4329,7 +4329,7 @@ test('am_interference_distance_and_service_area_overlap_guide present across col
     const g = c.am_interference_distance_and_service_area_overlap_guide;
     assert.ok(g !== undefined && g !== null, 'candidate missing am_interference_distance_and_service_area_overlap_guide');
     assert.ok(g.service_contours?.d_05_mvm_km > 0, 'd_05_mvm_km must be positive');
-    assert.strictEqual(g.du_requirements?.adj_10khz_db, -6, 'adj ±10 kHz must be −6 dB');
+    assert.strictEqual(g.du_requirements?.adj_10khz_db, 6, 'adj ±10 kHz must be 6 dB (§73.182 first-adjacent)');
     assert.ok(['LOW','MODERATE','HIGH'].includes(g.interference_risk_level), 'valid risk level required');
   }
 });
