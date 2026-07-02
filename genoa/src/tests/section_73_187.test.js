@@ -42,7 +42,7 @@ test('skywaveFieldAtPath: SS-1 50% returns finite positive field', () => {
   assert.ok(r.field_dBu > 0, 'dBu must be positive');
   assert.ok(r.distance_km > 700 && r.distance_km < 800);
   assert.equal(r.percent, 50);
-  assert.equal(r.regulation, '47 CFR §73.190 Figure 2 (SS-1 / SS-2)');
+  assert.equal(r.regulation, '47 CFR §73.190(c) (analytical formula permitted in lieu of Figure 2)');
 });
 
 test('skywaveFieldAtPath: SS-2 10% > SS-1 50% at the same range', () => {
@@ -73,9 +73,9 @@ test('skywaveFieldAtPath: power scaling — sqrt(P) law', () => {
   assert.ok(Math.abs(ratio - 2) < 0.05, `expected 2× field for 4× power; got ratio ${ratio.toFixed(3)}`);
 });
 
-test('SKYWAVE_PROVENANCE names §73.190 + OET-12 + license basis', () => {
+test('SKYWAVE_PROVENANCE names §73.190(c) + Berry (1968) + license basis', () => {
   assert.match(SKYWAVE_PROVENANCE.regulation, /73\.190/);
-  assert.match(SKYWAVE_PROVENANCE.reference, /OET Bulletin 12/);
+  assert.match(SKYWAVE_PROVENANCE.reference, /Berry.*1968/);
   assert.match(SKYWAVE_PROVENANCE.license_basis, /17 U\.S\.C\. § 105/);
   assert.ok(Array.isArray(SKYWAVE_PROVENANCE.modeled));
   assert.ok(Array.isArray(SKYWAVE_PROVENANCE.not_modeled));

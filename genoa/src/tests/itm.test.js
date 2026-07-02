@@ -146,11 +146,15 @@ test('terrainPathLoss: flat profile equals free-space + smooth-earth', () => {
   assert.ok(Math.abs(r.total_loss_db - (r.free_space_db + r.smooth_earth_extra_db)) < 0.01);
 });
 
-test('predictFieldStrengthDbu: 100 kW at 100 km / 100 MHz free-space ≈ 47 dBu', () => {
-  // E = 106.92 + 10·log10(100) - 20·log10(100) - 20·log10(100)
-  //   = 106.92 + 20 - 40 - 40 = 46.92 dBu
+test('predictFieldStrengthDbu: 100 kW at 100 km free-space ≈ 86.92 dBu (frequency-independent)', () => {
+  // Free-space FIELD STRENGTH has no frequency term:
+  // E = 106.92 + 10·log10(100) - 20·log10(100)
+  //   = 106.92 + 20 - 40 = 86.92 dBu
   const E = predictFieldStrengthDbu({ erp_kw: 100, distance_km: 100, frequency_mhz: 100 });
-  assert.ok(Math.abs(E - 46.92) < 0.01, `expected 46.92 dBu, got ${E}`);
+  assert.ok(Math.abs(E - 86.92) < 0.01, `expected 86.92 dBu, got ${E}`);
+  // Same answer at a different frequency — field strength is frequency-independent.
+  const E2 = predictFieldStrengthDbu({ erp_kw: 100, distance_km: 100, frequency_mhz: 700 });
+  assert.ok(Math.abs(E2 - E) < 1e-9, 'free-space field must not depend on frequency');
 });
 
 test('predictFieldStrengthDbu: terrain extra loss subtracts directly', () => {
@@ -166,15 +170,15 @@ test('findFieldStrengthCrossingOnRadial: locates 60 dBu crossing on flat-Earth p
   const profile = [];
   for (let d = 0; d <= 80; d += 5) profile.push({ distance_km: d, elevation_m: 0 });
   const r = findFieldStrengthCrossingOnRadial({
-    profile, tx_amsl_m: 100, erp_kw: 100, frequency_mhz: 100, target_field_dbu: 60
+    profile, tx_amsl_m: 100, erp_kw: 100, frequency_mhz: 100, target_field_dbu: 95
   });
-  // 60 dBu crossing at 100 kW / 100 MHz on flat: from FSL,
-  //   60 = 106.92 + 20 - 20·log10(d) - 40  →  log10(d) ≈ 1.346 → d ≈ 22.2 km
-  // Smooth-earth + 4/3 horizon adds modest extra loss inside that range,
-  // so the actual crossing is somewhat shorter — we just assert it's
-  // resolvable, finite, and positive.
+  // 95 dBu crossing at 100 kW on flat: free-space field is frequency-
+  // independent —
+  //   95 = 106.92 + 20 - 20·log10(d)  →  log10(d) ≈ 1.596 → d ≈ 39.5 km
+  // Smooth-earth + 4/3 horizon adds extra loss, so the actual crossing is
+  // at or inside that — we assert it's resolvable, finite, and positive.
   assert.ok(r.crossing_distance_km > 0, `crossing should be > 0, got ${r.crossing_distance_km}`);
-  assert.ok(r.crossing_distance_km < 50, `crossing should be < 50 km, got ${r.crossing_distance_km}`);
+  assert.ok(r.crossing_distance_km <= 40, `crossing should be ≤ 40 km, got ${r.crossing_distance_km}`);
   assert.equal(r.beyond_max_range, false);
 });
 
