@@ -13559,8 +13559,8 @@ test('am_total_project_cost_summary_guide present on KAZM candidate', async () =
 test('KAZM total project cost line items and grand total', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_total_project_cost_summary_guide;
-  assert.strictEqual(g.grand_total_low_usd,  377615, 'KAZM grand_total_low should be 377615');
-  assert.strictEqual(g.grand_total_high_usd, 1817175, 'KAZM grand_total_high should be 1817175');
+  assert.strictEqual(g.grand_total_low_usd,  380845, 'KAZM grand_total_low should be 380845 (ASR $5,175 + CP $15,495 line items per corrected §1.1102 FY2024 fees)');
+  assert.strictEqual(g.grand_total_high_usd, 1820405, 'KAZM grand_total_high should be 1820405');
   assert.ok(typeof g.line_items_low === 'object', 'line_items_low must be object');
   assert.ok(Object.keys(g.line_items_low).length >= 10, 'line_items_low must have >= 10 entries');
 });
@@ -13569,8 +13569,8 @@ test('KAZM 15% contingency applied correctly', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_total_project_cost_summary_guide;
   assert.strictEqual(g.contingency_pct,            15,         'contingency_pct should be 15');
-  assert.strictEqual(g.contingency_low_usd,        56642.25,   'KAZM contingency_low should be 56642.25');
-  assert.strictEqual(g.total_with_contingency_low_usd,  434257.25, 'KAZM total_with_contingency_low should be 434257.25');
+  assert.strictEqual(g.contingency_low_usd,        57126.75,   'KAZM contingency_low should be 57126.75 (15% of 380845)');
+  assert.strictEqual(g.total_with_contingency_low_usd,  437971.75, 'KAZM total_with_contingency_low should be 437971.75');
 });
 
 test('KAZM total project cost reference and note fields', async () => {
@@ -13588,9 +13588,9 @@ test('am_total_project_cost_summary_guide comparison table columns present', asy
     assert.ok('tpc_total_with_contingency' in row, 'tpc_total_with_contingency missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.tpc_grand_total_low_usd,    377615,    'rank-1 tpc_grand_total_low should be 377615');
-  assert.strictEqual(r0.tpc_grand_total_high_usd,   1817175,   'rank-1 tpc_grand_total_high should be 1817175');
-  assert.strictEqual(r0.tpc_total_with_contingency, 434257.25, 'rank-1 tpc_total_with_contingency should be 434257.25');
+  assert.strictEqual(r0.tpc_grand_total_low_usd,    380845,    'rank-1 tpc_grand_total_low should be 380845');
+  assert.strictEqual(r0.tpc_grand_total_high_usd,   1820405,   'rank-1 tpc_grand_total_high should be 1820405');
+  assert.strictEqual(r0.tpc_total_with_contingency, 437971.75, 'rank-1 tpc_total_with_contingency should be 437971.75');
 });
 
 test('am_community_impact_and_coverage_shift_guide present on KAZM candidate', async () => {

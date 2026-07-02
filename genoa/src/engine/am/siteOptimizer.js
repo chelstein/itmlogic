@@ -765,7 +765,7 @@ export async function runSiteOptimizer(body = {}){
     people_per_kw:          c.power_efficiency_metrics?.people_per_kw ?? null,
     km2_per_kw:             c.power_efficiency_metrics?.km2_per_kw ?? null,
     efficiency_tier:        c.power_efficiency_metrics?.efficiency_tier ?? null,
-    da_applicable:          c.da_gain_potential?.applicable ?? null,
+    da_gain_applicable:     c.da_gain_potential?.applicable ?? null,  // renamed: was clobbered by the later da_applicable key
     da_col_pct_estimate:    c.da_gain_potential?.da_col_coverage_estimate_pct ?? null,
     da_would_recover:       c.da_gain_potential?.would_recover_col_compliance ?? null,
     estimated_erp_kw:       c.antenna_system_summary?.estimated_erp_kw ?? null,
@@ -809,7 +809,7 @@ export async function runSiteOptimizer(body = {}){
     power_headroom_kw:      c.fcc_class_power_ceiling_analysis?.headroom_kw ?? null,
     upgrade_feasibility:    c.fcc_class_power_ceiling_analysis?.upgrade_feasibility ?? null,
     proof_antenna_mode:     c.technical_proof_guide?.antenna_mode ?? null,
-    proof_radials:          c.technical_proof_guide?.n_proof_radials ?? null,
+    tpg_proof_radials:      c.technical_proof_guide?.n_proof_radials ?? null,  // renamed: was clobbered by the later proof_radials key
     proof_field_days_min:   c.technical_proof_guide?.estimated_field_days?.[0] ?? null,
     acq_critical_items:     c.site_acquisition_checklist?.critical_count ?? null,
     acq_min_parcel_ha:      c.site_acquisition_checklist?.min_parcel_area_ha ?? null,
@@ -908,7 +908,7 @@ export async function runSiteOptimizer(body = {}){
     tower_faa_tier:         c.tower_lighting_marking_guide?.faa_lighting_tier ?? null,
     mpe_compliance_status:  c.rf_exposure_mpe_analysis?.compliance_status ?? null,
     mpe_excl_radius_m:      c.rf_exposure_mpe_analysis?.exclusion_radius_m ?? null,
-    mpe_eval_required:      c.rf_exposure_mpe_analysis?.evaluation_required ?? null,
+    mpe_analysis_eval_required: c.rf_exposure_mpe_analysis?.evaluation_required ?? null,  // renamed: was clobbered by the later mpe_eval_required key
     reloc_cost_low:         c.station_relocation_cost_estimator?.total_low ?? null,
     reloc_cost_high:        c.station_relocation_cost_estimator?.total_high ?? null,
     reloc_cost_midpoint:    c.station_relocation_cost_estimator?.total_midpoint ?? null,
@@ -1121,7 +1121,7 @@ export async function runSiteOptimizer(body = {}){
     colpop_growth_tier:         c.community_of_license_population_change_trend_guide?.growth_tier ?? null,
     colpop_307b_risk:           c.community_of_license_population_change_trend_guide?.sect_307b_preference_risk ?? null,
     nepa_tier:                  c.environmental_permitting_and_nepa_compliance_guide?.nepa_tier ?? null,
-    nepa_n_triggers:            c.environmental_permitting_and_nepa_compliance_guide?.n_section_1307_triggers ?? null,
+    envp_nepa_n_triggers:       c.environmental_permitting_and_nepa_compliance_guide?.n_section_1307_triggers ?? null,  // renamed: was clobbered by the later nepa_n_triggers key
     nepa_total_days_low:        c.environmental_permitting_and_nepa_compliance_guide?.total_permitting_timeline_days_low ?? null,
     lic_processing_priority:    c.fcc_license_history_and_compliance_record_guide?.processing_priority ?? null,
     lic_processing_months_low:  c.fcc_license_history_and_compliance_record_guide?.processing_months_low ?? null,
@@ -1146,10 +1146,10 @@ export async function runSiteOptimizer(body = {}){
     hd_adj_interference_risk:   c.am_digital_hd_radio_upgrade_pathway_guide?.adjacent_ch_interference_risk ?? null,
     xltr_erp_w:                 c.am_translator_and_booster_strategy_guide?.recommended_translator_erp_w ?? null,
     xltr_total_cost_low_usd:    c.am_translator_and_booster_strategy_guide?.translator_total_cost_low_usd ?? null,
-    xltr_coverage_km:           c.am_translator_and_booster_strategy_guide?.recommended_translator_coverage_km ?? null,
-    pop_proof_type:             c.fcc_proof_of_performance_measurement_guide?.proof_type ?? null,
+    xltr_strategy_coverage_km:  c.am_translator_and_booster_strategy_guide?.recommended_translator_coverage_km ?? null,  // renamed: was clobbered by the later xltr_coverage_km key
+    popm_proof_type:            c.fcc_proof_of_performance_measurement_guide?.proof_type ?? null,  // renamed: was clobbered by the later pop_proof_type key
     pop_total_pts:              c.fcc_proof_of_performance_measurement_guide?.total_measurement_points ?? null,
-    pop_cost_low_usd:           c.fcc_proof_of_performance_measurement_guide?.total_proof_cost_low_usd ?? null,
+    popm_cost_low_usd:          c.fcc_proof_of_performance_measurement_guide?.total_proof_cost_low_usd ?? null,  // renamed: was clobbered by the later pop_cost_low_usd key
     ins_annual_low_usd:         c.am_station_insurance_and_bonding_guide?.annual_premium_low_usd ?? null,
     ins_tower_value_low_usd:    c.am_station_insurance_and_bonding_guide?.tower_replacement_value_low_usd ?? null,
     ins_bond_amount_usd:        c.am_station_insurance_and_bonding_guide?.performance_bond_amount_usd ?? null,
@@ -1157,7 +1157,7 @@ export async function runSiteOptimizer(body = {}){
     gnd_total_cost_low_usd:     c.am_grounding_system_and_rf_safety_guide?.total_cost_low_usd ?? null,
     gnd_exclusion_zone_m:       c.am_grounding_system_and_rf_safety_guide?.exclusion_zone_m ?? null,
     ltg_type:                   c.am_antenna_tower_lighting_and_faa_guide?.lighting_type ?? null,
-    ltg_asr_required:           c.am_antenna_tower_lighting_and_faa_guide?.asr_required ?? null,
+    faa_ltg_asr_required:       c.am_antenna_tower_lighting_and_faa_guide?.asr_required ?? null,  // renamed: was clobbered by the later ltg_asr_required key
     ltg_total_initial_cost_low: c.am_antenna_tower_lighting_and_faa_guide?.total_initial_cost_low_usd ?? null,
     acq_site_class:             c.am_site_acquisition_and_real_property_guide?.site_class ?? null,
     acq_purchase_low_usd:       c.am_site_acquisition_and_real_property_guide?.total_purchase_low_usd ?? null,
@@ -1411,7 +1411,7 @@ export async function runSiteOptimizer(body = {}){
     ins_total_annual_low_usd:           c.am_insurance_and_liability_guide?.total_annual_insurance_low_usd ?? null,
     ins_tower_replacement_low_usd:      c.am_insurance_and_liability_guide?.tower_replacement_value_low_usd ?? null,
     ins_total_insured_low_usd:          c.am_insurance_and_liability_guide?.total_insured_value_low_usd ?? null,
-    str_total_structural_low_usd:       c.am_tower_structural_analysis_guide?.total_structural_low_usd ?? null,
+    tsa_total_structural_low_usd:       c.am_tower_structural_analysis_guide?.total_structural_low_usd ?? null,  // renamed: was clobbered by the later str_total_structural_low_usd key
     str_guy_levels:                     c.am_tower_structural_analysis_guide?.guy_levels ?? null,
     str_design_wind_speed_mph_low:      c.am_tower_structural_analysis_guide?.design_wind_speed_mph_low ?? null,
     sec_fence_perimeter_ft:             c.am_broadcast_facility_security_guide?.fence_perimeter_ft ?? null,
@@ -14154,14 +14154,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const tower_h_ft     = round2(tower_h_m * 3.28084);
       const distance_km    = pt.distance_from_current_km ?? 0;
       const distance_mi    = round2(distance_km * 0.621371);
-      // Line items (low estimates only, mirroring their respective IIFEs):
-      const transmitter_low    = FCC_CLASS_POWER_KW[fcc_class]
-        ? round2(Math.min(...Object.values(FCC_CLASS_POWER_KW)) > 0 ? tpo_kw * 50000 / 5 : 50000)
-        : 50000;
-      // Simplified: transmitter (15k), ground system (50k), tower (80k), guy wire (41k),
-      // lighting & aviation (5k), grounding (9k), transmission line (3.5k),
-      // FCC ASR (5k), site access (29k), utility power (24k), building+STL (41k),
-      // FCC CP (12k), real estate (12k), environmental (8k), zoning (5k), ROI survey (2k)
+      // STATIC screening-grade line items for a representative 5 kW Class D
+      // relocation build.  These values MIRROR the per-candidate cost guides
+      // (as audited) but are constants — they do NOT scale with tpo_kw,
+      // frequency, or class.  Use the individual guides for input-dependent
+      // estimates; this summary exists to give a single capital-budget
+      // anchor with contingency applied.
       const line_items_low = {
         transmitter_and_exciter:    50000,
         ground_system:              50000,
@@ -14170,11 +14168,11 @@ async function scoreCandidate(pt, ctx, warnings){
         tower_lighting_aviation:     5000,
         grounding_lightning:         9385,
         transmission_line:           3530,
-        fcc_asr_registration:        5130,
+        fcc_asr_registration:        5175,   // mirrors am_fcc_asr_tower_registration_guide (Form 854 $175)
         site_access_road:           28800,
         utility_power_backup:       23920,
         transmitter_building_stl:   41440,
-        fcc_cp_and_license:         12310,
+        fcc_cp_and_license:         15495,  // mirrors am_fcc_construction_permit_and_license_guide (Form 301-AM $4,200 major CP)
         real_estate_purchase:       12000,
         environmental_impact:        8000,
         zoning_permits:              5000,
@@ -14188,11 +14186,11 @@ async function scoreCandidate(pt, ctx, warnings){
         tower_lighting_aviation:    80000,
         grounding_lightning:        33655,
         transmission_line:          10000,
-        fcc_asr_registration:       18130,
+        fcc_asr_registration:       18175,  // mirrors am_fcc_asr_tower_registration_guide
         site_access_road:           92800,
         utility_power_backup:       56840,
         transmitter_building_stl:  127440,
-        fcc_cp_and_license:         49310,
+        fcc_cp_and_license:         52495,  // mirrors am_fcc_construction_permit_and_license_guide
         real_estate_purchase:      158000,
         environmental_impact:       35000,
         zoning_permits:             20000,
@@ -14218,7 +14216,7 @@ async function scoreCandidate(pt, ctx, warnings){
         contingency_high_usd,
         total_with_contingency_low_usd,
         total_with_contingency_high_usd,
-        reference: 'Aggregate of all AM Relocation Optimizer per-candidate engineering cost guides; 15% contingency per broadcast industry practice; individual line items from FCC regulatory data, RS Means, and broadcast engineering standards',
+        reference: 'Static screening-grade capital-budget summary; line items mirror the per-candidate engineering cost guides for a representative build (they do not scale with inputs — see individual guides for input-dependent estimates); 15% contingency per broadcast industry practice; FCC fees per §1.1102 FY2024',
         note: `Full relocation budget: $${grand_total_low_usd.toLocaleString()}–$${grand_total_high_usd.toLocaleString()} + 15% contingency = $${total_with_contingency_low_usd.toLocaleString()}–$${total_with_contingency_high_usd.toLocaleString()} total.`
       };
     })(),
