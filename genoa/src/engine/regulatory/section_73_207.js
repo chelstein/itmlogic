@@ -58,8 +58,9 @@ import { classifyFmOffsetKhz } from './_du_pair_study.js';
 //
 // Source: 47 CFR §73.207(b) Table A as published in the eCFR
 // (https://www.ecfr.gov/current/title-47/chapter-I/subchapter-C/part-73/subpart-B/section-73.207),
-// most recent revision.  Values verified against the canonical
-// published table; SEPARATION_TABLE_PROVENANCE below names the source.
+// most recent revision.  Values transcribed cell-by-cell from the
+// published Table 1 (co-channel / 200 kHz / 400-600 kHz / 10.6-10.8 MHz
+// columns, kilometers); SEPARATION_TABLE_PROVENANCE below names the source.
 // Symmetric: table[a][b] === table[b][a] (regulation requires symmetry).
 //
 // Class pairs not in the regulation (e.g. LPFM, FX) are not enumerated
@@ -68,93 +69,85 @@ import { classifyFmOffsetKhz } from './_du_pair_study.js';
 // (translators governed by §74.1235; LPFM by §73.807).
 
 const SEPARATION_KM = Object.freeze({
-  // Class A interactions
   A: {
-    A:  { co: 115, adj1: 72,  adj23: 31, if: 10 },
-    B1: { co: 142, adj1: 89,  adj23: 42, if: 10 },
-    B:  { co: 241, adj1: 169, adj23: 74, if: 10 },
-    C3: { co: 142, adj1: 89,  adj23: 42, if: 10 },
-    C2: { co: 166, adj1: 106, adj23: 55, if: 10 },
-    C1: { co: 200, adj1: 133, adj23: 75, if: 10 },
-    C0: { co: 215, adj1: 145, adj23: 85, if: 10 },
-    C:  { co: 226, adj1: 154, adj23: 90, if: 10 }
+    A:  { co: 115, adj1: 72, adj23: 31, if: 10 },
+    B1: { co: 143, adj1: 96, adj23: 48, if: 12 },
+    B:  { co: 178, adj1: 113, adj23: 69, if: 15 },
+    C3: { co: 142, adj1: 89, adj23: 42, if: 12 },
+    C2: { co: 166, adj1: 106, adj23: 55, if: 15 },
+    C1: { co: 200, adj1: 133, adj23: 75, if: 22 },
+    C0: { co: 215, adj1: 152, adj23: 86, if: 25 },
+    C:  { co: 226, adj1: 165, adj23: 95, if: 29 }
   },
-  // Class B1 interactions
   B1: {
-    A:  { co: 142, adj1: 89,  adj23: 42, if: 10 },
-    B1: { co: 175, adj1: 114, adj23: 50, if: 10 },
-    B:  { co: 241, adj1: 169, adj23: 74, if: 10 },
-    C3: { co: 175, adj1: 114, adj23: 50, if: 10 },
-    C2: { co: 200, adj1: 132, adj23: 64, if: 10 },
-    C1: { co: 233, adj1: 158, adj23: 84, if: 10 },
-    C0: { co: 248, adj1: 170, adj23: 95, if: 10 },
-    C:  { co: 259, adj1: 178, adj23: 100, if: 10 }
+    A:  { co: 143, adj1: 96, adj23: 48, if: 12 },
+    B1: { co: 175, adj1: 114, adj23: 50, if: 14 },
+    B:  { co: 211, adj1: 145, adj23: 71, if: 17 },
+    C3: { co: 175, adj1: 114, adj23: 50, if: 14 },
+    C2: { co: 200, adj1: 134, adj23: 56, if: 17 },
+    C1: { co: 233, adj1: 161, adj23: 77, if: 24 },
+    C0: { co: 248, adj1: 180, adj23: 87, if: 27 },
+    C:  { co: 259, adj1: 193, adj23: 105, if: 31 }
   },
-  // Class B interactions (Zone I & I-A)
   B: {
-    A:  { co: 241, adj1: 169, adj23: 74, if: 10 },
-    B1: { co: 241, adj1: 169, adj23: 74, if: 10 },
-    B:  { co: 241, adj1: 169, adj23: 74, if: 10 },
-    C3: { co: 241, adj1: 169, adj23: 74, if: 10 },
-    C2: { co: 241, adj1: 169, adj23: 74, if: 10 },
-    C1: { co: 270, adj1: 195, adj23: 105, if: 10 },
-    C0: { co: 285, adj1: 207, adj23: 115, if: 10 },
-    C:  { co: 311, adj1: 224, adj23: 125, if: 10 }
+    A:  { co: 178, adj1: 113, adj23: 69, if: 15 },
+    B1: { co: 211, adj1: 145, adj23: 71, if: 17 },
+    B:  { co: 241, adj1: 169, adj23: 74, if: 20 },
+    C3: { co: 211, adj1: 145, adj23: 71, if: 17 },
+    C2: { co: 241, adj1: 169, adj23: 74, if: 20 },
+    C1: { co: 270, adj1: 195, adj23: 79, if: 27 },
+    C0: { co: 272, adj1: 214, adj23: 89, if: 31 },
+    C:  { co: 274, adj1: 217, adj23: 105, if: 35 }
   },
-  // Class C3 — Zone II, lowest-power C
   C3: {
-    A:  { co: 142, adj1: 89,  adj23: 42, if: 10 },
-    B1: { co: 175, adj1: 114, adj23: 50, if: 10 },
-    B:  { co: 241, adj1: 169, adj23: 74, if: 10 },
-    C3: { co: 175, adj1: 114, adj23: 50, if: 10 },
-    C2: { co: 200, adj1: 132, adj23: 64, if: 10 },
-    C1: { co: 233, adj1: 158, adj23: 84, if: 10 },
-    C0: { co: 248, adj1: 170, adj23: 95, if: 10 },
-    C:  { co: 259, adj1: 178, adj23: 100, if: 10 }
+    A:  { co: 142, adj1: 89, adj23: 42, if: 12 },
+    B1: { co: 175, adj1: 114, adj23: 50, if: 14 },
+    B:  { co: 211, adj1: 145, adj23: 71, if: 17 },
+    C3: { co: 153, adj1: 99, adj23: 43, if: 14 },
+    C2: { co: 177, adj1: 117, adj23: 56, if: 17 },
+    C1: { co: 211, adj1: 144, adj23: 76, if: 24 },
+    C0: { co: 226, adj1: 163, adj23: 87, if: 27 },
+    C:  { co: 237, adj1: 176, adj23: 96, if: 31 }
   },
-  // Class C2
   C2: {
-    A:  { co: 166, adj1: 106, adj23: 55, if: 10 },
-    B1: { co: 200, adj1: 132, adj23: 64, if: 10 },
-    B:  { co: 241, adj1: 169, adj23: 74, if: 10 },
-    C3: { co: 200, adj1: 132, adj23: 64, if: 10 },
-    C2: { co: 224, adj1: 150, adj23: 75, if: 10 },
-    C1: { co: 245, adj1: 168, adj23: 92, if: 10 },
-    C0: { co: 260, adj1: 180, adj23: 100, if: 10 },
-    C:  { co: 271, adj1: 188, adj23: 105, if: 10 }
+    A:  { co: 166, adj1: 106, adj23: 55, if: 15 },
+    B1: { co: 200, adj1: 134, adj23: 56, if: 17 },
+    B:  { co: 241, adj1: 169, adj23: 74, if: 20 },
+    C3: { co: 177, adj1: 117, adj23: 56, if: 17 },
+    C2: { co: 190, adj1: 130, adj23: 58, if: 20 },
+    C1: { co: 224, adj1: 158, adj23: 79, if: 27 },
+    C0: { co: 239, adj1: 176, adj23: 89, if: 31 },
+    C:  { co: 249, adj1: 188, adj23: 105, if: 35 }
   },
-  // Class C1
   C1: {
-    A:  { co: 200, adj1: 133, adj23: 75, if: 10 },
-    B1: { co: 233, adj1: 158, adj23: 84, if: 10 },
-    B:  { co: 270, adj1: 195, adj23: 105, if: 10 },
-    C3: { co: 233, adj1: 158, adj23: 84, if: 10 },
-    C2: { co: 245, adj1: 168, adj23: 92, if: 10 },
-    C1: { co: 290, adj1: 200, adj23: 105, if: 10 },
-    C0: { co: 306, adj1: 213, adj23: 115, if: 10 },
-    C:  { co: 318, adj1: 222, adj23: 120, if: 10 }
+    A:  { co: 200, adj1: 133, adj23: 75, if: 22 },
+    B1: { co: 233, adj1: 161, adj23: 77, if: 24 },
+    B:  { co: 270, adj1: 195, adj23: 79, if: 27 },
+    C3: { co: 211, adj1: 144, adj23: 76, if: 24 },
+    C2: { co: 224, adj1: 158, adj23: 79, if: 27 },
+    C1: { co: 245, adj1: 177, adj23: 82, if: 34 },
+    C0: { co: 259, adj1: 196, adj23: 94, if: 37 },
+    C:  { co: 270, adj1: 209, adj23: 105, if: 41 }
   },
-  // Class C0 — between C1 and C
   C0: {
-    A:  { co: 215, adj1: 145, adj23: 85, if: 10 },
-    B1: { co: 248, adj1: 170, adj23: 95, if: 10 },
-    B:  { co: 285, adj1: 207, adj23: 115, if: 10 },
-    C3: { co: 248, adj1: 170, adj23: 95, if: 10 },
-    C2: { co: 260, adj1: 180, adj23: 100, if: 10 },
-    C1: { co: 306, adj1: 213, adj23: 115, if: 10 },
-    C0: { co: 322, adj1: 226, adj23: 125, if: 10 },
-    C:  { co: 333, adj1: 235, adj23: 130, if: 10 }
+    A:  { co: 215, adj1: 152, adj23: 86, if: 25 },
+    B1: { co: 248, adj1: 180, adj23: 87, if: 27 },
+    B:  { co: 272, adj1: 214, adj23: 89, if: 31 },
+    C3: { co: 226, adj1: 163, adj23: 87, if: 27 },
+    C2: { co: 239, adj1: 176, adj23: 89, if: 31 },
+    C1: { co: 259, adj1: 196, adj23: 94, if: 37 },
+    C0: { co: 270, adj1: 207, adj23: 96, if: 41 },
+    C:  { co: 281, adj1: 220, adj23: 105, if: 45 }
   },
-  // Class C — full-power, Zone II
   C: {
-    A:  { co: 226, adj1: 154, adj23: 90, if: 10 },
-    B1: { co: 259, adj1: 178, adj23: 100, if: 10 },
-    B:  { co: 311, adj1: 224, adj23: 125, if: 10 },
-    C3: { co: 259, adj1: 178, adj23: 100, if: 10 },
-    C2: { co: 271, adj1: 188, adj23: 105, if: 10 },
-    C1: { co: 318, adj1: 222, adj23: 120, if: 10 },
-    C0: { co: 333, adj1: 235, adj23: 130, if: 10 },
-    C:  { co: 374, adj1: 270, adj23: 145, if: 10 }
+    A:  { co: 226, adj1: 165, adj23: 95, if: 29 },
+    B1: { co: 259, adj1: 193, adj23: 105, if: 31 },
+    B:  { co: 274, adj1: 217, adj23: 105, if: 35 },
+    C3: { co: 237, adj1: 176, adj23: 96, if: 31 },
+    C2: { co: 249, adj1: 188, adj23: 105, if: 35 },
+    C1: { co: 270, adj1: 209, adj23: 105, if: 41 },
+    C0: { co: 281, adj1: 220, adj23: 105, if: 45 },
+    C:  { co: 290, adj1: 241, adj23: 105, if: 48 }
   }
 });
 

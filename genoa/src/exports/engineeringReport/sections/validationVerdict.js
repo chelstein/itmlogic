@@ -184,10 +184,13 @@ export function buildValidationVerdictSection(exhibit){
   }
 
 
+  // Radial parity is a property of the projection engine (verified in the
+  // repository's golden suite), NOT a per-exhibit measurement — no exhibit
+  // evidence feeds it here, so it must not be reported as a per-exhibit PASS.
   components.push({
     name:   'Radial parity (per-radial spherical-vs-Karney delta)',
-    status: 'PASS',
-    detail: 'WGS-84 Karney (2013) projection; bit-exact round-trip residual < 1 mm at FCC scales (golden-suite locked)'
+    status: 'SKIP',
+    detail: 'Engine property, not a per-exhibit test: WGS-84 Karney (2013) projection round-trip residual < 1 mm is locked by the repository golden suite, not re-verified per exhibit.'
   });
 
   // Terrain source
@@ -670,14 +673,16 @@ export function buildValidationVerdictSection(exhibit){
   };
   const findComponent = (prefix) =>
     components.find((x) => typeof x?.name === 'string' && x.name.startsWith(prefix)) || null;
-  // Computational = curve_validation + radial_parity.  Both PASS ⇒ PASS.
+  // Computational = curve_validation; radial parity is an engine property
+  // (status SKIP) and is neutral in the reduction — only an explicit FAIL
+  // on either component fails the category.
   const cvStatus = compStatuses('Curve validation (golden suite)');
   const rpStatus = compStatuses('Radial parity (per-radial spherical-vs-Karney delta)');
-  const computational = (cvStatus === 'PASS' && (rpStatus === 'PASS' || rpStatus == null))
-    ? { status: 'PASS',         detail: 'golden suite + per-radial geometry verified' }
+  const computational = (cvStatus === 'PASS' && rpStatus !== 'FAIL')
+    ? { status: 'PASS',         detail: 'golden suite verified; projection parity locked by repository golden suite' }
     : (cvStatus === 'FAIL' || rpStatus === 'FAIL')
       ? { status: 'FAIL',         detail: 'internal math did not pass; do not file' }
-      : { status: 'INCOMPLETE',   detail: 'curve validation or radial parity not attached' };
+      : { status: 'INCOMPLETE',   detail: 'curve validation not attached' };
 
   // External parity = fcc_cross_check + fcc_parity + FORTRAN parity.
   // Tier-3 SHA-fallback shows up as "FALLBACK"; we report that as

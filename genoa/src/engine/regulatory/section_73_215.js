@@ -16,9 +16,10 @@
 //     3rd-adjacent     (Δf = ±  600 kHz)   : D/U ≥ -40 dB
 //     IF (10.6/10.8)   (Δf = ±10600,10800) : D/U ≥ -40 dB
 //
-//   Protected-contour fields per §73.211 (FM full-service):
-//     Class A                                   :  60 dBu (1   mV/m)
-//     Class B / B1 / C / C0 / C1 / C2 / C3      :  54 dBu (0.5 mV/m)
+//   Protected-contour fields per §73.215(a)(1) (FM full-service):
+//     Class B                                   :  54 dBu (0.5 mV/m)
+//     Class B1                                  :  57 dBu (0.7 mV/m)
+//     All other classes (A, C, C0, C1, C2, C3)  :  60 dBu (1   mV/m)
 //
 //   §73.215 additionally requires the proposed station to demonstrate
 //   that any actual short-spacing relative to §73.207's table is
@@ -58,16 +59,20 @@ export const SECTION_73_215_DU_GATES = Object.freeze({
   if_offset:       -40
 });
 
-// §73.211 FM protected-contour field strengths by class.
+// §73.215(a)(1) FM protected-contour field strengths by class:
+// "For all Class B and B1 stations on Channels 221 through 300 inclusive,
+//  the F(50,50) field strengths along the protected contours are 0.5 mV/m
+//  (54 dBµ) and 0.7 mV/m (57 dBµ), respectively."  All other classes:
+//  1.0 mV/m (60 dBµ).
 export const FM_PROTECTED_FIELD_DBU_BY_CLASS = Object.freeze({
   A:    60,
   B:    54,
-  B1:   54,
-  C0:   54,
-  C1:   54,
-  C2:   54,
-  C3:   54,
-  C:    54,
+  B1:   57,
+  C0:   60,
+  C1:   60,
+  C2:   60,
+  C3:   60,
+  C:    60,
   // LPFM and translators carry their own protection rules but appear
   // in nearby-stations lists; default to 60 dBu so a §73.215 study
   // accidentally including one doesn't misreport.

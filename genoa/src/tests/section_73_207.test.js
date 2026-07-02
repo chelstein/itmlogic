@@ -29,15 +29,15 @@ test('§73.207: A↔A co-channel = 115 km, 1st-adj = 72 km, 2nd/3rd = 31 km, IF 
   assert.equal(minimumSeparationKm('A', 'A', 'if_offset'),        10);
 });
 
-test('§73.207: A↔B co-channel = 241 km (the asymmetric class-B-protects-class-A case)', () => {
+test('§73.207: A↔B co-channel = 178 km per Table A', () => {
   // Class B is much higher power; the protection distance is far.
-  assert.equal(minimumSeparationKm('A', 'B', 'cochannel'), 241);
-  // Symmetric: B↔A also 241
-  assert.equal(minimumSeparationKm('B', 'A', 'cochannel'), 241);
+  assert.equal(minimumSeparationKm('A', 'B', 'cochannel'), 178);
+  // Symmetric: B↔A also 178
+  assert.equal(minimumSeparationKm('B', 'A', 'cochannel'), 178);
 });
 
-test('§73.207: C↔C co-channel = 374 km (largest pair in table)', () => {
-  assert.equal(minimumSeparationKm('C', 'C', 'cochannel'), 374);
+test('§73.207: C↔C co-channel = 290 km (largest pair in table)', () => {
+  assert.equal(minimumSeparationKm('C', 'C', 'cochannel'), 290);
 });
 
 test('§73.207: classes outside table return null', () => {
@@ -77,26 +77,26 @@ test('§73.207: unknown subject class is noted; pass falls to false when nearby 
 
 /* ---------- pair-wise pass / fail ---------- */
 
-test('§73.207: well-spaced co-channel pair passes (200 km > 241 fails; 300 km > 241 passes)', () => {
-  // A↔B co-channel: 241 km required.  Place at 300 km north (~ 2.7° lat).
+test('§73.207: well-spaced co-channel pair passes (300 km > 178 required)', () => {
+  // A↔B co-channel: 178 km required.  Place at 300 km north (~ 2.7° lat).
   const nearby = classB({ lat: 42.7, lon: -100.0 });
   const r = checkSection73207({ subject: SUBJECT_A, nearbyStations: [nearby] });
   assert.equal(r.pass, true);
   assert.equal(r.studies.length, 1);
   assert.equal(r.studies[0].pair_pass, true);
-  assert.ok(r.studies[0].actual_separation_km > 241);
-  assert.equal(r.studies[0].required_separation_km, 241);
+  assert.ok(r.studies[0].actual_separation_km > 178);
+  assert.equal(r.studies[0].required_separation_km, 178);
   assert.ok(r.studies[0].margin_km > 0);
 });
 
 test('§73.207: short-spaced co-channel pair fails', () => {
-  // A↔B co-channel: 241 km required.  Place at 100 km (0.9° lat) — a fail.
+  // A↔B co-channel: 178 km required.  Place at 100 km (0.9° lat) — a fail.
   const nearby = classB({ lat: 40.9, lon: -100.0 });
   const r = checkSection73207({ subject: SUBJECT_A, nearbyStations: [nearby] });
   assert.equal(r.pass, false);
   assert.equal(r.violations.length, 1);
   assert.match(r.violations[0].cite, /73\.207/);
-  assert.match(r.violations[0].message, /Class A↔B co-channel requires 241 km/);
+  assert.match(r.violations[0].message, /Class A↔B co-channel requires 178 km/);
   assert.ok(r.violations[0].section_73_215_alternative);
   assert.equal(r.studies[0].pair_pass, false);
   assert.ok(r.studies[0].margin_km < 0);
@@ -107,8 +107,8 @@ test('§73.207: 1st-adjacent has shorter required separation than co-channel', (
     nearbyStations: [classB({ frequency_mhz: 100.7, lat: 40.9 })] });
   const adj = checkSection73207({ subject: SUBJECT_A,
     nearbyStations: [classB({ frequency_mhz: 100.9, lat: 40.9 })] });
-  assert.equal(co.studies[0].required_separation_km,  241);
-  assert.equal(adj.studies[0].required_separation_km, 169);
+  assert.equal(co.studies[0].required_separation_km,  178);
+  assert.equal(adj.studies[0].required_separation_km, 113);
   assert.ok(adj.studies[0].required_separation_km < co.studies[0].required_separation_km);
 });
 

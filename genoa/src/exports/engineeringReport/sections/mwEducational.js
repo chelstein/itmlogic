@@ -83,7 +83,7 @@ export function buildMwEducationalSections(exhibit){
     type:    'paragraphs',
     heading: 'BACKGROUND — BLANKETING CONTOURS',
     paragraphs: [
-      'When an AM signal reaches a consumer-electronic device with enough field strength, it can overload the device\'s input circuits and corrupt the signal the device is trying to receive — radios, televisions, computer audio, garage-door openers, baby monitors.  The FCC defines the BLANKETING CONTOUR as the locus where the AM signal is at or above 1 V/m (1000 mV/m, also written 115.6 dBu).',
+      'When an AM signal reaches a consumer-electronic device with enough field strength, it can overload the device\'s input circuits and corrupt the signal the device is trying to receive — radios, televisions, computer audio, garage-door openers, baby monitors.  The FCC defines the BLANKETING CONTOUR as the locus where the AM signal is at or above 1 V/m (1000 mV/m, also written 120 dBu).',
       'Under 47 CFR §73.24(g), if the population residing within the 1000 mV/m blanket contour exceeds 1.0% of the population residing within the 25 mV/m groundwave contour, the licensee is obligated to remediate complaints from those residents — re-tuning affected consumer electronics, replacing damaged devices, or in some cases relocating the consumer\'s antenna.  The Appendix J 8 km site survey and the §73.24(g) compliance component in the validation verdict together surface every constraint the licensee may be required to address.'
     ]
   });

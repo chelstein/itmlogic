@@ -5,14 +5,14 @@
 // the FAA is required by virtue of airport proximity (independent of
 // the §17.7(a) 60.96 m / 200 ft height test).
 //
-// 47 CFR §17.7(c) thresholds (distance-only first cut):
+// 47 CFR §17.7(c) / 14 CFR §77.9(b) thresholds (distance-only first cut):
 //   §17.7(c)(1)  Public-use airports with at least one runway > 3,200 ft:
 //                notification required for any structure that would penetrate
-//                the 100:1 imaginary surface within 6 nautical miles of the
-//                airport reference point.  Distance-only proxy: 6 nm.
+//                the 100:1 imaginary surface within 20,000 ft (≈ 3.29 nm) of
+//                the airport reference point.  Distance-only proxy: 20,000 ft.
 //   §17.7(c)(2)  Public-use airports with all runways ≤ 3,200 ft:
-//                4 nautical miles.
-//   §17.7(c)(3)  Heliports: 5,000 ft (≈ 0.823 nm).
+//                10,000 ft (≈ 1.65 nm), 50:1 surface.
+//   §17.7(c)(3)  Heliports: 5,000 ft (≈ 0.823 nm), 25:1 surface.
 //
 // The "imaginary surface" geometry (100:1 / 50:1 / 25:1 slope from each
 // runway threshold) is the precise §17.7(c) test.  This module
@@ -26,12 +26,12 @@ const NM_PER_M     = 1 / 1852;
 const M_PER_NM     = 1852;
 const M_PER_FOOT   = 0.3048;
 
-// Per-airport-type radius lookup.
+// Per-airport-type radius lookup — the 14 CFR §77.9(b) distances.
 function thresholdNm(airport){
-  if (airport.type === 'heliport') return 5000 * M_PER_FOOT * NM_PER_M;  // ≈ 0.823 nm
+  if (airport.type === 'heliport') return 5000 * M_PER_FOOT * NM_PER_M;   // 5,000 ft ≈ 0.823 nm
   const longestFt = airport.longest_runway_ft;
-  if (Number.isFinite(longestFt) && longestFt > 3200) return 6;
-  return 4;  // short runways or unknown length → conservative 4 nm
+  if (Number.isFinite(longestFt) && longestFt <= 3200) return 10000 * M_PER_FOOT * NM_PER_M;  // 10,000 ft ≈ 1.65 nm (§17.7(c)(2))
+  return 20000 * M_PER_FOOT * NM_PER_M;  // runway > 3,200 ft, or unknown length (conservative) — 20,000 ft ≈ 3.29 nm (§17.7(c)(1))
 }
 
 // Apply §17.7(c) to a list of airports + their pre-computed

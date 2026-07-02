@@ -133,7 +133,7 @@ export const WARNING_CODES = Object.freeze({
 
   FCC_CLASS_DEFAULTED:           { severity: 'info', phase: 'engine',
     title: 'FCC class not supplied — Class A default applied',
-    description: 'No FCC class was provided; §73.215 contour protection used the Class A protected-field default (60 dBu).  Class A is the most protective option; using it is conservative and will not produce false-pass results, but may flag interference pairs that a lower-class station (C, C0, C1, C2, B, B1) would be permitted to fail under the actual applicable threshold (54 dBu).  Supply inputs.fcc_class for a class-specific study.' },
+    description: 'No FCC class was provided; §73.215 contour protection used the 60 dBu protected-field default.  Per §73.215(a)(1), 60 dBu (1.0 mV/m) applies to all classes except Class B (54 dBu / 0.5 mV/m) and Class B1 (57 dBu / 0.7 mV/m); the 60 dBu default is the most protective option and will not produce false-pass results, but may flag interference pairs that a Class B or B1 station would be permitted under its lower threshold.  Supply inputs.fcc_class for a class-specific study.' },
 
   SIDECAR_UNAVAILABLE:           { severity: 'warning', phase: 'sidecar',
     title: 'Optional sidecar unavailable',

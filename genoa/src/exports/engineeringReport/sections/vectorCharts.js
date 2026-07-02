@@ -396,8 +396,10 @@ export function buildContourPolarChartSection(exhibit){
   const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
   const rows = Array.isArray(exhibit?.radial_table) ? exhibit.radial_table : [];
   if (rows.length < 6) return null;
-  // Pick the "primary" contour id per service.
-  const primaryId = svc === 'AM' ? 'primary_5mvm'
+  // Pick the "primary" contour id per service.  AM engine contour ids are
+  // city_5mvm / primary_2mvm / secondary_05mvm (see engine/am/groundwave.js);
+  // the AM primary service contour is 2 mV/m.
+  const primaryId = svc === 'AM' ? 'primary_2mvm'
                   : svc === 'LPFM' ? 'service_60dbu'
                   : 'service_60dbu';
   const data = rows
@@ -418,7 +420,7 @@ export function buildContourPolarChartSection(exhibit){
     id:        'service-contour-polar',
     type:      'polar-chart',
     heading:   svc === 'AM'
-                 ? 'Primary service contour polar — 5 mV/m per 47 CFR §73.184'
+                 ? 'Primary service contour polar — 2 mV/m per 47 CFR §73.184'
                  : 'Service contour polar — 60 dBu (1 mV/m) per 47 CFR §73.333',
     data,
     r_unit:    'km',

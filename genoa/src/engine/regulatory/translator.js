@@ -13,9 +13,10 @@
 //     3rd-adjacent     (Δf = ±  600 kHz)   : D/U ≥ -40 dB
 //     IF (10.6/10.8)   (Δf = ±10600,10800) : D/U ≥ -40 dB
 //
-//   Protected-contour fields:
-//     Class A primary FM           : 1   mV/m (60 dBu) F(50,50)
-//     Class B / B1 / C* primary FM : 0.5 mV/m (54 dBu) F(50,50)
+//   Protected-contour fields (§73.215(a)(1)):
+//     Class B primary FM           : 0.5 mV/m (54 dBu) F(50,50)
+//     Class B1 primary FM          : 0.7 mV/m (57 dBu) F(50,50)
+//     All other primary FM classes : 1   mV/m (60 dBu) F(50,50)
 //     LPFM primary                 : 1   mV/m (60 dBu) F(50,50)
 //     FM translator (as desired)   : 1   mV/m (60 dBu) F(50,50)
 //

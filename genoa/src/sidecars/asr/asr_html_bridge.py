@@ -65,9 +65,19 @@ def to_float(s):
         return None
 
 
-def ft_to_m(s):
+def height_m(s):
+    """REC Networks mirrors the FCC ASR database, whose height fields are
+    ALREADY meters (the ASR system is metric) — pass values through as-is.
+    Convert only when the value carries an explicit feet suffix.
+    A previous revision multiplied by 0.3048 unconditionally, storing every
+    tier-4 fallback height 3.28x too small."""
+    raw = str(s) if s is not None else ""
     f = to_float(s)
-    return round(f * 0.3048, 2) if f is not None else None
+    if f is None:
+        return None
+    if re.search(r"(?:ft|feet|')\s*$", raw.strip(), re.IGNORECASE):
+        return round(f * 0.3048, 2)
+    return round(f, 2)
 
 
 def parse_dms(s):
@@ -120,9 +130,9 @@ def tier_4a_rec_api(asr, scraper, attempts):
         "owner_frn":            t.get("frn") or t.get("fcc_registration_number"),
         "latitude_deg":         to_float(t.get("lat") or t.get("latitude")),
         "longitude_deg":        to_float(t.get("lon") or t.get("longitude")),
-        "overall_height_m":     ft_to_m(t.get("oahaag") or t.get("height_agl")),
-        "overall_height_amsl_m": ft_to_m(t.get("oahamsl") or t.get("height_amsl")),
-        "ground_elevation_m":   ft_to_m(t.get("ground") or t.get("ground_elevation")),
+        "overall_height_m":     height_m(t.get("oahaag") or t.get("height_agl")),
+        "overall_height_amsl_m": height_m(t.get("oahamsl") or t.get("height_amsl")),
+        "ground_elevation_m":   height_m(t.get("ground") or t.get("ground_elevation")),
         "structure_type":       t.get("type"),
         "faa_study_number":     t.get("faasn") or t.get("faa_study_number"),
         "painting_requirement": t.get("paint"),
@@ -189,9 +199,9 @@ def tier_4b_rec_web(asr, scraper, attempts):
         "owner":                grab("registrant", "owner", "entity"),
         "latitude_deg":         parse_dms(grab("latitude", "lat", "n latitude")),
         "longitude_deg":        parse_dms(grab("longitude", "lon", "w longitude")),
-        "overall_height_m":     ft_to_m(grab("overall height above ground", "oah agl")),
-        "overall_height_amsl_m": ft_to_m(grab("overall height above mean sea level", "oah amsl")),
-        "ground_elevation_m":   ft_to_m(grab("ground elevation")),
+        "overall_height_m":     height_m(grab("overall height above ground", "oah agl")),
+        "overall_height_amsl_m": height_m(grab("overall height above mean sea level", "oah amsl")),
+        "ground_elevation_m":   height_m(grab("ground elevation")),
         "structure_type":       grab("structure type", "type"),
         "faa_study_number":     grab("faa study number", "aeronautical study number"),
         "painting_requirement": grab("painting"),

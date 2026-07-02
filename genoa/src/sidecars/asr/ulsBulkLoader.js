@@ -33,7 +33,7 @@ import unzipper from 'unzipper';
 const BULK_URL = process.env.ASR_BULK_URL
               || 'https://data.fcc.gov/download/pub/uls/complete/r_tower.zip';
 
-const FT_PER_M = 0.3048;
+
 
 // Decode FCC coordinate triple (degrees, minutes, seconds, hemisphere)
 // to signed decimal degrees.  Empty fields yield null.
@@ -47,9 +47,14 @@ function dms(d, m, s, hemi){
   return deg;
 }
 
-function ftToM(ft){
-  const f = parseFloat(ft);
-  return Number.isFinite(f) ? f * FT_PER_M : null;
+// FCC ULS r_tower RA-record height fields are ALREADY in meters (the ASR
+// database is metric per the FCC ASR data dictionary) — parse them as-is.
+// A previous revision multiplied by 0.3048 as if they were feet, storing
+// every tower height 3.28× too small and defeating downstream §17.7 /
+// Part 17 checks.
+function metersAsIs(v){
+  const f = parseFloat(v);
+  return Number.isFinite(f) ? f : null;
 }
 
 function parseDate(s){
@@ -326,10 +331,10 @@ function handleRA(f, towers){
     structure_address:        emptyToNull(f[23]),
     structure_city:           emptyToNull(f[24]),
     structure_state:          emptyToNull(f[25]),
-    height_of_structure_m:    ftToM(f[28]),
-    ground_elevation_m:       ftToM(f[29]),
-    overall_height_agl_m:     ftToM(f[30]),            // overall_height_above_ground
-    overall_height_amsl_m:    ftToM(f[31]),            // overall_height_amsl
+    height_of_structure_m:    metersAsIs(f[28]),
+    ground_elevation_m:       metersAsIs(f[29]),
+    overall_height_agl_m:     metersAsIs(f[30]),       // overall_height_above_ground (meters in ULS)
+    overall_height_amsl_m:    metersAsIs(f[31]),       // overall_height_amsl (meters in ULS)
     structure_type:           emptyToNull(f[32]),
     date_faa_determination:   parseDate(f[33]),
     faa_study_number:         emptyToNull(f[34]),
