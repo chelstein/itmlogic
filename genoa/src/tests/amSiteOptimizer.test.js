@@ -7602,9 +7602,9 @@ test('adjacent_channel_protection_guide presence and structure', async () => {
 test('adjacent_channel_protection_guide D/U ratios by class (KAZM Class D)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].adjacent_channel_protection_guide;
-  // Class D: 20 dB at 10 kHz, 6 dB at 20 kHz
-  assert.ok(g.adjacent_10khz.required_du_db > 0, '10 kHz D/U must be positive');
-  assert.ok(g.adjacent_20khz.required_du_db > 0, '20 kHz D/U must be positive');
+  // §73.182: 6 dB at 10 kHz (first adjacent), 0 dB at 20 kHz (second adjacent) — all classes
+  assert.strictEqual(g.adjacent_10khz.required_du_db, 6, '10 kHz D/U must be 6 dB (§73.182 first adjacent)');
+  assert.strictEqual(g.adjacent_20khz.required_du_db, 0, '20 kHz D/U must be 0 dB (§73.182 second adjacent)');
   assert.ok(g.adjacent_10khz.required_du_db > g.adjacent_20khz.required_du_db, '10 kHz D/U must exceed 20 kHz D/U');
 });
 
@@ -8430,7 +8430,7 @@ test('rf_exposure_mpe_analysis MPE limits per §1.1310', async () => {
   const r = out.candidates[0].rf_exposure_mpe_analysis;
   assert.strictEqual(r.mpe_general_population_mw_cm2, 100, 'MPE must be 100 mW/cm² for 0.3–3 MHz general population');
   assert.strictEqual(r.mpe_general_population_e_vm, 614, 'E-field MPE must be 614 V/m');
-  assert.strictEqual(r.mpe_occupational_mw_cm2, 900, 'occupational MPE must be 900 mW/cm² (OET-65 Table 1, 0.3–3 MHz controlled)');
+  assert.strictEqual(r.mpe_occupational_mw_cm2, 100, 'occupational MPE must be 100 mW/cm² (§1.1310 Table 1, 0.3–3 MHz controlled — same as GP in AM band)');
 });
 
 test('rf_exposure_mpe_analysis exclusion zone and EIRP', async () => {
@@ -8439,7 +8439,7 @@ test('rf_exposure_mpe_analysis exclusion zone and EIRP', async () => {
   assert.ok(r.eirp_w > r.tpo_kw * 1000, 'EIRP must be greater than TPO (dipole gain factor)');
   assert.ok(r.exclusion_radius_ft > r.exclusion_radius_m, 'exclusion radius ft must exceed m');
   assert.ok(r.occupational_exclusion_m > 0, 'occupational exclusion zone must be positive');
-  assert.ok(r.occupational_exclusion_m < r.exclusion_radius_m, 'occupational zone must be smaller than general population zone');
+  assert.strictEqual(r.occupational_exclusion_m, r.exclusion_radius_m, 'occupational zone must equal general population zone (OC = GP limit in AM band)');
 });
 
 test('rf_exposure_mpe_analysis filing exhibits present', async () => {
@@ -8816,11 +8816,13 @@ test('rf_exposure_compliance_guide MPE evaluation required at 5 kW threshold', a
   assert.strictEqual(r1.mpe_evaluation_required, false, '1 kW must not require MPE evaluation');
 });
 
-test('rf_exposure_compliance_guide uncontrolled zone is stricter than controlled', async () => {
+test('rf_exposure_compliance_guide GP and occupational limits are equal in the AM band', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r = out.candidates[0].rf_exposure_compliance_guide;
-  assert.ok(r.mpe_limit_gp_mwcm2 < r.mpe_limit_occ_mwcm2, 'GP MPE limit must be less than occupational limit');
-  assert.ok(r.exclusion_radius_gp_m > r.exclusion_radius_occ_m, 'GP exclusion zone must be larger than controlled zone');
+  // §1.1310 Table 1: OC and GP power-density limits are both 100 mW/cm² at 0.3–3 MHz
+  assert.strictEqual(r.mpe_limit_gp_mwcm2, 100, 'GP MPE limit must be 100 mW/cm²');
+  assert.strictEqual(r.mpe_limit_occ_mwcm2, 100, 'occupational MPE limit must be 100 mW/cm² (same as GP in AM band)');
+  assert.strictEqual(r.exclusion_radius_gp_m, r.exclusion_radius_occ_m, 'GP exclusion zone must equal controlled zone (equal limits)');
 });
 
 test('rf_exposure_compliance_guide exclusion zones scale with power', async () => {
@@ -10424,7 +10426,7 @@ test('am_grounding_system_and_rf_safety_guide KAZM RF safety fence required', as
   // 780 kHz uncontrolled MPE: flat 100 mW/cm² for 0.3–1.34 MHz per OET Bulletin 65 Table 1
   assert.strictEqual(g.mpe_uncontrolled_mw_cm2, 100, 'uncontrolled MPE should be 100 mW/cm² for 0.3–1.34 MHz');
   assert.ok(g.exclusion_zone_m > 0, 'exclusion zone must be positive');
-  assert.ok(g.controlled_zone_m < g.exclusion_zone_m, 'controlled zone must be less than uncontrolled zone');
+  assert.strictEqual(g.controlled_zone_m, g.exclusion_zone_m, 'controlled zone must equal uncontrolled zone (OC = GP limit of 100 mW/cm² in AM band)');
 });
 
 test('am_grounding_system_and_rf_safety_guide cost structure is internally consistent', async () => {
@@ -14076,7 +14078,7 @@ it('am_rf_exposure_and_oet65_compliance_guide exclusion_radius_m_general is posi
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_rf_exposure_and_oet65_compliance_guide;
   assert.ok(g.exclusion_radius_m_general > 0, `exclusion_radius_m_general must be positive, got ${g.exclusion_radius_m_general}`);
-  assert.ok(g.exclusion_radius_m_controlled < g.exclusion_radius_m_general, 'controlled zone must be smaller than general');
+  assert.strictEqual(g.exclusion_radius_m_controlled, g.exclusion_radius_m_general, 'controlled zone must equal general zone (§1.1310: both limits 614 V/m in AM band)');
 });
 
 it('am_rf_exposure_and_oet65_compliance_guide evaluation_required is false for KAZM 5 kW (at/below threshold)', async () => {
@@ -16012,18 +16014,18 @@ test('KAZM 5 kW: eval_required = true and GP exclusion radius physically reasona
   assert.strictEqual(g.eval_required, true, 'MPE eval required for TPO > 1 kW');
   assert.ok(g.r_gp_exclusion_m > 0 && g.r_gp_exclusion_m < 10,
     `GP exclusion radius at 5 kW 780 kHz should be 0–10 m, got ${g.r_gp_exclusion_m}`);
-  assert.ok(g.r_oc_exclusion_m < g.r_gp_exclusion_m,
-    'OC exclusion must be smaller than GP exclusion (higher power limit)');
+  assert.strictEqual(g.r_oc_exclusion_m, g.r_gp_exclusion_m,
+    'OC exclusion must equal GP exclusion (§1.1310: both limits 614 V/m in AM band)');
 });
 
 test('KAZM 780 kHz: FCC limits follow OET Bulletin 65 flat limits for lower AM band', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_rf_exposure_mpe_evaluation_guide;
   // 47 CFR §1.1310 Table 1 / OET Bulletin 65: for 0.3–1.34 MHz, limits are FLAT:
-  //   GP (uncontrolled): 614 V/m; OC (controlled): 1842 V/m.
+  //   GP (uncontrolled): 614 V/m; OC (controlled): 614 V/m (same value, 0.3–3 MHz).
   // 780 kHz is below the 1.34 MHz boundary, so both limits are flat values.
-  assert.strictEqual(g.e_limit_gp_vm, 614,  'GP E-field must be 614 V/m flat (0.3–1.34 MHz)');
-  assert.strictEqual(g.e_limit_oc_vm, 1842, 'OC E-field must be 1842 V/m flat (0.3–3 MHz)');
+  assert.strictEqual(g.e_limit_gp_vm, 614, 'GP E-field must be 614 V/m flat (0.3–1.34 MHz)');
+  assert.strictEqual(g.e_limit_oc_vm, 614, 'OC E-field must be 614 V/m flat (0.3–3 MHz)');
 });
 
 test('KAZM 780 kHz: field_table has 5 rows and E decreases with distance', async () => {
@@ -16531,8 +16533,8 @@ test('#93 MPE limits follow OET Bulletin 65 Table 1 flat limits at 780 kHz', asy
   const mpe = out.candidates[0].am_rf_exposure_mpe_guide;
   // 47 CFR §1.1310 Table 1 / OET Bulletin 65: 780 kHz is in the 0.3–1.34 MHz flat band.
   //   Uncontrolled (GP): 614 V/m flat (not 614/f — that formula applies above 1.34 MHz)
-  //   Controlled (OC):   1842 V/m flat (0.3–3 MHz flat; 780 kHz < 3 MHz boundary)
-  assert.strictEqual(mpe.e_limit_controlled_vm,   1842, 'e_limit_controlled_vm must be 1842 V/m flat (0.3–3 MHz)');
+  //   Controlled (OC):   614 V/m flat (0.3–3 MHz flat; same as GP in the AM band)
+  assert.strictEqual(mpe.e_limit_controlled_vm,    614, 'e_limit_controlled_vm must be 614 V/m flat (0.3–3 MHz)');
   assert.strictEqual(mpe.e_limit_uncontrolled_vm,  614, 'e_limit_uncontrolled_vm must be 614 V/m flat (0.3–1.34 MHz)');
 });
 
@@ -18756,11 +18758,14 @@ test('#138 DA station has higher consulting cost than NDA', async () => {
   assert.ok(gDA.cost_estimates.consulting_low_usd > gNDA.cost_estimates.consulting_low_usd, 'DA consulting must cost more than NDA');
 });
 
-test('#138 total_fcc_fees = Form 301 + Form 302 + STA', async () => {
+test('#138 total_fcc_fees = sum of required fee items (annual reg fee + 301-AM CP + 302-AM)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_application_fee_budget_guide;
-  const expected = g.form_301_fee_usd + g.form_302_fee_usd + g.sta_fee_usd;
-  assert.strictEqual(g.total_fcc_fees_usd, expected, 'total FCC fees must equal sum of 301+302+STA');
+  const expected = g.fee_items.filter(f => f.required).reduce((s, f) => s + f.fee_usd, 0);
+  assert.strictEqual(g.total_fcc_fees_usd, expected, 'total FCC fees must equal sum of required fee items');
+  // Annual reg fee (class-dependent) + $4,200 Form 301-AM major change CP + $435 Form 302-AM
+  assert.strictEqual(g.total_fcc_fees_usd, g.form_301_fee_usd + 4200 + 435,
+    'total FCC fees must equal annual reg fee + $4,200 (301-AM CP) + $435 (302-AM)');
 });
 
 test('#138 candidate_comparison_table has fee_* columns', async () => {
