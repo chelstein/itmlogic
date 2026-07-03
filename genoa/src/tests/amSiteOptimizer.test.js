@@ -6610,7 +6610,7 @@ test('fcc_license_modification_guide uses Form 301-AM with correct filing fee', 
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].fcc_license_modification_guide;
   assert.strictEqual(g.fcc_form, '301-AM', 'AM CP form must be 301-AM');
-  assert.strictEqual(g.filing_fee_usd, 4200, 'AM CP major-change CP filing fee must be $4,200 (§1.1102 FY2024)');
+  assert.strictEqual(g.filing_fee_usd, 4675, 'AM CP major-change CP filing fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(g.cp_term_years, 3, 'CP term must be 3 years');
   assert.strictEqual(g.extension_available, true, 'extension must be available');
 });
@@ -8946,10 +8946,10 @@ test('license_renewal_compliance_guide presence and structure', async () => {
   assert.ok(l.n_opif_required > 0, 'must have required OPIF items');
 });
 
-test('license_renewal_compliance_guide Form 303-S renewal fee is $610', async () => {
+test('license_renewal_compliance_guide Form 303-S renewal fee is $365', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const l = out.candidates[0].license_renewal_compliance_guide;
-  assert.strictEqual(l.renewal_filing_fee_usd, 610, 'Form 303-S filing fee must be $610 (FCC Schedule of Fees FY 2024)');
+  assert.strictEqual(l.renewal_filing_fee_usd, 365, 'Form 303-S filing fee must be $365 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(l.renewal_form, 'FCC Form 303-S', 'renewal form must be FCC Form 303-S');
   assert.ok(l.renewal_cycle.publication_required, 'renewal publication must be required (§73.3580)');
 });
@@ -9258,8 +9258,8 @@ test('regulatory_filing_checklist total fees and filing counts', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r = out.candidates[0].regulatory_filing_checklist;
   assert.ok(r.total_required_fees_usd >= 0, 'total fees must be >= 0');
-  // Annual regulatory fee Class D ($2,195 per §1.1102 FY2024) must be reflected in total
-  assert.ok(r.total_required_fees_usd >= 2195, 'total fees must include at least Class D annual regulatory fee ($2,195 per §1.1102 FY2024)');
+  // Required filings: Form 301-AM $4,675 + Form 302-AM $755 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)
+  assert.strictEqual(r.total_required_fees_usd, 5430, 'total fees must be $5,430 ($4,675 Form 301-AM major CP + $755 Form 302-AM per §1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(r.n_total_filings, r.all_filings.length, 'n_total_filings must match all_filings.length');
 });
 
@@ -9638,8 +9638,8 @@ test('transmitter_power_upgrade_pathway_guide KAZM coverage gain to Class D ceil
 test('transmitter_power_upgrade_pathway_guide costs and upgrade steps', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
-  assert.strictEqual(g.form301_fee_usd, 4200, 'Form 301 fee must be $4,200');
-  assert.strictEqual(g.form302_fee_usd, 435, 'Form 302-AM fee must be $435');
+  assert.strictEqual(g.form301_fee_usd, 4675, 'Form 301 fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
+  assert.strictEqual(g.form302_fee_usd, 755, 'Form 302-AM fee must be $755 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.ok(g.total_project_low_usd > 30000, 'total project low must be > $30k');
   assert.ok(g.total_project_high_usd > g.total_project_low_usd, 'total high must exceed low');
   assert.strictEqual(g.n_upgrade_steps, 5, 'must have 5 upgrade steps');
@@ -9799,7 +9799,7 @@ test('fcc_form_301_exhibit_checklist_guide present and structured correctly', as
   assert.ok(g != null, 'fcc_form_301_exhibit_checklist_guide must be present');
   assert.ok(g.n_exhibits_total > 15, 'must have at least 15 total exhibits');
   assert.ok(g.n_exhibits_required <= g.n_exhibits_total, 'required must be ≤ total');
-  assert.strictEqual(g.filing_fee_usd, 4200, 'Form 301 filing fee must be $4,200');
+  assert.strictEqual(g.filing_fee_usd, 4675, 'Form 301 filing fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
 });
 
 test('fcc_form_301_exhibit_checklist_guide KAZM NDA has 0 DA-specific exhibits', async () => {
@@ -12250,24 +12250,25 @@ test('am_annual_regulatory_compliance_and_fee_guide present on KAZM candidate', 
 test('am_annual_regulatory_compliance_and_fee_guide KAZM Class D FCC fee', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
-  assert.strictEqual(g.annual_fcc_fee_usd, 2195, 'Class D annual FCC regulatory fee should be $2,195 (§1.1102 FY2024)');
+  assert.strictEqual(g.annual_fcc_fee_usd, 2180, 'Class D annual FCC regulatory fee should be $2,180 (§1.1153, 89 FR 78509 — tier 150,001–500,000 for KAZM rank-1 population basis 319,452)');
+  assert.strictEqual(g.annual_fcc_fee_tier, '150,001–500,000', 'tier label must reflect the §1.1153 population tier');
   assert.strictEqual(g.license_renewal_cycle_years, 8, 'AM license renewal cycle should be 8 years');
-  assert.strictEqual(g.renewal_fee_usd, 610, 'Renewal fee should be $610');
-  assert.strictEqual(g.renewal_amortized_annual_usd, 76, 'Amortized renewal should be $76/yr');
+  assert.strictEqual(g.renewal_fee_usd, 365, 'Renewal fee should be $365 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
+  assert.strictEqual(g.renewal_amortized_annual_usd, 46, 'Amortized renewal should be $46/yr (round(365/8))');
 });
 
 test('am_annual_regulatory_compliance_and_fee_guide KAZM total annual compliance', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
-  assert.strictEqual(g.total_annual_compliance_low_usd,  3771, 'Total annual compliance low should be $3,771 ($2,195 fee + $76 renewal + $500 EAS + $1,000 counsel)');
-  assert.strictEqual(g.total_annual_compliance_high_usd, 6771, 'Total annual compliance high should be $6,771 ($2,195 fee + $76 renewal + $1,500 EAS + $3,000 counsel)');
+  assert.strictEqual(g.total_annual_compliance_low_usd,  3726, 'Total annual compliance low should be $3,726 ($2,180 §1.1153 tier fee + $46 renewal + $500 EAS + $1,000 counsel)');
+  assert.strictEqual(g.total_annual_compliance_high_usd, 6726, 'Total annual compliance high should be $6,726 ($2,180 §1.1153 tier fee + $46 renewal + $1,500 EAS + $3,000 counsel)');
   assert.ok(g.total_annual_compliance_high_usd > g.total_annual_compliance_low_usd, 'High must exceed low');
 });
 
 test('am_annual_regulatory_compliance_and_fee_guide KAZM 10yr present value', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
-  assert.strictEqual(g.pv_10yr_low_usd, 32167, '10-yr PV low should be $32,167 ($3,771 × pv_factor_10yr=8.53; §1.1102 FY2024 Class D $2,195/yr + renewal + EAS + counsel)');
+  assert.strictEqual(g.pv_10yr_low_usd, 31783, '10-yr PV low should be $31,783 ($3,726 × pv_factor_10yr=8.53; §1.1153 (89 FR 78509) Class D tier $2,180/yr + renewal + EAS + counsel)');
   assert.ok(g.pv_10yr_high_usd > g.pv_10yr_low_usd, '10-yr PV high must exceed low');
   assert.strictEqual(g.public_file_annual_cost_usd, 0, 'Digital public file should have zero cost');
 });
@@ -12280,8 +12281,8 @@ test('am_annual_regulatory_compliance_and_fee_guide comparison table columns pre
     assert.ok('reg_renewal_years'        in row, 'reg_renewal_years missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.reg_annual_fcc_fee_usd,   2195, 'rank-1 reg_annual_fcc_fee_usd should be $2,195 (Class D §1.1102 FY2024)');
-  assert.strictEqual(r0.reg_total_annual_low_usd, 3771, 'rank-1 reg_total_annual_low_usd should be $3,771');
+  assert.strictEqual(r0.reg_annual_fcc_fee_usd,   2180, 'rank-1 reg_annual_fcc_fee_usd should be $2,180 (Class D §1.1153 (89 FR 78509) tier 150,001–500,000)');
+  assert.strictEqual(r0.reg_total_annual_low_usd, 3726, 'rank-1 reg_total_annual_low_usd should be $3,726');
   assert.strictEqual(r0.reg_renewal_years,          8,  'rank-1 reg_renewal_years should be 8');
 });
 
@@ -12483,7 +12484,7 @@ test('am_fcc_application_engineering_report_guide KAZM clear channel classificat
   const g = out.candidates[0].am_fcc_application_engineering_report_guide;
   assert.strictEqual(g.is_clear_channel, true, '780 kHz must be identified as clear channel');
   assert.strictEqual(g.is_da, false, 'KAZM NDA pattern should not be flagged as DA');
-  assert.strictEqual(g.fcc_filing_fee_usd, 4200, 'Form 301-AM major change CP fee should be $4,200 (§1.1102 FY2024)');
+  assert.strictEqual(g.fcc_filing_fee_usd, 4675, 'Form 301-AM major change CP fee should be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(g.study_radius_km, 500, 'Clear channel study radius should be 500 km');
 });
 
@@ -12492,7 +12493,7 @@ test('am_fcc_application_engineering_report_guide KAZM station count and cost', 
   const g = out.candidates[0].am_fcc_application_engineering_report_guide;
   assert.strictEqual(g.n_stations_to_study, 35, 'Clear channel NDA should require studying 35 stations');
   assert.strictEqual(g.eng_cost_low_usd, 10000, 'Clear channel NDA engineering cost low should be $10,000');
-  assert.strictEqual(g.total_application_low_usd, 14200, 'Total application low should be filing_fee + eng_cost_low');
+  assert.strictEqual(g.total_application_low_usd, 14675, 'Total application low should be filing_fee + eng_cost_low');
 });
 
 test('am_fcc_application_engineering_report_guide KAZM processing timeline', async () => {
@@ -12513,7 +12514,7 @@ test('am_fcc_application_engineering_report_guide comparison table columns prese
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.fca_n_stations,        35,    'rank-1 fca_n_stations should be 35');
   assert.strictEqual(r0.fca_eng_cost_low_usd,  10000, 'rank-1 fca_eng_cost_low_usd should be $10,000');
-  assert.strictEqual(r0.fca_total_app_low_usd, 14200, 'rank-1 fca_total_app_low_usd should be $14,200 ($4,200 Form 301-AM major CP + $10,000 engineering)');
+  assert.strictEqual(r0.fca_total_app_low_usd, 14675, 'rank-1 fca_total_app_low_usd should be $14,675 ($4,675 Form 301-AM major CP per §1.1104 + $10,000 engineering)');
 });
 
 test('am_site_access_road_and_security_guide comparison table columns present', async () => {
@@ -12728,14 +12729,14 @@ test('KAZM tower lighting type and costs', async () => {
   const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
   assert.strictEqual(g.lighting_type,          'medium_intensity_white_or_red', '315 ft tower should use medium-intensity lighting');
   assert.strictEqual(g.lighting_cost_low_usd,  5000, 'lighting_cost_low should be $5,000');
-  assert.strictEqual(g.asr_fee_usd,            175,  'ASR fee should be $175 (Form 854, §1.1102 FY2024)');
+  assert.strictEqual(g.asr_fee_usd,            0,    'Form 854 ASR carries no FCC filing fee under the current §1.1102 schedule');
 });
 
 test('KAZM tower lighting total install cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
-  assert.strictEqual(g.total_install_low_usd,  6175,  'total_install_low should be $6,175 (lighting $5k + FAA notice $1k + ASR $175)');
-  assert.strictEqual(g.total_install_high_usd, 25175, 'total_install_high should be $25,175 (lighting $20k + FAA notice $5k + ASR $175)');
+  assert.strictEqual(g.total_install_low_usd,  6000,  'total_install_low should be $6,000 (lighting $5k + FAA notice $1k + ASR $0)');
+  assert.strictEqual(g.total_install_high_usd, 25000, 'total_install_high should be $25,000 (lighting $20k + FAA notice $5k + ASR $0)');
 });
 
 test('am_tower_lighting_and_aviation_compliance_guide comparison table columns present', async () => {
@@ -12747,7 +12748,7 @@ test('am_tower_lighting_and_aviation_compliance_guide comparison table columns p
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.lit_tower_height_ft,       472.87,                       'rank-1 lit_tower_height_ft should be 472.87');
-  assert.strictEqual(r0.lit_total_install_low_usd,  6175,                         'rank-1 lit_total_install_low_usd should be $6,175 (Form 854 $175 per §1.1102 FY2024)');
+  assert.strictEqual(r0.lit_total_install_low_usd,  6000,                         'rank-1 lit_total_install_low_usd should be $6,000 (Form 854 ASR: no FCC filing fee under the current §1.1102 schedule)');
   assert.strictEqual(r0.lit_lighting_type,          'medium_intensity_white_or_red', 'rank-1 lit_lighting_type mismatch');
 });
 
@@ -13218,9 +13219,9 @@ test('KAZM 473 ft tower requires ASR and FAA notice', async () => {
 test('KAZM ASR regulatory cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_asr_tower_registration_guide;
-  assert.strictEqual(g.total_low_usd,  5175,  'KAZM total_low_usd should be 5175 (ASR $175 + structural $2500 + env $1500 + legal $1000)');
-  assert.strictEqual(g.total_high_usd, 18175, 'KAZM total_high_usd should be 18175 (ASR $175 + structural $8000 + env $6000 + legal $4000)');
-  assert.strictEqual(g.asr_fee_usd,    175,   'ASR fee should be $175 (Form 854, §1.1102 FY2024)');
+  assert.strictEqual(g.total_low_usd,  5000,  'KAZM total_low_usd should be 5000 (ASR $0 + structural $2500 + env $1500 + legal $1000)');
+  assert.strictEqual(g.total_high_usd, 18000, 'KAZM total_high_usd should be 18000 (ASR $0 + structural $8000 + env $6000 + legal $4000)');
+  assert.strictEqual(g.asr_fee_usd,    0,     'Form 854 ASR carries no FCC filing fee under the current §1.1102 schedule');
 });
 
 test('KAZM ASR reference and note fields', async () => {
@@ -13239,7 +13240,7 @@ test('am_fcc_asr_tower_registration_guide comparison table columns present', asy
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.asr_requires_asr,    true,   'rank-1 asr_requires_asr should be true');
-  assert.strictEqual(r0.asr_total_low_usd,   5175,   'rank-1 asr_total_low_usd should be 5175 (Form 854 $175 per §1.1102 FY2024)');
+  assert.strictEqual(r0.asr_total_low_usd,   5000,   'rank-1 asr_total_low_usd should be 5000 (Form 854 ASR: no FCC filing fee under the current §1.1102 schedule)');
   assert.strictEqual(r0.asr_tower_height_ft, 472.87, 'rank-1 asr_tower_height_ft should be 472.87');
 });
 
@@ -13342,14 +13343,14 @@ test('KAZM rank-1 site uses 950 MHz microwave STL (short distance)', async () =>
   const g = out.candidates[0].am_transmitter_building_and_studio_link_guide;
   assert.strictEqual(g.stl_type,    'licensed_950mhz_microwave', 'KAZM rank-1 should use microwave STL');
   assert.strictEqual(g.stl_low_usd, 8000,   'microwave STL low should be 8000');
-  assert.strictEqual(g.stl_license_fee_usd, 470, 'Part 74 license fee should be 470 (§1.1102 FY2024)');
+  assert.strictEqual(g.stl_license_fee_usd, 105, 'Part 74 aural STL new license/major mod should be $105 (§1.1102 site-based schedule, ULS Form 601)');
 });
 
 test('KAZM transmitter building and STL total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmitter_building_and_studio_link_guide;
-  assert.strictEqual(g.total_low_usd,  41470,  'KAZM total_low_usd should be 41470');
-  assert.strictEqual(g.total_high_usd, 127470, 'KAZM total_high_usd should be 127470');
+  assert.strictEqual(g.total_low_usd,  41105,  'KAZM total_low_usd should be 41105 (Part 74 STL $105)');
+  assert.strictEqual(g.total_high_usd, 127105, 'KAZM total_high_usd should be 127105 (Part 74 STL $105)');
 });
 
 test('KAZM building guide reference and note fields', async () => {
@@ -13367,7 +13368,7 @@ test('am_transmitter_building_and_studio_link_guide comparison table columns pre
     assert.ok('bld_stl_low_usd'   in row, 'bld_stl_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.bld_total_low_usd, 41470,  'rank-1 bld_total_low_usd should be 41470');
+  assert.strictEqual(r0.bld_total_low_usd, 41105,  'rank-1 bld_total_low_usd should be 41105 (Part 74 STL $105)');
   assert.strictEqual(r0.bld_stl_type,      'licensed_950mhz_microwave', 'rank-1 bld_stl_type should be microwave');
   assert.strictEqual(r0.bld_stl_low_usd,   8000,   'rank-1 bld_stl_low_usd should be 8000');
 });
@@ -13384,15 +13385,15 @@ test('KAZM NDA CP: correct FCC fee and engineering cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
   assert.strictEqual(g.isDA,              false, 'KAZM pattern_mode NDA so isDA should be false');
-  assert.strictEqual(g.fcc_filing_fee_usd, 4495, 'NDA CP FCC fee should be 4495 (Form 301-AM $4,200 + ASR $175 + misc $120)');
+  assert.strictEqual(g.fcc_filing_fee_usd, 4795, 'NDA CP FCC fee should be 4795 (Form 301-AM $4,675 per §1.1104 + ASR $0 + misc $120)');
   assert.strictEqual(g.engineering_low_usd, 5000, 'NDA engineering low should be 5000');
 });
 
 test('KAZM CP total nonrecurring cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
-  assert.strictEqual(g.total_nonrecurring_low_usd,  15495, 'KAZM total_nonrecurring_low should be 15495 (FCC $4,495 + eng $5k + atty $3k + NEPA $2k + §106 $1k)');
-  assert.strictEqual(g.total_nonrecurring_high_usd, 52495, 'KAZM total_nonrecurring_high should be 52495 (FCC $4,495 + eng $20k + atty $15k + NEPA $8k + §106 $5k)');
+  assert.strictEqual(g.total_nonrecurring_low_usd,  15795, 'KAZM total_nonrecurring_low should be 15795 (FCC $4,795 + eng $5k + atty $3k + NEPA $2k + §106 $1k)');
+  assert.strictEqual(g.total_nonrecurring_high_usd, 52795, 'KAZM total_nonrecurring_high should be 52795 (FCC $4,795 + eng $20k + atty $15k + NEPA $8k + §106 $5k)');
 });
 
 test('KAZM CP timeline values correct', async () => {
@@ -13412,8 +13413,8 @@ test('am_fcc_construction_permit_and_license_guide comparison table columns pres
     assert.ok('cp_review_months_high'     in row, 'cp_review_months_high missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.cp_total_nonrecurring_low, 15200, 'rank-1 cp_total_nonrecurring_low should be 15200 (Form 301-AM $4,200 major CP + eng $5k + atty $3k + NEPA $2k + §106 $1k)');
-  assert.strictEqual(r0.cp_fcc_filing_fee,          4200, 'rank-1 cp_fcc_filing_fee should be 4200 (Form 301-AM major change CP per §1.1102 FY2024)');
+  assert.strictEqual(r0.cp_total_nonrecurring_low, 15675, 'rank-1 cp_total_nonrecurring_low should be 15675 (Form 301-AM $4,675 major CP + eng $5k + atty $3k + NEPA $2k + §106 $1k)');
+  assert.strictEqual(r0.cp_fcc_filing_fee,          4675, 'rank-1 cp_fcc_filing_fee should be 4675 (Form 301-AM major change CP per §1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(r0.cp_review_months_high,         18, 'rank-1 cp_review_months_high should be 18');
 });
 
@@ -13559,8 +13560,8 @@ test('am_total_project_cost_summary_guide present on KAZM candidate', async () =
 test('KAZM total project cost line items and grand total', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_total_project_cost_summary_guide;
-  assert.strictEqual(g.grand_total_low_usd,  378475, 'KAZM grand_total_low should be 378475 (ASR $5,175 + CP $15,495 line items per corrected §1.1102 FY2024 fees)');
-  assert.strictEqual(g.grand_total_high_usd, 1815635, 'KAZM grand_total_high should be 1815635');
+  assert.strictEqual(g.grand_total_low_usd,  378235, 'KAZM grand_total_low should be 378235 (ASR $5,000 + CP $15,795 + STL $41,105 line items per current §1.1104 (90 FR 17013) / §1.1102 site-based fees)');
+  assert.strictEqual(g.grand_total_high_usd, 1815395, 'KAZM grand_total_high should be 1815395');
   assert.ok(typeof g.line_items_low === 'object', 'line_items_low must be object');
   assert.ok(Object.keys(g.line_items_low).length >= 10, 'line_items_low must have >= 10 entries');
 });
@@ -13569,8 +13570,8 @@ test('KAZM 15% contingency applied correctly', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_total_project_cost_summary_guide;
   assert.strictEqual(g.contingency_pct,            15,         'contingency_pct should be 15');
-  assert.strictEqual(g.contingency_low_usd,        56771.25,   'KAZM contingency_low should be 56771.25 (15% of 378475)');
-  assert.strictEqual(g.total_with_contingency_low_usd,  435246.25, 'KAZM total_with_contingency_low should be 435246.25');
+  assert.strictEqual(g.contingency_low_usd,        56735.25,   'KAZM contingency_low should be 56735.25 (15% of 378235)');
+  assert.strictEqual(g.total_with_contingency_low_usd,  434970.25, 'KAZM total_with_contingency_low should be 434970.25');
 });
 
 test('KAZM total project cost reference and note fields', async () => {
@@ -13588,9 +13589,9 @@ test('am_total_project_cost_summary_guide comparison table columns present', asy
     assert.ok('tpc_total_with_contingency' in row, 'tpc_total_with_contingency missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.tpc_grand_total_low_usd,    378475,    'rank-1 tpc_grand_total_low should be 378475');
-  assert.strictEqual(r0.tpc_grand_total_high_usd,   1815635,   'rank-1 tpc_grand_total_high should be 1815635');
-  assert.strictEqual(r0.tpc_total_with_contingency, 435246.25, 'rank-1 tpc_total_with_contingency should be 435246.25');
+  assert.strictEqual(r0.tpc_grand_total_low_usd,    378235,    'rank-1 tpc_grand_total_low should be 378235');
+  assert.strictEqual(r0.tpc_grand_total_high_usd,   1815395,   'rank-1 tpc_grand_total_high should be 1815395');
+  assert.strictEqual(r0.tpc_total_with_contingency, 434970.25, 'rank-1 tpc_total_with_contingency should be 434970.25');
 });
 
 test('am_community_impact_and_coverage_shift_guide present on KAZM candidate', async () => {
@@ -13961,14 +13962,14 @@ test('KAZM 5 kW electricity consumption', async () => {
 test('KAZM annual operating cost totals', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
-  assert.strictEqual(g.total_low_usd,  18943.6, 'KAZM total_low_usd (7 kW draw at 72% efficiency)');
-  assert.strictEqual(g.total_high_usd, 64771.6, 'KAZM total_high_usd (7 kW draw at 72% efficiency)');
+  assert.strictEqual(g.total_low_usd,  18928.6, 'KAZM total_low_usd (7 kW draw at 72% efficiency; §1.1153 tier fee $2,180)');
+  assert.strictEqual(g.total_high_usd, 64756.6, 'KAZM total_high_usd (7 kW draw at 72% efficiency; §1.1153 tier fee $2,180)');
 });
 
 test('KAZM annual ops reference and note fields', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
-  assert.ok(typeof g.reference === 'string' && g.reference.includes('§1.1102'), 'reference must cite §1.1102 (FCC regulatory fee schedule)');
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§1.1153'), 'reference must cite §1.1153 (89 FR 78509) (FCC annual regulatory fee schedule)');
   assert.ok(typeof g.note === 'string' && g.note.includes('kWh/yr'), 'note must mention kWh/yr');
 });
 
@@ -16157,12 +16158,12 @@ test('KAZM 780 kHz: am_fcc_application_filing_cost_and_timeline_guide present on
   }
 });
 
-test('KAZM NDA: FCC fees are $4,635 and NDA flag is false', async () => {
+test('KAZM NDA: FCC fees are $5,430 and NDA flag is false', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_application_filing_cost_and_timeline_guide;
-  assert.strictEqual(g.fee_form_301_am, 4200, 'Form 301-AM major change CP fee must be $4,200 (§1.1102 FY2024; relocation = major change under §73.3533)');
-  assert.strictEqual(g.fee_form_302_am, 435, 'Form 302-AM fee must be $435 (FY2024 §1.1102)');
-  assert.strictEqual(g.total_fcc_fees, 4635, 'total_fcc_fees must be $4,635 (301-AM $4,200 + 302-AM $435)');
+  assert.strictEqual(g.fee_form_301_am, 4675, 'Form 301-AM major change CP fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025; relocation = major change under §73.3533)');
+  assert.strictEqual(g.fee_form_302_am, 755, 'Form 302-AM fee must be $755 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
+  assert.strictEqual(g.total_fcc_fees, 5430, 'total_fcc_fees must be $5,430 (301-AM $4,675 + 302-AM $755)');
   assert.strictEqual(g.is_directional, false, 'NDA pattern must flag is_directional false');
 });
 
@@ -16191,7 +16192,7 @@ test('candidate_comparison_table fcc columns present and valid for KAZM', async 
     assert.ok('fcc_total_timeline_days_low' in row, 'fcc_total_timeline_days_low missing');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.fcc_total_fcc_fees, 4635, 'fcc_total_fcc_fees must be $4,635 (301-AM $4,200 major change CP + 302-AM $435 per §1.1102 FY2024)');
+  assert.strictEqual(r0.fcc_total_fcc_fees, 5430, 'fcc_total_fcc_fees must be $5,430 (301-AM $4,675 major change CP + 302-AM $755 per §1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(r0.fcc_processing_days_low, 180, 'fcc_processing_days_low must be 180');
 });
 
@@ -18740,14 +18741,16 @@ test('#138 KAZM: FCC fee budget guide present with correct shape', async () => {
   assert.ok(Array.isArray(g.fee_items) && g.fee_items.length >= 4, 'must list ≥4 fee items');
 });
 
-test('#138 Class A fee exceeds Class D fee', async () => {
+test('#138 Class A annual regulatory fee exceeds Class D at the same population tier', async () => {
   const classAOut = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
   const classDOut = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', candidate_limit: 1 });
   const gA = classAOut.candidates[0].am_fcc_application_fee_budget_guide;
   const gD = classDOut.candidates[0].am_fcc_application_fee_budget_guide;
-  assert.ok(gA.form_301_fee_usd > gD.form_301_fee_usd, 'Class A 301-AM fee must exceed Class D');
-  assert.strictEqual(gA.form_301_fee_usd, 7265, 'Class A Form 301 fee must be $7,265');
-  assert.strictEqual(gD.form_301_fee_usd, 2195, 'Class D Form 301 fee must be $2,195');
+  // §1.1153 (89 FR 78509): fees are population-tiered per class; Class A tier values exceed Class D at every tier.
+  assert.ok(gA.annual_reg_fee_low_usd > gD.annual_reg_fee_low_usd, 'Class A §1.1153 annual regulatory fee must exceed Class D');
+  // Form 301-AM application fee is flat (class-independent) per §1.1104 (90 FR 17013, eff. Apr. 23, 2025).
+  assert.strictEqual(gA.form_301_fee_usd, 4675, 'Form 301-AM major change CP fee must be $4,675 flat (§1.1104)');
+  assert.strictEqual(gD.form_301_fee_usd, 4675, 'Form 301-AM major change CP fee must be $4,675 flat (§1.1104)');
 });
 
 test('#138 DA station has higher consulting cost than NDA', async () => {
@@ -18761,11 +18764,11 @@ test('#138 DA station has higher consulting cost than NDA', async () => {
 test('#138 total_fcc_fees = sum of required fee items (annual reg fee + 301-AM CP + 302-AM)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_application_fee_budget_guide;
-  const expected = g.fee_items.filter(f => f.required).reduce((s, f) => s + f.fee_usd, 0);
-  assert.strictEqual(g.total_fcc_fees_usd, expected, 'total FCC fees must equal sum of required fee items');
-  // Annual reg fee (class-dependent) + $4,200 Form 301-AM major change CP + $435 Form 302-AM
-  assert.strictEqual(g.total_fcc_fees_usd, g.form_301_fee_usd + 4200 + 435,
-    'total FCC fees must equal annual reg fee + $4,200 (301-AM CP) + $435 (302-AM)');
+  const expectedLow = g.fee_items.filter(f => f.required).reduce((s, f) => s + f.fee_low_usd, 0);
+  assert.strictEqual(g.total_fcc_fees_low_usd, expectedLow, 'total FCC fees (low) must equal sum of required fee items');
+  // Annual reg fee (§1.1153 population tier) + $4,675 Form 301-AM major change CP + $755 Form 302-AM (§1.1104)
+  assert.strictEqual(g.total_fcc_fees_low_usd, g.annual_reg_fee_low_usd + 4675 + 755,
+    'total FCC fees must equal §1.1153 annual reg fee + $4,675 (301-AM CP) + $755 (302-AM)');
 });
 
 test('#138 candidate_comparison_table has fee_* columns', async () => {

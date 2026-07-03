@@ -2131,7 +2131,7 @@ test('colocation GRID candidates have fcc_form_301_exhibit_checklist_guide', asy
     const g = c.fcc_form_301_exhibit_checklist_guide;
     assert.ok(g != null, `rank ${c.rank} missing fcc_form_301_exhibit_checklist_guide`);
     assert.strictEqual(g.n_exhibits_da_specific, 0, `rank ${c.rank} NDA must have 0 DA exhibits`);
-    assert.strictEqual(g.filing_fee_usd, 4200, `rank ${c.rank} filing fee must be $4,200`);
+    assert.strictEqual(g.filing_fee_usd, 4675, `rank ${c.rank} filing fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)`);
   }
 });
 
@@ -2853,7 +2853,7 @@ test('am_annual_regulatory_compliance_and_fee_guide present across colocation ca
   for (const c of out.candidates) {
     const g = c.am_annual_regulatory_compliance_and_fee_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_annual_regulatory_compliance_and_fee_guide missing`);
-    assert.ok(g.annual_fcc_fee_usd > 0, `rank ${c.rank}: annual_fcc_fee_usd must be positive`);
+    assert.ok(g.annual_fcc_fee_low_usd > 0, `rank ${c.rank}: annual_fcc_fee_low_usd must be positive (§1.1153 tier)`);
     assert.ok(g.total_annual_compliance_low_usd > 0, `rank ${c.rank}: total_annual_compliance_low_usd must be positive`);
     assert.ok(g.license_renewal_cycle_years === 8, `rank ${c.rank}: license renewal cycle must be 8 years`);
   }
@@ -4035,7 +4035,7 @@ test('am_fcc_application_filing_cost_and_timeline_guide present across colocatio
   for (const c of out.candidates) {
     const g = c.am_fcc_application_filing_cost_and_timeline_guide;
     assert.ok(g !== undefined && g !== null, `candidate missing am_fcc_application_filing_cost_and_timeline_guide`);
-    assert.strictEqual(g.total_fcc_fees, 4635, 'total_fcc_fees must be $4,635 (301-AM $4,200 major change CP + 302-AM $435 per §1.1102 FY2024)');
+    assert.strictEqual(g.total_fcc_fees, 5430, 'total_fcc_fees must be $5,430 (301-AM $4,675 major change CP + 302-AM $755 per §1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
     assert.ok(g.filing_sequence.length >= 6, 'filing_sequence must have >= 6 steps');
     assert.ok(g.total_timeline_days_low > 0, 'total_timeline_days_low must be positive');
   }
@@ -4603,7 +4603,7 @@ test('am_fcc_application_fee_budget_guide present across colocation candidates',
     const g = c.am_fcc_application_fee_budget_guide;
     assert.ok(g !== undefined && g !== null, 'candidate missing am_fcc_application_fee_budget_guide');
     assert.ok(g.form_301_fee_usd > 0, 'Form 301-AM fee must be positive');
-    assert.ok(g.total_fcc_fees_usd > 0, 'total FCC fees must be positive');
+    assert.ok(g.total_fcc_fees_low_usd > 0, 'total FCC fees (low) must be positive');
     assert.ok(g.n_fee_items >= 4, 'must list ≥4 fee items');
   }
 });

@@ -98,6 +98,49 @@ const KNOWN_GOALS = Object.freeze([
 // and the vegetation management guide so all three are always in sync.
 // LOW=100, MODERATE=75, ELEVATED=50, HIGH=25, VERY_HIGH=0.
 const WF_SCORE = Object.freeze({ VERY_HIGH: 0, HIGH: 25, ELEVATED: 50, MODERATE: 75, LOW: 100 });
+// ─── FCC AM annual regulatory fee (47 CFR §1.1153, 89 FR 78509, Sept. 25, 2024) ───
+// The §1.1153 schedule is POPULATION-TIERED per class — there is no flat per-class AM fee.
+// Nine tiers by population served: ≤10,000; 10,001–25,000; 25,001–75,000; 75,001–150,000;
+// 150,001–500,000; 500,001–1,200,000; 1,200,001–3,000,000; 3,000,001–6,000,000; >6,000,000.
+const AM_ANNUAL_REG_FEE_TIER_UPPER_BOUNDS = [10000, 25000, 75000, 150000, 500000, 1200000, 3000000, 6000000];
+const AM_ANNUAL_REG_FEE_TIER_LABELS = [
+  '≤10,000', '10,001–25,000', '25,001–75,000', '75,001–150,000', '150,001–500,000',
+  '500,001–1,200,000', '1,200,001–3,000,000', '3,000,001–6,000,000', '>6,000,000'
+];
+const AM_ANNUAL_REG_FEE_TIERS_USD = {   // §1.1153 (89 FR 78509)
+  A: [560, 935, 1405, 2105, 3160, 4730, 7105, 10650, 15980],
+  B: [405, 675, 1015, 1520, 2280, 3415, 5130,  7690, 11535],
+  C: [350, 585,  880, 1315, 1975, 2960, 4445,  6665, 10000],
+  D: [385, 645,  970, 1450, 2180, 3265, 4900,  7345, 11025],
+};
+
+// Returns the §1.1153 AM annual regulatory fee for a station class + population served.
+// With a finite populationServed: { fee_usd, fee_low_usd, fee_high_usd (== fee_usd), tier_label, population_basis }.
+// With unknown population: { fee_usd: null, fee_low_usd (min tier), fee_high_usd (max tier),
+//   tier_label: 'population-dependent (§1.1153 tiers)', population_basis: 'not determined' }.
+function amAnnualRegFeeUsd(fccClass, populationServed){
+  const cls   = /^[A-D]$/i.test(String(fccClass ?? '')) ? String(fccClass).toUpperCase() : 'D';
+  const tiers = AM_ANNUAL_REG_FEE_TIERS_USD[cls];
+  if (Number.isFinite(populationServed) && populationServed >= 0){
+    let idx = AM_ANNUAL_REG_FEE_TIER_UPPER_BOUNDS.findIndex(b => populationServed <= b);
+    if (idx === -1) idx = tiers.length - 1;
+    return {
+      fee_usd:      tiers[idx],
+      fee_low_usd:  tiers[idx],
+      fee_high_usd: tiers[idx],
+      tier_label:   AM_ANNUAL_REG_FEE_TIER_LABELS[idx],
+      population_basis: Math.round(populationServed)
+    };
+  }
+  return {
+    fee_usd:      null,
+    fee_low_usd:  tiers[0],
+    fee_high_usd: tiers[tiers.length - 1],
+    tier_label:   'population-dependent (§1.1153 tiers)',
+    population_basis: 'not determined'
+  };
+}
+
 function wildfireRiskLevel(lat, lon){
   const isWesternUS = lon < -103 && lat > 30 && lat < 49;
   const isPacificNW = lon < -117 && lon > -125 && lat > 42;
@@ -1232,6 +1275,9 @@ export async function runSiteOptimizer(body = {}){
     fnd_total_low_usd:          c.am_concrete_foundation_and_anchor_design_guide?.total_foundation_low_usd ?? null,
     fnd_n_anchors:              c.am_concrete_foundation_and_anchor_design_guide?.n_anchors ?? null,
     reg_annual_fcc_fee_usd:     c.am_annual_regulatory_compliance_and_fee_guide?.annual_fcc_fee_usd ?? null,
+    reg_annual_fcc_fee_low_usd: c.am_annual_regulatory_compliance_and_fee_guide?.annual_fcc_fee_low_usd ?? null,
+    reg_annual_fcc_fee_high_usd: c.am_annual_regulatory_compliance_and_fee_guide?.annual_fcc_fee_high_usd ?? null,
+    reg_annual_fcc_fee_tier:    c.am_annual_regulatory_compliance_and_fee_guide?.annual_fcc_fee_tier ?? null,
     reg_total_annual_low_usd:   c.am_annual_regulatory_compliance_and_fee_guide?.total_annual_compliance_low_usd ?? null,
     reg_renewal_years:          c.am_annual_regulatory_compliance_and_fee_guide?.license_renewal_cycle_years ?? null,
     insp_tower_height_ft:       c.am_broadcast_tower_structural_inspection_guide?.tower_insp_ft ?? null,
@@ -1810,6 +1856,8 @@ export async function runSiteOptimizer(body = {}){
     wfr_total_low_usd:                  c.am_wildfire_risk_and_vegetation_management_guide?.cost_estimates?.total_low_usd ?? null,
     fee_form_301_fee_usd:               c.am_fcc_application_fee_budget_guide?.form_301_fee_usd ?? null,
     fee_total_fcc_fees_usd:             c.am_fcc_application_fee_budget_guide?.total_fcc_fees_usd ?? null,
+    fee_total_fcc_fees_low_usd:         c.am_fcc_application_fee_budget_guide?.total_fcc_fees_low_usd ?? null,
+    fee_total_fcc_fees_high_usd:        c.am_fcc_application_fee_budget_guide?.total_fcc_fees_high_usd ?? null,
     fee_consulting_low_usd:             c.am_fcc_application_fee_budget_guide?.cost_estimates?.consulting_low_usd ?? null,
     fee_total_with_consulting_low_usd:  c.am_fcc_application_fee_budget_guide?.cost_estimates?.total_with_consulting_low_usd ?? null,
     ada_applicability:                  c.am_site_accessibility_and_ada_compliance_guide?.ada_applicability ?? null,
@@ -3819,23 +3867,23 @@ async function scoreCandidate(pt, ctx, warnings){
       const line_items = [];
 
       // 1. FCC Form 301-AM (construction permit application)
-      // Site relocation = major change under §73.3533 → Form 301-AM major change CP fee: $4,200 (§1.1102 FY2024).
-      // Distinct from the annual regulatory fee (§1.1102): Class A $7,265, B $5,020, C/D $2,195.
-      const fcc_301_fee = 4200;
+      // Site relocation = major change under §73.3533 → Form 301-AM major change CP fee: $4,675 (§1.1104 (90 FR 17013, eff. Apr. 23, 2025)).
+      // Distinct from the annual regulatory fee (§1.1153 (89 FR 78509)), which is population-tiered per class.
+      const fcc_301_fee = 4675;
       line_items.push({
         id: 'FCC_FORM_301',
         label: 'FCC Form 301-AM major change CP fee (site relocation)',
         low_usd: fcc_301_fee, high_usd: fcc_301_fee,
-        note: `Form 301-AM major change CP per §1.1102 FY2024: $4,200 flat (all AM classes). Site relocation under §73.3533 is always a major change. Separate from annual §1.1102 regulatory fees.`
+        note: `Form 301-AM major change CP per §1.1104 (90 FR 17013, eff. Apr. 23, 2025): $4,675 flat (all AM classes, no auction). Site relocation under §73.3533 is always a major change. Separate from annual §1.1153 regulatory fees.`
       });
 
       // 2. FCC Form 302-AM (license to cover)
-      // FY2024 fee per §1.1102: $435 flat (all classes).
+      // Fee per §1.1104 (90 FR 17013, eff. Apr. 23, 2025): $755 flat (all classes).
       line_items.push({
         id: 'FCC_FORM_302',
         label: 'FCC Form 302-AM license-to-cover processing fee',
-        low_usd: 435, high_usd: 435,
-        note: 'Form 302-AM (license to cover) per §1.1102 FY2024: $435 flat (all classes); filed after construction completion.'
+        low_usd: 755, high_usd: 755,
+        note: 'Form 302-AM (license to cover) per §1.1104 (90 FR 17013, eff. Apr. 23, 2025): $755 flat (all classes); filed after construction completion.'
       });
 
       // 3. ASR registration (Form 854)
@@ -3843,8 +3891,8 @@ async function scoreCandidate(pt, ctx, warnings){
         line_items.push({
           id: 'FCC_FORM_854_ASR',
           label: 'FCC Form 854 ASR registration',
-          low_usd: 175, high_usd: 175,
-          note: `Design height ${Math.round(planH_pe)} m > §17.7 60.96 m — tower registration required.`
+          low_usd: 0, high_usd: 0,
+          note: `Design height ${Math.round(planH_pe)} m > §17.7 60.96 m — tower registration required. Form 854 ASR: no FCC filing fee under the current §1.1102 schedule (pre-2020 fee no longer applies); FAA study / consultant costs are separate.`
         });
       }
 
@@ -8500,7 +8548,7 @@ async function scoreCandidate(pt, ctx, warnings){
         {
           phase:       5,
           name:        'FCC application filing (Form 301-AM)',
-          description: 'Assemble and submit CP application: engineering exhibits, NIF study, site control letter, NEPA cert, ASR number, Form 301-AM major change CP fee ($4,200 per §1.1102 FY2024)',
+          description: 'Assemble and submit CP application: engineering exhibits, NIF study, site control letter, NEPA cert, ASR number, Form 301-AM major change CP fee ($4,675 per §1.1104 (90 FR 17013, eff. Apr. 23, 2025))',
           weeks_low:   2,
           weeks_high:  4,
           parallel:    false,
@@ -8945,7 +8993,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   §73.3533 — major modification petition
       //   §17.7 — ASR registration (tower ≥ 60.96 m / 200 ft AGL)
       //   §1.1307 / OET Bulletin 65 — MPE categorical exclusion threshold (> 1 kW)
-      //   FCC FY2024 fee schedule (47 CFR §1.1102) — $4,200 Form 301-AM major change CP; $175 Form 854
+      //   FCC application fee schedule (47 CFR §1.1104, 90 FR 17013, eff. Apr. 23, 2025) — $4,675 Form 301-AM major change CP; Form 854 ASR: no FCC filing fee under the current §1.1102 schedule
       //
       // Engineering cost model: ARBE (2023) + FCC ULS filing data; adjusted for
       //   current steel / copper / labor indices (ENR CCI Q4 2024).
@@ -9012,8 +9060,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ── 9. FCC filing fees ──
       const is_da_pf        = /^DA/i.test(pattern_mode);
-      const fcc_fee_cp_pf   = 4200;   // Form 301-AM major change CP (relocation) per §1.1102 FY2024
-      const fcc_fee_asr_pf  = asr_req_pf ? 175 : 0;  // Form 854
+      const fcc_fee_cp_pf   = 4675;   // Form 301-AM major change CP (relocation) per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)
+      const fcc_fee_asr_pf  = 0;      // Form 854 ASR: no FCC filing fee under the current §1.1102 schedule (pre-2020 fee no longer applies); FAA study / consultant costs are separate
       const fcc_fees_pf     = fcc_fee_cp_pf + fcc_fee_asr_pf;
 
       // ── 10. Soft costs (engineering + legal + NIF study) ──
@@ -9040,7 +9088,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { category: 'Transmitter building + HVAC',      low: bldg_low_pf,  high: bldg_high_pf,   notes: `${sqft_low_pf}–${sqft_high_pf} sqft; ${hvac_tons_pf}-ton HVAC` },
         { category: 'Tower lighting + painting',        low: ltg_low_pf,   high: ltg_high_pf,    notes: asr_req_pf ? `FAA marking required (${h_ft_pf} ft > 200 ft threshold)` : `No ASR required (${h_ft_pf} ft ≤ 200 ft)` },
         { category: 'RF/MPE safety fence + study',      low: mpe_low_pf,   high: mpe_high_pf,    notes: `GP exclusion r≈${r_gp_pf} m; ${fence_needed_pf ? `${Math.round(perim_ft_pf)} ft perimeter` : 'fence may not be required'}` },
-        { category: 'FCC filing fees',                  low: fcc_fees_pf,  high: fcc_fees_pf,    notes: `Form 301-AM major CP $4,200${asr_req_pf ? ' + Form 854 $175' : ''} (§1.1102 FY2024)` },
+        { category: 'FCC filing fees',                  low: fcc_fees_pf,  high: fcc_fees_pf,    notes: `Form 301-AM major CP $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025); Form 854 ASR carries no FCC filing fee under the current §1.1102 schedule` },
         { category: 'Soft costs (engineering + legal + NIF)', low: soft_low_pf, high: soft_high_pf, notes: `${is_da_pf ? 'DA' : 'NDA'} pathway; includes FCC counsel` },
         { category: 'Proof of performance (Form 302-AM)', low: pop_low_pf, high: pop_high_pf,    notes: `${is_da_pf ? '72-radial DA field survey' : '8-radial NDA inverse-distance traversal'}` }
       ];
@@ -9076,7 +9124,7 @@ async function scoreCandidate(pt, ctx, warnings){
         cost_basis_vintage:           'Q4 2024',
         cost_basis_source:            'ARBE cost model (2023); ENR CCI Q4 2024',
         refresh_cadence:              'annual',
-        reference: '47 CFR §73.3500; §73.3533; §73.3598; §17.7; §1.1307; §1.1310; OET Bulletin 65 Ed. 97-01; FCC FY2024 fee schedule (§1.1102); ARBE cost model (2023); ENR CCI Q4 2024',
+        reference: '47 CFR §73.3500; §73.3533; §73.3598; §17.7; §1.1307; §1.1310; OET Bulletin 65 Ed. 97-01; FCC application fee schedule (§1.1104, 90 FR 17013, eff. Apr. 23, 2025); ARBE cost model (2023); ENR CCI Q4 2024',
         note: `SCREENING-GRADE pro forma (cost basis: ENR CCI Q4 2024). Total project cost estimate: $${(total_low_pf/1000).toFixed(0)}K–$${(total_high_pf/1000).toFixed(0)}K (midpoint ~$${(midpoint_pf/1000).toFixed(0)}K) including 15–25% contingency. Class ${fcc_class} ${frequency_khz} kHz, ${tpo_kw} kW ${is_da_pf ? 'DA' : 'NDA'}, ${h_ft_pf} ft tower. Engage a licensed broadcast engineer and FCC counsel before committing capital.`
       };
     })(),
@@ -9093,10 +9141,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //     notice to file.  Contested applications take 12–24+ months.
       //   §73.3598: Period of construction — licensee has 3 years from CP issuance
       //     to complete construction and file for license. Extensions possible for cause.
-      //   47 CFR §1.1102 / FCC FY 2024 Fee Schedule:
-      //     AM station application fees (FY2024):
-      //       Form 301-AM major change CP (site relocation under §73.3533): $4,200
-      //       Form 302-AM (license to cover CP): $435 per §1.1102 FY2024
+      //   47 CFR §1.1104 (90 FR 17013, eff. Apr. 23, 2025):
+      //     AM station application fees:
+      //       Form 301-AM major change CP (site relocation under §73.3533): $4,675
+      //       Form 302-AM (license to cover CP): $755 per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)
       //       Form 303-S (renewal of license, not applicable to relocation)
       //     Note: FCC fee schedule updates annually in October.
       //   §73.3571(e): Non-substantial (minor) modification — faster processing
@@ -9122,9 +9170,9 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA = /^DA/i.test(pattern_mode);
 
-      // FCC filing fees (FY2024 per §1.1102)
-      const fee_301_am  = 4200;   // Form 301-AM major change CP (site relocation under §73.3533)
-      const fee_302_am  = 435;    // Form 302-AM license to cover
+      // FCC filing fees per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)
+      const fee_301_am  = 4675;   // Form 301-AM major change CP (site relocation under §73.3533)
+      const fee_302_am  = 755;    // Form 302-AM license to cover
       const total_fcc_fees = fee_301_am + fee_302_am;
 
       // Attorney cost
@@ -9187,12 +9235,12 @@ async function scoreCandidate(pt, ctx, warnings){
           'FCC Form 302-AM — License to Cover CP',
           'FCC grant of license'
         ],
-        fee_vintage:     'FY2024',
-        fee_source:      'FCC Fee Schedule DA 23-864',
+        fee_vintage:     'codified CFR (90 FR 17013, eff. Apr. 23, 2025)',
+        fee_source:      '47 CFR §1.1104',
         rate_vintage:    '2023 market rates',
         refresh_cadence: 'annual',
-        reference: '47 CFR §73.3500 (applications); §73.3533 (major mod); §73.3584 (petitions to deny); §73.3580 (public notice); §73.3598 (CP period of construction — 3 years); §1.1102 FY2024 (Form 301-AM major change CP $4,200; Form 302-AM $435)',
-        note: `${isDA ? 'DA' : 'NDA'} ${fcc_class} station. FCC fees: $${total_fcc_fees.toLocaleString()} (FY2024). Soft costs (atty + eng, 2023 market rates): $${total_soft_low.toLocaleString()}–$${total_soft_high.toLocaleString()}. Timeline: ${total_timeline_low}–${total_timeline_high} days (excl. construction).`
+        reference: '47 CFR §73.3500 (applications); §73.3533 (major mod); §73.3584 (petitions to deny); §73.3580 (public notice); §73.3598 (CP period of construction — 3 years); §1.1104 (90 FR 17013, eff. Apr. 23, 2025) (Form 301-AM major change CP $4,675; Form 302-AM $755)',
+        note: `${isDA ? 'DA' : 'NDA'} ${fcc_class} station. FCC fees: $${total_fcc_fees.toLocaleString()} (§1.1104, 90 FR 17013, eff. Apr. 23, 2025). Soft costs (atty + eng, 2023 market rates): $${total_soft_low.toLocaleString()}–$${total_soft_high.toLocaleString()}. Timeline: ${total_timeline_low}–${total_timeline_high} days (excl. construction).`
       };
     })(),
 
@@ -11090,7 +11138,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Cost basis (2024):
       //   FM translator equipment (250 W, antenna, transmission line): $15,000–$40,000
       //   Site lease for translator: $500–$2,000/yr
-      //   FCC application fee (Form 349, FM translator): $655 (FY2024, FCC DA 23-864; commercial)
+      //   FCC application fee (Form 349, FM translator new/major change CP): $830 (§1.1104 (90 FR 17013, eff. Apr. 23, 2025); if no auction)
       //   Construction permit (CP) for translator: $65–$225/hr engineering time
       //   Total translator buildout: $20,000–$60,000
 
@@ -11142,7 +11190,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const equipment_high_usd   = 40000;
       const lease_annual_low_usd = 500;
       const lease_annual_high_usd = 2000;
-      const fcc_fee_usd          = 655;   // Form 349 FM translator (FY2024, §1.1102; FCC DA 23-864)
+      const fcc_fee_usd          = 830;   // Form 349 FM translator new/major change CP (§1.1104 (90 FR 17013, eff. Apr. 23, 2025); if no auction)
       const engineering_low_usd  = 2500;
       const engineering_high_usd = 8000;
       const total_translator_low_usd  = equipment_low_usd  + lease_annual_low_usd  + fcc_fee_usd + engineering_low_usd;
@@ -11354,8 +11402,8 @@ async function scoreCandidate(pt, ctx, warnings){
       //     FCC-certified attorney or station manager: $75–$200/hr
       //   - Initial OPF setup / content audit (on relocation): $500–$2,000 one-time
       //   - Political file software or broadcast management system: $0–$2,500/yr
-      //   - FCC filing fees (ownership reports, renewal): $0 (commercial AM below $100M revenue threshold)
-      //     Note: §1.1102 FCC fee schedule applies to certain petitions/filings; routine renewals are free for AMs.
+      //   - FCC filing fees: license renewal (Form 303-S) $365; biennial ownership report (Form 323) $95/station
+      //     per §1.1104 (90 FR 17013, eff. Apr. 23, 2025). (§1.1102 is the wireless schedule and does not apply.)
 
       // Determine today's quarter deadline context
       //   Dates are relative to now — for a relocation planning tool this is informational
@@ -12357,13 +12405,13 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // Renewal/amendment cost (2024 market):
       //   Form 303-S renewal filing (attorney/broadcast consultant): $1,500–$4,000
-      //   FCC filing fee (Form 303-S AM renewal): $610 (FCC Schedule of Fees FY 2024)
+      //   FCC filing fee (Form 303-S AM renewal): $365 (§1.1104 (90 FR 17013, eff. Apr. 23, 2025))
       //   Form 302-AM amendment (technical change at new site): $2,000–$5,000
       //   §1.65 material-change notification (attorney letter): $500–$1,500
-      //   Total regulatory/renewal budget for relocation: $4,610–$10,500
+      //   Total regulatory/renewal budget for relocation: $4,365–$10,865
       const MAIN_STUDIO_MAX_DIST_KM = 40.23;                   // 25 statute miles in km
       const renewal_cycle_years = 8;
-      const form_renewal_fee_usd = 610;                        // FCC Schedule of Fees FY 2024 — Form 303-S renewal
+      const form_renewal_fee_usd = 365;                        // §1.1104 (90 FR 17013, eff. Apr. 23, 2025) — Form 303-S renewal
 
       // Distance from candidate to CoL centroid (col_centroid supplied in scope).
       // If col_centroid is not available fall back to distance from current_site.
@@ -13179,7 +13227,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const annual_fcc_compliance_low_usd  = 500;
       const annual_fcc_compliance_high_usd = 2000;
       // FCC license renewal fee (AM stations, per FCC schedule)
-      const fcc_license_fee_usd = 610; // FCC Schedule of Fees FY2024 — Form 303-S license renewal
+      const fcc_license_fee_usd = 365; // §1.1104 (90 FR 17013, eff. Apr. 23, 2025) — Form 303-S license renewal
       return {
         frequency_khz,
         freq_tolerance_hz,
@@ -13713,10 +13761,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower inspection (annual): $2,000–$5,000
       const tower_inspection_low  = 2000;
       const tower_inspection_high = 5000;
-      // FCC annual regulatory fee (§1.1102 FY2024): Class A $7,265; B $5,020; C/D $2,195.
-      const FCC_REG_FEE_BREAKDOWN = { A: 7265, B: 5020, C: 2195, D: 2195 };
-      const fcc_annual_fee_low  = FCC_REG_FEE_BREAKDOWN[fcc_class] ?? 2195;
-      const fcc_annual_fee_high = fcc_annual_fee_low;
+      // FCC annual regulatory fee (§1.1153 (89 FR 78509)): population-tiered per class, not flat.
+      const reg_fee_ops = amAnnualRegFeeUsd(fcc_class, estimated_daytime_population_served);
+      const fcc_annual_fee_low  = reg_fee_ops.fee_low_usd;
+      const fcc_annual_fee_high = reg_fee_ops.fee_high_usd;
       // Transmitter maintenance contract: $3,000–$8,000/yr
       const maintenance_low  = 3000;
       const maintenance_high = 8000;
@@ -13736,10 +13784,12 @@ async function scoreCandidate(pt, ctx, warnings){
         land_lease_low_usd, land_lease_high_usd,
         tower_inspection_low_usd: tower_inspection_low, tower_inspection_high_usd: tower_inspection_high,
         fcc_annual_fee_low_usd: fcc_annual_fee_low, fcc_annual_fee_high_usd: fcc_annual_fee_high,
+        fcc_annual_fee_tier: reg_fee_ops.tier_label,
+        fcc_annual_fee_population_basis: reg_fee_ops.population_basis,
         maintenance_low_usd: maintenance_low, maintenance_high_usd: maintenance_high,
         security_low_usd: security_low, security_high_usd: security_high,
         total_low_usd, total_high_usd,
-        reference: '47 CFR §1.1102 (FCC regulatory fee schedule); EIA commercial electricity rates; diesel fuel consumption (0.07 gal/kW-hr of generator load; transmitter grid draw ≈ 1.4× TPO at ≈72% efficiency); RS Means facilities maintenance data',
+        reference: '47 CFR §1.1153 (89 FR 78509) (FCC annual regulatory fee schedule — population-tiered); EIA commercial electricity rates; diesel fuel consumption (0.07 gal/kW-hr of generator load; transmitter grid draw ≈ 1.4× TPO at ≈72% efficiency); RS Means facilities maintenance data',
         note: `${tpo_kw} kW TPO → ${electricity_draw_kw} kW grid draw (${kwh_per_year.toLocaleString()} kWh/yr). Annual total: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
@@ -14166,11 +14216,11 @@ async function scoreCandidate(pt, ctx, warnings){
         tower_lighting_aviation:     5000,
         grounding_lightning:         9385,
         transmission_line:           3530,
-        fcc_asr_registration:        5175,   // mirrors am_fcc_asr_tower_registration_guide (Form 854 $175)
+        fcc_asr_registration:        5000,   // mirrors am_fcc_asr_tower_registration_guide (Form 854 ASR: no FCC filing fee under the current §1.1102 schedule)
         site_access_road:           28800,
         utility_power_backup:       21520,   // mirrors am_utility_power_and_backup_systems_guide (1.4× TPO draw + 25% headroom generator)
-        transmitter_building_stl:   41470,   // mirrors am_transmitter_building_and_studio_link_guide (Part 74 STL fee $470)
-        fcc_cp_and_license:         15495,  // mirrors am_fcc_construction_permit_and_license_guide (Form 301-AM $4,200 major CP)
+        transmitter_building_stl:   41105,   // mirrors am_transmitter_building_and_studio_link_guide (Part 74 STL new license $105 per §1.1102 site-based schedule)
+        fcc_cp_and_license:         15795,  // mirrors am_fcc_construction_permit_and_license_guide (Form 301-AM $4,675 major CP per §1.1104, 90 FR 17013, eff. Apr. 23, 2025)
         real_estate_purchase:       12000,
         environmental_impact:        8000,
         zoning_permits:              5000,
@@ -14184,11 +14234,11 @@ async function scoreCandidate(pt, ctx, warnings){
         tower_lighting_aviation:    80000,
         grounding_lightning:        33655,
         transmission_line:          10000,
-        fcc_asr_registration:       18175,  // mirrors am_fcc_asr_tower_registration_guide
+        fcc_asr_registration:       18000,  // mirrors am_fcc_asr_tower_registration_guide (no FCC filing fee for Form 854)
         site_access_road:           92800,
         utility_power_backup:       52040,  // mirrors am_utility_power_and_backup_systems_guide
-        transmitter_building_stl:  127470,  // mirrors am_transmitter_building_and_studio_link_guide (Part 74 STL fee $470)
-        fcc_cp_and_license:         52495,  // mirrors am_fcc_construction_permit_and_license_guide
+        transmitter_building_stl:  127105,  // mirrors am_transmitter_building_and_studio_link_guide (Part 74 STL new license $105 per §1.1102 site-based schedule)
+        fcc_cp_and_license:         52795,  // mirrors am_fcc_construction_permit_and_license_guide
         real_estate_purchase:      158000,
         environmental_impact:       35000,
         zoning_permits:             20000,
@@ -14214,7 +14264,7 @@ async function scoreCandidate(pt, ctx, warnings){
         contingency_high_usd,
         total_with_contingency_low_usd,
         total_with_contingency_high_usd,
-        reference: 'Static screening-grade capital-budget summary; line items mirror the per-candidate engineering cost guides for a representative build (they do not scale with inputs — see individual guides for input-dependent estimates); 15% contingency per broadcast industry practice; FCC fees per §1.1102 FY2024',
+        reference: 'Static screening-grade capital-budget summary; line items mirror the per-candidate engineering cost guides for a representative build (they do not scale with inputs — see individual guides for input-dependent estimates); 15% contingency per broadcast industry practice; FCC application fees per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)',
         note: `Full relocation budget: $${grand_total_low_usd.toLocaleString()}–$${grand_total_high_usd.toLocaleString()} + 15% contingency = $${total_with_contingency_low_usd.toLocaleString()}–$${total_with_contingency_high_usd.toLocaleString()} total.`
       };
     })(),
@@ -14366,17 +14416,18 @@ async function scoreCandidate(pt, ctx, warnings){
       // Process: file FCC Form 301-AM → receive CP → build → file Form 302-AM (license to cover).
       // Directional arrays also require antenna proof (§73.154) before license is granted.
       const isDA_cp    = /^DA/i.test(pattern_mode);
-      // Form 301-AM major change CP fee per §1.1102 FY2024: $4,200 (site relocation = major change under §73.3533).
-      const form_301_am_usd = 4200;
-      // FCC Form 854 ASR tower registration fee: $175 (required when tower ≥ 200 ft per §17.7)
-      const fcc_asr_fee_usd = 175;
+      // Form 301-AM major change CP fee per §1.1104 (90 FR 17013, eff. Apr. 23, 2025): $4,675 (site relocation = major change under §73.3533).
+      const form_301_am_usd = 4675;
+      // Form 854 ASR: no FCC filing fee under the current §1.1102 schedule (pre-2020 fee no longer applies); FAA study / consultant costs are separate.
+      const fcc_asr_fee_usd = 0;
       // FCC miscellaneous CP-related government costs (LMS/CORES filing, EAS registration): $120
       const fcc_misc_usd = 120;
       // Total FCC government filing fees for the CP process
-      const fcc_filing_fee_usd = form_301_am_usd + fcc_asr_fee_usd + fcc_misc_usd; // $4,495
-      // FCC annual regulatory fee (§1.1102 FY2024): Class D/C $2,195; Class B $5,020; Class A $7,265.
-      const annual_reg_fee_low  = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;
-      const annual_reg_fee_high = annual_reg_fee_low;
+      const fcc_filing_fee_usd = form_301_am_usd + fcc_asr_fee_usd + fcc_misc_usd; // $4,795
+      // FCC annual regulatory fee (§1.1153 (89 FR 78509)): population-tiered per class, not flat.
+      const reg_fee_cpg = amAnnualRegFeeUsd(fcc_class, estimated_daytime_population_served);
+      const annual_reg_fee_low  = reg_fee_cpg.fee_low_usd;
+      const annual_reg_fee_high = reg_fee_cpg.fee_high_usd;
       // Engineering consultant (CP preparation, technical exhibits, FCC Form 301-AM):
       // $5,000–$20,000 for NDA; $10,000–$40,000 for DA (complex directional exhibits)
       const engineering_low_usd  = isDA_cp ? 10000 : 5000;
@@ -14398,10 +14449,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const construction_period_years = 3;
       const proof_to_license_months_low  = 3;
       const proof_to_license_months_high = 6;
-      // Total including ALL FCC government fees ($1,310)
+      // Total including ALL FCC government fees ($4,795)
       const total_nonrecurring_low_usd  = round2(fcc_filing_fee_usd + engineering_low_usd  + attorney_low_usd  + nepa_low_usd  + section106_low_usd);
       const total_nonrecurring_high_usd = round2(fcc_filing_fee_usd + engineering_high_usd + attorney_high_usd + nepa_high_usd + section106_high_usd);
-      // Comparison-table total uses only the Form 301-AM major change CP fee ($4,200) — excludes ASR/misc FCC costs
+      // Comparison-table total uses only the Form 301-AM major change CP fee ($4,675) — excludes ASR/misc FCC costs
       const form_301_total_low_usd  = round2(form_301_am_usd + engineering_low_usd  + attorney_low_usd  + nepa_low_usd  + section106_low_usd);
       return {
         frequency_khz, fcc_class, pattern_mode,
@@ -14412,6 +14463,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fcc_filing_fee_usd,
         annual_reg_fee_low_usd: annual_reg_fee_low,
         annual_reg_fee_high_usd: annual_reg_fee_high,
+        annual_reg_fee_tier: reg_fee_cpg.tier_label,
         engineering_low_usd, engineering_high_usd,
         attorney_low_usd, attorney_high_usd,
         nepa_low_usd, nepa_high_usd,
@@ -14422,8 +14474,8 @@ async function scoreCandidate(pt, ctx, warnings){
         construction_period_years,
         proof_to_license_months_low, proof_to_license_months_high,
         filing_forms: ['FCC Form 301-AM (CP application)', 'FCC Form 302-AM (license to cover)', ...(isDA_cp ? ['Directional antenna proof exhibit'] : [])],
-        reference: '47 CFR §73.3700 (AM revitalization); §73.24 (CP standards); §73.154 (DA proof); FCC Form 301-AM instructions; FCC Schedule of Regulatory Fees (2024); NEPA §106; 36 CFR §800',
-        note: `${isDA_cp ? 'DA' : 'NDA'} CP: $${form_301_am_usd} Form 301-AM fee (DA 23-864 FY2024); $${fcc_filing_fee_usd} total FCC gov fees. Total project cost: $${total_nonrecurring_low_usd.toLocaleString()}–$${total_nonrecurring_high_usd.toLocaleString()}. Timeline: ${cp_review_months_low}–${cp_review_months_high} mo FCC review → ${construction_period_years}-yr build window → ${proof_to_license_months_low}–${proof_to_license_months_high} mo proof-to-license`
+        reference: '47 CFR §73.3700 (AM revitalization); §73.24 (CP standards); §73.154 (DA proof); FCC Form 301-AM instructions; 47 CFR §1.1104 (90 FR 17013, eff. Apr. 23, 2025); 47 CFR §1.1153 (89 FR 78509); NEPA §106; 36 CFR §800',
+        note: `${isDA_cp ? 'DA' : 'NDA'} CP: $${form_301_am_usd} Form 301-AM fee (§1.1104, 90 FR 17013, eff. Apr. 23, 2025); $${fcc_filing_fee_usd} total FCC gov fees. Total project cost: $${total_nonrecurring_low_usd.toLocaleString()}–$${total_nonrecurring_high_usd.toLocaleString()}. Timeline: ${cp_review_months_low}–${cp_review_months_high} mo FCC review → ${construction_period_years}-yr build window → ${proof_to_license_months_low}–${proof_to_license_months_high} mo proof-to-license`
       };
     })(),
 
@@ -14451,8 +14503,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Audio codec pairs (Tieline/Comrex/MPEG): $3,000–$8,000/pair
       const codec_low_usd  = 3000;
       const codec_high_usd = 8000;
-      // Part 74 STL license application fee: $470 (§1.1102 FY2024 Part 74 aural broadcast auxiliary; verify current schedule at filing)
-      const stl_license_fee_usd = stl_type === 'licensed_950mhz_microwave' ? 470 : 0;
+      // Part 74 STL license application fee: $105 (§1.1102 site-based schedule — Part 74 aural broadcast auxiliary, ULS Form 601 new license/major mod)
+      const stl_license_fee_usd = stl_type === 'licensed_950mhz_microwave' ? 105 : 0;
       const total_low_usd  = round2(building_low_usd  + hvac_low_usd  + security_low_usd  + stl_low_usd  + codec_low_usd  + stl_license_fee_usd);
       const total_high_usd = round2(building_high_usd + hvac_high_usd + security_high_usd + stl_high_usd + codec_high_usd + stl_license_fee_usd);
       return {
@@ -14581,7 +14633,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // white/red strobes (L-856/L-864) for taller structures.
       const lighting_type   = tower_height_ft > 500 ? 'L-856/L-864 (red/white strobe)' : 'L-810 (steady red)';
       // ASR filing fee and engineering costs
-      const asr_fee_usd          = 175;   // FCC Form 854 (ASR registration) fee per §1.1102 FY2024
+      const asr_fee_usd          = 0;     // Form 854 ASR: no FCC filing fee under the current §1.1102 schedule (pre-2020 fee no longer applies); FAA study / consultant costs are separate
       const structural_study_low  = 2500;
       const structural_study_high = 8000;
       const environmental_review_low  = 1500;  // NEPA / Section 106 review
@@ -14993,7 +15045,7 @@ async function scoreCandidate(pt, ctx, warnings){
       }
       const faa_notice_cost_low_usd  = needs_faa_notice ? 1000 : 0;
       const faa_notice_cost_high_usd = needs_faa_notice ? 5000 : 0;
-      const asr_fee_usd              = needs_asr ? 175 : 0;  // Form 854 fee per §1.1102 FY2024
+      const asr_fee_usd              = 0;  // Form 854 ASR: no FCC filing fee under the current §1.1102 schedule (pre-2020 fee no longer applies); FAA study / consultant costs are separate
       const annual_maint_low_usd     = needs_faa_notice ? 500  : 0;
       const annual_maint_high_usd    = needs_faa_notice ? 2000 : 0;
       const total_install_low_usd  = round2(lighting_cost_low_usd  + faa_notice_cost_low_usd  + asr_fee_usd);
@@ -15353,8 +15405,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const microwave_hw_low_usd  = stl_type === 'microwave_950mhz' ? 8000  : 0;
       const microwave_hw_high_usd = stl_type === 'microwave_950mhz' ? 25000 : 0;
 
-      // FCC Part 74 STL license (if microwave): $470 (§1.1102 FY2024 Part 74 aural broadcast auxiliary; verify current schedule at filing)
-      const fcc_stl_license_fee_usd = stl_fcc_license_required ? 470 : 0;
+      // FCC Part 74 STL license (if microwave): $105 (§1.1102 site-based schedule — Part 74 aural broadcast auxiliary, ULS Form 601 new license/major mod)
+      const fcc_stl_license_fee_usd = stl_fcc_license_required ? 105 : 0;
 
       // Audio processing and backup STL (cellular backup)
       const audio_proc_low_usd  = 500;
@@ -16257,16 +16309,15 @@ async function scoreCandidate(pt, ctx, warnings){
       // Quantifies the ongoing annual regulatory cost burden for the AM broadcast station,
       // independent of candidate location (driven by station class and power).
 
-      // FCC Annual Regulatory Fee (FY 2023 schedule, 47 CFR §1.1102).
-      // AM fees are assessed per station; rate differs by class.
-      // Class A: $7,265; Class B: $5,020; Class C/D: $2,195 (§1.1102 FY2024).
-      const annual_fcc_fee_usd = fcc_class === 'A' ? 7265
-        : fcc_class === 'B' ? 5020
-        : 2195;   // Class C or D
+      // FCC Annual Regulatory Fee (47 CFR §1.1153, 89 FR 78509).
+      // AM fees are assessed per station; the rate is population-tiered per class (not flat).
+      const reg_fee_arc = amAnnualRegFeeUsd(fcc_class, estimated_daytime_population_served);
+      const annual_fcc_fee_low_usd  = reg_fee_arc.fee_low_usd;
+      const annual_fcc_fee_high_usd = reg_fee_arc.fee_high_usd;
 
       // License renewal cycle (47 CFR §73.1020): 8-year term, Form 303-S filing
       const license_renewal_cycle_years = 8;
-      const renewal_fee_usd             = 610;  // FCC Schedule of Fees FY 2024
+      const renewal_fee_usd             = 365;  // Form 303-S renewal per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)
       const renewal_amortized_annual_usd = Math.round(renewal_fee_usd / license_renewal_cycle_years);
 
       // EAS compliance testing (§11.61): weekly, monthly, and annual test logging
@@ -16283,9 +16334,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const public_file_annual_cost_usd = 0;
 
       // Total annual regulatory burden
-      const total_annual_compliance_low_usd  = annual_fcc_fee_usd + renewal_amortized_annual_usd
+      const total_annual_compliance_low_usd  = annual_fcc_fee_low_usd + renewal_amortized_annual_usd
                                               + eas_testing_annual_low_usd  + compliance_consultant_annual_low_usd;
-      const total_annual_compliance_high_usd = annual_fcc_fee_usd + renewal_amortized_annual_usd
+      const total_annual_compliance_high_usd = annual_fcc_fee_high_usd + renewal_amortized_annual_usd
                                               + eas_testing_annual_high_usd + compliance_consultant_annual_high_usd;
 
       // 10-year present value (3% discount rate)
@@ -16295,7 +16346,11 @@ async function scoreCandidate(pt, ctx, warnings){
 
       return {
         fcc_class,
-        annual_fcc_fee_usd,
+        annual_fcc_fee_usd: reg_fee_arc.fee_usd,
+        annual_fcc_fee_low_usd,
+        annual_fcc_fee_high_usd,
+        annual_fcc_fee_tier: reg_fee_arc.tier_label,
+        annual_fcc_fee_population_basis: reg_fee_arc.population_basis,
         license_renewal_cycle_years,
         renewal_fee_usd,
         renewal_amortized_annual_usd,
@@ -16308,8 +16363,8 @@ async function scoreCandidate(pt, ctx, warnings){
         total_annual_compliance_high_usd,
         pv_10yr_low_usd,
         pv_10yr_high_usd,
-        reference: '47 CFR §1.1102 (annual regulatory fees); §73.1020 (license term — 8 years); §73.3539 (Form 303-S renewal application); §11.61 (EAS testing); §73.3526 (public file); FCC Schedule of Regulatory Fees FY 2023 §1.1102 (AM Class D/C: $2,195; Class B: $5,020; Class A: $7,265)',
-        note: `Annual regulatory burden for Class ${fcc_class} AM station at ${frequency_khz} kHz: FCC fee $${annual_fcc_fee_usd}/yr; renewal amortized $${renewal_amortized_annual_usd}/yr (8-yr cycle, $${renewal_fee_usd} fee); EAS testing $${eas_testing_annual_low_usd}–$${eas_testing_annual_high_usd}/yr; compliance counsel $${compliance_consultant_annual_low_usd}–$${compliance_consultant_annual_high_usd}/yr. Total: $${total_annual_compliance_low_usd.toLocaleString()}–$${total_annual_compliance_high_usd.toLocaleString()}/yr. 10-yr PV: $${pv_10yr_low_usd.toLocaleString()}–$${pv_10yr_high_usd.toLocaleString()}.`
+        reference: '47 CFR §1.1153 (89 FR 78509) (annual regulatory fees — population-tiered per class); §73.1020 (license term — 8 years); §73.3539 (Form 303-S renewal application); §11.61 (EAS testing); §73.3526 (public file); 47 CFR §1.1104 (90 FR 17013, eff. Apr. 23, 2025) (Form 303-S renewal: $365)',
+        note: `Annual regulatory burden for Class ${fcc_class} AM station at ${frequency_khz} kHz: FCC fee ${annual_fcc_fee_low_usd === annual_fcc_fee_high_usd ? `$${annual_fcc_fee_low_usd}` : `$${annual_fcc_fee_low_usd}–$${annual_fcc_fee_high_usd}`}/yr (§1.1153 tier: ${reg_fee_arc.tier_label}); renewal amortized $${renewal_amortized_annual_usd}/yr (8-yr cycle, $${renewal_fee_usd} fee); EAS testing $${eas_testing_annual_low_usd}–$${eas_testing_annual_high_usd}/yr; compliance counsel $${compliance_consultant_annual_low_usd}–$${compliance_consultant_annual_high_usd}/yr. Total: $${total_annual_compliance_low_usd.toLocaleString()}–$${total_annual_compliance_high_usd.toLocaleString()}/yr. 10-yr PV: $${pv_10yr_low_usd.toLocaleString()}–$${pv_10yr_high_usd.toLocaleString()}.`
       };
     })(),
 
@@ -16553,9 +16608,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const isLocalApp = LOCAL_CHANNEL_KHZ.has(frequency_khz);
       const isDA_app   = /^DA/i.test(pattern_mode);
 
-      // FCC Schedule of Application Fees (47 CFR §1.1102, FY2024) — Form 301-AM
-      // major change construction permit: $4,200.
-      const fcc_filing_fee_usd = 4200;
+      // FCC Schedule of Application Fees (47 CFR §1.1104, 90 FR 17013, eff. Apr. 23, 2025) — Form 301-AM
+      // major change construction permit: $4,675.
+      const fcc_filing_fee_usd = 4675;
 
       // Number of co-channel / adjacent-channel stations requiring interference check.
       // Clear channel: dominant (Class A) nighttime 0.1 mV/m skywave can span 500 km.
@@ -16596,7 +16651,7 @@ async function scoreCandidate(pt, ctx, warnings){
         study_radius_km,
         total_application_low_usd,
         total_application_high_usd,
-        reference: '47 CFR §73.37 (interference study requirements); 47 CFR §1.1102 FY2024 fee schedule (Form 301-AM major change CP: $4,200); §73.21 (channel classes); §73.25 (clear channel dominant station protection); §73.37(a)(1) co-channel; §73.37(b) adj-channel; OET Bulletin 69 (AM interference analysis methodology)',
+        reference: '47 CFR §73.37 (interference study requirements); 47 CFR §1.1104 (90 FR 17013, eff. Apr. 23, 2025) fee schedule (Form 301-AM major change CP: $4,675); §73.21 (channel classes); §73.25 (clear channel dominant station protection); §73.37(a)(1) co-channel; §73.37(b) adj-channel; OET Bulletin 69 (AM interference analysis methodology)',
         note: `FCC Form 301-AM engineering: ${isClearApp ? 'clear channel' : isLocalApp ? 'local' : 'regional'} Class ${fcc_class} at ${frequency_khz} kHz, ${tpo_kw} kW ${isDA_app ? 'DA' : 'NDA'}. Interference study: ~${n_stations_to_study} stations within ${study_radius_km} km. Engineering $${eng_cost_low_usd.toLocaleString()}–$${eng_cost_high_usd.toLocaleString()}; FCC filing fee $${fcc_filing_fee_usd}. Estimated processing ${processing_months_low}–${processing_months_high} months from acceptance.`
       };
     })(),
@@ -17299,9 +17354,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const equip_maint_high_usd = Math.round(EQUIP_VALUE[power_class_aoc] * 0.08);
 
       // ---- FCC annual regulatory fee ----
-      // 47 CFR §1.1102 FY2024 schedule: Class A $7,265; Class B $5,020; Class C/D $2,195.
-      const FCC_REGULATORY_FEE = { A: 7265, B: 5020, C: 2195, D: 2195 };
-      const fcc_annual_fee_usd = FCC_REGULATORY_FEE[fcc_class] ?? 2195;
+      // 47 CFR §1.1153 (89 FR 78509): population-tiered per class, not flat.
+      const reg_fee_opx = amAnnualRegFeeUsd(fcc_class, estimated_daytime_population_served);
+      const fcc_annual_fee_low_usd_opx  = reg_fee_opx.fee_low_usd;
+      const fcc_annual_fee_high_usd_opx = reg_fee_opx.fee_high_usd;
 
       // ---- Insurance ----
       // Annual premium estimate by class (from insurance guide logic)
@@ -17330,8 +17386,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const property_cost_high_usd = 12000;
 
       // ---- Totals ----
-      const total_annual_low_usd  = elec_cost_low_usd  + equip_maint_low_usd  + fcc_annual_fee_usd + insurance_low_usd  + stl_annual_low_usd  + tower_inspection_usd_low  + lighting_maint_low_usd  + property_cost_low_usd;
-      const total_annual_high_usd = elec_cost_high_usd + equip_maint_high_usd + fcc_annual_fee_usd + insurance_high_usd + stl_annual_high_usd + tower_inspection_usd_high + lighting_maint_high_usd + property_cost_high_usd;
+      const total_annual_low_usd  = elec_cost_low_usd  + equip_maint_low_usd  + fcc_annual_fee_low_usd_opx  + insurance_low_usd  + stl_annual_low_usd  + tower_inspection_usd_low  + lighting_maint_low_usd  + property_cost_low_usd;
+      const total_annual_high_usd = elec_cost_high_usd + equip_maint_high_usd + fcc_annual_fee_high_usd_opx + insurance_high_usd + stl_annual_high_usd + tower_inspection_usd_high + lighting_maint_high_usd + property_cost_high_usd;
 
       // 10-year NPV of operating costs at 5% discount rate
       const PV_FACTOR_10YR = round2((1 - Math.pow(1.05, -10)) / 0.05); // ≈ 7.72
@@ -17351,7 +17407,9 @@ async function scoreCandidate(pt, ctx, warnings){
         equip_maint_low_usd,
         equip_maint_high_usd,
         // FCC and Insurance
-        fcc_annual_fee_usd,
+        fcc_annual_fee_low_usd: fcc_annual_fee_low_usd_opx,
+        fcc_annual_fee_high_usd: fcc_annual_fee_high_usd_opx,
+        fcc_annual_fee_tier: reg_fee_opx.tier_label,
         insurance_low_usd,
         insurance_high_usd,
         // Infrastructure
@@ -17369,8 +17427,8 @@ async function scoreCandidate(pt, ctx, warnings){
         pv_factor_10yr: PV_FACTOR_10YR,
         opex_10yr_pv_low_usd,
         opex_10yr_pv_high_usd,
-        note: `Annual OPEX: electricity ${annual_kwh_total.toLocaleString()} kWh/yr ($${elec_cost_low_usd.toLocaleString()}–$${elec_cost_high_usd.toLocaleString()}); equip maintenance $${equip_maint_low_usd.toLocaleString()}–$${equip_maint_high_usd.toLocaleString()}; FCC fee $${fcc_annual_fee_usd.toLocaleString()}; insurance $${insurance_low_usd.toLocaleString()}–$${insurance_high_usd.toLocaleString()}. Total: $${total_annual_low_usd.toLocaleString()}–$${total_annual_high_usd.toLocaleString()}/yr; 10-yr NPV at 5%: $${opex_10yr_pv_low_usd.toLocaleString()}–$${opex_10yr_pv_high_usd.toLocaleString()}.`,
-        reference: '47 CFR §73.1350 (transmission system operation / equipment maintenance); FCC Schedule of Application Fees (annual regulatory fees); §11.35 (EAS equipment); NEC Art. 702 (emergency power)',
+        note: `Annual OPEX: electricity ${annual_kwh_total.toLocaleString()} kWh/yr ($${elec_cost_low_usd.toLocaleString()}–$${elec_cost_high_usd.toLocaleString()}); equip maintenance $${equip_maint_low_usd.toLocaleString()}–$${equip_maint_high_usd.toLocaleString()}; FCC fee ${fcc_annual_fee_low_usd_opx === fcc_annual_fee_high_usd_opx ? `$${fcc_annual_fee_low_usd_opx.toLocaleString()}` : `$${fcc_annual_fee_low_usd_opx.toLocaleString()}–$${fcc_annual_fee_high_usd_opx.toLocaleString()}`} (§1.1153); insurance $${insurance_low_usd.toLocaleString()}–$${insurance_high_usd.toLocaleString()}. Total: $${total_annual_low_usd.toLocaleString()}–$${total_annual_high_usd.toLocaleString()}/yr; 10-yr NPV at 5%: $${opex_10yr_pv_low_usd.toLocaleString()}–$${opex_10yr_pv_high_usd.toLocaleString()}.`,
+        reference: '47 CFR §73.1350 (transmission system operation / equipment maintenance); 47 CFR §1.1153 (89 FR 78509) (annual regulatory fees — population-tiered); §11.35 (EAS equipment); NEC Art. 702 (emergency power)',
       };
     })(),
 
@@ -17473,7 +17531,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // FCC Part 74 license required for 950 MHz and microwave STLs
       const fcc_part_74_license_required = stl_technology !== 'IP_INTERNET';
-      const fcc_license_fee_usd          = fcc_part_74_license_required ? 470 : 0;  // §1.1102 FY2024 Part 74 aural broadcast auxiliary; verify current schedule at filing
+      const fcc_license_fee_usd          = fcc_part_74_license_required ? 105 : 0;  // §1.1102 site-based schedule — Part 74 aural broadcast auxiliary, ULS Form 601 new license/major mod: $105
 
       // Equipment and installation costs (TX side + RX side)
       const STL_EQUIP = {
@@ -17959,7 +18017,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Engineering and FCC filing costs
       const engineering_cost_low_usd  = fcc_class === 'A' ? 25000 : (fcc_class === 'B' ? 15000 : 8000);
       const engineering_cost_high_usd = fcc_class === 'A' ? 75000 : (fcc_class === 'B' ? 40000 : 20000);
-      const fcc_filing_fee_usd = 4200; // Form 301-AM major change CP per §1.1102 FY2024 (relocation = major change)
+      const fcc_filing_fee_usd = 4675; // Form 301-AM major change CP per §1.1104 (90 FR 17013, eff. Apr. 23, 2025) (relocation = major change)
 
       return {
         filing_type,
@@ -19988,7 +20046,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const exhibits_F = [
         { id: 'F1', section: 'F', title: 'Engineer certification (PE stamp if required by state)', required: true, cfr: '§73.1870; §73.3536(a)(2)', notes: 'Licensed broadcast engineer (SBE CSRE or CPBE) certifies technical data; some states require PE stamp' },
         { id: 'F2', section: 'F', title: 'Applicant signature and certification', required: true, cfr: '§73.3533(a)(7)', notes: 'Authorized representative of licensee signs; false statements subject to 18 USC §1001 felony penalties' },
-        { id: 'F3', section: 'F', title: 'Filing fee payment', required: true, cfr: '§1.1102', notes: `AM major change CP: $4,200 (2024 schedule); pay via FCC Fee Filer at www.fcc.gov/licensing-databases/fees` },
+        { id: 'F3', section: 'F', title: 'Filing fee payment', required: true, cfr: '§1.1104', notes: `AM major change CP: $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025); pay via FCC Fee Filer at www.fcc.gov/licensing-databases/fees` },
       ];
 
       const exhibits_G_da = isDA_ch ? [
@@ -20036,10 +20094,10 @@ async function scoreCandidate(pt, ctx, warnings){
         required_exhibits,
         deficiency_triggers,
         n_deficiency_risks:     deficiency_triggers.length,
-        filing_fee_usd:         4200,   // AM major change CP filing fee per §1.1102
+        filing_fee_usd:         4675,   // AM major change CP filing fee per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)
         filing_system:          'FCC LMS (Licensing Management System)',
-        reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301-AM Instructions (2024); OET Bulletin 65; NHPA §106',
-        note: `FCC Form 301-AM ${isDA_ch ? `DA (${pattern_mode})` : 'NDA'} application for ${frequency_khz} kHz Class ${fcc_class}: ${n_required} required exhibits across ${isDA_ch ? 7 : 6} sections. Top deficiency risk: ${deficiency_triggers[0].issue}. ${asr_required_ch ? `ASR registration required (tower ≈ ${tower_ft_ch} ft). ` : ''}Filing fee: $4,200 (§1.1102 FY2024 major change CP).`
+        reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1104 (90 FR 17013, eff. Apr. 23, 2025); §1.1306; §1.1310; §17.4; FCC Form 301-AM Instructions (2024); OET Bulletin 65; NHPA §106',
+        note: `FCC Form 301-AM ${isDA_ch ? `DA (${pattern_mode})` : 'NDA'} application for ${frequency_khz} kHz Class ${fcc_class}: ${n_required} required exhibits across ${isDA_ch ? 7 : 6} sections. Top deficiency risk: ${deficiency_triggers[0].issue}. ${asr_required_ch ? `ASR registration required (tower ≈ ${tower_ft_ch} ft). ` : ''}Filing fee: $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025, major change CP).`
       };
     })(),
 
@@ -20300,13 +20358,13 @@ async function scoreCandidate(pt, ctx, warnings){
       const n_radials   = 120;                          // standard AM ground system
       const radial_len_m = Math.round(lambda_m * 0.35); // 0.35λ per §73.189(b)(4) / NBS TN-24
 
-      // 1. FCC Filing and Regulatory Fees (§1.1102 FY2024 schedule).
-      const fcc_form301     = 4200;   // Form 301-AM major change CP fee (§1.1102 FY2024); relocation = major change
-      const fcc_form302am   = 435;    // Form 302-AM license-to-cover fee (§1.1102 FY2024)
-      // Annual regulatory fee (§1.1102 FY2024): Class A $7,265; B $5,020; C/D $2,195
-      const fcc_annual_fee  = fcc_class === 'A' ? 7265 : fcc_class === 'B' ? 5020 : 2195;
-      const fcc_low  = fcc_form301 + fcc_form302am + fcc_annual_fee;
-      const fcc_high = fcc_low; // fees are fixed; no range
+      // 1. FCC Filing and Regulatory Fees (application fees per §1.1104, 90 FR 17013, eff. Apr. 23, 2025;
+      //    annual regulatory fee per §1.1153, 89 FR 78509 — population-tiered per class).
+      const fcc_form301     = 4675;   // Form 301-AM major change CP fee (§1.1104 (90 FR 17013, eff. Apr. 23, 2025)); relocation = major change
+      const fcc_form302am   = 755;    // Form 302-AM license-to-cover fee (§1.1104 (90 FR 17013, eff. Apr. 23, 2025))
+      const reg_fee_pfm = amAnnualRegFeeUsd(fcc_class, estimated_daytime_population_served);
+      const fcc_low  = fcc_form301 + fcc_form302am + reg_fee_pfm.fee_low_usd;
+      const fcc_high = fcc_form301 + fcc_form302am + reg_fee_pfm.fee_high_usd;
 
       // 2. Professional Services (attorney + engineer).
       // NDA is simpler than DA; DA adds pattern modeling + §73.182 night analysis.
@@ -20378,7 +20436,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Build cost category table.
       const cost_categories = [
-        { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: `Form 301-AM major CP ($4,200 §1.1102 FY2024) + Form 302-AM ($435 §1.1102 FY2024) + annual fee ($${fcc_annual_fee} §1.1102 FY2024)` },
+        { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: `Form 301-AM major CP ($4,675 §1.1104, 90 FR 17013, eff. Apr. 23, 2025) + Form 302-AM ($755 §1.1104) + annual regulatory fee (${reg_fee_pfm.fee_usd != null ? `$${reg_fee_pfm.fee_usd}` : `$${reg_fee_pfm.fee_low_usd}–$${reg_fee_pfm.fee_high_usd}`} §1.1153, 89 FR 78509, tier: ${reg_fee_pfm.tier_label})` },
         { category: 'Professional Services',             low_usd: prof_low,          high_usd: prof_high,         notes: `Broadcast attorney + engineer; ${isDA_pf ? 'DA adds pattern modeling & §73.182 night analysis' : 'NDA simplifies attorney scope'}` },
         { category: 'Site Acquisition (excl. land)',     low_usd: site_acq_low,      high_usd: site_acq_high,     notes: 'Title search, survey, Phase I ESA, NEPA §1.1307 / §106 consultation, local permits' },
         { category: 'Tower Construction',                low_usd: tower_low,         high_usd: tower_high,        notes: `${h_frac_pf}λ guyed monopole at ${frequency_khz} kHz = ${Math.round(lambda_q_m)} m (${tower_ft} ft); foundation, base insulator, guys, ASR reg.` },
@@ -20442,7 +20500,7 @@ async function scoreCandidate(pt, ctx, warnings){
         timeline_milestones,
         financing_options,
         n_financing_options:        financing_options.length,
-        reference: '47 CFR §73.21 (power); §73.154 (proof); §73.182 (interference); §73.189(b)(4) (ground radial system — 120 × 0.35λ); §1.1102 (fees); §1.1307 (NEPA); NHPA §106; SBA 7(a)/504 program guidelines',
+        reference: '47 CFR §73.21 (power); §73.154 (proof); §73.182 (interference); §73.189(b)(4) (ground radial system — 120 × 0.35λ); §1.1104 (application fees, 90 FR 17013, eff. Apr. 23, 2025); §1.1153 (annual regulatory fees, 89 FR 78509); §1.1307 (NEPA); NHPA §106; SBA 7(a)/504 program guidelines',
         note: `Complete relocation budget for ${frequency_khz} kHz Class ${fcc_class} (${pattern_mode}) ${tpo_kw} kW: estimated $${total_low.toLocaleString()}–$${total_high.toLocaleString()} (typical $${total_typ.toLocaleString()}), including ${contingency_pct}% contingency. Excludes land purchase price. Timeline: ${total_timeline_months_low}–${total_timeline_months_high} months from CP filing to new license. All figures are 2024 screening-grade estimates.`
       };
     })(),
@@ -20461,9 +20519,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Form 301 filed → FCC processing 6-18 mo → CP granted → build → Form 302-AM.
       // NDA stations do NOT need a DA proof; 8-radial NDA proof (§73.154(b)) suffices.
       //
-      // FCC filing fees (47 CFR §1.1102, 2024 schedule):
-      //   Form 301-AM (AM major CP): $4,200
-      //   Form 302-AM (license to cover): $435
+      // FCC filing fees (47 CFR §1.1104, 90 FR 17013, eff. Apr. 23, 2025):
+      //   Form 301-AM (AM major CP): $4,675
+      //   Form 302-AM (license to cover): $755
 
       const is_clear_ch  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const is_local_ch  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
@@ -20495,9 +20553,9 @@ async function scoreCandidate(pt, ctx, warnings){
         : 1.0;
       const coverage_gain_pct = Math.round((coverage_radius_factor - 1) * 100);
 
-      // FCC filing fees per §1.1102 FY2024 schedule.
-      const form301_fee_usd  = 4200;   // Form 301-AM (AM major CP per §1.1102, 2024 schedule)
-      const form302_fee_usd  = 435;    // Form 302-AM (license to cover per §1.1102, 2024 schedule)
+      // FCC filing fees per §1.1104 (90 FR 17013, eff. Apr. 23, 2025) schedule.
+      const form301_fee_usd  = 4675;   // Form 301-AM (AM major CP per §1.1104 (90 FR 17013, eff. Apr. 23, 2025))
+      const form302_fee_usd  = 755;    // Form 302-AM (license to cover per §1.1104 (90 FR 17013, eff. Apr. 23, 2025))
 
       // Transmitter cost: 10 kW AM (2024 market).
       // Low: refurbished Harris DX-10, Continental 312F, or Nautel NA-10.
@@ -20591,7 +20649,7 @@ async function scoreCandidate(pt, ctx, warnings){
         cp_processing_months_high: cp_months_high,
         n_upgrade_steps:           upgrade_steps.length,
         upgrade_steps,
-        reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.1620 (CP construction period); §1.1102 (filing fees); FCC Form 301-AM (CP application); FCC Form 302-AM (license to cover)',
+        reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.1620 (CP construction period); §1.1104 (filing fees, 90 FR 17013, eff. Apr. 23, 2025); FCC Form 301-AM (CP application); FCC Form 302-AM (license to cover)',
         note: `${frequency_khz} kHz Class ${fcc_class} (${pattern_mode}) — current ${tpo_kw} kW TPO. ${can_upgrade_day ? `Daytime upgrade to ${upgraded_tpo_kw} kW available (§73.21 Class ${fcc_class} ceiling) — groundwave coverage radius grows ~${coverage_gain_pct}% (√ERP scaling). Requires Form 301-AM CP, ~${cp_months_low}–${cp_months_high} month FCC processing, and new ${upgraded_tpo_kw} kW transmitter.` : `No daytime headroom — already at Class ${fcc_class} ceiling of ${day_max_kw} kW.`} Nighttime ceiling: ${night_max_kw} kW${night_upgrade_requires_da_n ? ' (Class D secondary; DA-N antenna + §73.182 skywave analysis required for night upgrade)' : ''}.`
       };
     })(),
@@ -21660,7 +21718,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // STA filing requirements (§73.1635)
       const STA_REQUIREMENTS = [
-        { id: 'FILING_FEE', label: 'FCC STA filing fee', detail: 'No fee for STA if related to CP construction', cost_usd: 0 },
+        { id: 'FILING_FEE', label: 'FCC STA filing fee', detail: 'STA filing fee $325 per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)', cost_usd: 325 },
         { id: 'LETTER_REQUEST', label: 'Written STA request to FCC Media Bureau', detail: 'Describe reason for silence, expected duration, and steps being taken to return to air; cite §73.1635 and §73.1740', cost_usd: 0 },
         { id: 'CP_REFERENCE', label: 'Reference Construction Permit number', detail: 'Include CP file number in STA request to establish nexus between silence and authorized construction', cost_usd: 0 },
         { id: 'MILESTONE_REPORT', label: 'Quarterly progress reports if silence > 90 days', detail: 'FCC Media Bureau may request periodic construction progress updates; document tower erection, ground radial installation, transmitter installation milestones', cost_usd: 0 }
@@ -22220,9 +22278,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.3539: CP expires if construction not completed within 3 years of grant
       // §73.3598(b): no routine extensions — the 3-year period tolls only for specified events (litigation, international coordination, acts of God)
       //
-      // Filing fee (§1.1102 FY2024 schedule):
-      //   - Form 301-AM major change CP (site relocation): $4,200 flat (all classes)
-      //   - Minor modification: $1,015; fee exempt only for certain waiver/emergency filings
+      // Filing fee (§1.1104 (90 FR 17013, eff. Apr. 23, 2025)):
+      //   - Form 301-AM major change CP (site relocation): $4,675 flat (all classes, no auction)
+      //   - Minor modification: $1,910; fee exempt only for certain waiver/emergency filings
 
       const isDA_lm = /^DA/i.test(pattern_mode);
 
@@ -22243,7 +22301,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const n_required_exhibits = required_exhibits.length;
 
       const FCC_PROCESSING_STEPS = [
-        { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $4,200 major-change CP filing fee electronically (§1.1102 FY2024)', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
+        { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $4,675 major-change CP filing fee electronically (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
         { step: 2, action: 'FCC issues public notice (PNOH)', detail: 'FCC Public Notice of Hearing or Application — 30-day window for petitions to deny (major modifications)', timeline: '30-day public comment period', cfr: '§73.3580' },
         { step: 3, action: 'FCC engineering review', detail: 'FCC Media Bureau AM engineers review technical exhibits, interference analysis, and DA proof if applicable', timeline: '3–18 months (NDA faster; DA longer)', cfr: '§73.3533' },
         { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3598; §73.3526(e)(1)' },
@@ -22256,7 +22314,7 @@ async function scoreCandidate(pt, ctx, warnings){
         is_directional: isDA_lm,
         fcc_form: '301-AM',
         fcc_system: 'FCC LMS (lms.fcc.gov)',
-        filing_fee_usd: 4200,  // Form 301-AM major change CP (site relocation) per §1.1102 FY2024
+        filing_fee_usd: 4675,  // Form 301-AM major change CP (site relocation) per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)
         required_exhibits,
         n_required_exhibits,
         all_exhibits: REQUIRED_EXHIBITS,
@@ -22273,9 +22331,9 @@ async function scoreCandidate(pt, ctx, warnings){
           da_optimistic_months: 9,
           da_conservative_months: 18
         },
-        relocation_note: `File FCC Form 301-AM via LMS. ${n_required_exhibits} required exhibits including interference analysis, contour map, FAA determination, and ASR number. $4,200 major-change CP filing fee (§1.1102 FY2024). ${isDA_lm ? 'DA station requires horizontal radiation pattern table per §73.150(a) (72 radials at 5°). Processing: 9–18 months.' : 'NDA station. Processing: 3–9 months.'} CP valid for 3 years; 6-month extension available.`,
-        reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3580; §73.150 (AM DA); §17.7; §1.1301; FCC LMS (lms.fcc.gov); §1.1102 FY2024 fee schedule',
-        note: `Form 301-AM via FCC LMS. ${n_required_exhibits} required exhibits. Filing fee: $4,200 major-change CP (§1.1102 FY2024). CP term: 3 years + 6-month extension. Processing: ${isDA_lm ? '9–18' : '3–9'} months. Public notice triggers 30-day petition window for major changes.`
+        relocation_note: `File FCC Form 301-AM via LMS. ${n_required_exhibits} required exhibits including interference analysis, contour map, FAA determination, and ASR number. $4,675 major-change CP filing fee (§1.1104, 90 FR 17013, eff. Apr. 23, 2025). ${isDA_lm ? 'DA station requires horizontal radiation pattern table per §73.150(a) (72 radials at 5°). Processing: 9–18 months.' : 'NDA station. Processing: 3–9 months.'} CP valid for 3 years; 6-month extension available.`,
+        reference: '47 CFR §73.3533; §73.3536; §73.3598; §73.3580; §73.150 (AM DA); §17.7; §1.1301; FCC LMS (lms.fcc.gov); §1.1104 (90 FR 17013, eff. Apr. 23, 2025) fee schedule',
+        note: `Form 301-AM via FCC LMS. ${n_required_exhibits} required exhibits. Filing fee: $4,675 major-change CP (§1.1104, 90 FR 17013, eff. Apr. 23, 2025). CP term: 3 years + 6-month extension. Processing: ${isDA_lm ? '9–18' : '3–9'} months. Public notice triggers 30-day petition window for major changes.`
       };
     })(),
 
@@ -23279,7 +23337,7 @@ async function scoreCandidate(pt, ctx, warnings){
       };
       const COST_ESTIMATE = {
         faa_filing_usd: { low: 0, high: 0 }, // FAA Form 7460-1 is free
-        fcc_asr_fee_usd: { low: 0, high: 0 }, // ASR registration is free
+        fcc_asr_fee_usd: { low: 0, high: 0 }, // Form 854 ASR: no FCC filing fee under the current §1.1102 schedule
         engineering_study_usd: { low: 1500, high: 5000 }, // tower height/lighting study
         faa_light_install_usd: { low: 5000, high: 30000 }, // depends on light type required
         total_estimated_usd: { low: 6500, high: 35000 }
@@ -24096,9 +24154,9 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // STA (Special Temporary Authority) options
       const STA_OPTIONS = [
-        { id: 'INITIAL_STA', label: 'Initial silent STA (§73.1740(a)(4))', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 290, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days' },
-        { id: 'RENEWAL_STA', label: 'STA renewal (each 6-month extension)', form: 'STA renewal request (informal letter acceptable)', fee_usd: 290, duration_weeks: 26, notes: 'FCC will grant up to 12 months total absent extraordinary circumstances' },
-        { id: 'REDUCED_POWER', label: 'Reduced power STA (interim operation during construction)', form: 'FCC Form 2100', fee_usd: 290, duration_weeks: null, notes: 'Allows partial operation during construction; must protect co-channel/adjacent allocations' }
+        { id: 'INITIAL_STA', label: 'Initial silent STA (§73.1740(a)(4))', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 325, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days. STA fee $325 per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)' },
+        { id: 'RENEWAL_STA', label: 'STA renewal (each 6-month extension)', form: 'STA renewal request (informal letter acceptable)', fee_usd: 325, duration_weeks: 26, notes: 'FCC will grant up to 12 months total absent extraordinary circumstances' },
+        { id: 'REDUCED_POWER', label: 'Reduced power STA (interim operation during construction)', form: 'FCC Form 2100', fee_usd: 325, duration_weeks: null, notes: 'Allows partial operation during construction; must protect co-channel/adjacent allocations' }
       ];
 
       // Risk mitigation strategies
@@ -24736,7 +24794,7 @@ async function scoreCandidate(pt, ctx, warnings){
           form: 'FCC Form 301-AM (Major Change)',
           timeline_months_optimistic: 18,
           timeline_months_conservative: 36,
-          filing_fee_usd_approx: 4200,   // Form 301-AM major change CP fee per §1.1102 FY2024 (class upgrade = major change)
+          filing_fee_usd_approx: 4675,   // Form 301-AM major change CP fee per §1.1104 (90 FR 17013, eff. Apr. 23, 2025) (class upgrade = major change)
           engineering_cost_usd_approx_low: 15000,
           engineering_cost_usd_approx_high: 50000,
           note: 'Class D→B upgrade is a major modification. The station must demonstrate it meets Class B minimum power (≥0.25 kW) and the new Class B §73.37 spacing table in all directions. FCC staff review typically takes 12–24 months after filing.'
@@ -25398,7 +25456,7 @@ async function scoreCandidate(pt, ctx, warnings){
         phases,
         critical_path_milestone_ids: criticalPath,
         n_critical_path:           criticalPath.length,
-        filing_fee_major_change_usd: 4200,  // Form 301-AM major change CP fee per §1.1102 FY2024 (relocation = major change)
+        filing_fee_major_change_usd: 4675,  // Form 301-AM major change CP fee per §1.1104 (90 FR 17013, eff. Apr. 23, 2025) (relocation = major change)
         reference: '47 CFR §73.3533; §73.3598; §73.3580; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
         note: `CP timeline for ${fcc_class} class ${isDA_cpt ? 'directional' : 'non-directional'} AM relocation. Optimistic: ${totalOptimisticWeeks} weeks (~${round2(totalOptimisticWeeks / 4.33)} months). Conservative: ${totalConservativeWeeks} weeks (~${round2(totalConservativeWeeks / 4.33)} months).`
       };
@@ -25822,8 +25880,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const easCost = 8000; // IPAWS-compatible EAS unit
 
       // 8. FCC fees and engineering
-      // One-time application fees per §1.1102 FY2024: Form 301-AM major CP $4,200 + Form 302-AM $435
-      const fccFilingFee = 4635;   // $4,200 + $435, flat all classes (§1.1102 FY2024)
+      // One-time application fees per §1.1104 (90 FR 17013, eff. Apr. 23, 2025): Form 301-AM major CP $4,675 + Form 302-AM $755
+      const fccFilingFee = 5430;   // $4,675 + $755, flat all classes (§1.1104 (90 FR 17013, eff. Apr. 23, 2025))
       const engineeringLow  = 25000;
       const engineeringHigh = 75000; // includes NIF study, spacing, DA pattern, proof of performance
 
@@ -25847,7 +25905,7 @@ async function scoreCandidate(pt, ctx, warnings){
         { id: 'transmitter',  category: 'Transmitter equipment',        low: txCostLow,       high: txCostHigh,       note: `${tpo_kw} kW ${isDA_cost ? 'DA-capable' : 'NDA'} AM transmitter; cost assumes new unit.` },
         { id: 'phasor_atu',   category: isDA_cost ? 'Phasor + ATU' : 'Antenna tuning unit (ATU)', low: phasorCostLow, high: phasorCostHigh, note: isDA_cost ? 'DA phasor and ATU for directional antenna.' : 'Non-directional ATU.' },
         { id: 'eas',          category: 'EAS encoder/decoder (IPAWS)', low: easCost,          high: easCost,          note: 'IPAWS-compatible EAS unit per §11.35/§11.56.' },
-        { id: 'fcc_fees',     category: 'FCC filing fees',             low: fccFilingFee,     high: fccFilingFee,     note: 'One-time FCC application fees: Form 301-AM major change CP $4,200 + Form 302-AM license to cover $435 (§1.1102 FY2024, flat all classes).' },
+        { id: 'fcc_fees',     category: 'FCC filing fees',             low: fccFilingFee,     high: fccFilingFee,     note: 'One-time FCC application fees: Form 301-AM major change CP $4,675 + Form 302-AM license to cover $755 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025, flat all classes).' },
         { id: 'engineering',  category: 'Engineering + proof-of-performance', low: engineeringLow, high: engineeringHigh, note: 'Spacing study, NIF study, DA pattern, §73.154 proof, FCC forms.' },
         { id: 'env_legal',    category: 'Environmental + legal + zoning', low: envLegalLow,   high: envLegalHigh,     note: 'NEPA §106, zoning CUP, FCC counsel.' },
         { id: 'contingency',  category: 'Contingency (15–20%)',         low: contingencyLow,  high: contingencyHigh,  note: 'Reserve for scope changes, cost escalation, permit delays.' }
@@ -26696,8 +26754,8 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // FCC application forms
       const FCC_FORMS = [
-        { id: 'FORM_301_AM',  phase: 'FCC_APPLICATION',  form: 'FCC Form 301-AM',         required: true,  fee_usd: 4200, description: 'Application for construction permit — major change of facility. Required for site relocation. Fee per §1.1102 FY2024 schedule (major AM CP: $4,200, flat all classes).' },
-        { id: 'FORM_314_315', phase: 'FCC_APPLICATION',  form: 'FCC Form 314/315 (assignment/transfer, if applicable)', required: false, fee_usd: 1020, description: 'Assignment of license (Form 314) / transfer of control (Form 315). Required if ownership changes at same time as relocation. Fee: $1,020 per §1.1102 FY2024.' },
+        { id: 'FORM_301_AM',  phase: 'FCC_APPLICATION',  form: 'FCC Form 301-AM',         required: true,  fee_usd: 4675, description: 'Application for construction permit — major change of facility. Required for site relocation. Fee per §1.1104 (90 FR 17013, eff. Apr. 23, 2025) schedule (major AM CP: $4,675, flat all classes).' },
+        { id: 'FORM_314_315', phase: 'FCC_APPLICATION',  form: 'FCC Form 314/315 (assignment/transfer, if applicable)', required: false, fee_usd: 1180, description: 'Assignment of license (Form 314) / transfer of control (Form 315). Required if ownership changes at same time as relocation. Fee: $1,180 per station (long form) per §1.1104 (90 FR 17013, eff. Apr. 23, 2025).' },
         { id: 'FORM_301_EXH', phase: 'FCC_APPLICATION',  form: 'Form 301-AM Exhibit A',   required: isDA_rc, description: 'Directional antenna pattern exhibit. Required for DA stations. Includes theoretical radiation pattern and tower coordinates.' },
         { id: 'FORM_301_HRP', phase: 'FCC_APPLICATION',  form: 'Form 301-AM HRP',         required: isDA_rc, description: 'Horizontal radiation pattern table (72 radials, 5° increments). Required for DA CP applications.' },
         { id: 'FORM_335',     phase: 'FCC_APPLICATION',  form: 'FCC Form 335',            required: true,  fee_usd: 0, description: 'AM antenna efficiency certification. Required if standard antenna efficiency not achieved (loading coil, reduced height, non-standard conductor).' }
@@ -26712,7 +26770,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Post-construction / license filings
       const POST_CONSTRUCTION = [
-        { id: 'FORM_302_AM',   phase: 'POST_CONSTRUCTION', form: 'FCC Form 302-AM',       required: true,  fee_usd: 435, description: 'License to cover construction permit. Filed after construction; must include field strength measurements per §73.154. Fee: $435 per §1.1102 FY2024.' },
+        { id: 'FORM_302_AM',   phase: 'POST_CONSTRUCTION', form: 'FCC Form 302-AM',       required: true,  fee_usd: 755, description: 'License to cover construction permit. Filed after construction; must include field strength measurements per §73.154. Fee: $755 per §1.1104 (90 FR 17013, eff. Apr. 23, 2025).' },
         { id: 'DA_PROOF',      phase: 'POST_CONSTRUCTION', form: 'DA Proof of Performance', required: isDA_rc, description: 'DA field strength traversal (72 radials × 8 measurement points each per §73.154). Complete before filing Form 302-AM (due before the 3-year CP expiration; §73.1620(a)(1)).' },
         { id: 'MPE_STUDY',     phase: 'POST_CONSTRUCTION', form: 'MPE Exhibit (Form 302)', required: tpo_kw > 1, description: `RF exposure MPE analysis per OET Bulletin 65. Required per §1.1307(b) for AM ERP > 1 kW. ${tpo_kw >= 5 ? 'REQUIRED (≥ 5 kW — formal exhibit).' : tpo_kw > 1 ? 'REQUIRED (> 1 kW per §1.1307(b)); retain OET-65 on file.' : 'Categorically excluded (≤ 1 kW).'}` },
         { id: 'ANNUAL_EAS',    phase: 'ONGOING',            form: 'EAS Compliance Review', required: true,  description: 'Annual EAS compliance review per §11.61. Document LP sources, RWT/RMT/NAT test logs, and IPAWS connectivity.' }
@@ -26770,7 +26828,7 @@ async function scoreCandidate(pt, ctx, warnings){
           cost_usd_est: 8500,
           suitable: stlDistKm <= 80,
           pros: ['Broadcast standard', 'Low latency', 'Licensed spectrum protection', 'Rainfast'],
-          cons: ['LOS required', 'FCC license ($1,035 fee)', 'Physical path survey needed']
+          cons: ['LOS required', 'FCC license ($105 fee)', 'Physical path survey needed']
         },
         {
           id: 'IP_STL',         label: 'IP/Internet STL (codec pair)',
@@ -26844,7 +26902,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const part74_licensing = {
         applicable:       recommendedStl.fcc_license_required,
         form:             'FCC Form 601 (UHF STL) or FCC Form 601 (microwave)',
-        fee_usd:          1035,
+        fee_usd:          105,   // §1.1102 site-based schedule: Part 74 aural STL new license/major mod $105
         coordination:     'Frequency coordination required before filing (TOWERCO or independent)',
         processing_days:  45,
         note:             'Part 74 STL license is separate from AM station license; filed under same call sign'
@@ -26853,7 +26911,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Budget estimate
       const equipCost_usd   = recommendedStl.cost_usd_est;
       const installCost_usd = round2(equipCost_usd * 0.30);
-      const licenseFee_usd  = recommendedStl.fcc_license_required ? 1035 : 0;
+      const licenseFee_usd  = recommendedStl.fcc_license_required ? 105 : 0;
       const totalCost_usd   = round2(equipCost_usd + installCost_usd + licenseFee_usd);
 
       return {
@@ -27791,7 +27849,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const RENEWAL_CYCLE = {
         term_years: 8,
         form: 'FCC Form 303-S',
-        filing_fee_usd: 610,  // FCC Schedule of Fees FY 2024 — Form 303-S renewal
+        filing_fee_usd: 365,  // §1.1104 (90 FR 17013, eff. Apr. 23, 2025) — Form 303-S renewal
         filing_window_days_before_expiry: 4 * 30, // 4 months before expiry
         publication_required: true,
         publication_cfr: '§73.3580',
@@ -27832,7 +27890,7 @@ async function scoreCandidate(pt, ctx, warnings){
         frequency: 'Biennial (odd-numbered years, by December 1)',
         cfr: '§73.3615',
         covers: ['Licensee identity and ownership structure', 'Attributable interests', 'Local marketing agreements', 'Time brokerage agreements'],
-        filing_fee_usd: 0
+        filing_fee_usd: 95   // Biennial Ownership Report (Form 323): $95/station per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)
       };
 
       // Key compliance calendar
@@ -27856,7 +27914,7 @@ async function scoreCandidate(pt, ctx, warnings){
         compliance_calendar: complianceCalendar,
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
-        note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $${RENEWAL_CYCLE.filing_fee_usd} (FCC Schedule of Fees FY 2024). OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+        note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $${RENEWAL_CYCLE.filing_fee_usd} (§1.1104, 90 FR 17013, eff. Apr. 23, 2025). OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
       };
     })(),
 
@@ -27885,8 +27943,8 @@ async function scoreCandidate(pt, ctx, warnings){
       // Tower height estimate: class-aware design height per §73.150.
       // 5/8λ for Class A/B (FCC optimum); 3/8λ for Class C/D (standard planning height).
       //
-      // Form 301-AM filing fee: $4,200 major change CP (site relocation per §73.3533) per §1.1102 FY2024.
-      // Form 302-AM (license to cover) fee: $435 per §1.1102 FY2024.
+      // Form 301-AM filing fee: $4,675 major change CP (site relocation per §73.3533) per §1.1104 (90 FR 17013, eff. Apr. 23, 2025).
+      // Form 302-AM (license to cover) fee: $755 per §1.1104 (90 FR 17013, eff. Apr. 23, 2025).
 
       const isDA = /^DA/i.test(pattern_mode);
 
@@ -27929,8 +27987,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const prep_cost_low  = base_cost_low  + Math.round(da_increment * 0.8) + Math.round(ea_increment * 0.75) + Math.round(nif_increment * 0.8);
       const prep_cost_high = base_cost_high + da_increment + ea_increment + nif_increment + 2000;
 
-      // Filing fee: Form 301-AM major change CP (site relocation under §73.3533) per §1.1102 FY2024.
-      const fcc_filing_fee_usd = 4200;
+      // Filing fee: Form 301-AM major change CP (site relocation under §73.3533) per §1.1104 (90 FR 17013, eff. Apr. 23, 2025).
+      const fcc_filing_fee_usd = 4675;
 
       return {
         fcc_class, frequency_khz, tpo_kw,
@@ -28032,7 +28090,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const atu_high = isDA ? 65000 : 20000;
 
       // Engineering + FCC
-      const eng_low  = 7700;  // $3,500 eng prep + $4,200 Form 301-AM major change CP (§1.1102 FY2024) (base NDA)
+      const eng_low  = 8175;  // $3,500 eng prep + $4,675 Form 301-AM major change CP (§1.1104, 90 FR 17013, eff. Apr. 23, 2025) (base NDA)
       const eng_high = isDA ? 20000 : 10000;
 
       // Utility + road + site access
@@ -29312,11 +29370,11 @@ async function scoreCandidate(pt, ctx, warnings){
       ];
 
       // ---- FCC filing fees (Form 302-AM) ----
-      // §1.1102 FY2024: Form 302-AM (license to cover) flat fee $435, all classes.
-      // STA (Form 700): $75 filing fee
+      // §1.1104 (90 FR 17013, eff. Apr. 23, 2025): Form 302-AM (license to cover) flat fee $755, all classes.
+      // STA: $325 filing fee (§1.1104 (90 FR 17013, eff. Apr. 23, 2025))
       const fees = {
-        ltc_form_302_am_usd: 435,
-        sta_form_700_usd:     75,
+        ltc_form_302_am_usd: 755,
+        sta_form_700_usd:    325,
         total_ltc_soft_cost_low_usd:  3500,   // Engineering report + filing preparation
         total_ltc_soft_cost_high_usd: isDA_ltc ? 12000 : 6000  // DA proof-of-performance adds cost
       };
@@ -29338,7 +29396,7 @@ async function scoreCandidate(pt, ctx, warnings){
           ? 'DA proof of performance must be completed and filed with Form 302-AM — this typically adds 30–60 days to the LTC timeline; plan proof measurements before tower construction wraps.'
           : 'File Form 302-AM within 10 days of construction completion; do not operate on new site until license is granted.',
         reference: '47 CFR §73.3598 (CP term); §73.3536 (LTC); §73.1635 (STA); §73.154 (DA proof); §73.1740 (silent STA); FCC Form 302-AM; FCC Form 700',
-        note: `CP term: ${cp_term_years} yr from grant. LTC (Form 302-AM): file within ${ltc_days_after} days of completion. STA (Form 700): $75; file before non-authorized operation. ${isDA_ltc ? 'DA proof required before LTC.' : ''} LTC filing fee: $${fees.ltc_form_302_am_usd}; est. soft cost $${(fees.total_ltc_soft_cost_low_usd/1000).toFixed(1)}K–$${(fees.total_ltc_soft_cost_high_usd/1000).toFixed(1)}K.`
+        note: `CP term: ${cp_term_years} yr from grant. LTC (Form 302-AM): file within ${ltc_days_after} days of completion. STA: $325 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025); file before non-authorized operation. ${isDA_ltc ? 'DA proof required before LTC.' : ''} LTC filing fee: $${fees.ltc_form_302_am_usd}; est. soft cost $${(fees.total_ltc_soft_cost_low_usd/1000).toFixed(1)}K–$${(fees.total_ltc_soft_cost_high_usd/1000).toFixed(1)}K.`
       };
     })(),
 
@@ -29673,7 +29731,7 @@ async function scoreCandidate(pt, ctx, warnings){
         fm_band: '88.1–107.9 MHz',
         coverage_note: 'FM translator can extend effective coverage into areas with poor AM reception (buildings, urban canyons)',
         application_form: 'FCC Form 349',
-        filing_fee_usd: 655,
+        filing_fee_usd: 830,  // Form 349 new/major change CP per §1.1104 (90 FR 17013, eff. Apr. 23, 2025) (if no auction)
         application_window: 'FCC AM Translator Window (periodic; last 2021)',
         band_stacking: 'FM translator must protect all co-channel and adjacent FM stations per §74.1204'
       };
@@ -30577,7 +30635,7 @@ async function scoreCandidate(pt, ctx, warnings){
       );
 
       // New-site registration one-time costs
-      const asr_registration_usd = asr_required ? 1200 : 0;   // Form 854 filing + engineer
+      const asr_registration_usd = asr_required ? 1200 : 0;   // engineer/consultant cost to prepare Form 854 (no FCC filing fee under the current §1.1102 schedule)
       const lms_cp_filing_usd    = 2500;   // attorney/engineer fee for CP
       const opif_setup_usd       = 200;    // initial OPIF configuration
       const one_time_total_usd   = round2(asr_registration_usd + lms_cp_filing_usd + opif_setup_usd);
@@ -30689,7 +30747,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //           within 30 days of closing (FCC Form 316).
       //
       // COST ESTIMATES
-      //  Filing fee: Form 314/315 FCC fee: $1,020 (FY2024 AM schedule fee)
+      //  Filing fee: Form 314/315 FCC fee: $1,180 per station, long form (§1.1104 (90 FR 17013, eff. Apr. 23, 2025)); short form (Form 316): $500/station
       //  Legal (simple assignment): $5,000–$15,000 (buyer + seller counsel)
       //  Legal (contested/complex): $25,000–$75,000+
       //  Engineering technical exhibits: $3,000–$8,000
@@ -30697,7 +30755,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const is_da = /^DA/i.test(pattern_mode);
 
-      const FCC_FORM_FEE_USD    = 1020;     // FY2024 FCC Form 314/315 filing fee
+      const FCC_FORM_FEE_USD    = 1180;     // Form 314/315 (long form) filing fee per station, §1.1104 (90 FR 17013, eff. Apr. 23, 2025)
       const LEGAL_LOW_USD       = 5000;     // simple streamlined transaction
       const LEGAL_HIGH_USD      = 15000;
       const ENG_EXHIBIT_LOW_USD = 3000;
@@ -31335,8 +31393,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const ENG_HIGH = is_da ? 20000 : 12000;
       const LEGAL_LOW  = mod_type === 'MAJOR' ? 5000 : 2000;
       const LEGAL_HIGH = mod_type === 'MAJOR' ? 15000 : 6000;
-      // §1.1102 FY2024: Form 301-AM minor modification $1,015; major change CP $4,200
-      const FCC_FEE    = mod_type === 'MINOR' ? 1015 : 4200;
+      // §1.1104 (90 FR 17013, eff. Apr. 23, 2025): Form 301-AM minor modification $1,910; major change CP $4,675
+      const FCC_FEE    = mod_type === 'MINOR' ? 1910 : 4675;
       const total_low  = round2(ENG_LOW  + LEGAL_LOW  + FCC_FEE);
       const total_high = round2(ENG_HIGH + LEGAL_HIGH + FCC_FEE);
 
@@ -31672,7 +31730,7 @@ async function scoreCandidate(pt, ctx, warnings){
       //   DA proof of performance (8 rad):  $8,000–$20,000
       //   DA proof (complex, 16+ radials):  $15,000–$40,000
       //   Monitor point establishment:       $1,000–$2,500 per point
-      //   FCC Form 302-AM license-to-cover filing fee: $435 (§1.1102 FY2024)
+      //   FCC Form 302-AM license-to-cover filing fee: $755 (§1.1104 (90 FR 17013, eff. Apr. 23, 2025))
 
       const is_da  = /^DA/i.test(pattern_mode);
       const is_da2 = /^DA-2/i.test(pattern_mode);
@@ -31708,7 +31766,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const PROOF_HIGH = is_da2 ? 20000 : is_da ? 12000 : 0;
       const MONITOR_LOW  = n_monitor_points * 1000;
       const MONITOR_HIGH = n_monitor_points * 2500;
-      const FCC_FEE = 435;   // Form 302-AM license to cover (§1.1102 FY2024)
+      const FCC_FEE = 755;   // Form 302-AM license to cover (§1.1104 (90 FR 17013, eff. Apr. 23, 2025))
 
       const total_low  = round2(BASE_COMM_LOW  + PROOF_LOW  + MONITOR_LOW  + FCC_FEE);
       const total_high = round2(BASE_COMM_HIGH + PROOF_HIGH + MONITOR_HIGH + FCC_FEE);
@@ -32602,27 +32660,23 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
 
     am_fcc_application_fee_budget_guide: (() => {
-      // FCC application fees per §1.1102 FY2024 fee schedule.
-      // AM relocation requires: Form 301-AM major change CP ($4,200) + potentially STA.
-      // Fees last updated per FCC 20-75 (Annual Adjustment proceeding).
+      // FCC application fees per §1.1104 (90 FR 17013, eff. Apr. 23, 2025) fee schedule.
+      // AM relocation requires: Form 301-AM major change CP ($4,675) + potentially STA.
+      // Annual regulatory fees per §1.1153 (89 FR 78509) are population-tiered per class.
       const isDA      = /^DA/i.test(pattern_mode ?? '');
       const fcc_cl    = fcc_class ?? 'D';
       const tpo       = tpo_kw ?? 1;
 
-      // Annual regulatory fee (§1.1102 FY2024 schedule) — class-dependent recurring fee paid annually.
-      // Distinct from the Form 301-AM major change CP application fee ($4,200 flat per §1.1102 FY2024).
-      // Field is named form_301_fee_usd for historical reasons; value is the §1.1102 annual regulatory fee.
-      // Class A: $7,265 | Class B: $5,020 | Class C/D: $2,195
-      const FORM_301_FEE =
-        fcc_cl === 'A' ? 7265 :
-        fcc_cl === 'B' ? 5020 : 2195;
+      // Annual regulatory fee (§1.1153 (89 FR 78509)) — population-tiered recurring fee paid annually.
+      // Distinct from the Form 301-AM major change CP application fee ($4,675 flat per §1.1104 (90 FR 17013, eff. Apr. 23, 2025)).
+      const reg_fee_bud = amAnnualRegFeeUsd(fcc_cl, estimated_daytime_population_served);
 
-      // STA (Special Temporary Authority, Form 700) — needed if construction begins before CP grant
-      // §1.1102 FY2024: $75 (FCC eliminated the former higher broadcast STA fees)
-      const STA_FEE = 75;
+      // STA (Special Temporary Authority) — needed if construction begins before CP grant
+      // §1.1104 (90 FR 17013, eff. Apr. 23, 2025): $325
+      const STA_FEE = 325;
 
-      // License to cover (Form 302-AM) after construction — §1.1102 FY2024: $435
-      const FORM_302_FEE = 435;
+      // License to cover (Form 302-AM) after construction — §1.1104 (90 FR 17013, eff. Apr. 23, 2025): $755
+      const FORM_302_FEE = 755;
 
       // Amendment fee (if CP must be amended mid-construction)
       const AMENDMENT_FEE = 585;
@@ -32631,41 +32685,50 @@ async function scoreCandidate(pt, ctx, warnings){
       const CONSULTING_LOW  = round2(isDA ? 8000 : 4500);
       const CONSULTING_HIGH = round2(isDA ? 18000 : 10000);
 
-      // Fee items list.
-      // FORM_301_FEE here is the §1.1102 annual regulatory fee (class-dependent);
-      // the Form 301-AM major-change CP application fee is $4,200 flat (§1.1102 FY2024).
+      // Fee items list. The annual regulatory fee is population-tiered (§1.1153 (89 FR 78509));
+      // the Form 301-AM major-change CP application fee is $4,675 flat (§1.1104 (90 FR 17013, eff. Apr. 23, 2025)).
       const fee_items = [
-        { item: `FCC Annual Regulatory Fee (§1.1102, Class ${fcc_cl})`, fee_usd: FORM_301_FEE, required: true },
-        { item: 'Form 301-AM Major Change CP (application processing)', fee_usd: 4200, required: true },
-        { item: 'Form 302-AM License to Cover',   fee_usd: FORM_302_FEE, required: true },
-        { item: 'Special Temporary Authority (STA, if needed)', fee_usd: STA_FEE, required: false },
-        { item: 'Amendment fee (if CP amended)',  fee_usd: AMENDMENT_FEE, required: false },
+        { item: `FCC Annual Regulatory Fee (§1.1153, 89 FR 78509, Class ${fcc_cl}, tier: ${reg_fee_bud.tier_label})`, fee_usd: reg_fee_bud.fee_usd, fee_low_usd: reg_fee_bud.fee_low_usd, fee_high_usd: reg_fee_bud.fee_high_usd, required: true },
+        { item: 'Form 301-AM Major Change CP (application processing)', fee_usd: 4675, fee_low_usd: 4675, fee_high_usd: 4675, required: true },
+        { item: 'Form 302-AM License to Cover',   fee_usd: FORM_302_FEE, fee_low_usd: FORM_302_FEE, fee_high_usd: FORM_302_FEE, required: true },
+        { item: 'Special Temporary Authority (STA, if needed)', fee_usd: STA_FEE, fee_low_usd: STA_FEE, fee_high_usd: STA_FEE, required: false },
+        { item: 'Amendment fee (if CP amended)',  fee_usd: AMENDMENT_FEE, fee_low_usd: AMENDMENT_FEE, fee_high_usd: AMENDMENT_FEE, required: false },
       ];
 
       // Total FCC fees for typical relocation = sum of required fee items
-      // (annual reg fee + $4,200 Form 301-AM CP + $435 Form 302-AM)
-      const total_fcc_fees = round2(fee_items.filter(f => f.required).reduce((s, f) => s + f.fee_usd, 0));
-      const total_with_consulting_low  = round2(total_fcc_fees + CONSULTING_LOW);
-      const total_with_consulting_high = round2(total_fcc_fees + CONSULTING_HIGH);
+      // (annual reg fee tier + $4,675 Form 301-AM CP + $755 Form 302-AM)
+      const total_fcc_fees_low  = round2(fee_items.filter(f => f.required).reduce((s, f) => s + f.fee_low_usd, 0));
+      const total_fcc_fees_high = round2(fee_items.filter(f => f.required).reduce((s, f) => s + f.fee_high_usd, 0));
+      const total_fcc_fees = reg_fee_bud.fee_usd != null ? total_fcc_fees_low : null;
+      const total_with_consulting_low  = round2(total_fcc_fees_low  + CONSULTING_LOW);
+      const total_with_consulting_high = round2(total_fcc_fees_high + CONSULTING_HIGH);
 
       return {
         fcc_class:                fcc_cl,
-        form_301_fee_usd:         FORM_301_FEE,
+        annual_reg_fee_usd:       reg_fee_bud.fee_usd,
+        annual_reg_fee_low_usd:   reg_fee_bud.fee_low_usd,
+        annual_reg_fee_high_usd:  reg_fee_bud.fee_high_usd,
+        annual_reg_fee_tier:      reg_fee_bud.tier_label,
+        annual_reg_fee_population_basis: reg_fee_bud.population_basis,
+        form_301_fee_usd:         4675,   // Form 301-AM major change CP application fee (§1.1104 (90 FR 17013, eff. Apr. 23, 2025))
         form_302_fee_usd:         FORM_302_FEE,
         sta_fee_usd:              STA_FEE,
         amendment_fee_usd:        AMENDMENT_FEE,
         total_fcc_fees_usd:       total_fcc_fees,
+        total_fcc_fees_low_usd:   total_fcc_fees_low,
+        total_fcc_fees_high_usd:  total_fcc_fees_high,
         n_fee_items:              fee_items.length,
         fee_items,
         cost_estimates: {
-          fcc_fees_usd:            total_fcc_fees,
+          fcc_fees_low_usd:        total_fcc_fees_low,
+          fcc_fees_high_usd:       total_fcc_fees_high,
           consulting_low_usd:      CONSULTING_LOW,
           consulting_high_usd:     CONSULTING_HIGH,
           total_with_consulting_low_usd:  total_with_consulting_low,
           total_with_consulting_high_usd: total_with_consulting_high,
         },
-        reference: '47 CFR §1.1102 FY2024 (annual regulatory fees: Class A $7,265; Class B $5,020; Class C/D $2,195; Form 301-AM major change CP: $4,200 flat; Form 302-AM: $435 flat); FCC Form 301-AM; FCC Form 302-AM',
-        note: `FCC Class ${fcc_cl} annual regulatory fee (§1.1102): $${FORM_301_FEE.toLocaleString()}/yr. Form 301-AM major change CP application fee: $4,200 (§1.1102 FY2024, flat all classes). Form 302-AM $${FORM_302_FEE}. STA $${STA_FEE}. Annual + one-time FCC outlay: $${(FORM_301_FEE + 4200 + FORM_302_FEE).toLocaleString()} (year 1). With consulting: $${total_with_consulting_low.toLocaleString()}–$${total_with_consulting_high.toLocaleString()}${isDA ? ' (DA premium)' : ''}.`
+        reference: '47 CFR §1.1153 (89 FR 78509) (annual regulatory fees — population-tiered per class); 47 CFR §1.1104 (90 FR 17013, eff. Apr. 23, 2025) (Form 301-AM major change CP: $4,675 flat; Form 302-AM: $755 flat; STA: $325); FCC Form 301-AM; FCC Form 302-AM',
+        note: `FCC Class ${fcc_cl} annual regulatory fee (§1.1153, 89 FR 78509): ${reg_fee_bud.fee_usd != null ? `$${reg_fee_bud.fee_usd.toLocaleString()}` : `$${reg_fee_bud.fee_low_usd.toLocaleString()}–$${reg_fee_bud.fee_high_usd.toLocaleString()}`}/yr (tier: ${reg_fee_bud.tier_label}). Form 301-AM major change CP application fee: $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025, flat all classes). Form 302-AM $${FORM_302_FEE}. STA $${STA_FEE}. Annual + one-time FCC outlay: ${total_fcc_fees_low === total_fcc_fees_high ? `$${total_fcc_fees_low.toLocaleString()}` : `$${total_fcc_fees_low.toLocaleString()}–$${total_fcc_fees_high.toLocaleString()}`} (year 1). With consulting: $${total_with_consulting_low.toLocaleString()}–$${total_with_consulting_high.toLocaleString()}${isDA ? ' (DA premium)' : ''}.`
       };
     })(),
 
