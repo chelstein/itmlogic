@@ -10783,8 +10783,8 @@ test('am_daytime_interference_and_protection_guide service radius is physically 
 test('am_daytime_interference_and_protection_guide protection ratios are valid', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_daytime_interference_and_protection_guide;
-  // Clear-channel daytime D/U: 6 dB
-  assert.strictEqual(g.co_channel_D_U_daytime_db, 6, 'clear-channel D/U protection should be 6 dB');
+  // Co-channel daytime D/U per §73.182: 26 dB (20:1 field ratio, all classes)
+  assert.strictEqual(g.co_channel_D_U_daytime_db, 26, 'co-channel D/U protection is 26 dB per §73.182');
   // 1st adjacent: 6 dB; 2nd adjacent: 0 dB
   assert.strictEqual(g.first_adjacent_protection_db, 6, '1st adjacent protection should be 6 dB');
   assert.strictEqual(g.second_adjacent_protection_db, 0, '2nd adjacent protection should be 0 dB');
@@ -13298,7 +13298,7 @@ test('KAZM 5 kW TPO yields 15 kW generator', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_utility_power_and_backup_systems_guide;
   assert.strictEqual(g.gen_kw,              9,    'KAZM gen_kw should be 9 (1.4× 5 kW draw + 25% headroom)');
-  assert.strictEqual(g.generator_low_usd,   6000, 'KAZM generator_low_usd should be 6000');
+  assert.strictEqual(g.generator_low_usd,   3600, 'KAZM generator_low_usd should be 3600 (9 kW × $400/kW)');
   assert.strictEqual(g.power_ext_mi,        0.1,  'KAZM power_ext_mi should be 0.1 (minimum)');
 });
 
@@ -13326,7 +13326,7 @@ test('am_utility_power_and_backup_systems_guide comparison table columns present
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.pwr_total_low_usd,     21520, 'rank-1 pwr_total_low_usd should be 21520');
   assert.strictEqual(r0.pwr_gen_kw,             9,    'rank-1 pwr_gen_kw should be 9');
-  assert.strictEqual(r0.pwr_generator_low_usd,  6000, 'rank-1 pwr_generator_low_usd should be 6000');
+  assert.strictEqual(r0.pwr_generator_low_usd,  3600, 'rank-1 pwr_generator_low_usd should be 3600 (9 kW × $400/kW)');
 });
 
 test('am_transmitter_building_and_studio_link_guide present on KAZM candidate', async () => {
@@ -13954,15 +13954,15 @@ test('KAZM 5 kW electricity consumption', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
   assert.strictEqual(g.electricity_draw_kw, 7,      'KAZM 5 kW × 1.4 = 7 kW grid draw (≈72% efficiency)');
-  assert.strictEqual(g.kwh_per_year,        131400, 'KAZM 15 kW × 8760 hr = 131400 kWh/yr');
-  assert.strictEqual(g.electricity_low_usd, 10512,  'KAZM electricity low should be 10512');
+  assert.strictEqual(g.kwh_per_year,        61320,  'KAZM 7 kW × 8760 hr = 61320 kWh/yr');
+  assert.strictEqual(g.electricity_low_usd, 4905.6, 'KAZM electricity low: 61320 kWh × $0.08');
 });
 
 test('KAZM annual operating cost totals', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
-  assert.strictEqual(g.total_low_usd,  23797, 'KAZM total_low_usd should be 23797');
-  assert.strictEqual(g.total_high_usd, 78007, 'KAZM total_high_usd should be 78007');
+  assert.strictEqual(g.total_low_usd,  18943.6, 'KAZM total_low_usd (7 kW draw at 72% efficiency)');
+  assert.strictEqual(g.total_high_usd, 64771.6, 'KAZM total_high_usd (7 kW draw at 72% efficiency)');
 });
 
 test('KAZM annual ops reference and note fields', async () => {
@@ -13980,9 +13980,9 @@ test('am_annual_operating_cost_breakdown_guide comparison table columns present'
     assert.ok('aoc_kwh_per_year'        in row, 'aoc_kwh_per_year missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.aoc_total_low_usd,       23797,  'rank-1 aoc_total_low_usd should be 23797');
-  assert.strictEqual(r0.aoc_electricity_low_usd,  10512,  'rank-1 aoc_electricity_low_usd should be 10512');
-  assert.strictEqual(r0.aoc_kwh_per_year,         131400, 'rank-1 aoc_kwh_per_year should be 131400');
+  assert.strictEqual(r0.aoc_total_low_usd,       18943.6, 'rank-1 aoc_total_low_usd (7 kW grid draw)');
+  assert.strictEqual(r0.aoc_electricity_low_usd,  4905.6,  'rank-1 aoc_electricity_low_usd (61320 kWh × $0.08)');
+  assert.strictEqual(r0.aoc_kwh_per_year,         61320,   'rank-1 aoc_kwh_per_year (7 kW × 8760 hr)');
 });
 
 test('am_terrain_and_propagation_assessment_guide present on KAZM candidate', async () => {
