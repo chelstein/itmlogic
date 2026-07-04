@@ -49,6 +49,7 @@
 import { studyContourPair, classifyFmOffsetKhz } from './_du_pair_study.js';
 import { fccDistanceKm }       from '../curves/fcc/index.mjs';
 import { buildContourPolygon, polygonOverlap } from '../geometry/polygonOverlap.js';
+import { FM_PROTECTED_CONTOURS_73_215 } from './regulatoryConstants.js';
 
 // §73.215 reuses the §74.1204(c) D/U gates for the restricted offsets.
 export const SECTION_73_215_DU_GATES = Object.freeze({
@@ -63,16 +64,18 @@ export const SECTION_73_215_DU_GATES = Object.freeze({
 // "For all Class B and B1 stations on Channels 221 through 300 inclusive,
 //  the F(50,50) field strengths along the protected contours are 0.5 mV/m
 //  (54 dBµ) and 0.7 mV/m (57 dBµ), respectively."  All other classes:
-//  1.0 mV/m (60 dBµ).
+//  1.0 mV/m (60 dBµ).  Values come from the shared regulatory-constants
+//  catalog — never re-declare them here.
+const _PC = FM_PROTECTED_CONTOURS_73_215;
 export const FM_PROTECTED_FIELD_DBU_BY_CLASS = Object.freeze({
-  A:    60,
-  B:    54,
-  B1:   57,
-  C0:   60,
-  C1:   60,
-  C2:   60,
-  C3:   60,
-  C:    60,
+  A:    _PC.all_other_classes_dbu,
+  B:    _PC.B_dbu,
+  B1:   _PC.B1_dbu,
+  C0:   _PC.all_other_classes_dbu,
+  C1:   _PC.all_other_classes_dbu,
+  C2:   _PC.all_other_classes_dbu,
+  C3:   _PC.all_other_classes_dbu,
+  C:    _PC.all_other_classes_dbu,
   // LPFM and translators carry their own protection rules but appear
   // in nearby-stations lists; default to 60 dBu so a §73.215 study
   // accidentally including one doesn't misreport.

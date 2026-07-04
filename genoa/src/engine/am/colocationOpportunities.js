@@ -33,6 +33,7 @@ import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, buildRegulato
 const { buildProtectionAdvisory, buildMinimumSpacingReference, buildRecommendedActions } = SO;
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { m3LoadStatus } from './m3.js';
+import { AM_POWER_LIMITS_73_21 } from '../regulatory/regulatoryConstants.js';
 import { complianceDistance_m, nearFieldBoundary_m } from '../regulatory/oet65.js';
 import {
   loadManualInfrastructureSites,
@@ -92,7 +93,7 @@ export async function runColocationOpportunities(body = {}){
   }
 
   // ---- 1c. FCC class power limit advisory (mirrors siteOptimizer §73.21 check) ----
-  const FCC_CLASS_POWER_KW = { A:{min:10,max:50}, B:{min:0.25,max:50}, C:{min:0.25,max:1}, D:{min:0.25,max:50} }; // §73.21; D day 0.25–50 kW per §73.21(b)(2); night < 0.25 kW where authorized
+  const FCC_CLASS_POWER_KW = AM_POWER_LIMITS_73_21.day_kw; // §73.21 daytime limits from the shared regulatory-constants catalog
   const classLimits = FCC_CLASS_POWER_KW[fcc_class];
   if (classLimits){
     if (tpo_kw > classLimits.max){
