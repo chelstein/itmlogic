@@ -13981,7 +13981,7 @@ test('am_annual_operating_cost_breakdown_guide comparison table columns present'
     assert.ok('aoc_kwh_per_year'        in row, 'aoc_kwh_per_year missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.aoc_total_low_usd,       18943.6, 'rank-1 aoc_total_low_usd (7 kW grid draw)');
+  assert.strictEqual(r0.aoc_total_low_usd,       18928.6, 'rank-1 aoc_total_low_usd (7 kW grid draw; §1.1153 tier fee $2,180)');
   assert.strictEqual(r0.aoc_electricity_low_usd,  4905.6,  'rank-1 aoc_electricity_low_usd (61320 kWh × $0.08)');
   assert.strictEqual(r0.aoc_kwh_per_year,         61320,   'rank-1 aoc_kwh_per_year (7 kW × 8760 hr)');
 });
