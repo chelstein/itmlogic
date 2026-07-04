@@ -32,6 +32,7 @@
 import { fccAmDistanceKm, fccAmFieldMvmAtDistance } from '../curves/fcc/index.mjs';
 import { detectInternationalBorder } from '../regulatory/internationalBorderDetect.js';
 import { lookupM3Conductivity, lookupM3ZoneFallback, m3LoadStatus } from './m3.js';
+import { amAnnualRegFeeUsd, ANNUAL_REG_FEES_1153 } from '../regulatory/regulatoryConstants.js';
 
 // ---------- thresholds & weights ----------
 
@@ -98,48 +99,14 @@ const KNOWN_GOALS = Object.freeze([
 // and the vegetation management guide so all three are always in sync.
 // LOW=100, MODERATE=75, ELEVATED=50, HIGH=25, VERY_HIGH=0.
 const WF_SCORE = Object.freeze({ VERY_HIGH: 0, HIGH: 25, ELEVATED: 50, MODERATE: 75, LOW: 100 });
-// ─── FCC AM annual regulatory fee (47 CFR §1.1153, 89 FR 78509, Sept. 25, 2024) ───
-// The §1.1153 schedule is POPULATION-TIERED per class — there is no flat per-class AM fee.
-// Nine tiers by population served: ≤10,000; 10,001–25,000; 25,001–75,000; 75,001–150,000;
-// 150,001–500,000; 500,001–1,200,000; 1,200,001–3,000,000; 3,000,001–6,000,000; >6,000,000.
-const AM_ANNUAL_REG_FEE_TIER_UPPER_BOUNDS = [10000, 25000, 75000, 150000, 500000, 1200000, 3000000, 6000000];
-const AM_ANNUAL_REG_FEE_TIER_LABELS = [
-  '≤10,000', '10,001–25,000', '25,001–75,000', '75,001–150,000', '150,001–500,000',
-  '500,001–1,200,000', '1,200,001–3,000,000', '3,000,001–6,000,000', '>6,000,000'
-];
-const AM_ANNUAL_REG_FEE_TIERS_USD = {   // §1.1153 (89 FR 78509)
-  A: [560, 935, 1405, 2105, 3160, 4730, 7105, 10650, 15980],
-  B: [405, 675, 1015, 1520, 2280, 3415, 5130,  7690, 11535],
-  C: [350, 585,  880, 1315, 1975, 2960, 4445,  6665, 10000],
-  D: [385, 645,  970, 1450, 2180, 3265, 4900,  7345, 11025],
-};
-
-// Returns the §1.1153 AM annual regulatory fee for a station class + population served.
-// With a finite populationServed: { fee_usd, fee_low_usd, fee_high_usd (== fee_usd), tier_label, population_basis }.
-// With unknown population: { fee_usd: null, fee_low_usd (min tier), fee_high_usd (max tier),
-//   tier_label: 'population-dependent (§1.1153 tiers)', population_basis: 'not determined' }.
-function amAnnualRegFeeUsd(fccClass, populationServed){
-  const cls   = /^[A-D]$/i.test(String(fccClass ?? '')) ? String(fccClass).toUpperCase() : 'D';
-  const tiers = AM_ANNUAL_REG_FEE_TIERS_USD[cls];
-  if (Number.isFinite(populationServed) && populationServed >= 0){
-    let idx = AM_ANNUAL_REG_FEE_TIER_UPPER_BOUNDS.findIndex(b => populationServed <= b);
-    if (idx === -1) idx = tiers.length - 1;
-    return {
-      fee_usd:      tiers[idx],
-      fee_low_usd:  tiers[idx],
-      fee_high_usd: tiers[idx],
-      tier_label:   AM_ANNUAL_REG_FEE_TIER_LABELS[idx],
-      population_basis: Math.round(populationServed)
-    };
-  }
-  return {
-    fee_usd:      null,
-    fee_low_usd:  tiers[0],
-    fee_high_usd: tiers[tiers.length - 1],
-    tier_label:   'population-dependent (§1.1153 tiers)',
-    population_basis: 'not determined'
-  };
-}
+// ─── FCC AM annual regulatory fee (47 CFR §1.1153, 89 FR 78509) ───
+// Single source of truth: src/engine/regulatory/regulatoryConstants.js
+// (imported above).  The §1.1153 schedule is POPULATION-TIERED per class —
+// there is no flat per-class AM fee.  amAnnualRegFeeUsd(class, population)
+// returns a tier-selected fee when population served is known and an
+// honest min/max tier range when it is not.  Do NOT re-declare fee
+// values in this file; extend the catalog module instead.
+const AM_ANNUAL_REG_FEE_TIERS_USD = ANNUAL_REG_FEES_1153.am_tiers_usd;
 
 function wildfireRiskLevel(lat, lon){
   const isWesternUS = lon < -103 && lat > 30 && lat < 49;
