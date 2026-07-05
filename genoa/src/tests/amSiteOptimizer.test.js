@@ -16606,12 +16606,12 @@ test('#94 candidate_comparison_table has cp_* columns', async () => {
 
 // ---- Feature #95: am_skywave_nighttime_guide ----
 
-test('#95 KAZM 780 kHz (clear, Class D): night limit 1 kW, PSA eligible', async () => {
+test('#95 KAZM 780 kHz (clear, Class D): night limit 0.25 kW, PSA eligible', async () => {
   const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
   const sw = out.candidates[0].am_skywave_nighttime_guide;
   assert.ok(sw != null, 'am_skywave_nighttime_guide must be present');
   assert.strictEqual(sw.is_clear_channel, true, '780 kHz must be clear channel');
-  assert.strictEqual(sw.night_power_limit_kw, 1, 'Class D clear channel night limit must be 1 kW');
+  assert.strictEqual(sw.night_power_limit_kw, 0.25, 'Class D clear channel night limit is < 0.25 kW per §73.21(b)(2)');
   assert.strictEqual(sw.psa_eligible, true, 'Class D clear channel must be PSA eligible');
 });
 
@@ -16625,7 +16625,7 @@ test('#95 regional channel: night limit 5 kW, no PSA', async () => {
   const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1500, fcc_class: 'B', candidate_limit: 1 });
   const sw = out.candidates[0].am_skywave_nighttime_guide;
   assert.strictEqual(sw.is_regional_channel, true, '1500 kHz must be regional');
-  assert.strictEqual(sw.night_power_limit_kw, 5, 'Class B regional night limit must be 5 kW');
+  assert.strictEqual(sw.night_power_limit_kw, 5, 'Class B regional night limit = min(tpo 5 kW, §73.21(b)(1) 50 kW cap) = 5 kW');
   assert.strictEqual(sw.psa_eligible, false, 'regional channel must not be PSA eligible');
 });
 

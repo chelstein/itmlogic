@@ -14,13 +14,15 @@
 //   (the repository's documented screening-grade skywave path), so the
 //   two paths agree by construction:
 //
-//     E(µV/m) = 1000 · E0 · d^(−α) · 10^((K_φ + K_f)/20) · s(p)
+//     E(µV/m) = 1000 · E0 · d^(−α) · 10^(K_φ + K_f) · s(p)
 //
 //   where
 //     E0   = 100 · √P_kW  mV/m at 1 km        (§73.184 normalization)
 //     α    = 1.0 + 0.001·|φm|                  distance-decay exponent
-//     K_φ  = −0.05 · (φm / 90)  dB             midpoint-latitude correction
-//     K_f  = −0.10 · log10(f_kHz / 1000)  dB   frequency correction
+//     K_φ  = −0.05 · (φm / 90)                 midpoint-latitude correction
+//     K_f  = −0.10 · log10(f_kHz / 1000)       frequency correction
+//     (K_φ and K_f are raw log10 exponents applied as 10^(K_φ + K_f),
+//      exactly as in berrySkywaveClient.js — they are NOT dB values)
 //     s(p) = 10^(6/20) ≈ 1.995 for SS-2 (10%)  per §73.190(c) percent-time
 //            1.0 for SS-1 (50%)                 charts (+6 dB, NOT 1.4×)
 //     φm   = geographic midpoint latitude (proxy for geomagnetic; ≤ 1.5°
@@ -53,11 +55,15 @@ function alphaForMidLat(midpoint_lat_deg){
   return 1.0 + 0.001 * Math.abs(Number(midpoint_lat_deg) || 40);
 }
 
-function latitudeCorrection_dB(midpoint_lat_deg){
+// K_φ and K_f are raw log10 exponents applied as 10^(K_φ + K_f), matching
+// src/evidence/berrySkywaveClient.js exactly.  They are NOT dB values (a dB
+// interpretation would divide by 20 before exponentiation; the reference
+// client does not).
+function latitudeCorrection_log10(midpoint_lat_deg){
   return -0.05 * ((Number(midpoint_lat_deg) || 40) / 90);
 }
 
-function frequencyCorrection_dB(f_khz){
+function frequencyCorrection_log10(f_khz){
   const f = Number(f_khz);
   if (!Number.isFinite(f) || f <= 0) return 0;
   return -0.10 * Math.log10(f / 1000);
@@ -85,7 +91,7 @@ function percentScale(percent){
  * @param {boolean} [args.directional_rss_applied=false]  caller-supplied RSS flag (provenance only)
  * @returns {{
  *   field_dBu, field_mV_m, distance_km, midpoint_lat, midpoint_lon,
- *   percent, alpha, k_lat_db, k_freq_db, frequency_khz, erp_kw,
+ *   percent, alpha, k_lat_log10, k_freq_log10, frequency_khz, erp_kw,
  *   directional_rss_applied, regulation, method
  * }}
  */
@@ -106,15 +112,17 @@ export function skywaveFieldAtPath({
   const mid_lon = (Number(tx_lon) + Number(rx_lon)) / 2;
 
   const alpha   = alphaForMidLat(mid_lat);
-  const k_lat   = latitudeCorrection_dB(mid_lat);
-  const k_freq  = frequencyCorrection_dB(frequency_khz);
+  const k_lat   = latitudeCorrection_log10(mid_lat);
+  const k_freq  = frequencyCorrection_log10(frequency_khz);
   const scale_p = percentScale(percent);
 
   // Berry closed form (see header): E0 = 100·√P mV/m at 1 km (§73.184).
+  // k_lat + k_freq are raw log10 exponents (10^(K_φ + K_f)), matching
+  // berrySkywaveClient.js — NOT dB (no /20).
   const E0_mvm  = 100 * Math.sqrt(Math.max(0, Number(erp_kw)));
   const E_mvm   = E0_mvm
                 * Math.pow(Math.max(1, d), -alpha)
-                * Math.pow(10, (k_lat + k_freq) / 20)
+                * Math.pow(10, k_lat + k_freq)
                 * scale_p;
   const E_dbu   = 20 * Math.log10(Math.max(E_mvm, 1e-9) * 1000);   // mV/m → µV/m → dBu
 
@@ -126,8 +134,8 @@ export function skywaveFieldAtPath({
     midpoint_lon:             mid_lon,
     percent,
     alpha:                    Number(alpha.toFixed(4)),
-    k_lat_db:                 Number(k_lat.toFixed(3)),
-    k_freq_db:                Number(k_freq.toFixed(3)),
+    k_lat_log10:              Number(k_lat.toFixed(3)),
+    k_freq_log10:             Number(k_freq.toFixed(3)),
     frequency_khz:            Number(frequency_khz),
     erp_kw:                   Number(erp_kw),
     directional_rss_applied,
@@ -156,7 +164,7 @@ export const SKYWAVE_PROVENANCE = Object.freeze({
   modeled:         [
     'Single-jump nighttime skywave 200 ≤ d ≤ 5000 km (Berry screening form)',
     'Distance decay d^(−α), α = 1 + 0.001·|φm| (midpoint-latitude dependent)',
-    'Frequency correction −0.10·log10(f/1000) dB and latitude correction −0.05·(φm/90) dB',
+    'Frequency correction −0.10·log10(f/1000) and latitude correction −0.05·(φm/90) as raw log10 exponents (10^(K_φ+K_f), matching berrySkywaveClient.js)',
     'SS-2 (10%) via +6 dB (×1.995) scaling of SS-1 per §73.190(c) percent-time charts'
   ],
   not_modeled:     [

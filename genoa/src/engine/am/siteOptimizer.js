@@ -32,7 +32,7 @@
 import { fccAmDistanceKm, fccAmFieldMvmAtDistance } from '../curves/fcc/index.mjs';
 import { detectInternationalBorder } from '../regulatory/internationalBorderDetect.js';
 import { lookupM3Conductivity, lookupM3ZoneFallback, m3LoadStatus } from './m3.js';
-import { amAnnualRegFeeUsd, ANNUAL_REG_FEES_1153 } from '../regulatory/regulatoryConstants.js';
+import { amAnnualRegFeeUsd, ANNUAL_REG_FEES_1153, AM_POWER_LIMITS_73_21 } from '../regulatory/regulatoryConstants.js';
 
 // ---------- thresholds & weights ----------
 
@@ -7767,19 +7767,20 @@ async function scoreCandidate(pt, ctx, warnings){
       //   §73.182 — Nighttime interference; skywave signal contours and Class A protection
       //   §73.25–27 — Channel classification (clear/regional/local)
       //   §73.21 — Class A stations may operate up to 50 kW nights on clear channels
-      //   §73.21(b) — Class B/D stations severely restricted at night on clear channels
-      //             (typically 1–2.5 kW max nighttime, or DA-N required)
+      //   §73.21(b) — Class D stations restricted at night on clear channels
+      //             (< 0.25 kW where authorized, or DA-N required); Class B may run
+      //             up to 50 kW nights per §73.21(b)(1) but DA-N is typically needed
       //
       // Class D stations on clear channels at night:
       //   §73.21(b)(2): Class D on clear channel → either:
-      //   Option 1: Operate at ≤ 1 kW at night (no interference to dominant)
+      //   Option 1: Operate at < 0.25 kW at night where authorized
       //   Option 2: Operate DA-N with pattern that protects dominant at 0.1 mV/m contour
       //   Option 3: "Sunset to sunrise" (sign on after local sunset, off before local sunrise)
-      //             —allows pre-sunrise authorization (PSA) via §73.99 and post-sunset
-      //             authorization (PSA) up to a defined limit
+      //             —allows pre-sunrise authorization via §73.99 and post-sunset
+      //             authorization (PSSA) up to 500 W per §73.99
       //
       // Class B regional channel:
-      //   §73.21(b): 5 kW max nights; DA-N often required to protect co-channel stations
+      //   §73.21(b)(1): up to 50 kW nights; DA-N often required to protect co-channel stations
       //
       // The nighttime situation is frequently the binding constraint on AM site selection:
       // if a candidate site at night cannot achieve the required D/U margin toward the
@@ -7800,17 +7801,17 @@ async function scoreCandidate(pt, ctx, warnings){
         night_operation_type = 'FULL_POWER';
         nighttime_constraint = 'Class A dominant — may operate full power nights; receives §73.182 50 µV/m skywave protection from co-channel secondaries';
       } else if (isClearCh_sw && fcc_class === 'D') {
-        night_power_limit_kw = Math.min(tpo_kw, 1.0);
+        night_power_limit_kw = Math.min(tpo_kw, AM_POWER_LIMITS_73_21.night_kw.D);
         night_operation_type = 'LIMITED_1KW_OR_DAN';
-        nighttime_constraint = 'Class D on clear channel — §73.21(b)(2): nighttime power capped at 1 kW max (or DA-N pattern required); may need Sunset-to-Sunrise authorization';
+        nighttime_constraint = 'Class D on clear channel — < 0.25 kW where authorized per §73.21(b)(2); PSSA up to 500 W per §73.99';
       } else if (isClearCh_sw && fcc_class === 'B') {
-        night_power_limit_kw = Math.min(tpo_kw, 2.5);
+        night_power_limit_kw = Math.min(tpo_kw, AM_POWER_LIMITS_73_21.night_kw.B);
         night_operation_type = 'LIMITED_2_5KW_OR_DAN';
-        nighttime_constraint = 'Class B on clear channel — §73.21(b): max 2.5 kW nights; DA-N typically required to protect Class A dominant';
+        nighttime_constraint = 'Class B on clear channel — §73.21(b)(1): up to 50 kW nights; DA-N typically required to protect Class A dominant';
       } else if (isRegionalCh_sw) {
-        night_power_limit_kw = Math.min(tpo_kw, 5);
+        night_power_limit_kw = Math.min(tpo_kw, AM_POWER_LIMITS_73_21.night_kw.B);
         night_operation_type = 'REGIONAL_NIGHT';
-        nighttime_constraint = 'Class B regional — §73.21(b): max 5 kW nights; DA-N may be required to protect co-channel regional stations';
+        nighttime_constraint = 'Class B regional — §73.21(b)(1): up to 50 kW nights; DA-N may be required to protect co-channel regional stations';
       } else {
         // Local channel — Class C ceiling is 1 kW unlimited time per §73.21(c)
         night_power_limit_kw = Math.min(tpo_kw, 1);

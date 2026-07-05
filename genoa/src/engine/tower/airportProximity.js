@@ -57,9 +57,12 @@ export function check17_7c({ lat, lon, airports } = {}){
     const dist_m = a.distance_m;
     if (!Number.isFinite(Number(dist_m))) continue;
     if (dist_m <= th_m){
-      const ruleSubsection = a.type === 'heliport'    ? '§17.7(c)(3)'
-                            : (Number(a.longest_runway_ft) > 3200) ? '§17.7(c)(1)'
-                            : '§17.7(c)(2)';
+      // Cite must match the threshold thresholdNm() actually applied:
+      // heliport → (c)(3); runway ≤ 3,200 ft → (c)(2); runway > 3,200 ft
+      // OR unknown length (conservative 20,000 ft threshold) → (c)(1).
+      const ruleSubsection = a.type === 'heliport' ? '§17.7(c)(3)'
+                            : (Number.isFinite(Number(a.longest_runway_ft)) && Number(a.longest_runway_ft) <= 3200) ? '§17.7(c)(2)'
+                            : '§17.7(c)(1)';
       triggering.push({
         airport_id:        a.airport_id,
         ident:             a.ident,

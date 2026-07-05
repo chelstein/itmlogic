@@ -33,6 +33,13 @@ import unzipper from 'unzipper';
 const BULK_URL = process.env.ASR_BULK_URL
               || 'https://data.fcc.gov/download/pub/uls/complete/r_tower.zip';
 
+// Data-semantics version of what this loader writes into asr_towers.
+// Bump whenever the MEANING of stored values changes (not just the code),
+// so already-populated databases are force-re-ingested on next boot:
+// the server treats asr_load_state.loader_version !== LOADER_DATA_VERSION
+// as stale.
+export const LOADER_DATA_VERSION = 2; // v2: RA heights stored as meters (v1 wrongly converted ft→m)
+
 
 
 // Decode FCC coordinate triple (degrees, minutes, seconds, hemisphere)
@@ -223,8 +230,9 @@ export async function runBulkLoad(pool, log = console){
     await client.query(`
       INSERT INTO asr_load_state (id, last_loaded_at, last_source_url, last_source_etag,
                                   last_source_last_modified, records_total, records_with_coords,
-                                  records_with_owner, load_duration_seconds, load_error)
-      VALUES (1, now(), $1, $2, $3, $4, $5, $6, $7, NULL)
+                                  records_with_owner, load_duration_seconds, load_error,
+                                  loader_version)
+      VALUES (1, now(), $1, $2, $3, $4, $5, $6, $7, NULL, $8)
       ON CONFLICT (id) DO UPDATE SET
         last_loaded_at = EXCLUDED.last_loaded_at,
         last_source_url = EXCLUDED.last_source_url,
@@ -234,9 +242,10 @@ export async function runBulkLoad(pool, log = console){
         records_with_coords = EXCLUDED.records_with_coords,
         records_with_owner = EXCLUDED.records_with_owner,
         load_duration_seconds = EXCLUDED.load_duration_seconds,
-        load_error = NULL
+        load_error = NULL,
+        loader_version = EXCLUDED.loader_version
     `, [BULK_URL, etag, lastMod ? new Date(lastMod) : null,
-        towers.size, nWithCoords, nWithOwner, elapsed]);
+        towers.size, nWithCoords, nWithOwner, elapsed, LOADER_DATA_VERSION]);
 
     // 4. Archive the raw zip + rotate off anything > 28 days.  The
     //    archive lets operators diff this week's data against any of

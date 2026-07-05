@@ -6245,7 +6245,12 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             <div key="reg-guide" style={{ marginBottom: 16, padding: 12, background: '#eef2ff', borderRadius: 8, border: '2px solid #4338ca' }}>
               <div style={{ fontWeight: 700, color: '#312e81', marginBottom: 6, fontSize: 13 }}>Annual Regulatory Compliance &amp; FCC Fees</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3730a3' }}>
-                <span style={{ color: '#4338ca' }}>Annual FCC Fee:</span><span>{fmt(g.annual_fcc_fee_usd)} (Class {g.fcc_class})</span>
+                <span style={{ color: '#4338ca' }}>Annual FCC Fee:</span><span>
+                  {g.annual_fcc_fee_usd != null
+                    ? fmt(g.annual_fcc_fee_usd)
+                    : g.annual_fcc_fee_low_usd != null
+                      ? `${fmt(g.annual_fcc_fee_low_usd)} – ${fmt(g.annual_fcc_fee_high_usd ?? g.annual_fcc_fee_low_usd)}${g.annual_fcc_fee_tier ? ` (${g.annual_fcc_fee_tier})` : ''}`
+                      : '—'} (Class {g.fcc_class})</span>
                 <span style={{ color: '#4338ca' }}>License Renewal:</span><span>{fmt(g.renewal_fee_usd)} / {g.license_renewal_cycle_years} yr ({fmt(g.renewal_amortized_annual_usd)}/yr amortized)</span>
                 <span style={{ color: '#4338ca' }}>EAS Testing:</span><span>{fmt(g.eas_testing_annual_low_usd)} – {fmt(g.eas_testing_annual_high_usd)}/yr</span>
                 <span style={{ color: '#4338ca' }}>Compliance Counsel:</span><span>{fmt(g.compliance_consultant_annual_low_usd)} – {fmt(g.compliance_consultant_annual_high_usd)}/yr</span>
@@ -11588,7 +11593,16 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL FCC FEES</span>
-                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>${(g.total_fcc_fees_usd || 0).toLocaleString()}</div>
+                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>
+                    {g.total_fcc_fees_usd != null
+                      ? `$${g.total_fcc_fees_usd.toLocaleString()}`
+                      : g.total_fcc_fees_low_usd != null
+                        ? `$${g.total_fcc_fees_low_usd.toLocaleString()}–$${(g.total_fcc_fees_high_usd ?? g.total_fcc_fees_low_usd).toLocaleString()}`
+                        : '—'}
+                  </div>
+                  {g.total_fcc_fees_usd == null && g.total_fcc_fees_low_usd != null && (
+                    <div style={{ color: '#64748b', fontSize: 8 }}>{g.annual_reg_fee_tier ?? 'population-dependent (§1.1153)'}</div>
+                  )}
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>WITH CONSULTING</span>
@@ -11601,7 +11615,13 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   {g.fee_items.map((fi, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
                       <span style={{ color: fi.required ? '#cbd5e1' : '#64748b', fontSize: 9 }}>{fi.item}{!fi.required ? ' *' : ''}</span>
-                      <span style={{ color: '#94a3b8', fontSize: 9 }}>${(fi.fee_usd || 0).toLocaleString()}</span>
+                      <span style={{ color: '#94a3b8', fontSize: 9 }}>
+                        {fi.fee_usd != null
+                          ? `$${fi.fee_usd.toLocaleString()}`
+                          : fi.fee_low_usd != null
+                            ? `$${fi.fee_low_usd.toLocaleString()}–$${(fi.fee_high_usd ?? fi.fee_low_usd).toLocaleString()}`
+                            : '—'}
+                      </span>
                     </div>
                   ))}
                   <div style={{ color: '#475569', fontSize: 9, marginTop: 2 }}>* conditional fee</div>
