@@ -16887,11 +16887,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const coverage_radius_delta_pct = Math.round((d_candidate_km / d_current_km - 1) * 100);
 
       // ---- COL centroid coverage at each site ----
-      // Simplified great-circle distance (km) using equirectangular approximation
+      // Great-circle distance (km) via shared haversine helper
       function distKm(lat1, lon1, lat2, lon2) {
-        const dlat = (lat2 - lat1) * 111.32;
-        const dlon = (lon2 - lon1) * 111.32 * Math.cos((lat1 + lat2) / 2 * Math.PI / 180);
-        return round2(Math.sqrt(dlat * dlat + dlon * dlon));
+        return round2(greatCircleKm(lat1, lon1, lat2, lon2));
       }
       const col_lat = col_centroid?.lat ?? current_site.lat;
       const col_lon = col_centroid?.lon ?? current_site.lon;
@@ -17661,11 +17659,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Distance from COL centroid (urbanization proxy)
       const dist_from_col_km = (() => {
         if (col_centroid) {
-          const dLat = pt.lat - col_centroid.lat;
-          const dLon = pt.lon - col_centroid.lon;
-          const dx = dLon * 111.32 * Math.cos(pt.lat * Math.PI / 180);
-          const dy = dLat * 110.57;
-          return round2(Math.sqrt(dx * dx + dy * dy));
+          return round2(greatCircleKm(pt.lat, pt.lon, col_centroid.lat, col_centroid.lon));
         }
         return round2(pt.distance_from_current_km ?? 20);
       })();
@@ -18064,11 +18058,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // current site as proxy for urban density
       const dist_from_col_km = (() => {
         if (col_centroid) {
-          const dLat = pt.lat - col_centroid.lat;
-          const dLon = pt.lon - col_centroid.lon;
-          const dx = dLon * 111.32 * Math.cos(pt.lat * Math.PI / 180);
-          const dy = dLat * 110.57;
-          return round2(Math.sqrt(dx * dx + dy * dy));
+          return round2(greatCircleKm(pt.lat, pt.lon, col_centroid.lat, col_centroid.lon));
         }
         return round2(pt.distance_from_current_km ?? 20);
       })();
@@ -23457,11 +23447,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // Studio coordinates from FCC record; approximate here with current_site as proxy
       const studio_lat = current_site?.lat ?? pt.lat ?? 35;  // proxy: current site lat as studio reference
       const studio_lon = current_site?.lon ?? pt.lon ?? -98;
-      const dx_deg = (pt.lon - studio_lon) || 0;
-      const dy_deg = (pt.lat - studio_lat) || 0;
-      const dx_km_rpu = dx_deg * 111.32 * Math.cos(pt.lat * Math.PI / 180);
-      const dy_km_rpu = dy_deg * 110.57;
-      const dist_km_rpu = round2(Math.sqrt(dx_km_rpu * dx_km_rpu + dy_km_rpu * dy_km_rpu));
+      const dist_km_rpu = round2(greatCircleKm(pt.lat ?? studio_lat, pt.lon ?? studio_lon, studio_lat, studio_lon));
 
       // RPU path feasibility — VHF RPU practical range: ~50–80 km with directional antenna at 250W
       // UHF RPU practical range: ~30–50 km; better penetration in urban areas
