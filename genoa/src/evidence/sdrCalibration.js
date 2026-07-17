@@ -68,7 +68,61 @@ import { fccFieldDbuAtDistance, fccAmFieldMvmAtDistance } from '../engine/curves
 import { karneyInverse } from '../engine/geometry/wgs84.js';
 
 const DEFAULT_FLOOR_DBM = -120;
-const POWER_TO_FIELD_DB = 107;     // dBm→dBu conversion in 50Ω matched antenna
+export const POWER_TO_FIELD_DB = 107;     // dBm→dBu conversion in 50Ω matched antenna
+
+// ---------------------------------------------------------------------------
+// RSSI → field-strength conversion (single source of the physics)
+// ---------------------------------------------------------------------------
+
+/**
+ * Pure two-stage RSSI→field conversion shared by applyCalibration()
+ * below and by buildSigmfFromKiwiCapture.js (which used to carry its
+ * own copy of this arithmetic).
+ *
+ * Stage 1:  P(dBm) + 107 = V(dBµV) at 50 Ω
+ *             V(dBµV) = P(dBm) + 10·log10(50) + 90 ≈ P(dBm) + 107.
+ * Stage 2:  E(dBµV/m) = V(dBµV) + AF
+ *           The antenna factor AF already encodes antenna gain
+ *           (AF = 20·log10(f_MHz) − G_dBi − 29.77 at 50 Ω), so gain
+ *           must NOT be subtracted again on the AF path.
+ * Fallback: when no AF is available, use dBm + 107 − LNA − ant_gain
+ *           + cable_loss, which yields receiver dBµV as a
+ *           field-strength approximation.
+ *
+ * @param {object} args
+ * @param {number} args.rssi_dbm
+ * @param {number} [args.lna_gain_db=0]
+ * @param {number} [args.antenna_gain_dbi=0]   ignored on the AF path
+ * @param {number} [args.cable_loss_db=0]
+ * @param {number|null} [args.antenna_factor_db_per_m=null]
+ * @returns {{ field_dBu: number, basis: string, hasAF: boolean }}
+ *          field_dBu is unrounded; callers apply their own rounding.
+ */
+export function rssiToFieldDbu({
+  rssi_dbm,
+  lna_gain_db = 0,
+  antenna_gain_dbi = 0,
+  cable_loss_db = 0,
+  antenna_factor_db_per_m = null
+} = {}){
+  const hasAF = Number.isFinite(antenna_factor_db_per_m);
+  const field_dBu = hasAF
+    ? Number(rssi_dbm) + POWER_TO_FIELD_DB
+      - Number(lna_gain_db || 0)
+      + Number(cable_loss_db || 0)
+      + Number(antenna_factor_db_per_m)
+    : Number(rssi_dbm) + POWER_TO_FIELD_DB
+      - Number(lna_gain_db || 0)
+      - Number(antenna_gain_dbi || 0)
+      + Number(cable_loss_db || 0);
+  return {
+    field_dBu,
+    hasAF,
+    basis: hasAF
+      ? `${POWER_TO_FIELD_DB} dB (dBm→dBµV, 50Ω) + antenna_factor_db_per_m (per-antenna)`
+      : `${POWER_TO_FIELD_DB} dB (50Ω matched-antenna default)`
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Calibration extraction
@@ -198,19 +252,15 @@ export function applyCalibration(capture, calibration){
     };
   }
   const cal = calibration || defaultCalibration('no calibration');
-  // Two-stage conversion: P(dBm) + 107 = V(dBµV) at 50 Ω, then E(dBµV/m) = V(dBµV) + AF.
-  // The antenna factor AF already encodes antenna gain (AF = 20·log10(f_MHz) − G_dBi − 29.77
-  // at 50 Ω), so gain must NOT be subtracted again on the AF path.
-  const hasAF = Number.isFinite(cal.antenna_factor_db_per_m);
-  const field_dBu = hasAF
-    ? rssi_dbm + POWER_TO_FIELD_DB
-      - (cal.lna_gain_db || 0)
-      + (cal.cable_loss_db || 0)
-      + cal.antenna_factor_db_per_m
-    : rssi_dbm + POWER_TO_FIELD_DB
-      - (cal.lna_gain_db || 0)
-      - (cal.antenna_gain_dbi || 0)
-      + (cal.cable_loss_db || 0);
+  // Two-stage conversion lives in rssiToFieldDbu() above (single
+  // source of the physics; see its doc comment for the derivation).
+  const { field_dBu, hasAF, basis } = rssiToFieldDbu({
+    rssi_dbm,
+    lna_gain_db:             cal.lna_gain_db,
+    antenna_gain_dbi:        cal.antenna_gain_dbi,
+    cable_loss_db:           cal.cable_loss_db,
+    antenna_factor_db_per_m: cal.antenna_factor_db_per_m
+  });
   return {
     field_dBu: Number(field_dBu.toFixed(2)),
     source:    'rssi_to_field_chain',
@@ -222,9 +272,7 @@ export function applyCalibration(capture, calibration){
       cable_loss_db:           cal.cable_loss_db,
       dbm_to_dbuv_db:          POWER_TO_FIELD_DB,
       antenna_factor_db_per_m: hasAF ? cal.antenna_factor_db_per_m : null,
-      conversion_basis:        hasAF
-                                  ? `${POWER_TO_FIELD_DB} dB (dBm→dBµV, 50Ω) + antenna_factor_db_per_m (per-antenna)`
-                                  : `${POWER_TO_FIELD_DB} dB (50Ω matched-antenna default)`
+      conversion_basis:        basis
     }
   };
 }

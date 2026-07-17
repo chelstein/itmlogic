@@ -183,13 +183,28 @@ export const FM_PROTECTED_CONTOURS_73_215 = Object.freeze({
 export const MPE_LIMITS_1_1310 = Object.freeze({
   cite:        '47 CFR §1.1310 Table 1',
   verified_at: '2026-07-03',
-  // 0.3–3.0 MHz occupational/controlled: E = 614 V/m, S = 100 mW/cm²
-  occupational: Object.freeze({ e_v_per_m: 614, s_mw_cm2: 100, band: '0.3–3.0 MHz' }),
+  // 0.3–3.0 MHz occupational/controlled: E = 614 V/m, S = 100 mW/cm²;
+  // 3–30 MHz occupational: E = 1842/f V/m, S = 900/f² mW/cm²
+  // (numerators pinned as numbers for call-site formulas).
+  occupational: Object.freeze({
+    e_v_per_m: 614, s_mw_cm2: 100, band: '0.3–3.0 MHz',
+    above_3_mhz: Object.freeze({
+      e_numerator_v_per_m: 1842,  // E = 1842/f_MHz V/m
+      s_numerator_mw_cm2: 900,    // S = 900/f_MHz² mW/cm²
+      e_v_per_m_formula: '1842/f_MHz',
+      s_mw_cm2_formula: '900/f_MHz²'
+    })
+  }),
   // General population: 0.3–1.34 MHz E = 614 V/m, S = 100 mW/cm²;
   // 1.34–30 MHz E = 824/f V/m, S = 180/f² mW/cm² (f in MHz).
   general_population: Object.freeze({
     below_1_34_mhz: Object.freeze({ e_v_per_m: 614, s_mw_cm2: 100 }),
-    above_1_34_mhz: Object.freeze({ e_v_per_m_formula: '824/f_MHz', s_mw_cm2_formula: '180/f_MHz²' })
+    above_1_34_mhz: Object.freeze({
+      e_numerator_v_per_m: 824,   // E = 824/f_MHz V/m
+      s_numerator_mw_cm2: 180,    // S = 180/f_MHz² mW/cm²
+      e_v_per_m_formula: '824/f_MHz',
+      s_mw_cm2_formula: '180/f_MHz²'
+    })
   })
 });
 

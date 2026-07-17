@@ -152,6 +152,14 @@ test('§1.1310 MPE limits (AM band) and §17.7 ASR thresholds', () => {
   assert.equal(MPE_LIMITS_1_1310.occupational.e_v_per_m, 614);
   assert.equal(MPE_LIMITS_1_1310.occupational.s_mw_cm2,  100);
   assert.equal(MPE_LIMITS_1_1310.general_population.below_1_34_mhz.e_v_per_m, 614);
+  assert.equal(MPE_LIMITS_1_1310.general_population.below_1_34_mhz.s_mw_cm2,  100);
+  // §1.1310 Table 1 formula numerators, pinned as numbers so call sites can
+  // implement E = 824/f, S = 180/f² (GP, 1.34–30 MHz) and E = 1842/f (OC, 3–30 MHz)
+  // without re-declaring the constants:
+  assert.equal(MPE_LIMITS_1_1310.general_population.above_1_34_mhz.e_numerator_v_per_m, 824);
+  assert.equal(MPE_LIMITS_1_1310.general_population.above_1_34_mhz.s_numerator_mw_cm2,  180);
+  assert.equal(MPE_LIMITS_1_1310.occupational.above_3_mhz.e_numerator_v_per_m, 1842);
+  assert.equal(MPE_LIMITS_1_1310.occupational.above_3_mhz.s_numerator_mw_cm2,   900);
   assert.equal(ASR_THRESHOLD_17_7.height_m, 60.96);
   assert.equal(ASR_THRESHOLD_17_7.airport_long_runway_ft,  20000);
   assert.equal(ASR_THRESHOLD_17_7.airport_short_runway_ft, 10000);

@@ -8384,9 +8384,13 @@ test('tower_lighting_marking_guide presence and height estimate', async () => {
 test('tower_lighting_marking_guide ASR threshold check', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const t = out.candidates[0].tower_lighting_marking_guide;
-  assert.strictEqual(t.asr_threshold_m, 61, 'ASR threshold must be 61m (§17.7)');
-  // KAZM at 780 kHz: λ = 384.6m; 3/8λ ≈ 144m > 61m → ASR required
-  assert.strictEqual(t.asr_required, true, 'KAZM tower at 780 kHz must require ASR (> 61m)');
+  // Threshold normalized from the informal 61 m approximation to the exact
+  // §17.7 value (60.96 m / 200 ft) sourced from ASR_THRESHOLD_17_7 in the
+  // regulatory-constants catalog. No behavior change for any AM design height
+  // (class planning heights are 3/8λ or 5/8λ, never inside 60.96–61 m).
+  assert.strictEqual(t.asr_threshold_m, 60.96, 'ASR threshold must be 60.96m / 200 ft (§17.7)');
+  // KAZM at 780 kHz: λ = 384.6m; 3/8λ ≈ 144m > 60.96m → ASR required
+  assert.strictEqual(t.asr_required, true, 'KAZM tower at 780 kHz must require ASR (> 60.96m)');
 });
 
 test('tower_lighting_marking_guide LED retrofit spec', async () => {
