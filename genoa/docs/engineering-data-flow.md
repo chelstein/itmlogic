@@ -54,18 +54,38 @@ uncertainty}` — construction throws if `source` or `confidence` is missing.
 
 ## Integration state (honest)
 
-- The canonical assembler is **implemented and tested**
-  (`src/tests/canonicalPipeline.test.js`, `canonicalCore.test.js`,
-  `canonicalRules.test.js`, against the KAZM fixture in
-  `src/tests/fixtures/kazmCanonical.js`), producing the
-  `schema: 'canonical-candidate-result/1'` record with attached
-  `.validation`. It is not yet invoked from the production
-  `siteOptimizer.js` scoring path — attaching the canonical result per
-  candidate in `scoreCandidate()` output is the wiring step.
-- The legacy guide IIFEs inside `scoreCandidate()`
-  (`src/engine/am/siteOptimizer.js`) **still emit their own sections**,
-  with the divergences catalogued in
-  `docs/architecture-contradiction-origins.md`.
+- The canonical assembler is **implemented, tested, and wired into
+  production**: `scoreCandidate()` (`src/engine/am/siteOptimizer.js`) calls
+  `buildCanonicalCandidateResult()` once per candidate with real
+  provenance (COL geometry basis, conductivity tier, blanket fraction
+  explicitly converted from the optimizer's percent storage at the
+  boundary, proxy ranking layers marked so they cannot inflate confidence)
+  and attaches the result as `candidate.canonical`, including
+  `.validation` run in production mode. Full regression suite: 1900/1900
+  (`src/tests/amSiteOptimizer.test.js`).
+- A subset of top-level authoritative fields now **read from** the
+  canonical result instead of independently re-deriving: ASR requirement
+  (`asr_required_design` ← `canonical.regulatory.asr`, the parallel
+  λ/4-basis field is removed), NIF requirement
+  (`frequency_allocation_context.nif_required/_completion/_result` ←
+  `canonical.regulatory.nif`), scoring ties and baseline deltas
+  (`tied_within_model_precision`, `scoring_display_label`, etc. ←
+  `canonical.scoring`), recommendation levels
+  (`candidate_set_recommendation` priorities are the canonical
+  `RecommendationLevel` gate-ladder enum, `'ADVANCE_IMMEDIATELY'` is
+  gone), and confidence (`optimization_confidence.level` ←
+  `canonical.confidence.rankingSignalQuality.tier`, all four axes exposed
+  separately). An inconsistent candidate is forced to `status_category
+  REVIEW_REQUIRED` with the `INTERNALLY_INCONSISTENT_CANDIDATE` blocker
+  warning (`src/types/warnings.js`).
+- The **remaining** legacy guide IIFEs inside `scoreCandidate()` (the
+  ~262 not yet extracted into `guides/`) **still emit their own sections**
+  independently, with the divergences catalogued in
+  `docs/architecture-contradiction-origins.md` — the top-level fields
+  listed above are the only ones rewired so far. Closing this gap for the
+  remaining guides (making the registry the sole production path and
+  proving no guide can override a canonical authoritative field) is
+  open work; see `docs/known-screening-limitations.md`.
 - Guide decomposition per `src/engine/am/guides/README.md` has begun:
   three modules (`amSiteAccessibilityAndAdaComplianceGuide.js`,
   `amGroundSystemAndRadialFieldInstallationGuide.js`,

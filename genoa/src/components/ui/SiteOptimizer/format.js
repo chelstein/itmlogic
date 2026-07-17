@@ -63,16 +63,22 @@ export const STATE_COLORS = Object.freeze({
   blue:  '#7ec8e3',
 });
 
-const GREEN_STATES = new Set(['PASS', 'COMPLIANT', 'OK', 'NOT_REQUIRED', 'CLEAR', 'READY', 'CONSISTENT', 'GO']);
+const GREEN_STATES = new Set(['PASS', 'COMPLIANT', 'OK', 'CLEAR', 'READY', 'CONSISTENT', 'GO']);
 const RED_STATES   = new Set(['FAIL', 'NON_COMPLIANT', 'EXCEEDS_LIMIT', 'VIOLATION', 'NO_GO', 'BLOCKED']);
 const AMBER_STATES = new Set(['WARN', 'WARNING', 'REQUIRED', 'ADVISORY', 'CONDITIONAL', 'ELEVATED', 'HIGH', 'FOLLOW_UP', 'PENDING', 'NOT_READY']);
-const BLUE_STATES  = new Set(['INFO', 'INFORMATIONAL', 'MODELED', 'SCENARIO', 'SCREENING', 'ESTIMATE', 'LIKELY']);
+// NOT_REQUIRED lives with the informational states, NOT with PASS: a
+// verified-not-applicable determination ("this rule doesn't bind here") is
+// a different fact than "this rule was checked and satisfied" — the two
+// must never share a color (reconciliation invariant: no PASS color for
+// UNKNOWN, NOT_EVALUATED, or NOT_REQUIRED).
+const BLUE_STATES  = new Set(['INFO', 'INFORMATIONAL', 'MODELED', 'SCENARIO', 'SCREENING', 'ESTIMATE', 'LIKELY', 'NOT_REQUIRED']);
 
 /**
  * Map an evaluation/decision state to its display color.
  * Anything missing or unrecognized (including NOT_EVALUATED / UNKNOWN)
  * renders gray — a candidate must never look green just because a field
- * was absent from the payload.
+ * was absent from the payload.  NOT_REQUIRED renders blue (informational),
+ * never green (PASS) — see BLUE_STATES comment above.
  */
 export function stateColor(state) {
   if (state === null || state === undefined || state === '') return STATE_COLORS.gray;
@@ -87,8 +93,8 @@ export function stateColor(state) {
 /**
  * Color for a tri-state "X required" flag:
  *   true  → amber (required follow-up — a requirement is work, not a failure)
- *   false → green (verified not required)
- *   null/undefined → gray (not evaluated — NEVER green)
+ *   false → blue (verified not required — informational, NOT the PASS color)
+ *   null/undefined → gray (not evaluated — NEVER green, NEVER blue)
  */
 export function requirementColor(flag) {
   if (flag === true)  return stateColor('REQUIRED');
