@@ -51,7 +51,9 @@ const KNOWN_SOURCES      = Object.freeze(['MANUAL']);
 const DIPLEX_RADIUS_KM            = 10;   // same-band AM host < 10 km → diplexing required
 const SAME_BAND_INTERFERENCE_KHZ  = 20;   // freq delta ≤ this → HIGH risk on AM_SITE host
 const COL_COVERAGE_HARD_FLOOR     = 0.80; // mirrors siteOptimizer §73.24(i)
-const BLANKET_POP_HARD_CEIL_PCT   = 1.0;  // mirrors siteOptimizer §73.24(g)
+// BLANKET_POP_HARD_CEIL_PCT removed — blanket-pop checks now read
+// candidate.canonical.blanket (populationFraction/limitFraction) directly;
+// see assignStatusCategory() and collectHardFails() below.
 const PROMISING_TOP_QUANTILE      = 0.75;
 const RECOVERY_SCORE_FLOOR        = 55;   // recoverable categories need a base of usable rf merit
 const NEARBY_COMMUNITY_RADIUS_KM  = 25;   // “populated nearby community” heuristic for COL_CHANGE
@@ -781,7 +783,10 @@ function assignStatusCategory(c, scoreCutoff, { current_site }){
 
   const treaty = !!c.treaty_zone;
   const colFail = c.col_coverage_pct != null && c.col_coverage_pct < COL_COVERAGE_HARD_FLOOR;
-  const blanketFail = c.blanket_population_pct != null && c.blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT;
+  // Rewired to c.canonical.blanket (candidate.canonical.blanket) instead of
+  // the locally-mirrored BLANKET_POP_HARD_CEIL_PCT percent constant.
+  const blanketFail = c.canonical?.blanket?.populationFraction != null
+    && c.canonical.blanket.populationFraction > c.canonical.blanket.limitFraction;
   const missing = (c.col_coverage_pct == null) || (c.daytime_reach_km == null);
 
   const reasoning = [];
@@ -899,8 +904,11 @@ function collectHardFails(c){
   if (c.col_coverage_pct != null && c.col_coverage_pct < COL_COVERAGE_HARD_FLOOR){
     flags.push(`COL coverage ${(c.col_coverage_pct * 100).toFixed(0)}% < §73.24(i) floor`);
   }
-  if (c.blanket_population_pct != null && c.blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT){
-    flags.push(`Blanket population ${c.blanket_population_pct.toFixed(2)}% > §73.24(g) 1% limit`);
+  // Rewired to c.canonical.blanket (candidate.canonical.blanket) instead of
+  // the locally-mirrored BLANKET_POP_HARD_CEIL_PCT percent constant.
+  if (c.canonical?.blanket?.populationFraction != null
+      && c.canonical.blanket.populationFraction > c.canonical.blanket.limitFraction){
+    flags.push(`Blanket population ${(c.canonical.blanket.populationFraction * 100).toFixed(2)}% > §73.24(g) 1% limit`);
   }
   return flags;
 }

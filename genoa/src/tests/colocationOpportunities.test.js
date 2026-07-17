@@ -192,12 +192,20 @@ test('HYBRID mode returns score_stats and optimization_confidence', async () => 
 });
 
 test('Status RECOVERABLE_WITH_REDUCED_POWER when blanket pop fails but COL OK', () => {
+  // NOTE: blanketFail in assignStatusCategory() now reads
+  // c.canonical.blanket (populationFraction/limitFraction) instead of the
+  // removed local BLANKET_POP_HARD_CEIL_PCT-vs-blanket_population_pct
+  // comparison (canonical-consistency-audit-followup, Group 4 item 4) —
+  // this fixture supplies the canonical fraction that a real scoreCandidate()
+  // output would carry (1.4% = 0.014 fraction) so the test still exercises
+  // the real decision path rather than the removed duplicate.
   const c = {
     lat: 34.87, lon: -111.83,
     distance_from_current_km: 5,
     score: 72,
     col_coverage_pct: 0.92,
     blanket_population_pct: 1.4,     // > 1% §73.24(g) ceiling
+    canonical: { blanket: { populationFraction: 0.014, limitFraction: 0.01 } },
     daytime_reach_km: 60,
     treaty_zone: null,
     source: 'INFRASTRUCTURE',

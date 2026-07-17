@@ -607,7 +607,7 @@ export async function runSiteOptimizer(body = {}){
   // skywave_risk_level is the same for all candidates (determined by station
   // class + channel, not by candidate location within a regional search area).
   for (const c of scored){
-    if (!c.nif_status || c.nif_status === LABEL_SCREENING) continue;
+    if (!c.nif_status || c.nif_status === LABEL_SCREENING || c.nif_status === 'NOT REQUIRED') continue;
     if (c.treaty_zone){
       c.nif_status += ' — TREATY COORDINATION REQUIRED';
     } else if (skywave_risk_level === 'HIGH'){
@@ -2452,7 +2452,14 @@ export async function runSiteOptimizer(body = {}){
     schema:          'genoa.am_relocation_optimizer.v1',
     generated_at:    _generated_at,
     screening_only:  true,
-    filing_ready:    false,
+    // Rewired to candidate.canonical.filingReadiness — true only if at
+    // least one scored candidate's canonical filing-readiness gate says
+    // ready (canonical/confidence.js filingReadiness axis). In practice
+    // this screening endpoint never runs a §73.182 night study or supplies
+    // filing-grade population basis, so canonical filingReadiness.ready is
+    // never true here — but the flag now reads that real gate instead of
+    // being a hardcoded constant that could silently drift from it.
+    filing_ready:    scored.some((c) => c.canonical?.filingReadiness?.ready === true),
     input: {
       callsign, frequency_khz, current_site, search_radius_km,
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
@@ -2984,9 +2991,14 @@ async function scoreCandidate(pt, ctx, warnings){
     } catch (_){ /* leave null */ }
   }
 
-  // 4. NIF status (screening grade) — pass-through for now; future
-  //    versions will run a partial §73.182 NIF screening here.
-  const nif_status = 'SCREENING ONLY';
+  // 4. NIF status (screening grade). Placeholder default; overwritten
+  //    immediately below once `canonical` is built, from
+  //    canonical.regulatory.nif (see nifStatusFromCanonical()) — NEVER
+  //    from the compliance-category classification (that used to happen
+  //    in finalizeLabels(), which clobbered this field; see
+  //    docs/architecture-contradiction-origins.md §3/§10 and
+  //    colocationOpportunities.js's identical nifStatusFromCanonical()).
+  let nif_status = 'SCREENING ONLY';
 
   // 5. International border / treaty zone.
   let treaty_zone = null;
@@ -3001,6 +3013,113 @@ async function scoreCandidate(pt, ctx, warnings){
     }
   } catch (_){ /* leave null */ }
 
+  // ── Canonical candidate result — the SINGLE SOURCE OF TRUTH ─────────
+  // (src/engine/am/canonical/; docs/architecture-contradiction-origins.md.)
+  // Every top-level regulatory / confidence / recommendation field on this
+  // candidate is an echo of `canonical` — never re-derive them locally.
+  //
+  // Built here (BEFORE the per-goal sub-scores below) because sub.blanket
+  // (the minimize_blanket_population ranking sub-score, which feeds the
+  // actual candidate ranking) and the confidence-dampening block further
+  // down both need to read canonical instead of recomputing independently.
+  //
+  // Conductivity provenance: tier follows ground_sigma_source /
+  // ground_sigma_filing_grade (GeoTIFF raster → FILING_GRADE, M3 zone
+  // table → SCREENING, hard default 4 mS/m → LOW).
+  const sigma_source_tier = _m3?.available
+    ? (ground_sigma_filing_grade === 'filing' ? 'FILING_GRADE' : 'SCREENING')
+    : 'LOW';
+
+  // UNIT BOUNDARY (§73.24(g)): the optimizer computes blanket population
+  // as a PERCENT (1.0 === 1%); the canonical pipeline carries a FRACTION
+  // (0.01 === 1%).  Convert exactly once, HERE, by dividing by 100 — the
+  // canonical result carries the fraction only.  Out-of-range percents
+  // (defensive) are passed as null so the rule reports NOT_EVALUATED
+  // instead of leaking a bad unit downstream.
+  const blanket_population_fraction =
+    (blanket_population_pct != null
+      && blanket_population_pct >= 0 && blanket_population_pct <= 100)
+      ? blanket_population_pct / 100
+      : null;
+
+  // Ranking layers for the canonical confidence axes.  Proxy layers are
+  // declared as proxies so they can NEVER raise rankingSignalQuality
+  // (canonical/confidence.js).  Cross-layer agreement is not measured by
+  // this screening run, so agreesWithTopChoice is null (never guessed).
+  const ranking_layers = [];
+  if (goals.maximize_col_coverage) ranking_layers.push({
+    name: 'col_coverage', isProxy: !community_of_license_polygon, agreesWithTopChoice: null });
+  if (goals.maximize_population) ranking_layers.push({
+    name: 'population_density_proxy', isProxy: true, agreesWithTopChoice: null });
+  if (goals.minimize_blanket_population) ranking_layers.push({
+    name: 'blanket_population_proxy', isProxy: true, agreesWithTopChoice: null });
+  if (goals.prefer_high_conductivity) ranking_layers.push({
+    name: 'conductivity', isProxy: ground_sigma_filing_grade !== 'filing', agreesWithTopChoice: null });
+  if (goals.avoid_wildfire_risk) ranking_layers.push({
+    name: 'wildfire_region_proxy', isProxy: true, agreesWithTopChoice: null });
+  if (goals.minimize_int_treaty_zone) ranking_layers.push({
+    name: 'treaty_zone_distance', isProxy: false, agreesWithTopChoice: null });
+
+  const canonical = buildCanonicalCandidateResult({
+    station: {
+      callsign: ctx.callsign ?? null,
+      frequency_khz,
+      fcc_class,
+      tpo_kw,
+      licensed_pattern_mode: pattern_mode,
+      latitude: current_site.lat,
+      longitude: current_site.lon,
+    },
+    candidate: {
+      latitude: pt.lat,
+      longitude: pt.lon,
+      distance_from_current_km: pt.distance_from_current_km ?? null,
+      land_use_class,
+      col_polygon_present: !!community_of_license_polygon,
+      parcel_data_present: null,    // parcel / zoning availability not checked at screening
+      near_airport_trigger: null,   // §17.7(c) airport prong not checked at screening
+    },
+    propagation: {
+      coverage_fraction: coverage_pct == null ? null : {
+        value: coverage_pct,
+        unit: 'fraction',
+        // COL geometry basis carries through from coverage_computed_from.
+        source: `siteOptimizer/scoreCandidate: ${coverage_computed_from}`,
+        confidence: community_of_license_polygon ? 'ENGINEERING_GRADE' : 'LOW',
+        assumptions: [`COL geometry basis: ${coverage_computed_from}`],
+      },
+      blanket_population_fraction: blanket_population_fraction == null ? null : {
+        value: blanket_population_fraction,
+        unit: 'fraction',
+        source: 'siteOptimizer/scoreCandidate: density-proxy (screening)',
+        confidence: 'LOW',
+        assumptions: ['converted from the optimizer PERCENT at the canonical boundary (÷100)'],
+      },
+      blanket_population_basis: 'density-proxy (screening)',
+      contour_distances_km: Object.fromEntries(groundwave_contour_table.map(
+        (r) => [`mv${String(r.mvm).replace('.', '_')}`, r.distance_km])),
+      sigma_msm,
+      sigma_source_tier,             // conductivity provenance (ground_sigma_source)
+      population_basis_tier: 'LOW',  // population basis: density-proxy (screening)
+      night_study_present: false,    // screening never runs the §73.182 solver
+      night_study_result: null,
+      ranking_layers,
+    },
+    options: {
+      groundScenarioKey: 'STANDARD_120',
+      screeningAssumptionMode: pattern_mode,
+      towersCount: 1,
+      validationMode: 'production',
+    },
+  });
+
+  // nif_status is a NIF fact — derived solely from canonical.regulatory.nif,
+  // never from the compliance-category classification (finalizeLabels() used
+  // to overwrite it with LABEL_PROMISING/LABEL_NON_COMPLIANT/etc.; that write
+  // has been removed — see finalizeLabels() below, which now sets
+  // compliance_category instead).
+  nif_status = nifStatusFromCanonical(canonical.regulatory.nif);
+
   // --- per-goal sub-scores (0..100) ---
 
   const sub = {
@@ -3011,9 +3130,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // meaningful than linear r.  Uses best-achievable reach at σ=15 mS/m
       // as the ceiling so conductivity differences actually differentiate sites.
       : Math.max(0, Math.min(100, (daytime_reach_km / reach_scale_km) ** 2 * 100)),
-    blanket:      blanket_population_pct == null ? null
-      // Lower is better.  0% blanket pop → 100 score; 1% → 50; 2% → 0.
-      : Math.max(0, Math.min(100, 100 - 50 * blanket_population_pct)),
+    // Rewired to canonical.blanket (candidate.canonical.blanket) — this
+    // sub-score feeds the ranking, so it reads the same fraction/limit the
+    // rest of the pipeline reads instead of a locally-recomputed percent.
+    blanket:      canonical.blanket.populationFraction == null ? null
+      // Lower is better.  0% blanket pop → 100 score; limit → 50; 2×limit → 0.
+      : Math.max(0, Math.min(100, 100 - 50 * (canonical.blanket.populationFraction / canonical.blanket.limitFraction))),
     // Sqrt scale: groundwave path-loss improvement diminishes with increasing σ.
     // sigma=1→2 mS/m gains ~40% reach; sigma=7→8 gains ~5%. sqrt(σ/8)×100
     // captures this better than linear σ/8×100.
@@ -3080,8 +3202,21 @@ async function scoreCandidate(pt, ctx, warnings){
   // HIGH (filing σ AND polygon): no adjustment.
   // MEDIUM (one of the two): −3%.
   // LOW (neither — zone σ + disc proxy): −7%.
-  const _confTier = (ground_sigma_filing_grade === 'filing' && community_of_license_polygon) ? 'HIGH'
-    : (ground_sigma_filing_grade === 'filing' || community_of_license_polygon) ? 'MEDIUM'
+  //
+  // Rewired to canonical.confidence.engineeringDataConfidence.inputTiers
+  // (candidate.canonical.confidence) instead of re-deriving the tier locally.
+  // NOTE: engineeringDataConfidence.tier itself is NOT used here — it is the
+  // MIN across all three engineering inputs (conductivitySource, colGeometry,
+  // populationBasis), and populationBasis is unconditionally LOW at screening
+  // time (density-proxy only; see propagation.population_basis_tier above),
+  // which would collapse this multiplier to LOW for every candidate. The two
+  // per-input tiers this dampening actually cares about — conductivity and
+  // COL geometry — are read individually from the same canonical axis instead.
+  const _engConf = canonical.confidence.engineeringDataConfidence.inputTiers;
+  const _sigmaFilingGrade = _engConf.conductivitySource === 'FILING_GRADE';
+  const _colEngineeringGrade = _engConf.colGeometry !== 'LOW';
+  const _confTier = (_sigmaFilingGrade && _colEngineeringGrade) ? 'HIGH'
+    : (_sigmaFilingGrade || _colEngineeringGrade) ? 'MEDIUM'
     : 'LOW';
   const _confFactor = { HIGH: 1.00, MEDIUM: 0.97, LOW: 0.93 }[_confTier];
   const score_final = round2(score * _confFactor);
@@ -3277,101 +3412,6 @@ async function scoreCandidate(pt, ctx, warnings){
     treaty_zone, flags, score: score_final, score_breakdown
   });
 
-  // ── Canonical candidate result — the SINGLE SOURCE OF TRUTH ─────────
-  // (src/engine/am/canonical/; docs/architecture-contradiction-origins.md.)
-  // Every top-level regulatory / confidence / recommendation field on this
-  // candidate is an echo of `canonical` — never re-derive them locally.
-  //
-  // Conductivity provenance: tier follows ground_sigma_source /
-  // ground_sigma_filing_grade (GeoTIFF raster → FILING_GRADE, M3 zone
-  // table → SCREENING, hard default 4 mS/m → LOW).
-  const sigma_source_tier = _m3?.available
-    ? (ground_sigma_filing_grade === 'filing' ? 'FILING_GRADE' : 'SCREENING')
-    : 'LOW';
-
-  // UNIT BOUNDARY (§73.24(g)): the optimizer computes blanket population
-  // as a PERCENT (1.0 === 1%); the canonical pipeline carries a FRACTION
-  // (0.01 === 1%).  Convert exactly once, HERE, by dividing by 100 — the
-  // canonical result carries the fraction only.  Out-of-range percents
-  // (defensive) are passed as null so the rule reports NOT_EVALUATED
-  // instead of leaking a bad unit downstream.
-  const blanket_population_fraction =
-    (blanket_population_pct != null
-      && blanket_population_pct >= 0 && blanket_population_pct <= 100)
-      ? blanket_population_pct / 100
-      : null;
-
-  // Ranking layers for the canonical confidence axes.  Proxy layers are
-  // declared as proxies so they can NEVER raise rankingSignalQuality
-  // (canonical/confidence.js).  Cross-layer agreement is not measured by
-  // this screening run, so agreesWithTopChoice is null (never guessed).
-  const ranking_layers = [];
-  if (goals.maximize_col_coverage) ranking_layers.push({
-    name: 'col_coverage', isProxy: !community_of_license_polygon, agreesWithTopChoice: null });
-  if (goals.maximize_population) ranking_layers.push({
-    name: 'population_density_proxy', isProxy: true, agreesWithTopChoice: null });
-  if (goals.minimize_blanket_population) ranking_layers.push({
-    name: 'blanket_population_proxy', isProxy: true, agreesWithTopChoice: null });
-  if (goals.prefer_high_conductivity) ranking_layers.push({
-    name: 'conductivity', isProxy: ground_sigma_filing_grade !== 'filing', agreesWithTopChoice: null });
-  if (goals.avoid_wildfire_risk) ranking_layers.push({
-    name: 'wildfire_region_proxy', isProxy: true, agreesWithTopChoice: null });
-  if (goals.minimize_int_treaty_zone) ranking_layers.push({
-    name: 'treaty_zone_distance', isProxy: false, agreesWithTopChoice: null });
-
-  const canonical = buildCanonicalCandidateResult({
-    station: {
-      callsign: ctx.callsign ?? null,
-      frequency_khz,
-      fcc_class,
-      tpo_kw,
-      licensed_pattern_mode: pattern_mode,
-      latitude: current_site.lat,
-      longitude: current_site.lon,
-    },
-    candidate: {
-      latitude: pt.lat,
-      longitude: pt.lon,
-      distance_from_current_km: pt.distance_from_current_km ?? null,
-      land_use_class,
-      col_polygon_present: !!community_of_license_polygon,
-      parcel_data_present: null,    // parcel / zoning availability not checked at screening
-      near_airport_trigger: null,   // §17.7(c) airport prong not checked at screening
-    },
-    propagation: {
-      coverage_fraction: coverage_pct == null ? null : {
-        value: coverage_pct,
-        unit: 'fraction',
-        // COL geometry basis carries through from coverage_computed_from.
-        source: `siteOptimizer/scoreCandidate: ${coverage_computed_from}`,
-        confidence: community_of_license_polygon ? 'ENGINEERING_GRADE' : 'LOW',
-        assumptions: [`COL geometry basis: ${coverage_computed_from}`],
-      },
-      blanket_population_fraction: blanket_population_fraction == null ? null : {
-        value: blanket_population_fraction,
-        unit: 'fraction',
-        source: 'siteOptimizer/scoreCandidate: density-proxy (screening)',
-        confidence: 'LOW',
-        assumptions: ['converted from the optimizer PERCENT at the canonical boundary (÷100)'],
-      },
-      blanket_population_basis: 'density-proxy (screening)',
-      contour_distances_km: Object.fromEntries(groundwave_contour_table.map(
-        (r) => [`mv${String(r.mvm).replace('.', '_')}`, r.distance_km])),
-      sigma_msm,
-      sigma_source_tier,             // conductivity provenance (ground_sigma_source)
-      population_basis_tier: 'LOW',  // population basis: density-proxy (screening)
-      night_study_present: false,    // screening never runs the §73.182 solver
-      night_study_result: null,
-      ranking_layers,
-    },
-    options: {
-      groundScenarioKey: 'STANDARD_120',
-      screeningAssumptionMode: pattern_mode,
-      towersCount: 1,
-      validationMode: 'production',
-    },
-  });
-
   // v1 contract fields
   const candidate_id = `${round6(pt.lat)}_${round6(pt.lon)}`.replace(/\./g, 'd');
   const candidate_type = pt.candidate_type ?? 'grid';
@@ -3419,10 +3459,13 @@ async function scoreCandidate(pt, ctx, warnings){
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),
     // Qualitative §73.24(g) blanket-population risk tier.
     // OK: well clear of limit; ELEVATED: monitoring warranted; HIGH: near limit; EXCEEDS_LIMIT: non-compliant.
-    blanket_pop_risk: blanket_population_pct == null ? null
-      : blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT ? 'EXCEEDS_LIMIT'
-      : blanket_population_pct >= 0.8 ? 'HIGH'
-      : blanket_population_pct >= 0.5 ? 'ELEVATED'
+    // Rewired to canonical.blanket (candidate.canonical.blanket) — the fraction
+    // value and the §73.24(g) 1% limit are read from the single canonical
+    // source instead of the local BLANKET_POP_HARD_CEIL_PCT percent constant.
+    blanket_pop_risk: canonical.blanket.populationFraction == null ? null
+      : canonical.blanket.populationFraction > canonical.blanket.limitFraction ? 'EXCEEDS_LIMIT'
+      : canonical.blanket.populationFraction >= canonical.blanket.limitFraction * 0.8 ? 'HIGH'
+      : canonical.blanket.populationFraction >= canonical.blanket.limitFraction * 0.5 ? 'ELEVATED'
       : 'OK',
     // Structured per-candidate FCC compliance table.  Each entry: status, numeric value, threshold, rule cite.
     regulatory_compliance_summary: {
@@ -3433,11 +3476,14 @@ async function scoreCandidate(pt, ctx, warnings){
         threshold: COL_COVERAGE_HARD_FLOOR,
         rule: '47 CFR §73.24(i)'
       },
+      // Rewired to canonical.blanket (candidate.canonical.blanket) — value and
+      // threshold read from the single canonical fraction source (converted to
+      // percent for display) instead of the local BLANKET_POP_HARD_CEIL_PCT.
       blanket_pop: {
-        status: blanket_population_pct == null ? 'NOT_EVALUATED'
-          : blanket_population_pct <= BLANKET_POP_HARD_CEIL_PCT ? 'PASS' : 'FAIL',
-        value: blanket_population_pct == null ? null : round2(blanket_population_pct),
-        threshold: BLANKET_POP_HARD_CEIL_PCT,
+        status: canonical.blanket.populationFraction == null ? 'NOT_EVALUATED'
+          : canonical.blanket.populationFraction <= canonical.blanket.limitFraction ? 'PASS' : 'FAIL',
+        value: canonical.blanket.populationFraction == null ? null : round2(canonical.blanket.populationFraction * 100),
+        threshold: round2(canonical.blanket.limitFraction * 100),
         rule: '47 CFR §73.24(g)'
       },
       class_power: {
@@ -3560,8 +3606,27 @@ async function scoreCandidate(pt, ctx, warnings){
     // location within its FCC class limits?  Intended as the first field a PM, FCC
     // counsel, or LLM reads before diving into detail.
     site_viability_summary: (() => {
+      // NOTE (Group 1 item 2 — partial rewire): canonical has no §73.24(i)
+      // COL-coverage rule yet (only blanket/NIF/ASR/proof-of-performance/RF
+      // exposure/current-site rules exist under canonical.regulatory), so
+      // colOk cannot be sourced from canonical without fabricating a rule
+      // that doesn't exist — left as a local computation (BLOCKED, see
+      // commit message / final report). blankOk is genuinely duplicated
+      // elsewhere and is rewired to canonical.blanket below. Likewise the
+      // `confidence` field returned by this IIFE is a compliance-category
+      // label (PROMISING/RECOVERABLE/NON_COMPLIANT/…), not one of the four
+      // canonical confidence axes — canonical.recommendation.level is
+      // gated by engineering-data-confidence tier (always capped at
+      // ADVANCE_TO_DESK_STUDY during screening, since population basis is
+      // unconditionally LOW-tier there), which answers a different
+      // question ("what's the next process step") than this field
+      // ("does the site pass §73.24 floors at current TPO"). Forcing it
+      // onto canonical.recommendation.level would silently replace a real
+      // compliance verdict with an unrelated, always-identical value, so
+      // it is left local and NOT rewired.
       const colOk   = coverage_pct == null ? null : coverage_pct >= COL_COVERAGE_HARD_FLOOR;
-      const blankOk = blanket_population_pct == null ? null : blanket_population_pct <= BLANKET_POP_HARD_CEIL_PCT;
+      const blankOk = canonical.blanket.populationFraction == null ? null
+        : canonical.blanket.populationFraction <= canonical.blanket.limitFraction;
       const classCeil = FCC_CLASS_POWER_KW[fcc_class]?.max ?? null;
       const powerFixAvailable = minimum_tpo_for_col_coverage_kw != null
         && classCeil != null
@@ -4724,9 +4789,10 @@ async function scoreCandidate(pt, ctx, warnings){
     // HIGH: filing-grade σ raster AND polygon provided.
     // MEDIUM: one of the two present.
     // LOW: both absent (zone-table σ, disc-proxy COL).
-    score_confidence: ground_sigma_filing_grade === 'filing' && community_of_license_polygon ? 'HIGH'
-      : ground_sigma_filing_grade === 'filing' || community_of_license_polygon ? 'MEDIUM'
-      : 'LOW',
+    // Rewired to _confTier (already derived from canonical.confidence —
+    // see the confidence-dampening block above) instead of an independent
+    // re-derivation from the same two locals.
+    score_confidence: _confTier,
     // Numeric uncertainty bounds on the composite score.
     // Not a statistical confidence interval — a practical range showing how much
     // the score could shift if the operator supplies higher-quality input data.
@@ -33152,7 +33218,9 @@ async function scoreCandidate(pt, ctx, warnings){
     blockers,
     required_next_studies,
     screening_only: true,
-    filing_ready:   false,
+    // Rewired to canonical.filingReadiness.ready (candidate.canonical.filingReadiness)
+    // instead of a hardcoded constant — see filingReadiness in canonical/confidence.js.
+    filing_ready:   canonical.filingReadiness?.ready === true,
     status_labels: [LABEL_SCREENING, LABEL_ENGINEER_REVIEW],  // base set; finalizeLabels() adds more
     _flags: flags,                                            // private: removed in finalizeLabels
     limitations
@@ -33170,27 +33238,30 @@ function finalizeLabels(c, scoreCutoff){
   const colFail   = hasFlags && c._flags.some(f => /COL/i.test(f));
   const blankFail = hasFlags && c._flags.some(f => /Blanket/i.test(f));
 
+  // NOTE (Group 3 item 1): this function used to overwrite c.nif_status with
+  // a compliance-category label (LABEL_PROMISING/LABEL_NON_COMPLIANT/etc.),
+  // clobbering the canonical §73.182 NIF status set from
+  // canonical.regulatory.nif above (nifStatusFromCanonical()). Those writes
+  // are removed. c.status_category (set below) already carries this
+  // compliance-category information as its own distinct field — there is no
+  // need for a second "compliance_category" field duplicating it.
   if (c.treaty_zone){
     // Treaty zone takes highest priority — FCC IB coordination required
     // before any other action regardless of coverage/blanket status.
     if (hasFlags) labels.add(LABEL_NON_COMPLIANT); else labels.add(LABEL_REVIEW_REQUIRED);
-    c.nif_status = hasFlags ? LABEL_NON_COMPLIANT : LABEL_REVIEW_REQUIRED;
     c.status_category = 'TREATY_REVIEW';
   } else if (!hasFlags){
     // No hard compliance failures.
     if (c.score >= scoreCutoff){
       labels.add(LABEL_PROMISING);
-      c.nif_status = LABEL_PROMISING;
       c.status_category = 'PROMISING';
     } else {
       labels.add(LABEL_REVIEW_REQUIRED);
-      c.nif_status = LABEL_REVIEW_REQUIRED;
       c.status_category = 'REVIEW_REQUIRED';
     }
   } else {
     // At least one hard failure — classify recovery pathway.
     labels.add(LABEL_NON_COMPLIANT);
-    c.nif_status = LABEL_NON_COMPLIANT;
 
     if (blankFail && !colFail){
       // Only blanket pop fails: reduce power to fix.
@@ -33263,6 +33334,29 @@ function baselineSummary(b){
 
 // Qualitative conductivity label based on FCC M3 zone ranges.
 // Guides the engineer on site selection even before the sub-score number.
+/**
+ * Map the canonical §73.182 NIF RegulatoryDecision (candidate.canonical.
+ * regulatory.nif) to the nif_status display label. Requirement, completion,
+ * and result stay distinct — a required-but-not-run study is
+ * 'REQUIRED — NOT EVALUATED', never a compliance-category claim.
+ * Mirrors colocationOpportunities.js's identical nifStatusFromCanonical() —
+ * this is the SINGLE shared mapping; callers must not fork this logic
+ * (docs/architecture-contradiction-origins.md §3/§10).
+ */
+function nifStatusFromCanonical(nif){
+  if (!nif) return 'SCREENING ONLY';
+  if (nif.required === false) return 'NOT REQUIRED';
+  if (nif.required === true){
+    if (nif.completion === 'RUN'){
+      if (nif.result === 'PASS') return 'REQUIRED — STUDY PASSED';
+      if (nif.result === 'FAIL') return 'REQUIRED — STUDY FAILED';
+      return 'REQUIRED — STUDY INCONCLUSIVE';
+    }
+    return 'REQUIRED — NOT EVALUATED';
+  }
+  return 'REQUIREMENT UNKNOWN';
+}
+
 function sigmaQuality(sigma_msm){
   if (sigma_msm == null || !Number.isFinite(sigma_msm)) return 'UNKNOWN';
   if (sigma_msm >= 8)  return 'EXCELLENT';   // Great Plains / coastal / rich soil
