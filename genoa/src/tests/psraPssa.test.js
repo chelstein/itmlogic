@@ -59,13 +59,13 @@ test('buildPsraPssaWindows: typical winter day in Phoenix (07:30 / 17:30)', () =
   assert.equal(r.windows.psra.start, '06:00');
   assert.equal(r.windows.psra.end,   '07:30');
   assert.equal(r.windows.psra.duration_minutes, 90);
-  // PSSA: 17:30 → 18:00 = 30 min, applicable
+  // PSSA: 17:30 → 19:30 = 120 min (sunset + 2 h per §73.99), applicable
   assert.equal(r.windows.pssa.applicable, true);
   assert.equal(r.windows.pssa.start, '17:30');
-  assert.equal(r.windows.pssa.end,   '18:00');
-  assert.equal(r.windows.pssa.duration_minutes, 30);
-  // Nighttime always 720 min total.
-  assert.equal(r.windows.nighttime.duration_minutes, 720);
+  assert.equal(r.windows.pssa.end,   '19:30');
+  assert.equal(r.windows.pssa.duration_minutes, 120);
+  // Nighttime: 19:30 (end of PSSA) → 06:00 (start of PSRA) = 630 min.
+  assert.equal(r.windows.nighttime.duration_minutes, 630);
   assert.equal(r.windows.nighttime.wraps_midnight, true);
 });
 
@@ -76,11 +76,12 @@ test('buildPsraPssaWindows: summer day with sunrise before 6 AM → no PSRA', ()
   assert.match(r.windows.psra.note, /no PSRA window/);
 });
 
-test('buildPsraPssaWindows: summer day with sunset after 6 PM → no PSSA', () => {
+test('buildPsraPssaWindows: summer day — PSSA runs sunset → sunset + 2 h (no 6 PM cap in §73.99)', () => {
   const r = buildPsraPssaWindows({ sunrise: '05:15', sunset: '20:45' });
-  assert.equal(r.windows.pssa.applicable, false);
-  assert.equal(r.windows.pssa.duration_minutes, 0);
-  assert.match(r.windows.pssa.note, /no PSSA window/);
+  assert.equal(r.windows.pssa.applicable, true);
+  assert.equal(r.windows.pssa.duration_minutes, 120);
+  assert.equal(r.windows.pssa.start, '20:45');
+  assert.equal(r.windows.pssa.end,   '22:45');
 });
 
 test('buildPsraPssaWindows: timezone label passes through', () => {
@@ -131,8 +132,13 @@ test('classifyMode: 17:30 (exact sunset) → pssa (sunset is inclusive to PSSA)'
   assert.equal(r.mode, 'pssa');
 });
 
-test('classifyMode: 18:00 (exact 6 PM boundary) → nighttime', () => {
+test('classifyMode: 18:00 with 17:30 sunset → still PSSA (window runs to 19:30)', () => {
   const r = classifyMode(WINTER_WINDOWS, '18:00');
+  assert.equal(r.mode, 'pssa');
+});
+
+test('classifyMode: 19:30 (end of PSSA) → nighttime', () => {
+  const r = classifyMode(WINTER_WINDOWS, '19:30');
   assert.equal(r.mode, 'nighttime');
 });
 

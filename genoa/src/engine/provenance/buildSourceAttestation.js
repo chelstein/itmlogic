@@ -78,7 +78,10 @@ function classifyField(name, exhibit, evidence){
       return { field: name, source_authority: authority, cross_checked: crossCheck, conflict: false };
     }
     case 'fcc_class': {
-      const authority = cl.engineering_assumption_source === 'operator_supplied'
+      // A class resolved from the FCC licensed record is the authoritative
+      // source; an operator-typed class is operator input.  (A previous
+      // revision had this inverted.)
+      const authority = cl.engineering_assumption_source === 'fcc_licensed_record'
         ? SOURCE_AUTHORITY.FCC_LMS
         : SOURCE_AUTHORITY.OPERATOR_INPUT;
       const crossCheck = false;

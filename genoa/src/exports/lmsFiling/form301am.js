@@ -14,8 +14,8 @@
 //
 // SCOPE
 //   AM physics is fundamentally different from FM: groundwave
-//   (Sommerfeld–Norton over finite-conductivity earth, §73.183 /
-//   §73.184) plus skywave (Berry model under §73.190 conditions of
+//   (Sommerfeld–Norton over finite-conductivity earth per §73.184)
+//   plus skywave (Berry model under §73.190 conditions of
 //   atmosphere) — NOT free-space ERP into HAAT-driven F(50,50)
 //   contours.  This schema therefore:
 //
@@ -251,7 +251,7 @@ export const FORM_301_AM_FIELDS = Object.freeze([
     source: 'genoa-auto',
     required: true,
     cite: '47 CFR §73.183, §73.184, §73.189',
-    notes: 'AM filings report groundwave field strength at 1 km — NOT ERP.  Computed from antenna efficiency and pattern rms per §73.189.',
+    notes: 'AM filings report groundwave field strength at 1 km — NOT ERP.  Radiation efficiency per §73.183; pattern rms per §73.189; groundwave propagation curves per §73.184.',
     derive: (exhibit) => firstNonEmptyPath(exhibit, [
       'station_inputs.rms_field_mv_m',
       'station_inputs.rms_groundwave_mv_m_at_1km',
@@ -306,7 +306,7 @@ export const FORM_301_AM_FIELDS = Object.freeze([
     required: true,
     cite: '47 CFR §73.189',
     mapping: null,
-    notes: 'Number and physical length of buried-copper radials per tower (typically 120 radials × 0.25λ for full ground system).'
+    notes: 'Number and physical length of buried-copper radials per tower (FCC standard: 120 radials × 0.35λ per §73.189(b)(4) / NBS TN-24; λ/4 = 0.25λ is only the physics reference for R_rad calculation).'
   },
 
   // ── 3C — §73.182 / §73.187 protection (AM allocation) ────────
@@ -564,8 +564,8 @@ export const FORM_301_AM_FIELDS = Object.freeze([
     type: 'file_reference',
     source: 'genoa-auto',
     required: true,
-    cite: '47 CFR §73.183, §73.184',
-    notes: 'AM contour map shows groundwave field strength contours from §73.183 / §73.184 curves applied with §73.190 M3 conductivity — NOT FM 60/54/40 dBu contours.',
+    cite: '47 CFR §73.184',
+    notes: 'AM contour map shows groundwave field strength contours per §73.184 (field strength graphs) using conductivity from §73.190 Figure M3 — NOT FM 60/54/40 dBu contours.',
     derive: (exhibit) => {
       const call = String(exhibit?.station_inputs?.call || 'exhibit')
                      .replace(/[^A-Za-z0-9]/g, '_');
@@ -620,7 +620,7 @@ export const FORM_301_AM_META = Object.freeze({
     'Engineering Statement PDF signed by a qualified broadcast engineer; AM-specific narrative (skywave + groundwave + ground system) included',
     'PE signature / seal on the certification page',
     'Method-of-Moments (MoM) proof attached if directional and §73.151(c) is invoked; sample-system schematic + reference field per §73.152',
-    'Ground system description per §73.189 (120 buried 90° radials minimum for non-directional, or as filed for directional)',
+    'Ground system description per §73.189(b)(4) (120 buried 0.35λ radials per NBS TN-24 standard for non-directional; λ/4 is the physics reference only, not the filing standard)',
     '§73.182 nighttime interference / RSS aggregation: nighttime NIF contour computed; protected stations listed',
     '§73.99 pre-sunrise (PSRA) / post-sunset (PSSA) service-authorization tables included if PSRA/PSSA requested',
     'OET-65 RF-exposure exhibit attached (AM tower base-current → near-field MPE check at fence line)',

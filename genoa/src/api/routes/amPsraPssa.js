@@ -9,9 +9,14 @@
 //       pattern_table?, pattern_mode?
 //     },
 //     options?: {
-//       radius_km?, max_protected?, rss_share?, month_for_power?
+//       radius_km?, max_protected?, month_for_power?
 //     }
 //   }
+//
+//   Per-pair E_max_allowed comes from operator-supplied
+//   e_max_pssa_uv_m / e_max_psra_uv_m on the protected rows
+//   (§73.182(k) nighttime-limit data) — never derived from the
+//   proposer's own field.
 //   → 200 {
 //       available: boolean,
 //       sun, windows, monthly, power, protected_pairs,

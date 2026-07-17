@@ -95,7 +95,7 @@ function section_provenance(x){
   lines.push(`Facility       : ${fm.facility_lookup_source || '—'}${fm.facility_endpoint ? '  · ' + fm.facility_endpoint : ''}`);
   if (fm.facility_updated_at) lines.push(`               (updated ${fm.facility_updated_at})`);
   // Terrain provenance line — labelled "HAAT" for FM/TV (per §73.313),
-  // "Ground σ" for AM since §73.183 keys on conductivity, not terrain
+  // "Ground σ" for AM since §73.184 keys on conductivity, not terrain
   // elevation.  Same evidence packet for AM is the conductivity source.
   const isAmFacility = String(s.service || '').toUpperCase() === 'AM';
   lines.push(isAmFacility
@@ -217,7 +217,7 @@ function section_summary(x){
 }
 
 function section_inputs(s){
-  // AM narrative uses §73.183 vocabulary: TPO + ground conductivity +
+  // AM narrative uses §73.184 vocabulary: TPO + ground conductivity +
   // DA/NDA mode.  ERP/HAAT are FM/TV concepts and would look like an
   // FM exhibit imported onto an AM filing — exactly the credibility
   // hit an AM engineer would flag.
@@ -233,7 +233,7 @@ function section_inputs(s){
          ? `RMS field @1 km: ${fmt(s.rms_field_1km)} mV/m (filed)`
          : `RMS field @1 km: — (derived from TPO + pattern)`)
       : `HAAT (input):    ${fmt(s.haat_m_input)} m`,
-    // AM has no HAAT (groundwave propagation per §73.184 Figure M3 is
+    // AM has no HAAT (groundwave propagation per §73.184 / §73.190 Figure M3 is
     // distance/conductivity/frequency-keyed, not antenna-height-keyed).
     // Render an explicit n/a label so the standard summary keeps the
     // same shape across services; the txt exporter already does this.
@@ -352,7 +352,7 @@ function section_population(pop){
   } else {
     lines.push(`Primary contour:  ~${(pop?.primary ?? 0).toLocaleString()} (${pop?.model || '—'})`);
     lines.push(`Protected:        ~${(pop?.protected ?? 0).toLocaleString()}`);
-    lines.push(`PLACEHOLDER — population sourced from model estimate only.`);
+    lines.push(`MODEL ESTIMATE — population sourced from area/density proxy, not Census/ACS data.`);
     lines.push(`A Census/ACS dispatch is required for any filing-grade population claim.`);
   }
   return lines.join('\n');
@@ -380,7 +380,7 @@ function section_warnings(warnings, fr){
 
 function section_certification(fr){
   return [
-    hr('Engineering Certification Placeholder'),
+    hr('Engineering Certification — Engineer Stamp Required Before Filing'),
     CERTIFICATION_LANGUAGE,
     '',
     `Genoa filing readiness:   ${fr.score ?? '—'}/100  (${fr.status || '—'})`,

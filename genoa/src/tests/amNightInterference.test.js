@@ -130,8 +130,8 @@ test('standardDuDb: Class A co-channel = 26 dB', () => {
   assert.equal(standardDuDb('A', 'co_channel'), 26);
 });
 
-test('standardDuDb: Class B co-channel = 20 dB', () => {
-  assert.equal(standardDuDb('B', 'co_channel'), 20);
+test('standardDuDb: Class B co-channel = 26 dB (20:1 field ratio per §73.182)', () => {
+  assert.equal(standardDuDb('B', 'co_channel'), 26);
 });
 
 test('standardDuDb: 2nd-adjacent everywhere = -26 dB (weaker interferer needed)', () => {

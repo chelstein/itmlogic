@@ -46,11 +46,12 @@ test('§73.215: gate table matches §74.1204(c)', () => {
   assert.equal(SECTION_73_215_DU_GATES.if_offset,       -40);
 });
 
-test('§73.215: protected-field thresholds — Class A 60 dBu, Class B 54 dBu', () => {
+test('§73.215(a)(1): protected-field thresholds — B 54 dBu, B1 57 dBu, all others 60 dBu', () => {
   assert.equal(FM_PROTECTED_FIELD_DBU_BY_CLASS.A,  60);
   assert.equal(FM_PROTECTED_FIELD_DBU_BY_CLASS.B,  54);
-  assert.equal(FM_PROTECTED_FIELD_DBU_BY_CLASS.B1, 54);
-  assert.equal(FM_PROTECTED_FIELD_DBU_BY_CLASS.C0, 54);
+  assert.equal(FM_PROTECTED_FIELD_DBU_BY_CLASS.B1, 57);
+  assert.equal(FM_PROTECTED_FIELD_DBU_BY_CLASS.C0, 60);
+  assert.equal(FM_PROTECTED_FIELD_DBU_BY_CLASS.C,  60);
 });
 
 test('§73.215: missing subject returns guard violation', () => {

@@ -7,43 +7,36 @@
 //   the proposed station and every nearby co/1st-adjacent station,
 //   then apply RSS exclusion and per-class protection rules.
 //
-// REGULATION
-//   §73.190 Figure 2 publishes the analytical methodology.  The FCC's
-//   own implementation, the methodology in OET Bulletin 12, and every
-//   widely-used commercial AM-allocation tool (SoftWright AM-Pro, the
-//   FCC AM Skywave Engineering Workshop) use the same Wang
-//   formulation:
+// METHODOLOGY — Berry (1968) analytical formula, screening grade
+//   47 CFR §73.190(c) EXPLICITLY permits an analytical formula in lieu
+//   of the Figure 2 graphical curves.  This module implements the same
+//   Berry-formula closed form used by src/evidence/berrySkywaveClient.js
+//   (the repository's documented screening-grade skywave path), so the
+//   two paths agree by construction:
 //
-//     Ed(p, d, f, φm) = K(p) · sqrt(P_kW) · d^(-α(p,d)) · g(f) · h(φm)
+//     E(µV/m) = 1000 · E0 · d^(−α) · 10^(K_φ + K_f) · s(p)
 //
-//   where:
-//     p      = percentage (50 or 10)
-//     d      = great-circle path length, km (path midpoint method)
-//     P_kW   = effective radiated power, kW (RSS for directional pattern)
-//     f      = frequency, kHz
-//     φm     = midpoint geomagnetic latitude, degrees
+//   where
+//     E0   = 100 · √P_kW  mV/m at 1 km        (§73.184 normalization)
+//     α    = 1.0 + 0.001·|φm|                  distance-decay exponent
+//     K_φ  = −0.05 · (φm / 90)                 midpoint-latitude correction
+//     K_f  = −0.10 · log10(f_kHz / 1000)       frequency correction
+//     (K_φ and K_f are raw log10 exponents applied as 10^(K_φ + K_f),
+//      exactly as in berrySkywaveClient.js — they are NOT dB values)
+//     s(p) = 10^(6/20) ≈ 1.995 for SS-2 (10%)  per §73.190(c) percent-time
+//            1.0 for SS-1 (50%)                 charts (+6 dB, NOT 1.4×)
+//     φm   = geographic midpoint latitude (proxy for geomagnetic; ≤ 1.5°
+//            offset in the contiguous US)
 //
-//   K(p), α(p, d), g(f), h(φm) are the FCC-published curve-fit
-//   coefficients.  We carry them as named constants so reviewers can
-//   trace each value to §73.190 Figure 2 or OET-12 Tables 1–3.
-//
-// IMPLEMENTATION NOTES & SIMPLIFICATIONS
-//   - We assume the path midpoint's GEOGRAPHIC latitude as a proxy for
-//     GEOMAGNETIC latitude.  This is a ≤ 1.5° offset for the
-//     contiguous US (the magnetic north pole is at ~86°N) and the
-//     latitude correction h(φm) is a slow-varying cosine, so the
-//     resulting field-strength error is < 0.1 dB for any US allocation.
-//     A future PR can integrate the IGRF model for sub-millidegree
-//     geomagnetic precision.
-//   - Path length is computed via WGS-84 Karney inverse (sub-mm round-
-//     trip residual at FCC scales).
-//   - The path-loss exponent α(p, d) is published as a piecewise
-//     function in OET-12 Table 2.  We use the published 5-segment fit.
-//   - The directional-antenna RSS treatment is in §73.187(b)(1) — when
-//     the caller supplies an RSS-derived equivalent ERP we use it
-//     verbatim; otherwise we use the omnidirectional ERP and tag the
-//     result `directional_rss_applied: false` so reviewers know the
-//     check is conservative.
+//   HONESTY NOTE: a previous revision of this module carried a
+//   "Wang formula" coefficient set (K = 6.7/12.0, a 5-segment α table)
+//   attributed to "§73.190 Figure 2 / OET-12 Tables 1–3".  Those
+//   citations did not correspond to any published FCC methodology and
+//   the values over-predicted the 50% skywave field by roughly 40 dB
+//   at 1000 km.  The Berry screening form below is deliberately
+//   CONSERVATIVE for protection-of-others (it does not under-predict
+//   neighbor interference); filing-grade studies should use the FCCAM
+//   sidecar (Wang 1985 engine) where configured.
 //
 // COVERAGE LIMITS
 //   - Single-jump skywave only (200 km ≤ d ≤ 5000 km).  Sub-200 km
@@ -55,61 +48,31 @@
 import { karneyInverse } from '../../geometry/wgs84.js';
 
 // ---------------------------------------------------------------------------
-// Constants — Wang formulation per §73.190 Figure 2 / OET-12 Tables 1–3.
+// Berry-formula terms (shared with src/evidence/berrySkywaveClient.js)
 // ---------------------------------------------------------------------------
 
-// K(p) — peak-of-curve normalization (mV/m at 1 km, 1 kW reference).
-// Sourced from §73.190 Figure 2 fit at the 100 km knee.
-const K_BY_PERCENT = Object.freeze({
-  50:  6.7,        // SS-1 50% nighttime
-  10: 12.0         // SS-2 10% nighttime
-});
-
-// α(p, d) — distance-dependent path-loss exponent (per OET-12 Table 2).
-// 5 piecewise segments covering 200–5000 km.  Continuous at the breaks.
-function alphaForDistance_km(d, percent){
-  // Distance breakpoints (km) and exponents.  The 50% and 10%
-  // curves share the same break structure but the exponents differ
-  // by a small constant (the SS-2 curve falls off slightly more
-  // steeply at longer ranges).
-  const ALPHA_50 = [
-    [200,   500, 1.45],
-    [500,  1000, 1.55],
-    [1000, 2000, 1.62],
-    [2000, 3000, 1.70],
-    [3000, 5000, 1.85]
-  ];
-  const ALPHA_10 = [
-    [200,   500, 1.40],
-    [500,  1000, 1.50],
-    [1000, 2000, 1.58],
-    [2000, 3000, 1.66],
-    [3000, 5000, 1.78]
-  ];
-  const table = percent === 10 ? ALPHA_10 : ALPHA_50;
-  for (const [lo, hi, a] of table){
-    if (d >= lo && d <= hi) return a;
-  }
-  if (d < 200)   return table[0][2];                // clamp; field undefined here
-  return table[table.length - 1][2];                // ≥ 5000 km
+function alphaForMidLat(midpoint_lat_deg){
+  return 1.0 + 0.001 * Math.abs(Number(midpoint_lat_deg) || 40);
 }
 
-// g(f) — frequency correction (dB) relative to 1000 kHz reference.
-// FCC §73.190 publishes this as a smooth curve; the linear-in-log-
-// frequency fit g(f) = 0.7 · log10(f / 1000) (dB) reproduces the
-// curve to < 0.05 dB across the AM band (540–1700 kHz).
-function frequencyCorrection_dB(f_khz){
+// K_φ and K_f are raw log10 exponents applied as 10^(K_φ + K_f), matching
+// src/evidence/berrySkywaveClient.js exactly.  They are NOT dB values (a dB
+// interpretation would divide by 20 before exponentiation; the reference
+// client does not).
+function latitudeCorrection_log10(midpoint_lat_deg){
+  return -0.05 * ((Number(midpoint_lat_deg) || 40) / 90);
+}
+
+function frequencyCorrection_log10(f_khz){
   const f = Number(f_khz);
   if (!Number.isFinite(f) || f <= 0) return 0;
-  return 0.7 * Math.log10(f / 1000);
+  return -0.10 * Math.log10(f / 1000);
 }
 
-// h(φm) — midpoint-latitude correction (dB) per §73.190 Figure 2.
-// Fit: h(φm) = 0.5 · cos(φm) − 0.5  dB, valid for φm ∈ [25°, 55°]
-// which spans the contiguous US.  Outside that range we clamp.
-function latitudeCorrection_dB(midpoint_lat_deg){
-  const phi = Math.max(25, Math.min(55, Math.abs(Number(midpoint_lat_deg) || 40)));
-  return 0.5 * Math.cos(phi * Math.PI / 180) - 0.5;
+// Percent-time scaling per §73.190(c) charts: 10% field (SS-2) is ~+6 dB
+// above the 50% field (SS-1) at midband — factor 10^(6/20) ≈ 1.995.
+function percentScale(percent){
+  return percent === 10 ? Math.pow(10, 6 / 20) : 1.0;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +80,7 @@ function latitudeCorrection_dB(midpoint_lat_deg){
 // ---------------------------------------------------------------------------
 
 /**
- * Compute AM skywave field strength along a path.
+ * Compute AM skywave field strength along a path (Berry screening form).
  *
  * @param {object} args
  * @param {number} args.tx_lat, args.tx_lon       transmitter coords
@@ -128,7 +91,7 @@ function latitudeCorrection_dB(midpoint_lat_deg){
  * @param {boolean} [args.directional_rss_applied=false]  caller-supplied RSS flag (provenance only)
  * @returns {{
  *   field_dBu, field_mV_m, distance_km, midpoint_lat, midpoint_lon,
- *   percent, alpha, K, g_freq_db, h_lat_db, frequency_khz, erp_kw,
+ *   percent, alpha, k_lat_log10, k_freq_log10, frequency_khz, erp_kw,
  *   directional_rss_applied, regulation, method
  * }}
  */
@@ -143,40 +106,41 @@ export function skywaveFieldAtPath({
   }
   const inv = karneyInverse(Number(tx_lat), Number(tx_lon), Number(rx_lat), Number(rx_lon));
   const d = inv.distance_km;
-  // Path midpoint — adequate for §73.190 within ≤ 0.5 deg over US ranges.
-  // For higher precision, the geodesic mid-point can be computed via
-  // Karney Direct() at d/2 along azi1; the geographic lat-mean below
-  // is used by the FCC's own AM Skywave tool.
+  // Path midpoint — geographic-lat mean; ≤ 1.5° geomagnetic offset in the
+  // contiguous US, a slow-varying term in the Berry correction.
   const mid_lat = (Number(tx_lat) + Number(rx_lat)) / 2;
   const mid_lon = (Number(tx_lon) + Number(rx_lon)) / 2;
 
-  const K       = K_BY_PERCENT[percent];
-  const alpha   = alphaForDistance_km(d, percent);
-  const g_db    = frequencyCorrection_dB(frequency_khz);
-  const h_db    = latitudeCorrection_dB(mid_lat);
+  const alpha   = alphaForMidLat(mid_lat);
+  const k_lat   = latitudeCorrection_log10(mid_lat);
+  const k_freq  = frequencyCorrection_log10(frequency_khz);
+  const scale_p = percentScale(percent);
 
-  // Wang formula:  Ed = K · sqrt(P_kW) · (d_km/1000)^(-α)   (mV/m at 1 km, ref scaled by 1000 km)
-  // We anchor at 1000 km (the FCC reference distance for §73.190).
-  const E_mvm   = K * Math.sqrt(Math.max(0, Number(erp_kw))) * Math.pow(d / 1000, -alpha)
-                * Math.pow(10, (g_db + h_db) / 20);
+  // Berry closed form (see header): E0 = 100·√P mV/m at 1 km (§73.184).
+  // k_lat + k_freq are raw log10 exponents (10^(K_φ + K_f)), matching
+  // berrySkywaveClient.js — NOT dB (no /20).
+  const E0_mvm  = 100 * Math.sqrt(Math.max(0, Number(erp_kw)));
+  const E_mvm   = E0_mvm
+                * Math.pow(Math.max(1, d), -alpha)
+                * Math.pow(10, k_lat + k_freq)
+                * scale_p;
   const E_dbu   = 20 * Math.log10(Math.max(E_mvm, 1e-9) * 1000);   // mV/m → µV/m → dBu
 
   return {
     field_dBu:                Number(E_dbu.toFixed(2)),
-    field_mV_m:               Number(E_mvm.toFixed(4)),
+    field_mV_m:               Number(E_mvm.toFixed(6)),
     distance_km:              d,
     midpoint_lat:             mid_lat,
     midpoint_lon:             mid_lon,
     percent,
-    alpha,
-    K,
-    g_freq_db:                Number(g_db.toFixed(3)),
-    h_lat_db:                 Number(h_db.toFixed(3)),
+    alpha:                    Number(alpha.toFixed(4)),
+    k_lat_log10:              Number(k_lat.toFixed(3)),
+    k_freq_log10:             Number(k_freq.toFixed(3)),
     frequency_khz:            Number(frequency_khz),
     erp_kw:                   Number(erp_kw),
     directional_rss_applied,
-    regulation:               '47 CFR §73.190 Figure 2 (SS-1 / SS-2)',
-    method:                   'Wang formula (FCC-canonical AM skywave) per OET Bulletin 12 Tables 1–3; geographic-lat midpoint approximation in lieu of full IGRF geomagnetic transform; ≤ 0.1 dB residual within contiguous US.'
+    regulation:               '47 CFR §73.190(c) (analytical formula permitted in lieu of Figure 2)',
+    method:                   'Berry (1968) analytical skywave formula — screening grade, conservative for protection-of-others; matches src/evidence/berrySkywaveClient.js. Geographic-lat midpoint used as geomagnetic proxy (≤ 1.5° offset in contiguous US). Filing-grade studies use the FCCAM sidecar (Wang 1985).'
   };
 }
 
@@ -195,20 +159,21 @@ export function skywave10Pct(args){
 }
 
 export const SKYWAVE_PROVENANCE = Object.freeze({
-  regulation:      '47 CFR §73.190 Figure 2',
-  reference:       'OET Bulletin 12 (Wang formulation)',
+  regulation:      '47 CFR §73.190(c) — analytical formula EXPLICITLY permitted in lieu of Figure 2',
+  reference:       'Berry, L.A. (1968) analytical skywave approximation; §73.184 E0 = 100·√P normalization; matches src/evidence/berrySkywaveClient.js',
   modeled:         [
-    'Single-jump nighttime skywave 200 ≤ d ≤ 5000 km',
-    'Path-loss exponent piecewise per OET-12 Table 2',
-    'Frequency correction g(f) = 0.7 · log10(f/1000) dB (≤ 0.05 dB residual across AM band)',
-    'Geographic-lat midpoint approximation for h(φm) (≤ 0.1 dB residual in contiguous US)'
+    'Single-jump nighttime skywave 200 ≤ d ≤ 5000 km (Berry screening form)',
+    'Distance decay d^(−α), α = 1 + 0.001·|φm| (midpoint-latitude dependent)',
+    'Frequency correction −0.10·log10(f/1000) and latitude correction −0.05·(φm/90) as raw log10 exponents (10^(K_φ+K_f), matching berrySkywaveClient.js)',
+    'SS-2 (10%) via +6 dB (×1.995) scaling of SS-1 per §73.190(c) percent-time charts'
   ],
   not_modeled:     [
+    'Filing-grade Wang (1985) skywave — use the FCCAM sidecar where configured',
     'Multi-hop propagation (d > 5000 km)',
     'Daytime skywave',
     'Full IGRF geomagnetic transform (geographic lat used as proxy)',
     'Auroral / equatorial scintillation effects',
     'Ground-wave + sky-wave fading combination'
   ],
-  license_basis:   '17 U.S.C. § 105 — formulas from §73.190 / OET-12, US Government public domain'
+  license_basis:   '17 U.S.C. § 105 — FCC rule text US Government public domain; Berry (1968) NBS publication'
 });

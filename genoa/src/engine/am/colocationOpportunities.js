@@ -33,6 +33,10 @@ import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, buildRegulato
 const { buildProtectionAdvisory, buildMinimumSpacingReference, buildRecommendedActions } = SO;
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { m3LoadStatus } from './m3.js';
+import { deriveScoringContext, TIE_LABEL } from './canonical/scoring.js';
+import { advisoryFromCanonical, ladderRank } from './canonical/recommendation.js';
+import { RECOMMENDATION_LEVELS } from './canonical/types.js';
+import { AM_POWER_LIMITS_73_21 } from '../regulatory/regulatoryConstants.js';
 import { complianceDistance_m, nearFieldBoundary_m } from '../regulatory/oet65.js';
 import {
   loadManualInfrastructureSites,
@@ -92,7 +96,7 @@ export async function runColocationOpportunities(body = {}){
   }
 
   // ---- 1c. FCC class power limit advisory (mirrors siteOptimizer §73.21 check) ----
-  const FCC_CLASS_POWER_KW = { A:{min:10,max:50}, B:{min:0.25,max:50}, C:{min:0.25,max:1}, D:{min:0.25,max:50} }; // §73.21; D night < 0.25 kW
+  const FCC_CLASS_POWER_KW = AM_POWER_LIMITS_73_21.day_kw; // §73.21 daytime limits from the shared regulatory-constants catalog
   const classLimits = FCC_CLASS_POWER_KW[fcc_class];
   if (classLimits){
     if (tpo_kw > classLimits.max){
@@ -120,6 +124,7 @@ export async function runColocationOpportunities(body = {}){
     const candidates = so.candidates.map((c) => decorateGridCandidate(c));
     const cutoff = quantile(candidates.map((c) => c.score), PROMISING_TOP_QUANTILE);
     for (const c of candidates) assignStatusCategory(c, cutoff, { current_site });
+    applyCanonicalConsistencyGate(candidates, warnings);
     return composeResponse({
       method: 'GRID (delegated to siteOptimizer + co-location classifier)',
       candidates,
@@ -222,6 +227,7 @@ export async function runColocationOpportunities(body = {}){
 
   const cutoff = quantile(pool.map((c) => c.score), PROMISING_TOP_QUANTILE);
   for (const c of pool) assignStatusCategory(c, cutoff, { current_site });
+  applyCanonicalConsistencyGate(pool, warnings);
 
   const nPool = pool.length;
   pool.forEach((c, i) => {
@@ -253,6 +259,25 @@ export async function runColocationOpportunities(body = {}){
         if (delta !== 0) componentDeltas[k] = delta;
       }
       c.score_delta_explanation = { total: c.score_delta_vs_baseline, components: componentDeltas };
+    }
+  }
+
+  // Canonical scoring context — ties are first-class (mirrors siteOptimizer;
+  // deriveScoringContext is the single tie/delta authority).  Stamped both
+  // at the candidate top level and into candidate.canonical.scoring.
+  {
+    const allScores = pool.map((c) => c.score);
+    for (const c of pool){
+      const sc = deriveScoringContext({
+        candidateScore: c.score,
+        baselineScore: baseline ? baseline.score : null,
+        allScores,
+      });
+      c.tied_within_model_precision     = sc.tiedWithinModelPrecision;
+      c.tie_group_size                  = sc.tieGroupSize;
+      c.materially_better_than_baseline = sc.materiallyBetterThanBaseline;
+      c.scoring_display_label           = sc.displayLabel;
+      if (c.canonical) c.canonical.scoring = sc;
     }
   }
 
@@ -289,9 +314,19 @@ export async function runColocationOpportunities(body = {}){
   for (const c of pool) confDist[c.score_confidence || 'LOW'] = (confDist[c.score_confidence || 'LOW'] || 0) + 1;
   const nPoolTotal = pool.length || 1;
   const pctLow = ((confDist.LOW / nPoolTotal) * 100).toFixed(0);
+  // `level` now EQUALS the canonical ranking_signal_quality tier (mirrors
+  // siteOptimizer): counting enabled goal LAYERS is gone, and a PROXY layer
+  // can never raise confidence (src/engine/am/canonical/confidence.js).
+  const _canonConf = pool[0]?.canonical ?? null;
   const optimization_confidence = {
-    level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
+    level: _canonConf?.confidence?.rankingSignalQuality?.tier ?? 'LOW',
     contributing_layers: confidenceLayers,
+    n_contributing_layers: nLayers,
+    // The four canonical confidence axes — kept SEPARATE, never collapsed.
+    ranking_signal_quality:      _canonConf?.confidence?.rankingSignalQuality ?? null,
+    engineering_data_confidence: _canonConf?.confidence?.engineeringDataConfidence ?? null,
+    regulatory_completeness:     _canonConf?.confidence?.regulatoryCompleteness ?? null,
+    filing_readiness:            _canonConf?.filingReadiness ?? null,
     per_candidate_confidence: confDist,
     notes: [
       ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
@@ -362,7 +397,13 @@ export async function runColocationOpportunities(body = {}){
     minimum_spacing_reference: buildMinimumSpacingReference({ fcc_class, channel_class: chanClass }),
     regulatory_timeline_estimate: buildRegulatoryTimeline({
       fcc_class, channel_class: chanClass, skywave_risk_level,
-      asr_required: (300000 / frequency_khz / 4) > 60.96,
+      // §17.7 ASR from the canonical rule (selected design height basis) —
+      // the old λ/4 basis here was contradiction class §6 in
+      // docs/architecture-contradiction-origins.md.  Fallback (empty pool)
+      // uses the same class design-height basis, never λ/4.
+      asr_required: (pool[0]?.canonical?.regulatory?.asr)
+        ? pool[0].canonical.regulatory.asr.required === true
+        : (300000 / frequency_khz) * (/^[AB]$/i.test(fcc_class) ? 0.625 : 0.375) > 60.96,
       has_treaty_candidates: returned.some(c => !!c.treaty_zone),
       any_poor_sigma: returned.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
       n_promising: Object.keys(candidate_count_by_status || {}).includes('PROMISING')
@@ -391,32 +432,58 @@ export async function runColocationOpportunities(body = {}){
         median_distance_km: (() => { if (!top5.length) return null; const d = top5.map(c => c.distance_from_current_km ?? 0).sort((a, b) => a - b); const m = Math.floor(d.length / 2); return Math.round((d.length % 2 ? d[m] : (d[m - 1] + d[m]) / 2) * 100) / 100; })()
       };
     })(),
+    // Priorities are the canonical RecommendationLevel gate-ladder enum,
+    // READ from candidate.canonical (grid + infrastructure candidates carry
+    // it) via the SAME shared mapping siteOptimizer uses
+    // (canonical/recommendation.js advisoryFromCanonical) — the logic is
+    // deliberately not forked here.
     candidate_set_recommendation: (() => {
       const top5 = returned.slice(0, 5);
       if (!top5.length) return null;
       const bearingToQ = b => { const n = ((b % 360) + 360) % 360; return n < 90 ? 'NE' : n < 180 ? 'SE' : n < 270 ? 'SW' : 'NW'; };
       const entries = top5.map(c => {
-        const gateFails = c.regulatory_gate_summary?.fail_count ?? 0;
-        const isProm = c.status_category === 'PROMISING';
-        const isRec = c.status_category?.startsWith('RECOVERABLE');
-        const isNonComp = c.status_category === 'NON_COMPLIANT';
-        let priority, action;
-        if (gateFails > 0 || isNonComp) {
-          priority = 'HOLD'; action = `Hold — ${gateFails} gate failure(s) require engineering remediation.`;
-        } else if (isProm) {
-          priority = 'ADVANCE_IMMEDIATELY'; action = 'Advance to full §73.182 NIF study + parcel investigation.';
-        } else if (isRec) {
-          priority = 'ADVANCE_AFTER_REMEDY'; action = `Advance after resolving recovery path — see compliance_pathway.`;
-        } else {
-          priority = 'MONITOR'; action = 'Monitor — viable fallback site.';
-        }
-        return { rank: c.rank, status: c.status_category, score: c.score, gate_verdict: c.regulatory_gate_summary?.overall_verdict ?? null, gate_fail_count: gateFails, quadrant: bearingToQ(c.bearing_deg ?? 0), action, priority };
+        const adv = advisoryFromCanonical({
+          recommendation: c.canonical?.recommendation ?? null,
+          scoring: c.canonical?.scoring ?? null,
+          internallyConsistent: c.internally_consistent !== false,
+        });
+        return {
+          rank: c.rank,
+          status: c.status_category,
+          score: c.score,
+          gate_verdict: c.regulatory_gate_summary?.overall_verdict ?? null,
+          gate_fail_count: c.regulatory_gate_summary?.fail_count ?? 0,
+          quadrant: bearingToQ(c.bearing_deg ?? 0),
+          tied_within_model_precision: c.tied_within_model_precision ?? null,
+          action: adv.action,
+          priority: adv.priority   // canonical RecommendationLevel enum value
+        };
       });
-      const n_advance_ready = entries.filter(e => e.priority === 'ADVANCE_IMMEDIATELY').length;
-      const n_need_remedy   = entries.filter(e => e.priority === 'ADVANCE_AFTER_REMEDY').length;
-      const n_hold          = entries.filter(e => e.priority === 'HOLD').length;
-      const primary = entries.find(e => e.priority === 'ADVANCE_IMMEDIATELY') ?? entries[0];
-      return { overall_guidance: n_advance_ready >= 1 ? `${n_advance_ready} candidate(s) ready to advance to NIF study + parcel investigation.` : 'No immediately advanceable candidates — resolve remediation items first.', primary_recommended_rank: primary?.rank ?? null, n_advance_ready, n_need_remedy, n_hold, candidates: entries, note: 'Screening-grade advisory — qualified broadcast engineer and FCC counsel must review before site commitment or filing.' };
+      const primary = entries.reduce((best, e) =>
+        (ladderRank(e.priority) ?? -1) > (ladderRank(best.priority) ?? -1) ? e : best,
+        entries[0]);
+      const count_by_level = {};
+      for (const e of entries) count_by_level[e.priority] = (count_by_level[e.priority] ?? 0) + 1;
+      const n_advance_ready = entries.filter(e =>
+        (ladderRank(e.priority) ?? 0) > ladderRank(RECOMMENDATION_LEVELS.SCREEN_FURTHER)).length;
+      const n_need_remedy   = count_by_level[RECOMMENDATION_LEVELS.SCREEN_FURTHER] ?? 0;
+      const n_hold          = count_by_level[RECOMMENDATION_LEVELS.REJECT] ?? 0;
+      const primaryTied = primary?.tied_within_model_precision === true;
+      const overall_guidance = primaryTied
+        ? `${TIE_LABEL} — the top candidates cannot be ranked against each other at screening precision. ` +
+          `Apply the canonical gate ladder instead of rank order: highest supportable level is ${primary.priority}.`
+        : n_advance_ready >= 1
+        ? `${n_advance_ready} candidate(s) clear the canonical gate ladder above SCREEN_FURTHER. ` +
+          `Highest supportable level: ${primary.priority} (Rank ${primary.rank}).`
+        : 'No candidate clears the canonical gate ladder above SCREEN_FURTHER — resolve pending required decisions and data-quality blockers before advancing any site.';
+      return {
+        overall_guidance,
+        primary_recommended_rank: primary?.rank ?? null,
+        n_advance_ready, n_need_remedy, n_hold, count_by_level,
+        candidates: entries,
+        note: 'Priorities are the canonical recommendation gate-ladder levels (candidate.canonical.recommendation). ' +
+          'Screening-grade advisory — qualified broadcast engineer and FCC counsel must review before site commitment or filing.'
+      };
     })(),
     engineering_confidence_matrix: (() => {
       const rasterLoaded = m3LoadStatus().loaded;
@@ -775,20 +842,53 @@ function assignStatusCategory(c, scoreCutoff, { current_site }){
   c.explanation = c.explanation || {};
   c.explanation.recovery_reasoning = reasoning.join(' ');
 
-  // Align nif_status with the assigned category so colocation candidates
-  // carry a meaningful label (not just the default 'SCREENING ONLY').
-  const NIF_MAP = {
-    PROMISING:                     'PROMISING',
-    REVIEW_REQUIRED:               'REVIEW REQUIRED',
-    NON_COMPLIANT:                 'NON-COMPLIANT',
-    RECOVERABLE_WITH_DA:           'NON-COMPLIANT',
-    RECOVERABLE_WITH_POWER_INCREASE: 'NON-COMPLIANT',
-    RECOVERABLE_WITH_REDUCED_POWER: 'NON-COMPLIANT',
-    RECOVERABLE_WITH_COL_CHANGE:   'NON-COMPLIANT',
-    TREATY_REVIEW:                 'REVIEW REQUIRED',
-    UNKNOWN_DATA:                  'SCREENING ONLY'
-  };
-  c.nif_status = NIF_MAP[category] ?? 'SCREENING ONLY';
+  // nif_status derives from the CANONICAL §73.182 NIF decision
+  // (candidate.canonical.regulatory.nif) — NEVER from the score category.
+  // Fabricating a NIF label from the score category was the contradiction
+  // catalogued in docs/architecture-contradiction-origins.md §3/§10.
+  c.nif_status = nifStatusFromCanonical(c.canonical?.regulatory?.nif ?? null);
+}
+
+/**
+ * Map the canonical §73.182 NIF RegulatoryDecision to the colocation
+ * nif_status display label.  Requirement, completion, and result stay
+ * distinct — a required-but-not-run study is 'REQUIRED — NOT EVALUATED',
+ * never a compliance claim.
+ */
+function nifStatusFromCanonical(nif){
+  if (!nif) return 'SCREENING ONLY';
+  if (nif.required === false) return 'NOT REQUIRED';
+  if (nif.required === true){
+    if (nif.completion === 'RUN'){
+      if (nif.result === 'PASS') return 'REQUIRED — STUDY PASSED';
+      if (nif.result === 'FAIL') return 'REQUIRED — STUDY FAILED';
+      return 'REQUIRED — STUDY INCONCLUSIVE';
+    }
+    return 'REQUIRED — NOT EVALUATED';
+  }
+  return 'REQUIREMENT UNKNOWN';
+}
+
+/**
+ * Canonical invariant-validation gate (mirrors siteOptimizer 4b): an
+ * internally inconsistent candidate is forced to REVIEW_REQUIRED, marked
+ * internally_consistent=false, and a blocker warning is emitted.
+ */
+function applyCanonicalConsistencyGate(candidates, warnings){
+  for (const c of candidates){
+    const report = c.canonical?.validation ?? null;
+    c.internally_consistent = report ? report.consistent === true : false;
+    if (report && report.consistent !== true){
+      c.status_category = 'REVIEW_REQUIRED';
+      warnings.push({
+        code: 'INTERNALLY_INCONSISTENT_CANDIDATE',
+        message: `Candidate at (${c.lat}, ${c.lon}) violates ${report.violations.length} internal invariant(s): ` +
+          `${report.violations.map((v) => v.invariant).join(', ')} — status forced to REVIEW_REQUIRED and ` +
+          'advancement recommendation suppressed (see candidate.canonical.validation).',
+        blocking: true
+      });
+    }
+  }
 }
 
 function collectHardFails(c){
@@ -826,8 +926,10 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   // Enrich nif_status with station-level skywave risk (same logic as siteOptimizer).
+  // 'NOT REQUIRED' never gets a "NIF study required" suffix — that would
+  // reintroduce the requirement contradiction the canonical rule removed.
   for (const c of candidates){
-    if (!c.nif_status || c.nif_status === 'SCREENING ONLY') continue;
+    if (!c.nif_status || c.nif_status === 'SCREENING ONLY' || c.nif_status === 'NOT REQUIRED') continue;
     if (c.treaty_zone){
       c.nif_status += ' — TREATY COORDINATION REQUIRED';
     } else if (skywave_risk_level === 'HIGH'){
@@ -1027,6 +1129,8 @@ export const __test__ = {
   decorateGridCandidate,
   assignStatusCategory,
   collectHardFails,
+  nifStatusFromCanonical,
+  applyCanonicalConsistencyGate,
   KNOWN_SEARCH_MODES,
   KNOWN_SOURCES,
   DIPLEX_RADIUS_KM,

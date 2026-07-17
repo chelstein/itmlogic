@@ -319,9 +319,9 @@ function _processRaw(raw, source){
     path:                 source,
     dataset_sha256,
     raw_feature_count,
-    valid_source_kml_files: 3207,
-    fcc_endpoint_misses:  FCC_ENDPOINT_MISSES,
-    partial_but_valid:    true,
+    valid_source_kml_files: valid_counties.length,   // derived from what was actually parsed, not a manifest literal
+    fcc_endpoint_misses:  FCC_ENDPOINT_MISSES,       // documented upstream-manifest constant (18 FCC KML endpoints never returned boundaries)
+    partial_but_valid:    valid_counties.length > 0 && (invalid_counties.length > 0 || FCC_ENDPOINT_MISSES > 0),
     unique_county_count:  counties.length,
     valid_county_count:   valid_counties.length,
     invalid_county_count: invalid_counties.length,

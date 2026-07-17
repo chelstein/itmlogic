@@ -91,7 +91,7 @@ export const sidecars = Object.freeze({
   // or ZTR is not configured.  Always on (geo.fcc.gov is public / no auth).
   // Disable with FCC_CONTOURS_DISABLE=1.
   fccContours: process.env.FCC_CONTOURS_DISABLE === '1' ? null : makeFccContoursClient(),
-  // §73.190 / Figure R3 ground-conductivity lookup.  Sourced via ZTR's
+  // §73.190 / Figure M3 ground-conductivity lookup.  Sourced via ZTR's
   // /api/m3/conductivity endpoint (chelstein/zerotrustradio); operator-
   // supplied inputs.ground_sigma_mS_m always wins over the lookup.
   // No separate sidecar is registered because no public JSON authority

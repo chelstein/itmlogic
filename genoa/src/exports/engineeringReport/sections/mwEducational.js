@@ -11,7 +11,7 @@
 //   1. MW Radio Propagation — groundwave vs skywave, why σ matters
 //   2. Soil-conductivity reference (FCC 1939 Table B verbatim)
 //   3. Blanketing Contours — what §73.24(g) is for
-//   4. Ground System — why 120 buried radials at quarter-wavelength
+//   4. Ground System — why 120 buried radials at 0.35λ (§73.189(b)(4))
 //   5. Maintenance Recommendations — for existing_facility_review intent
 //
 // All rendered as PARAGRAPHS sections (no schema change required) so
@@ -83,7 +83,7 @@ export function buildMwEducationalSections(exhibit){
     type:    'paragraphs',
     heading: 'BACKGROUND — BLANKETING CONTOURS',
     paragraphs: [
-      'When an AM signal reaches a consumer-electronic device with enough field strength, it can overload the device\'s input circuits and corrupt the signal the device is trying to receive — radios, televisions, computer audio, garage-door openers, baby monitors.  The FCC defines the BLANKETING CONTOUR as the locus where the AM signal is at or above 1 V/m (1000 mV/m, also written 115.6 dBu).',
+      'When an AM signal reaches a consumer-electronic device with enough field strength, it can overload the device\'s input circuits and corrupt the signal the device is trying to receive — radios, televisions, computer audio, garage-door openers, baby monitors.  The FCC defines the BLANKETING CONTOUR as the locus where the AM signal is at or above 1 V/m (1000 mV/m, also written 120 dBu).',
       'Under 47 CFR §73.24(g), if the population residing within the 1000 mV/m blanket contour exceeds 1.0% of the population residing within the 25 mV/m groundwave contour, the licensee is obligated to remediate complaints from those residents — re-tuning affected consumer electronics, replacing damaged devices, or in some cases relocating the consumer\'s antenna.  The Appendix J 8 km site survey and the §73.24(g) compliance component in the validation verdict together surface every constraint the licensee may be required to address.'
     ]
   });
@@ -94,7 +94,7 @@ export function buildMwEducationalSections(exhibit){
     type:    'paragraphs',
     heading: 'BACKGROUND — GROUND SYSTEM',
     paragraphs: [
-      'AM broadcast antennas radiate as VERTICAL MONOPOLES — the tower itself is the antenna, and the radiated field is referenced against an idealized perfect-ground image plane.  Real soil is imperfect, so every authorized AM facility includes a GROUND SYSTEM — buried copper radials that extend the conducting plane outward and approximate the ideal image.  The FCC standard is 120 equally-spaced radials, each at least a quarter-wavelength long (75-145 m depending on frequency).',
+      'AM broadcast antennas radiate as VERTICAL MONOPOLES — the tower itself is the antenna, and the radiated field is referenced against an idealized perfect-ground image plane.  Real soil is imperfect, so every authorized AM facility includes a GROUND SYSTEM — buried copper radials that extend the conducting plane outward and approximate the ideal image.  Per 47 CFR §73.189(b)(4) / NBS Technical Note 24, the FCC standard is 120 equally-spaced radials, each 0.35 wavelengths long (approximately 62–194 m depending on frequency across the 540–1700 kHz AM band).  The quarter-wave length (0.25λ) is a physics reference used in ground-loss resistance calculations, not the filing standard.',
       'A poorly-maintained or partially-removed ground system reduces the antenna\'s effective height, lowering the inverse-distance field at 1 km (RMS) below the authorized value.  §73.150 requires the as-built RMS to be at least 85% of the authorized RMS; a non-compliant ground system is the most common cause of falling below that threshold.  The §73.150 DA pattern compliance component in the validation verdict captures this when an authorized_pattern_table is attached for comparison.'
     ]
   });

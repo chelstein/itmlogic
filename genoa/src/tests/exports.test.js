@@ -28,7 +28,7 @@ test('TXT export contains required engineering sections', async () => {
     '-- FILING READINESS --',
     '-- VERSION BLOCK --',
     '-- REPRODUCIBILITY STATEMENT --',
-    '-- ENGINEERING CERTIFICATION PLACEHOLDER --'
+    '-- ENGINEERING CERTIFICATION (ENGINEER STAMP REQUIRED BEFORE FILING) --'
   ]){
     assert.ok(t.includes(section), 'TXT missing section ' + section);
   }

@@ -11,7 +11,7 @@
 //   - "validation pass" when validation.runs[].authoritative_pass is not true
 //   - any "terrain source" reference without exhibit.evidence.terrain.available
 //   - any "measurement evidence" reference without exhibit.evidence.measurements.available
-//   - any specific population claim when population_estimate.method === 'placeholder'
+//   - any specific population claim when population_estimate.method === 'model_estimate'
 
 const FORBIDDEN_ABSOLUTE = [
   /\bFCC\s+approved\b/i,
@@ -77,13 +77,13 @@ export function guardNarrative(text, exhibit){
     });
   }
 
-  // Conditional: do not state a specific population number when placeholder.
-  if (exhibit?.population_estimate?.method === 'placeholder'){
+  // Conditional: do not state a specific population number when using a model estimate (no Census dispatch).
+  if (exhibit?.population_estimate?.method === 'model_estimate' || exhibit?.population_estimate?.method === 'placeholder'){
     // Strip "covers <number> people" / "<number> persons" forms.
     out = out.replace(/\b(covers|reaches|services?)\s+~?\d[\d,]*\s+(people|persons|listeners)\b/gi, m => {
       violations.push({ rule: 'no_real_population', snippet: m });
       rewrites += 1;
-      return '[REMOVED: population estimate is a placeholder]';
+      return '[REMOVED: population is a model estimate — Census/ACS data required for filing-grade population claims]';
     });
   }
 

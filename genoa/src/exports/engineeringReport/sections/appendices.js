@@ -510,7 +510,7 @@ export function buildAppendixSections(exhibit){
   const tNested = ev.terrain?.dem || {};
   // For AM exhibits, §73.184 groundwave does not consume a DEM at all —
   // contour distances are derived from the FCC curve over assumed
-  // ground conductivity (§73.183 / §73.190 Fig. M3/R3).  Print the
+  // ground conductivity (§73.190 Fig. M3 conductivity maps).  Print the
   // regulatory rationale rather than a misleading em-dash that would
   // suggest a missing data source.
   const demNotApplicable = svc_c === 'AM' && !tDem.available;
@@ -832,15 +832,21 @@ export function buildAppendixSections(exhibit){
       const bindLabel = (b) => b
         ? `${b.call || b.facility_id || 'unknown'} (${b.relation || 'co_channel'})`
         : '— (ceiling-only)';
+      // Report the pool's OWN error cause (truncated) instead of a
+      // hard-coded "all pairs NaN" guess that may not match the actual
+      // failure (e.g. missing operator-supplied §73.182(k) e_max data).
+      const poolStatus = (pool) => pool.available === false
+        ? `NO — ${String(pool.error || 'not computable').slice(0, 120)}`
+        : 'yes';
 
       const gSummary = [
         ['§73.99(b)(1) ceiling',     `${ceiling} W`],
         ['PSSA reduced power',       fmtW(pssa.p_reduced_w) + (pssa.ceiling_applied ? '  (ceiling clipped)' : '')],
         ['PSSA binding pair',        bindLabel(pssa.binding)],
-        ['PSSA pool available',      pssa.available === false ? 'NO — all pairs NaN' : 'yes'],
+        ['PSSA pool available',      poolStatus(pssa)],
         ['PSRA reduced power',       fmtW(psraPool.p_reduced_w) + (psraPool.ceiling_applied ? '  (ceiling clipped)' : '')],
         ['PSRA binding pair',        bindLabel(psraPool.binding)],
-        ['PSRA pool available',      psraPool.available === false ? 'NO — all pairs NaN' : 'yes'],
+        ['PSRA pool available',      poolStatus(psraPool)],
         ['Skywave engine',           psra.provenance?.skywave_engine || 'unconfigured'],
         ['Sun authority',            psra.sun?.source || 'unavailable'],
         ['Regulation',               psra.regulation || '47 CFR §73.99(b)(1) / §73.99(b)(2)']
@@ -852,10 +858,29 @@ export function buildAppendixSections(exhibit){
         preface: 'Pre-sunrise / Post-sunset reduced-power exhibit per 47 CFR §73.99(b)(1)/(2).  ' +
                  'PSSA uses 50% (SS-1) skywave; PSRA uses 10% (SS-2) per §73.190.  ' +
                  'Per-pair allowed power P = P_daytime · (E_max_allowed / E_actual)² ' +
-                 'with E_max_allowed embedding the §73.182(k) RSS share.  ' +
+                 'with E_max_allowed taken from operator-supplied §73.182(k) nighttime-limit data ' +
+                 'for each protected station (never derived from the proposer\'s own field).  ' +
                  'The §73.99(b)(1) 500 W ceiling clips any binding pair that allows more.',
         rows: gSummary
       });
+
+      // E_max data gap — the orchestrator flags protected pairs whose
+      // operator-supplied §73.182(k) limits (e_max_pssa_uv_m /
+      // e_max_psra_uv_m) were missing; surface the gap prominently so
+      // the reviewer knows those pairs are NOT filing-grade.
+      if (psra.e_max_data_gap){
+        const gap = psra.e_max_data_gap;
+        sections.push({
+          id:      'appendix-g-emax-gap',
+          type:    'kv',
+          heading: 'Appendix G — §73.182(k) E_max data gap',
+          preface: gap.detail || 'Operator-supplied §73.182(k) nighttime-limit data was missing for one or more protected pairs.',
+          rows: [
+            ['Pairs missing E_max', String(gap.n_pairs_missing ?? (gap.pairs || []).length)],
+            ['Affected pairs',      (gap.pairs || []).join(', ') || '—']
+          ]
+        });
+      }
 
       // Window schedule (per-month local-time sunrise/sunset bracket
       // the PSRA/PSSA windows; FCC convention is 6 AM local for PSRA
@@ -1003,7 +1028,7 @@ export function buildAppendixSections(exhibit){
     } else {
       const fmtNum = (v, dp = 6) =>
         Number.isFinite(Number(v)) ? Number(v).toFixed(dp) : '—';
-      const sigmaSrc = inp.sigma_source === 'default' ? '  (default per §73.190 Fig. R3)' : '';
+      const sigmaSrc = inp.sigma_source === 'default' ? '  (default per §73.190 Fig. M3)' : '';
       const eprSrc   = inp.epr_source   === 'default' ? '  (default — NEC average soil)' : '';
       const timeSec  = Number.isFinite(Number(sum.time_seconds))
         ? `${Number(sum.time_seconds).toFixed(4)} s` : '—';

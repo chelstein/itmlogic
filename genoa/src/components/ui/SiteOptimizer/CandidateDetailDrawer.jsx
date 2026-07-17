@@ -1,6 +1,9 @@
 import React from 'react';
 import StatusChip from './StatusChip.jsx';
 import ScoreBreakdownChart from './ScoreBreakdownChart.jsx';
+import CanonicalStatusBanner from './CanonicalStatusBanner.jsx';
+import { fmtCoord, fmtBlanketPct, stateColor, requirementColor, passFailColor, violationColor, STATE_COLORS } from './format.js';
+import { approxString, costRangeString, scoreString } from '../../../engine/am/canonical/formatters.js';
 
 // CandidateDetailDrawer — slides up from the bottom (desktop: docked
 // to the right side, but rendered as a fixed overlay so it works at
@@ -17,22 +20,26 @@ function fmtNum(v, digits = 1){
   if (v == null || !Number.isFinite(Number(v))) return '—';
   return Number(v).toFixed(digits);
 }
-// blanket_population_pct is stored as a percent value (e.g. 2.14 = 2.14%),
-// NOT as a 0..1 fraction — do NOT multiply by 100.
-function fmtBlanketPct(v, digits = 2){
-  if (v == null || !Number.isFinite(Number(v))) return '—';
-  return `${Number(v).toFixed(digits)}%`;
-}
+// fmtBlanketPct and fmtCoord are shared via ./format.js — blanket
+// percentages are stored as PERCENT values (2.14 = 2.14%), never *100'd,
+// and coordinate hemispheres are always derived from the sign.
 function fmtPopulation(n){
   if (n == null || !Number.isFinite(n)) return '—';
   if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
   if (n >= 1e3) return `${Math.round(n / 1e3)}K`;
   return String(Math.round(n));
 }
-function fmtCoord(lat, lon){
-  const latDir = lat >= 0 ? 'N' : 'S';
-  const lonDir = lon >= 0 ? 'E' : 'W';
-  return `${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lon).toFixed(4)}° ${lonDir}`;
+
+// Confidence tiers from the canonical result (candidate.canonical may be
+// absent on older payloads — every read is null-guarded).
+function canonicalEngTier(candidate){
+  return candidate?.canonical?.confidence?.engineeringDataConfidence?.tier ?? null;
+}
+function canonicalPopTier(candidate){
+  return candidate?.canonical?.confidence?.engineeringDataConfidence?.inputTiers?.populationBasis ?? null;
+}
+function isCoarseTier(tier){
+  return tier === 'SCREENING' || tier === 'LOW';
 }
 
 function MiniContourPreview({ daytimeReachKm }){
@@ -63,18 +70,22 @@ function MiniContourPreview({ daytimeReachKm }){
 // Inline chip helpers for the co-location analysis section.  Kept local
 // because they only matter inside this drawer; the table uses StatusChip.
 function YesNoChip({ value, yesTone = 'amber' }){
-  const yes = !!value;
-  const palette = yes
-    ? (yesTone === 'red'
-        ? { fg: '#ff5a5a', bg: 'rgba(255,90,90,0.12)',  border: 'rgba(255,90,90,0.55)' }
-        : { fg: '#ffb347', bg: 'rgba(255,179,71,0.12)', border: 'rgba(255,179,71,0.55)' })
-    : { fg: '#63d471', bg: 'rgba(99,212,113,0.10)', border: 'rgba(99,212,113,0.45)' };
+  // Tri-state: a MISSING value must render gray, never the green 'NO' side.
+  const missing = value === null || value === undefined;
+  const yes = value === true || (!missing && !!value);
+  const palette = missing
+    ? { fg: '#a89c84', bg: 'rgba(168,156,132,0.10)', border: 'rgba(168,156,132,0.45)' }
+    : yes
+      ? (yesTone === 'red'
+          ? { fg: '#ff5a5a', bg: 'rgba(255,90,90,0.12)',  border: 'rgba(255,90,90,0.55)' }
+          : { fg: '#ffb347', bg: 'rgba(255,179,71,0.12)', border: 'rgba(255,179,71,0.55)' })
+      : { fg: '#63d471', bg: 'rgba(99,212,113,0.10)', border: 'rgba(99,212,113,0.45)' };
   return (
     <span
       className="inline-flex items-center font-mono tracking-rack uppercase border rounded-sm px-1.5 py-0.5 text-[9px]"
       style={{ color: palette.fg, background: palette.bg, borderColor: palette.border }}
     >
-      {yes ? 'YES' : 'NO'}
+      {missing ? '—' : yes ? 'YES' : 'NO'}
     </span>
   );
 }
@@ -233,6 +244,14 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           <div className="rack-eyebrow">Candidate detail</div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="font-display text-cream text-[18px]">Rank #{candidate.rank}</span>
+            {candidate.canonical?.scoring?.tiedWithinModelPrecision && (
+              <span className="font-mono text-[9px] uppercase tracking-rack border rounded-sm px-1.5 py-0.5"
+                style={{ color: STATE_COLORS.blue, background: 'rgba(126,200,227,0.08)', borderColor: 'rgba(126,200,227,0.35)' }}
+                title={candidate.canonical.scoring.displayLabel || 'Tied at current screening resolution'}
+              >
+                {candidate.canonical.scoring.displayLabel || 'Tied at current screening resolution'}
+              </span>
+            )}
             {candidate.rank_percentile != null && (
               <span className="font-mono text-[10px] text-textDim border border-rule rounded-sm px-1.5 py-0.5">
                 {candidate.rank_percentile.toFixed(0)}th pct
@@ -325,6 +344,9 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
       </header>
 
       <section className="px-4 py-4 space-y-5">
+        {/* Canonical result status — confidence / readiness / studies / consistency */}
+        <CanonicalStatusBanner canonical={candidate.canonical} />
+
         {/* FCC Filing Auto-Fill Preview */}
         {(() => {
           const ltg = candidate.am_tower_lighting_and_painting_compliance_guide;
@@ -405,6 +427,9 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           <ScoreBreakdownChart
             breakdown={e.score_breakdown}
             totalScore={candidate.score}
+            totalScoreDisplay={isCoarseTier(canonicalEngTier(candidate))
+              ? scoreString(candidate.score, candidate.score_confidence_band?.uncertainty_pts ?? null)
+              : null}
             baselineBreakdown={baseline?.score_breakdown ?? null}
             baselineTotalScore={baseline?.score ?? null}
             rawComponents={e.score_components_raw ?? null}
@@ -432,7 +457,10 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div className="flex justify-between font-mono text-[10px] text-textDim mb-2">
                 <span>0</span>
                 <span className="font-semibold" style={{ color: rangeColor }}>
-                  {low.toFixed(1)} – {score.toFixed(1)} – {high.toFixed(1)}
+                  {isCoarseTier(canonicalEngTier(candidate))
+                    // Screening-grade scores must not display false 0.1-pt precision.
+                    ? (scoreString(score, band.uncertainty_pts) ?? '—')
+                    : `${low.toFixed(1)} – ${score.toFixed(1)} – ${high.toFixed(1)}`}
                 </span>
                 <span>100</span>
               </div>
@@ -775,7 +803,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             {/* Antenna height profile */}
             {candidate.antenna_height_profile && (() => {
               const ahp = candidate.antenna_height_profile;
-              const asrColor = ahp.quarter_wave_asr_required ? '#ffb347' : '#63d471';
+              const asrColor = requirementColor(ahp.quarter_wave_asr_required ?? null);
               return (
                 <div className="col-span-2 border border-rule/40 rounded p-2 font-mono text-[10px] space-y-0.5">
                   <div className="text-textDim text-[9px] uppercase tracking-rack mb-1">Antenna height (λ/4)</div>
@@ -890,12 +918,14 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* Regulatory compliance summary — structured FCC check table */}
         {candidate.regulatory_compliance_summary && (() => {
           const rcs = candidate.regulatory_compliance_summary;
-          const rowColor = s => s === 'PASS' ? '#63d471' : s === 'FAIL' ? '#ff5a5a' : s === 'ADVISORY' ? '#ffb347' : '#a89c84';
+          const rowColor = s => stateColor(s);
           const rows = [
             { label: 'COL coverage', entry: rcs.col_coverage,
               display: rcs.col_coverage.value != null ? `${(rcs.col_coverage.value * 100).toFixed(0)}% (floor ${(rcs.col_coverage.threshold * 100).toFixed(0)}%)` : '—' },
             { label: 'Blanket pop', entry: rcs.blanket_pop,
-              display: rcs.blanket_pop.value != null ? `${(rcs.blanket_pop.value * 100).toFixed(1)}% (limit ${(rcs.blanket_pop.threshold * 100).toFixed(0)}%)` : '—' },
+              // blanket_pop.value / .threshold are already PERCENT values
+              // (0.6 = 0.6%, threshold 1 = the §73.24(g) 1% limit) — never *100.
+              display: rcs.blanket_pop.value != null ? `${fmtBlanketPct(rcs.blanket_pop.value, 2)} (limit ${fmtBlanketPct(rcs.blanket_pop.threshold ?? 1, 0)})` : '—' },
             { label: 'Class power', entry: rcs.class_power,
               display: rcs.class_power.value != null ? `${rcs.class_power.value} kW${rcs.class_power.ceiling != null ? ` (ceil ${rcs.class_power.ceiling} kW)` : ''}` : '—' },
             { label: 'Treaty zone', entry: rcs.treaty_zone,
@@ -997,8 +1027,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 {fa.blanket_pop_pct != null && (
                   <div>
                     <span className="text-textDim">Blanket pop</span>{' '}
-                    <span style={{ color: fa.blanket_pop_meets_limit ? '#63d471' : '#ff5a5a' }}>
-                      {fa.blanket_pop_pct.toFixed(2)}%
+                    <span style={{ color: passFailColor(fa.blanket_pop_meets_limit ?? null) }}>
+                      {fmtBlanketPct(fa.blanket_pop_pct, 2)}
                     </span>
                     <span className="text-textDim opacity-50"> (limit 1%)</span>
                   </div>
@@ -1048,9 +1078,10 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   {pua.blanket_concern_at_max && (
                     <div>
                       <span className="text-textDim">Blanket at max: </span>
-                      <span style={{ color: pua.blanket_concern_at_max.would_exceed_limit ? '#ff7a7a' : '#63d471' }}>
-                        {pua.blanket_concern_at_max.estimated_blanket_pop_pct}%
-                        {pua.blanket_concern_at_max.would_exceed_limit ? ' ✕ EXCEEDS §73.24(g)' : ' ✓'}
+                      <span style={{ color: violationColor(pua.blanket_concern_at_max.would_exceed_limit ?? null) }}>
+                        {fmtBlanketPct(pua.blanket_concern_at_max.estimated_blanket_pop_pct)}
+                        {pua.blanket_concern_at_max.would_exceed_limit === true ? ' ✕ EXCEEDS §73.24(g)'
+                          : pua.blanket_concern_at_max.would_exceed_limit === false ? ' ✓' : ''}
                       </span>
                     </div>
                   )}
@@ -2088,7 +2119,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div className="text-[9px] text-textDim/60 font-mono">Wire: {std.wire_gauge} · Burial: {std.burial_depth_mm} mm</div>
                 )}
                 {std?.area_required_ha != null && (
-                  <div className="text-[9px] text-textDim/50 font-mono">Site area needed: {std.area_required_ha} ha for full λ/4 radial field</div>
+                  <div className="text-[9px] text-textDim/50 font-mono">Site area needed: {std.area_required_ha} ha for FCC-standard 0.35λ radial field</div>
                 )}
                 <p className="text-[8px] text-textDim/40 leading-snug">{gs.note}</p>
               </div>
@@ -2360,13 +2391,17 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {candidate.am_total_project_capital_cost_rollup_guide && (() => {
           const cap = candidate.am_total_project_capital_cost_rollup_guide;
           const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          // Screening-grade totals render coarsened (≈2 sig figs); exact
+          // dollar figures only for filing/engineering-grade candidates.
+          const tier = canonicalEngTier(candidate);
+          const fmtRange = (lo, hi) => costRangeString(lo ?? null, hi ?? null, tier) ?? `${fmtUsd(lo)}–${fmtUsd(hi)}`;
           return (
             <div style={{ background: '#0f172a', border: '1px solid #166534', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 15, color: '#4ade80' }}>💰</span>
                 <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Total Project Capital Cost</span>
                 <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#4ade80', background: '#14532d', padding: '2px 10px', borderRadius: 4 }}>
-                  {fmtUsd(cap.total_usd?.low)}–{fmtUsd(cap.total_usd?.high)}
+                  {fmtRange(cap.total_usd?.low, cap.total_usd?.high)}
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
@@ -2375,7 +2410,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 ))}
               </div>
               <div style={{ fontSize: 11, color: '#4ade80', borderTop: '1px solid #166534', paddingTop: 6 }}>
-                Subtotal {fmtUsd(cap.subtotal_usd?.low)}–{fmtUsd(cap.subtotal_usd?.high)} + 15% contingency = <b>{fmtUsd(cap.total_usd?.low)}–{fmtUsd(cap.total_usd?.high)}</b>
+                Subtotal {fmtRange(cap.subtotal_usd?.low, cap.subtotal_usd?.high)} + 15% contingency = <b>{fmtRange(cap.total_usd?.low, cap.total_usd?.high)}</b>
               </div>
               <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>SCREENING GRADE · {cap.note}</div>
             </div>
@@ -2425,7 +2460,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
-                <span>Radial length (λ/4): <b style={{ color: '#e2e8f0' }}>{grs.radial_length_m}m</b></span>
+                <span>Radial length (0.35λ): <b style={{ color: '#e2e8f0' }}>{grs.radial_length_m}m</b></span>
                 <span>Total wire (std): <b style={{ color: '#e2e8f0' }}>{rec?.total_wire_m?.toLocaleString()}m</b></span>
                 <span>Efficiency (std): <b style={{ color: '#4ade80' }}>{rec?.efficiency_pct}%</b></span>
                 <span>Ground loss (std): <b style={{ color: '#e2e8f0' }}>{rec?.r_loss_ohm}Ω</b></span>
@@ -2502,8 +2537,11 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {candidate.am_construction_permit_exhibit_requirements_guide && (() => {
           const cpe = candidate.am_construction_permit_exhibit_requirements_guide;
           const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
-          const asrColor = cpe.asr_required ? '#f87171' : '#4ade80';
-          const eaColor  = cpe.environmental_assessment_required ? '#f87171' : '#4ade80';
+          const asrColor = requirementColor(cpe.asr_required ?? null);
+          // 'CE LIKELY' is a modeled expectation, not a verified PASS → blue.
+          const eaColor  = cpe.environmental_assessment_required === true ? stateColor('REQUIRED')
+            : cpe.environmental_assessment_required === false ? STATE_COLORS.blue
+            : stateColor(null);
           return (
             <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -2515,9 +2553,9 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
                 <span>Quarter-wave tower: <b style={{ color: '#e2e8f0' }}>{cpe.quarter_wave_height_m}m</b></span>
-                <span>ASR registration: <b style={{ color: asrColor }}>{cpe.asr_required ? 'REQUIRED' : 'NOT REQUIRED'}</b></span>
-                <span>Env. Assessment: <b style={{ color: eaColor }}>{cpe.environmental_assessment_required ? 'EA REQUIRED (>5 kW)' : 'CE LIKELY'}</b></span>
-                <span>Nighttime NIF: <b style={{ color: cpe.nif_required ? '#facc15' : '#4ade80' }}>{cpe.nif_required ? 'REQUIRED (A/B)' : 'NOT REQUIRED'}</b></span>
+                <span>ASR registration: <b style={{ color: asrColor }}>{cpe.asr_required === true ? 'REQUIRED' : cpe.asr_required === false ? 'NOT REQUIRED' : 'NOT EVALUATED'}</b></span>
+                <span>Env. Assessment: <b style={{ color: eaColor }}>{cpe.environmental_assessment_required === true ? 'EA REQUIRED (>5 kW)' : cpe.environmental_assessment_required === false ? 'CE LIKELY' : 'NOT EVALUATED'}</b></span>
+                <span>Nighttime NIF: <b style={{ color: requirementColor(cpe.nif_required ?? null) }}>{cpe.nif_required === true ? 'REQUIRED (A/B)' : cpe.nif_required === false ? 'NOT REQUIRED' : 'NOT EVALUATED'}</b></span>
                 <span>FCC filing fee: <b style={{ color: '#e2e8f0' }}>{fmtUsd(cpe.fcc_filing_fee_usd)}</b></span>
                 <span>Total est. cost: <b style={{ color: '#e2e8f0' }}>{fmtUsd(cpe.total_filing_cost_low_usd)}–{fmtUsd(cpe.total_filing_cost_high_usd)}</b></span>
               </div>
@@ -2532,14 +2570,14 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {candidate.am_proof_of_performance_guide && (() => {
           const pop = candidate.am_proof_of_performance_guide;
           const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
-          const reqColor = pop.proof_required ? '#f87171' : '#4ade80';
+          const reqColor = requirementColor(pop.proof_required ?? null);
           return (
             <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 15, color: '#fbbf24' }}>📐</span>
                 <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Proof of Performance (§73.151)</span>
                 <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: reqColor, background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
-                  {pop.proof_required ? 'DA PROOF REQUIRED' : 'NDA — NO PROOF'}
+                  {pop.proof_required === true ? 'DA PROOF REQUIRED' : pop.proof_required === false ? 'NDA — NO PROOF' : 'NOT EVALUATED'}
                 </div>
               </div>
               {pop.proof_required ? (
@@ -2561,7 +2599,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* AM Environmental & RF Hazard Assessment Guide */}
         {candidate.am_environmental_and_rf_hazard_assessment_guide && (() => {
           const env = candidate.am_environmental_and_rf_hazard_assessment_guide;
-          const nepaColor = env.nepa_disposition === 'EA_REQUIRED' ? '#f87171' : '#4ade80';
+          const nepaColor = env.nepa_disposition == null ? stateColor(null) : requirementColor(env.nepa_disposition === 'EA_REQUIRED');
           return (
             <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -2573,9 +2611,9 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
                 <span>NEPA: <b style={{ color: nepaColor }}>{env.nepa_disposition?.replace(/_/g,' ')}</b></span>
-                <span>RF eval required: <b style={{ color: env.rf_eval_required ? '#f87171' : '#4ade80' }}>{env.rf_eval_required ? 'YES (≥1 kW)' : 'NO'}</b></span>
+                <span>RF eval required: <b style={{ color: requirementColor(env.rf_eval_required ?? null) }}>{env.rf_eval_required === true ? 'YES (≥1 kW)' : env.rf_eval_required === false ? 'NO' : 'NOT EVALUATED'}</b></span>
                 <span>RF fence dist: <b style={{ color: '#e2e8f0' }}>{env.rf_safe_dist_m != null ? `~${env.rf_safe_dist_m} m` : '—'}</b></span>
-                <span>NHPA §106: <b style={{ color: env.nhpa_likely_required ? '#facc15' : '#4ade80' }}>{env.nhpa_likely_required ? 'VERIFY HEIGHT' : 'CHECK HEIGHT'}</b></span>
+                <span>NHPA §106: <b style={{ color: requirementColor(env.nhpa_likely_required ?? null) }}>{env.nhpa_likely_required ? 'VERIFY HEIGHT' : 'CHECK HEIGHT'}</b></span>
                 <span>Checklist items: <b style={{ color: '#e2e8f0' }}>{env.n_env_required} required</b></span>
                 <span>Advisory items: <b style={{ color: '#64748b' }}>{env.n_env_advisory}</b></span>
               </div>
@@ -2599,7 +2637,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
                 <span>Channel class: <b style={{ color: clsColor }}>{fcs.channel_class || '—'}</b></span>
-                <span>Skywave obligation: <b style={{ color: fcs.has_skywave_obligation ? '#f87171' : '#4ade80' }}>{fcs.has_skywave_obligation ? 'YES' : 'NO (Class C)'}</b></span>
+                <span>Skywave obligation: <b style={{ color: requirementColor(fcs.has_skywave_obligation ?? null) }}>{fcs.has_skywave_obligation === true ? 'YES' : fcs.has_skywave_obligation === false ? 'NO (Class C)' : 'NOT EVALUATED'}</b></span>
                 <span>Co-channel search: <b style={{ color: '#e2e8f0' }}>{fcs.co_channel_search_radius_km} km</b></span>
                 <span>Adj-channel search: <b style={{ color: '#e2e8f0' }}>{fcs.adj_channel_search_radius_km} km</b></span>
                 <span>Study effort: <b style={{ color: '#e2e8f0' }}>{fcs.study_effort_hrs?.min}–{fcs.study_effort_hrs?.max} hrs</b></span>
@@ -3053,7 +3091,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               {/* Required / CE badge */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                <span style={{ background: (mpe.mpe_required ? '#dc2626' : '#16a34a') + '33', color: mpe.mpe_required ? '#fca5a5' : '#86efac', borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
+                <span style={{ background: requirementColor(mpe.mpe_required ?? null) + '33', color: requirementColor(mpe.mpe_required ?? null), borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
                   {mpe.mpe_required ? 'MPE EVALUATION REQUIRED' : 'CATEGORICALLY EXCLUDED (CE)'}
                 </span>
                 <span style={{ background: evalColor + '22', color: evalColor, borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
@@ -3133,7 +3171,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               {/* Key metrics row */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10 }}>
                 <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
-                  <div style={{ color: '#6b7280' }}>λ/4 radial length</div>
+                  <div style={{ color: '#6b7280' }}>λ/4 tower height ref.</div>
                   <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{fmtFt(gs.quarter_wave_ft)}</div>
                 </div>
                 <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
@@ -3374,7 +3412,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* AM NEPA Environmental Review Guide */}
         {candidate.am_nepa_environmental_review_guide && (() => {
           const ne = candidate.am_nepa_environmental_review_guide;
-          const pathColor = ne.review_path === 'EA_REQUIRED' ? '#ef4444' : ne.review_path === 'CE_LIKELY_WITH_NHPA' ? '#f59e0b' : '#22c55e';
+          const pathColor = ne.review_path == null ? stateColor(null) : ne.review_path === 'EA_REQUIRED' ? stateColor('REQUIRED') : ne.review_path === 'CE_LIKELY_WITH_NHPA' ? stateColor('WARN') : stateColor('PASS');
           const pathBg    = ne.review_path === 'EA_REQUIRED' ? '#450a0a' : ne.review_path === 'CE_LIKELY_WITH_NHPA' ? '#451a03' : '#052e16';
           const sevColor  = (s) => s === 'HIGH' ? '#ef4444' : s === 'MODERATE' ? '#f59e0b' : '#94a3b8';
           return (
@@ -3432,7 +3470,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* AM Site Access and Land Use Guide */}
         {candidate.am_site_access_and_land_use_guide && (() => {
           const lu = candidate.am_site_access_and_land_use_guide;
-          const riskColor = lu.zone_risk_tier === 'HIGH' ? '#ef4444' : lu.zone_risk_tier === 'MODERATE' ? '#f59e0b' : '#22c55e';
+          const riskColor = lu.zone_risk_tier == null ? stateColor(null) : lu.zone_risk_tier === 'HIGH' ? stateColor('HIGH') : lu.zone_risk_tier === 'MODERATE' ? stateColor('WARN') : stateColor('PASS');
           const riskBg    = lu.zone_risk_tier === 'HIGH' ? '#450a0a' : lu.zone_risk_tier === 'MODERATE' ? '#451a03' : '#052e16';
           const fmtK = (n) => n != null ? '$' + Math.round(n / 1000) + 'K' : '—';
           return (
@@ -3487,6 +3525,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const pf = candidate.am_station_relocation_total_project_cost_proforma;
           const fmt = (n) => n != null ? '$' + Number(n).toLocaleString() : '—';
           const fmtK = (n) => n != null ? '$' + Math.round(n / 1000) + 'K' : '—';
+          const tier = canonicalEngTier(candidate);
+          const fmtRange = (lo, hi) => costRangeString(lo ?? null, hi ?? null, tier) ?? `${fmtK(lo)} – ${fmtK(hi)}`;
           return (
             <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -3499,7 +3539,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div>
                   <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', marginBottom: 2 }}>GRAND TOTAL (incl. contingency)</div>
                   <div style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>
-                    {fmtK(pf.grand_total_low_usd)} – {fmtK(pf.grand_total_high_usd)}
+                    {fmtRange(pf.grand_total_low_usd, pf.grand_total_high_usd)}
                   </div>
                   <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', marginTop: 2 }}>midpoint {fmtK(pf.grand_total_midpoint_usd)}</div>
                 </div>
@@ -3648,7 +3688,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const g = candidate.am_rf_exposure_mpe_evaluation_guide;
           const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
           const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
-          const evalColor = g.eval_required ? '#ef4444' : '#22c55e';
+          const evalColor = requirementColor(g.eval_required ?? null);
           return (
             <div style={{ background: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#991b1b', marginBottom: 8 }}>
@@ -3729,7 +3769,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 Daytime / Nighttime Power Reduction (§73.99)
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#cbd5e1' }}>
-                <div><b>Channel class:</b> <span style={{ color: g.is_clear_channel ? '#f87171' : '#86efac' }}>{g.is_clear_channel ? 'CLEAR — dominant protection' : 'Regional / Local'}</span></div>
+                <div><b>Channel class:</b> <span style={{ color: requirementColor(g.is_clear_channel ?? null) }}>{g.is_clear_channel ? 'CLEAR — dominant protection' : 'Regional / Local'}</span></div>
                 <div><b>Daytime TPO:</b> {g.daytime_tpo_kw} kW</div>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <b>Night power:</b>
@@ -3825,7 +3865,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#fff7f0', border: '1px solid #fbbf24', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 8 }}>
-                Groundwave Field Strength Estimate (§73.183 / §73.184 M3 Curves)
+                Groundwave Field Strength Estimate (§73.184 M3 Curves)
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
                 <div><b>σ (conductivity):</b> {fmtF(g.conductivity_msm)} mS/m</div>
@@ -3836,8 +3876,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <b>COL field ({fmtF(g.field_at_col_dist_km)} km):</b>
                   <span style={{ color: compColor, fontWeight: 600 }}>{fmtF(g.field_at_col_dist_mvm, 2)} mV/m</span>
                 </div>
-                <div><b>§73.24(b) min (2 mV/m):</b> <span style={{ color: compColor }}>{g.col_field_compliant ? '✓ MET' : '✗ FAILS'}</span></div>
-                <div style={{ gridColumn: '1/-1' }}><b>Formal §73.183 study cost:</b> ${fmt(g.study_cost_low_usd)}–${fmt(g.study_cost_high_usd)}</div>
+                <div><b>§73.182 min (2 mV/m):</b> <span style={{ color: compColor }}>{g.col_field_compliant ? '✓ MET' : '✗ FAILS'}</span></div>
+                <div style={{ gridColumn: '1/-1' }}><b>Formal §73.184 groundwave study cost:</b> ${fmt(g.study_cost_low_usd)}–${fmt(g.study_cost_high_usd)}</div>
                 <div style={{ gridColumn: '1/-1', fontSize: 10, color: '#b45309' }}>Screening estimate ±30%. Formal M3 study required for FCC filing.</div>
               </div>
             </div>
@@ -3979,18 +4019,18 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 Nighttime NIF Service Contour (§73.182)
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#d4d4d8' }}>
-                <div><b style={{ color: '#a1a1aa' }}>Distance to KKOB:</b> {fmtF(g.dist_to_kkob_km)} km</div>
+                <div><b style={{ color: '#a1a1aa' }}>Distance to dominant:</b> {fmtF(g.dist_to_dominant_km ?? g.dist_to_kkob_km)} km</div>
                 <div>
-                  <b style={{ color: '#a1a1aa' }}>Skywave at KKOB:</b>{' '}
+                  <b style={{ color: '#a1a1aa' }}>Skywave at dominant:</b>{' '}
                   <span style={{ color: compliantColor, fontWeight: 700 }}>{fmtF(g.sky_uVm, 1)} µV/m</span>
-                  {' '}(limit: {g.protection_threshold_uVm} µV/m — {g.kkob_interference_compliant ? 'COMPLIANT' : 'EXCEEDS'})
+                  {' '}(limit: {g.protection_threshold_uVm} µV/m — {(g.dominant_interference_compliant ?? g.kkob_interference_compliant) ? 'COMPLIANT' : 'EXCEEDS'})
                 </div>
                 <div><b style={{ color: '#a1a1aa' }}>0.1 mV/m Contour:</b> ≈{g.nighttime_0p1_km} km radius</div>
                 <div><b style={{ color: '#a1a1aa' }}>Conductivity (σ):</b> ≈{g.sigma_proxy_mSm} mS/m</div>
                 <div><b style={{ color: '#a1a1aa' }}>Est. NIF Area:</b> {g.nif_fraction_pct_low}–{g.nif_fraction_pct_high}% of nighttime contour</div>
-                <div><b style={{ color: '#a1a1aa' }}>Clear Channel:</b> 780 kHz — KKOB dominant (50 kW)</div>
+                <div><b style={{ color: '#a1a1aa' }}>Clear Channel dominant:</b> {g.dominant_station || '—'}</div>
                 <div style={{ gridColumn: '1 / -1', borderTop: `1px solid ${compliantColor}40`, marginTop: 4, paddingTop: 6, color: '#a1a1aa' }}>
-                  <b>NIF Study Cost:</b> ${fmt(g.nif_study_low_usd)}–${fmt(g.nif_study_high_usd)} (§73.182 M3 skywave analysis required at filing)
+                  <b>NIF Study Cost:</b> ${fmt(g.nif_study_low_usd)}–${fmt(g.nif_study_high_usd)} (§73.182 skywave NIF analysis required at filing)
                 </div>
               </div>
             </div>
@@ -4076,7 +4116,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div><b>Audience Uplift:</b> {g.audience_reach_uplift_pct_low}–{g.audience_reach_uplift_pct_high}% with translator</div>
                 <div><b>On Relocation:</b> {g.translator_modification_form}</div>
                 <div><b>FCC Fee:</b> ${fmt(g.fcc_fee_usd)}</div>
-                <div><b>AM Contour:</b> within {g.am_primary_contour_mv_m} mV/m daytime (§74.1237)</div>
+                <div><b>AM Contour:</b> GREATER of {g.am_primary_contour_mv_m} mV/m daytime contour or 40 km radius (§74.1231(i))</div>
                 <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #c4b5fd', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
                   <span><b>Equipment:</b> ${fmt(g.equipment_low_usd)}–${fmt(g.equipment_high_usd)}</span>
                   <span><b>Engineering:</b> ${fmt(g.engineering_low_usd)}–${fmt(g.engineering_high_usd)}</span>
@@ -4123,7 +4163,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   {' '}(0.1 mV/m contour)
                 </div>
                 <div><b style={{ color: '#a1a1aa' }}>Hi-Fi Threshold (25 dB):</b> {g.snr_day_hifi ? 'Met' : 'Not met'}</div>
-                <div><b style={{ color: '#a1a1aa' }}>Clear Channel (780 kHz):</b> {g.is_clear_channel_freq ? 'Yes — KKOB dominant' : 'No'}</div>
+                <div><b style={{ color: '#a1a1aa' }}>Clear Channel (780 kHz):</b> {g.is_clear_channel_freq ? 'Yes — WBBM Chicago IL dominant (50 kW)' : 'No'}</div>
                 <div style={{ gridColumn: '1 / -1', borderTop: `1px solid ${riskColor}40`, marginTop: 4, paddingTop: 6, display: 'flex', gap: 18, color: '#a1a1aa' }}>
                   <span><b>Site Survey:</b> ${fmt(g.survey_cost_low_usd)}–${fmt(g.survey_cost_high_usd)}</span>
                   <span><b>Total (incl. remediation):</b> ${fmt(g.total_noise_low_usd)}–${fmt(g.total_noise_high_usd)}</span>
@@ -4208,7 +4248,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             <div key="prl-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf7f2', borderRadius: 8, border: '2px solid #9a3412' }}>
               <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Site Lease &amp; Property Rights — ASTM E1527 / §73.49</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#7c2d12', marginBottom: 8 }}>
-                <span style={{ color: '#9a3412' }}>Radial reach:</span><span>{fmtF(g.radial_length_m, 1)} m (λ/4)</span>
+                <span style={{ color: '#9a3412' }}>Radial reach:</span><span>{fmtF(g.radial_length_m, 1)} m (0.35λ FCC std)</span>
                 <span style={{ color: '#9a3412' }}>Min. site area:</span><span style={{ fontWeight: 700 }}>{fmtF(g.site_area_required_acres, 1)} acres</span>
                 <span style={{ color: '#9a3412' }}>Lease tier:</span><span style={{ textTransform: 'capitalize' }}>{g.lease_tier}</span>
                 <span style={{ color: '#9a3412' }}>Annual lease:</span><span>${fmt(g.lease_annual_low_usd)} – ${fmt(g.lease_annual_high_usd)}/yr</span>
@@ -4439,11 +4479,11 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </span>
                 <span style={{ color: '#c026d3' }}>Dominant station:</span><span>{g.dominant_station}</span>
                 <span style={{ color: '#c026d3' }}>Night sign-off risk:</span>
-                <span style={{ fontWeight: 700, color: g.night_signoff_risk ? '#f87171' : '#4ade80' }}>
+                <span style={{ fontWeight: 700, color: requirementColor(g.night_signoff_risk ?? null) }}>
                   {g.night_signoff_risk ? '⚠ YES — §73.182(m)' : 'NO'}
                 </span>
                 <span style={{ color: '#c026d3' }}>D/U study required:</span>
-                <span style={{ fontWeight: 700, color: g.du_study_required ? '#fbbf24' : '#4ade80' }}>
+                <span style={{ fontWeight: 700, color: requirementColor(g.du_study_required ?? null) }}>
                   {g.du_study_required ? 'YES — ITU-R P.1147' : 'NO'}
                 </span>
                 <span style={{ color: '#c026d3' }}>Skip zone est:</span><span>~{fmt(g.skip_zone_est_km)} km</span>
@@ -4762,7 +4802,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Tower Lighting &amp; Marking (§17.21 / FAA AC 70/7460-1M)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#075985' }}>
                 <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
-                <span>Lighting required:</span><span style={{ fontWeight: 600, color: g.lighting_required ? '#dc2626' : '#16a34a' }}>{g.lighting_required === true ? 'YES (> 200 ft AGL)' : 'No (≤ 200 ft AGL)'}</span>
+                <span>Lighting required:</span><span style={{ fontWeight: 600, color: requirementColor(g.lighting_required ?? null) }}>{g.lighting_required === true ? 'YES (> 200 ft AGL)' : g.lighting_required === false ? 'No (≤ 200 ft AGL)' : '—'}</span>
                 <span>Lighting category:</span><span style={{ fontSize: 11 }}>{g.lighting_category ?? '—'}</span>
                 <span>Paint bands:</span><span>{g.paint_bands ?? '—'} alternating (aviation orange/white)</span>
                 <span>Tower surface area:</span><span>{g.tower_surface_area_sqft != null ? `${fmt(Math.round(g.tower_surface_area_sqft))} sq ft` : '—'}</span>
@@ -4986,7 +5026,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>FAA Aeronautical Study &amp; Airspace</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
                 <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
-                <span>FAA Form 7460-1:</span><span style={{ fontWeight: 600, color: g.notice_required ? '#dc2626' : '#16a34a' }}>{g.notice_required === true ? 'REQUIRED (> 200 ft AGL)' : g.notice_required === false ? 'Not required (≤ 200 ft)' : '—'}</span>
+                <span>FAA Form 7460-1:</span><span style={{ fontWeight: 600, color: requirementColor(g.notice_required ?? null) }}>{g.notice_required === true ? 'REQUIRED (> 200 ft AGL)' : g.notice_required === false ? 'Not required (≤ 200 ft)' : '—'}</span>
                 <span>Obstruction lighting:</span><span>{g.lighting_type ?? '—'}</span>
                 <span>Airport study radius:</span><span>{g.airport_proximity_study_radius_nm != null ? `${g.airport_proximity_study_radius_nm} nm` : '—'}</span>
                 <span>Study timeline:</span><span>{g.faa_study_duration_weeks_low != null ? `${g.faa_study_duration_weeks_low}–${g.faa_study_duration_weeks_high} weeks` : '—'}</span>
@@ -5010,7 +5050,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <span>MPE limit (general public):</span><span>{g.mpe_general_mv_per_m != null ? `${g.mpe_general_mv_per_m} mV/m (${g.mpe_general_uW_per_cm2} µW/cm²)` : '—'}</span>
                 <span>Exclusion zone (general):</span><span style={{ color: '#dc2626' }}>{g.exclusion_radius_m_general != null ? `${fmt(g.exclusion_radius_m_general)} m (${g.exclusion_radius_km_general} km)` : '—'}</span>
                 <span>Exclusion zone (controlled):</span><span>{g.exclusion_radius_m_controlled != null ? `${fmt(g.exclusion_radius_m_controlled)} m (${g.exclusion_radius_km_controlled} km)` : '—'}</span>
-                <span>§1.1310 evaluation:</span><span style={{ fontWeight: 600, color: g.evaluation_required ? '#dc2626' : '#16a34a' }}>{g.evaluation_required === true ? 'REQUIRED' : g.evaluation_required === false ? 'Not required' : '—'}</span>
+                <span>§1.1310 evaluation:</span><span style={{ fontWeight: 600, color: requirementColor(g.evaluation_required ?? null) }}>{g.evaluation_required === true ? 'REQUIRED' : g.evaluation_required === false ? 'Not required' : '—'}</span>
                 <span>Evaluation cost:</span><span>{g.evaluation_cost_low_usd != null ? `$${fmt(g.evaluation_cost_low_usd)} – $${fmt(g.evaluation_cost_high_usd)}` : '—'}</span>
               </div>
               {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c2410c', fontStyle: 'italic' }}>{g.note}</div>}
@@ -5048,7 +5088,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             <div key="ter-guide" style={{ marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 8, border: '2px solid #737373' }}>
               <div style={{ fontWeight: 700, color: '#1c1917', marginBottom: 6, fontSize: 13 }}>Terrain &amp; Propagation Assessment</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#44403c' }}>
-                <span>Candidate location:</span><span>{g.candidate_lat != null ? `${g.candidate_lat}°N, ${Math.abs(g.candidate_lon)}°W` : '—'}</span>
+                <span>Candidate location:</span><span>{fmtCoord(g.candidate_lat, g.candidate_lon)}</span>
                 <span>Est. elevation:</span><span>{g.elevation_proxy_m != null ? `~${g.elevation_proxy_m.toFixed(0)} m` : '—'}</span>
                 <span>FCC M3 zone:</span><span>{g.fcc_m3_zone ?? '—'}</span>
                 <span>Conductivity (σ):</span><span>{g.conductivity_ms_per_m_low != null ? `${g.conductivity_ms_per_m_low}–${g.conductivity_ms_per_m_high} mS/m` : '—'}</span>
@@ -5169,7 +5209,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ fontWeight: 700, color: '#064e3b', marginBottom: 6, fontSize: 13 }}>Ground Radial System Design (§73.190)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#065f46' }}>
                 <span>Wavelength (λ):</span><span>{g.wavelength_m != null ? `${g.wavelength_m} m` : '—'}</span>
-                <span>Radial length (λ/4):</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? `${g.radial_length_m} m` : '—'})` : '—'}</span>
+                <span>Radial length (0.35λ):</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? `${g.radial_length_m} m` : '—'})` : '—'}</span>
                 <span>Radials (ideal / min):</span><span>{g.num_radials_ideal} / {g.num_radials_min}</span>
                 <span>Total wire length:</span><span>{g.total_radial_length_mi != null ? `${g.total_radial_length_mi} mi (${g.total_radial_length_ft != null ? `${g.total_radial_length_ft.toLocaleString()} ft` : '—'})` : '—'}</span>
                 <span>Copper wire:</span><span>{fmt(g.copper_low_usd)} – {fmt(g.copper_high_usd)}</span>
@@ -5256,13 +5296,14 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* AM Community Impact and Coverage Shift Guide */}
         {candidate.am_community_impact_and_coverage_shift_guide && (() => {
           const g = candidate.am_community_impact_and_coverage_shift_guide;
-          const statusColor = g.col_proximity_status?.startsWith('excellent') ? '#16a34a'
-            : g.col_proximity_status?.startsWith('acceptable') ? '#d97706' : '#dc2626';
+          const statusColor = g.col_proximity_status == null ? stateColor(null)
+            : g.col_proximity_status.startsWith('excellent') ? stateColor('PASS')
+            : g.col_proximity_status.startsWith('acceptable') ? stateColor('WARN') : stateColor('FAIL');
           return (
             <div key="cis-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f4f8', borderRadius: 8, border: '2px solid #64748b' }}>
               <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6, fontSize: 13 }}>Community of License Coverage Shift</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
-                <span>CoL centroid:</span><span>{g.col_lat != null ? `${g.col_lat}°N, ${g.col_lon}°W` : '—'}</span>
+                <span>CoL centroid:</span><span>{fmtCoord(g.col_lat, g.col_lon)}</span>
                 <span>Candidate → CoL:</span><span>{g.dist_candidate_to_col_km != null ? `${g.dist_candidate_to_col_km} km` : '—'}</span>
                 <span>Current → CoL:</span><span>{g.dist_current_to_col_km != null ? `${g.dist_current_to_col_km} km` : '—'}</span>
                 <span>Distance delta:</span>
@@ -5284,6 +5325,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {candidate.am_total_project_cost_summary_guide && (() => {
           const g = candidate.am_total_project_cost_summary_guide;
           const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const tier = canonicalEngTier(candidate);
+          const fmtRange = (lo, hi) => costRangeString(lo ?? null, hi ?? null, tier) ?? `${fmt(lo)} – ${fmt(hi)}`;
           const li = g.line_items_low ?? {};
           const liH = g.line_items_high ?? {};
           const liKeys = Object.keys(li);
@@ -5300,11 +5343,11 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               <div style={{ borderTop: '1px solid #1e3a5f', paddingTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12 }}>
                 <span style={{ color: '#bae6fd', fontWeight: 600 }}>Grand total:</span>
-                <span style={{ color: '#e0f2fe', fontWeight: 600 }}>{fmt(g.grand_total_low_usd)} – {fmt(g.grand_total_high_usd)}</span>
+                <span style={{ color: '#e0f2fe', fontWeight: 600 }}>{fmtRange(g.grand_total_low_usd, g.grand_total_high_usd)}</span>
                 <span style={{ color: '#bae6fd' }}>+ {g.contingency_pct}% contingency:</span>
                 <span style={{ color: '#e0f2fe' }}>{fmt(g.contingency_low_usd)} – {fmt(g.contingency_high_usd)}</span>
                 <span style={{ color: '#7dd3fc', fontWeight: 700, fontSize: 13 }}>TOTAL (w/ contingency):</span>
-                <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 13 }}>{fmt(g.total_with_contingency_low_usd)} – {fmt(g.total_with_contingency_high_usd)}</span>
+                <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 13 }}>{fmtRange(g.total_with_contingency_low_usd, g.total_with_contingency_high_usd)}</span>
               </div>
               {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#7dd3fc', fontStyle: 'italic' }}>{g.note}</div>}
             </div>
@@ -5850,7 +5893,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Ground System (Radials)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
                 <span>Frequency:</span><span>{g.frequency_khz != null ? `${g.frequency_khz} kHz` : '—'}</span>
-                <span>λ/4 radial:</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? g.radial_length_m.toFixed(1) : '—'} m)` : '—'}</span>
+                <span>0.35λ radial (FCC std):</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? g.radial_length_m.toFixed(1) : '—'} m)` : '—'}</span>
                 <span>Radials:</span><span>{g.recommended_radials ?? '—'} {g.is_da ? '(DA enhanced)' : '(standard)'}</span>
                 <span>Total wire:</span><span>{g.total_ft_standard != null ? `${Math.round(g.total_ft_standard).toLocaleString()} ft` : '—'}</span>
                 <span>Wire:</span><span>{fmt(g.wire_low_usd)} – {fmt(g.wire_high_usd)}</span>
@@ -6245,7 +6288,12 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             <div key="reg-guide" style={{ marginBottom: 16, padding: 12, background: '#eef2ff', borderRadius: 8, border: '2px solid #4338ca' }}>
               <div style={{ fontWeight: 700, color: '#312e81', marginBottom: 6, fontSize: 13 }}>Annual Regulatory Compliance &amp; FCC Fees</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3730a3' }}>
-                <span style={{ color: '#4338ca' }}>Annual FCC Fee:</span><span>{fmt(g.annual_fcc_fee_usd)} (Class {g.fcc_class})</span>
+                <span style={{ color: '#4338ca' }}>Annual FCC Fee:</span><span>
+                  {g.annual_fcc_fee_usd != null
+                    ? fmt(g.annual_fcc_fee_usd)
+                    : g.annual_fcc_fee_low_usd != null
+                      ? `${fmt(g.annual_fcc_fee_low_usd)} – ${fmt(g.annual_fcc_fee_high_usd ?? g.annual_fcc_fee_low_usd)}${g.annual_fcc_fee_tier ? ` (${g.annual_fcc_fee_tier})` : ''}`
+                      : '—'} (Class {g.fcc_class})</span>
                 <span style={{ color: '#4338ca' }}>License Renewal:</span><span>{fmt(g.renewal_fee_usd)} / {g.license_renewal_cycle_years} yr ({fmt(g.renewal_amortized_annual_usd)}/yr amortized)</span>
                 <span style={{ color: '#4338ca' }}>EAS Testing:</span><span>{fmt(g.eas_testing_annual_low_usd)} – {fmt(g.eas_testing_annual_high_usd)}/yr</span>
                 <span style={{ color: '#4338ca' }}>Compliance Counsel:</span><span>{fmt(g.compliance_consultant_annual_low_usd)} – {fmt(g.compliance_consultant_annual_high_usd)}/yr</span>
@@ -6286,7 +6334,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ fontWeight: 700, color: '#9a3412', marginBottom: 6, fontSize: 13 }}>Tower Painting &amp; Aviation Marking (47 CFR §17.50)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#7c2d12' }}>
                 <span style={{ color: '#c2410c' }}>Tower Height:</span><span>{g.tower_pnt_ft} ft ({g.tower_pnt_m} m)</span>
-                <span style={{ color: '#c2410c' }}>Aviation Marking:</span><span style={{ fontWeight: 600, color: g.requires_aviation_marking ? '#dc2626' : '#16a34a' }}>{g.requires_aviation_marking ? 'Required (>200 ft)' : 'Not Required'}</span>
+                <span style={{ color: '#c2410c' }}>Aviation Marking:</span><span style={{ fontWeight: 600, color: requirementColor(g.requires_aviation_marking ?? null) }}>{g.requires_aviation_marking === true ? 'Required (>200 ft)' : g.requires_aviation_marking === false ? 'Not Required' : 'Not evaluated'}</span>
                 <span style={{ color: '#c2410c' }}>Initial Paint Cost:</span><span>{fmt(g.initial_paint_cost_low_usd)} – {fmt(g.initial_paint_cost_high_usd)}</span>
                 <span style={{ color: '#c2410c' }}>Paint Cycle:</span><span>{g.paint_cycle_years_low}–{g.paint_cycle_years_high} years</span>
                 <span style={{ color: '#c2410c' }}>Annual Reserve:</span><span>{fmt(g.annual_paint_reserve_usd)}/yr</span>
@@ -6655,7 +6703,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <span>Tower elements</span>
                 <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA)' : ' (NDA)'}</span>
                 <span>Radial count</span>
-                <span style={{ fontWeight: 600 }}>{g.n_radials} buried (λ/4 each)</span>
+                <span style={{ fontWeight: 600 }}>{g.n_radials} buried (0.35λ each per §73.189(b)(4))</span>
                 <span>Radiation resistance</span>
                 <span style={{ fontWeight: 600 }}>{g.radiation_resistance_ohm}Ω</span>
                 <span>Ground loss (R_g)</span>
@@ -7074,7 +7122,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#78350f' }}>
                 <span>Radials</span>
-                <span style={{ fontWeight: 600 }}>{g.n_radials} × {g.radial_length_m}m (λ/4 = {g.radial_length_m}m)</span>
+                <span style={{ fontWeight: 600 }}>{g.n_radials} × {g.radial_length_m}m (0.35λ per §73.189(b)(4))</span>
                 <span>Tower elements</span>
                 <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA array)' : ' (NDA)'}</span>
                 <span>Wire gauge</span>
@@ -7403,8 +7451,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div><span style={{ color: '#94a3b8' }}>Skip Distance:</span> <strong>{g.skip_distance_km} km</strong></div>
                 <div><span style={{ color: '#94a3b8' }}>Skip Zone:</span> <strong>{g.skip_zone_low_km}–{g.skip_zone_high_km} km</strong></div>
                 <div><span style={{ color: '#94a3b8' }}>Night Operation:</span> <strong style={{ color: opColor === '#15803d' ? '#4ade80' : opColor === '#92400e' ? '#fb923c' : '#93c5fd' }}>{g.night_operation_type?.replace(/_/g, ' ')}</strong></div>
-                <div><span style={{ color: '#94a3b8' }}>DA-N Required:</span> <strong style={{ color: g.da_n_required ? '#f87171' : '#4ade80' }}>{g.da_n_required ? 'YES' : 'No'}</strong></div>
-                <div><span style={{ color: '#94a3b8' }}>Night Reduce Power:</span> <strong style={{ color: g.requires_night_power_reduction ? '#fb923c' : '#4ade80' }}>{g.requires_night_power_reduction ? 'Required' : 'No'}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>DA-N Required:</span> <strong style={{ color: requirementColor(g.da_n_required ?? null) }}>{g.da_n_required === true ? 'YES' : g.da_n_required === false ? 'No' : 'Not evaluated'}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Night Reduce Power:</span> <strong style={{ color: requirementColor(g.requires_night_power_reduction ?? null) }}>{g.requires_night_power_reduction ? 'Required' : 'No'}</strong></div>
                 <div><span style={{ color: '#94a3b8' }}>Night Noise Penalty:</span> <strong>{g.night_noise_penalty_db} dB</strong></div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -7690,7 +7738,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div><span style={{ color: '#6b7280' }}>Total exhibits:</span> <strong>{g.n_exhibits_total}</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Required exhibits:</span> <strong style={{ color: '#7c3aed' }}>{g.n_exhibits_required}</strong></div>
                 <div><span style={{ color: '#6b7280' }}>DA-specific exhibits:</span> <strong>{g.n_exhibits_da_specific} {g.is_directional ? '(required)' : '(not needed — NDA)'}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>ASR required:</span> <strong style={{ color: g.asr_required ? '#dc2626' : '#16a34a' }}>{g.asr_required ? `Yes — tower ${g.tower_height_ft} ft (§17.7)` : 'No'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>ASR required:</span> <strong style={{ color: requirementColor(g.asr_required ?? null) }}>{g.asr_required === true ? `Yes — tower ${g.tower_height_ft} ft (§17.7)` : g.asr_required === false ? 'No' : 'Not evaluated'}</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Filing fee:</span> <strong>${g.filing_fee_usd?.toLocaleString()} (Form 301)</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Filing system:</span> <strong>{g.filing_system}</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Deficiency risks:</span> <strong>{g.n_deficiency_risks} identified</strong></div>
@@ -7930,7 +7978,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div><span style={{ color: '#6b7280' }}>Optimal height (5λ/8):</span> <strong>{g.optimal_height_m} m / {g.optimal_height_ft} ft</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Max field gain:</span> <strong>+{g.max_coverage_gain_pct}% vs λ/4</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Height increase needed:</span> <strong>{g.height_increase_m} m ({Math.round(g.height_increase_m * 3.28084)} ft)</strong></div>
-                <div><span style={{ color: '#6b7280' }}>ASR required:</span> <strong style={{ color: g.asr_required ? '#dc2626' : '#16a34a' }}>{g.asr_required ? 'Yes (§17.7)' : 'No'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>ASR required:</span> <strong style={{ color: requirementColor(g.asr_required ?? null) }}>{g.asr_required === true ? 'Yes (§17.7)' : g.asr_required === false ? 'No' : 'Not evaluated'}</strong></div>
               </div>
               {g.height_milestones && (
                 <div>
@@ -8155,7 +8203,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>ASR Required</div>
-                  <div style={{ fontWeight: 700, color: g.asr_required_by_height ? '#ef4444' : '#22c55e', fontSize: 15 }}>{g.asr_required_by_height ? 'YES (§17.7)' : 'Not by height'}</div>
+                  <div style={{ fontWeight: 700, color: requirementColor(g.asr_required_by_height ?? null), fontSize: 15 }}>{g.asr_required_by_height ? 'YES (§17.7)' : 'Not by height'}</div>
                   <div style={{ fontSize: 10, color: '#64748b' }}>Threshold: {g.asr_height_threshold_ft}ft</div>
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
@@ -8326,7 +8374,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div style={{ fontSize: 10, color: '#64748b' }}>${(lowCost || 0).toLocaleString()}–${(highCost || 0).toLocaleString()}</div>
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>λ/4 Radial Length</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>λ/4 Tower Height Ref.</div>
                   <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 15 }}>{g.lambda_quarter_m}m</div>
                   <div style={{ fontSize: 10, color: '#64748b' }}>λ/2 = {g.lambda_half_m}m</div>
                 </div>
@@ -8372,7 +8420,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Secondary Status</div>
-                  <div style={{ fontWeight: 700, color: g.is_secondary_on_clear ? '#f97316' : '#22c55e', fontSize: 15 }}>{g.is_secondary_on_clear ? 'SECONDARY on Clear' : 'Not Secondary'}</div>
+                  <div style={{ fontWeight: 700, color: requirementColor(g.is_secondary_on_clear ?? null), fontSize: 15 }}>{g.is_secondary_on_clear ? 'SECONDARY on Clear' : 'Not Secondary'}</div>
                   <div style={{ fontSize: 10, color: '#64748b' }}>Class {g.fcc_class}</div>
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
@@ -8484,12 +8532,12 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>STA Required</div>
-                  <div style={{ fontWeight: 700, color: g.sta_required ? '#ef4444' : '#22c55e', fontSize: 15 }}>{g.sta_required ? 'YES (§73.1635)' : 'Not Required'}</div>
+                  <div style={{ fontWeight: 700, color: requirementColor(g.sta_required ?? null), fontSize: 15 }}>{g.sta_required ? 'YES (§73.1635)' : 'Not Required'}</div>
                   <div style={{ fontSize: 10, color: '#64748b' }}>Auto-allowed: {g.silent_days_auto_allowed} days</div>
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Forfeiture Risk</div>
-                  <div style={{ fontWeight: 700, color: g.forfeiture_risk ? '#ef4444' : '#22c55e', fontSize: 15 }}>{g.forfeiture_risk ? 'RISK EXISTS' : 'Low Risk'}</div>
+                  <div style={{ fontWeight: 700, color: requirementColor(g.forfeiture_risk ?? null), fontSize: 15 }}>{g.forfeiture_risk ? 'RISK EXISTS' : 'Low Risk'}</div>
                   <div style={{ fontSize: 10, color: '#64748b' }}>Trigger: {g.silent_months_forfeiture} months (§73.1740)</div>
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
@@ -8519,8 +8567,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* Antenna RFI From Nearby Equipment Guide */}
         {candidate.antenna_rfi_from_nearby_equipment_guide && (() => {
           const g = candidate.antenna_rfi_from_nearby_equipment_guide;
-          const sensitivityColor = g.frequency_sensitivity === 'VERY_HIGH' ? '#ef4444' : g.frequency_sensitivity === 'HIGH' ? '#f97316' : g.frequency_sensitivity === 'MEDIUM' ? '#eab308' : '#22c55e';
-          const severityColor = (s) => s === 'HIGH' ? '#ef4444' : s === 'MEDIUM' ? '#eab308' : '#22c55e';
+          const sensitivityColor = g.frequency_sensitivity == null ? stateColor(null) : g.frequency_sensitivity === 'VERY_HIGH' ? stateColor('FAIL') : g.frequency_sensitivity === 'HIGH' ? stateColor('HIGH') : g.frequency_sensitivity === 'MEDIUM' ? stateColor('WARN') : stateColor('PASS');
+          const severityColor = (s) => s == null ? stateColor(null) : s === 'HIGH' ? stateColor('HIGH') : s === 'MEDIUM' ? stateColor('WARN') : stateColor('PASS');
           return (
             <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
               <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
@@ -8544,7 +8592,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Pre-Construction Survey</div>
-                  <div style={{ fontWeight: 700, color: g.pre_construction_survey_required ? '#ef4444' : '#22c55e', fontSize: 15 }}>{g.pre_construction_survey_required ? 'REQUIRED' : 'Optional'}</div>
+                  <div style={{ fontWeight: 700, color: requirementColor(g.pre_construction_survey_required ?? null), fontSize: 15 }}>{g.pre_construction_survey_required ? 'REQUIRED' : 'Optional'}</div>
                   <div style={{ fontSize: 10, color: '#64748b' }}>{g.n_survey_steps} survey steps</div>
                 </div>
               </div>
@@ -8730,7 +8778,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
               <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
-                Community of License (COL) Change <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3571 / §73.24(h)</span>
+                Community of License (COL) Change <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3571 / §73.24(i)</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
@@ -9055,7 +9103,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
                   <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Ground Radial Radius</div>
-                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.ground_radial_radius_m}m (λ/4 at {g.frequency_khz} kHz)</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.ground_radial_radius_m}m (0.35λ per §73.189(b)(4) at {g.frequency_khz} kHz)</div>
                 </div>
               </div>
               {g.key_provisions && (
@@ -10061,8 +10109,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {candidate.am_transmitter_power_monitoring_and_operating_log_guide && (() => {
           const g = candidate.am_transmitter_power_monitoring_and_operating_log_guide;
           const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
-          const apcColor = g.automatic_power_control_required ? '#f97316' : '#4ade80';
-          const monColor = g.antenna_monitor_required ? '#f97316' : '#4ade80';
+          const apcColor = requirementColor(g.automatic_power_control_required ?? null);
+          const monColor = requirementColor(g.antenna_monitor_required ?? null);
           return (
             <div>
               <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
@@ -10208,7 +10256,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {candidate.am_tia222_tower_structural_certification_guide && (() => {
           const g = candidate.am_tia222_tower_structural_certification_guide;
           const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
-          const asrColor = g.asr_triggered_qw ? '#ef4444' : '#4ade80';
+          const asrColor = requirementColor(g.asr_triggered_qw ?? null);
           const iceColor = g.ice_thickness_in === 0 ? '#4ade80' : g.ice_thickness_in === 0.5 ? '#fbbf24' : '#ef4444';
           return (
             <div>
@@ -10367,7 +10415,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {candidate.am_field_strength_measurement_and_contour_verification_guide && (() => {
           const g = candidate.am_field_strength_measurement_and_contour_verification_guide;
           const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
-          const proofColor = g.formal_proof_required ? '#f97316' : '#4ade80';
+          const proofColor = requirementColor(g.formal_proof_required ?? null);
           const reqConds = (g.measurement_conditions ?? []).filter(c => c.required);
           return (
             <div>
@@ -10515,7 +10563,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>ASR REQUIRED</span>
-                  <div style={{ color: g.asr_required ? '#f59e0b' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                  <div style={{ color: requirementColor(g.asr_required ?? null), fontSize: 11, fontWeight: 700 }}>
                     {g.asr_required ? 'YES' : 'NO'}
                   </div>
                 </div>
@@ -10629,7 +10677,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           return (
             <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
               <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
-                Signal Coverage Mapping &amp; Contour Documentation (§73.183 / §73.186)
+                Signal Coverage Mapping &amp; Contour Documentation (§73.184 / §73.186)
               </div>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
                 <div>
@@ -10648,7 +10696,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>FORMAL PROOF</span>
-                  <div style={{ color: g.formal_proof_required ? '#f87171' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                  <div style={{ color: requirementColor(g.formal_proof_required ?? null), fontSize: 11, fontWeight: 700 }}>
                     {g.formal_proof_required ? 'REQUIRED' : 'Not required'}
                   </div>
                 </div>
@@ -10748,7 +10796,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>WAIVER NEEDED</span>
-                  <div style={{ color: g.waiver_likely_needed ? '#f87171' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                  <div style={{ color: requirementColor(g.waiver_likely_needed ?? null), fontSize: 11, fontWeight: 700 }}>
                     {g.waiver_likely_needed ? 'LIKELY' : 'Unlikely'}
                   </div>
                 </div>
@@ -10775,7 +10823,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* Nighttime Clear-Channel Exclusion Zone Guide */}
         {candidate.am_nighttime_clear_channel_exclusion_zone_guide && (() => {
           const g = candidate.am_nighttime_clear_channel_exclusion_zone_guide;
-          const zoneColor = g.exclusion_zone_applies ? '#f87171' : g.is_clear_channel_freq ? '#f59e0b' : '#22c55e';
+          const zoneColor = g.exclusion_zone_applies ? '#f87171' : requirementColor(g.is_clear_channel_freq ?? null);
           return (
             <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
               <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
@@ -10784,7 +10832,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>CLEAR CHANNEL FREQ</span>
-                  <div style={{ color: g.is_clear_channel_freq ? '#f59e0b' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                  <div style={{ color: requirementColor(g.is_clear_channel_freq ?? null), fontSize: 11, fontWeight: 700 }}>
                     {g.is_clear_channel_freq ? 'YES' : 'NO'}
                   </div>
                 </div>
@@ -10796,7 +10844,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>DAYTIME-ONLY REQUIRED</span>
-                  <div style={{ color: g.daytime_only_required ? '#f87171' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                  <div style={{ color: requirementColor(g.daytime_only_required ?? null), fontSize: 11, fontWeight: 700 }}>
                     {g.daytime_only_required ? 'YES' : 'NO'}
                   </div>
                 </div>
@@ -10977,7 +11025,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>FORMAL PROOF</span>
-                  <div style={{ color: g.formal_proof_required ? '#f59e0b' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                  <div style={{ color: requirementColor(g.formal_proof_required ?? null), fontSize: 11, fontWeight: 700 }}>
                     {g.formal_proof_required ? `YES (≥${g.proof_radials_required} radials)` : 'Not required'}
                   </div>
                 </div>
@@ -11169,7 +11217,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>CONDUCTED TEST</span>
-                  <div style={{ color: g.conducted_emission_test_required ? '#f59e0b' : '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                  <div style={{ color: requirementColor(g.conducted_emission_test_required ?? null), fontSize: 10, fontWeight: 700 }}>
                     {g.conducted_emission_test_required ? 'REQUIRED' : 'NOT REQUIRED'}
                   </div>
                 </div>
@@ -11297,7 +11345,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>MOD MONITOR</span>
-                  <div style={{ color: g.modulation_monitor_required ? '#f59e0b' : '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                  <div style={{ color: requirementColor(g.modulation_monitor_required ?? null), fontSize: 10, fontWeight: 700 }}>
                     {g.modulation_monitor_required ? 'REQUIRED' : 'NOT REQUIRED'}
                   </div>
                 </div>
@@ -11346,7 +11394,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>EST SERVED POP</span>
-                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{(g.est_served_population || 0).toLocaleString()}</div>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{approxString(g.est_served_population ?? null, canonicalPopTier(candidate)) ?? (g.est_served_population || 0).toLocaleString()}</div>
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>COVERAGE AREA</span>
@@ -11534,7 +11582,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>NEPA EA</span>
-                  <div style={{ color: g.ea_required ? '#f87171' : '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                  <div style={{ color: requirementColor(g.ea_required ?? null), fontSize: 10, fontWeight: 700 }}>
                     {g.ea_required ? 'REQUIRED' : 'NOT REQUIRED'}
                   </div>
                 </div>
@@ -11588,7 +11636,16 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL FCC FEES</span>
-                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>${(g.total_fcc_fees_usd || 0).toLocaleString()}</div>
+                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>
+                    {g.total_fcc_fees_usd != null
+                      ? `$${g.total_fcc_fees_usd.toLocaleString()}`
+                      : g.total_fcc_fees_low_usd != null
+                        ? `$${g.total_fcc_fees_low_usd.toLocaleString()}–$${(g.total_fcc_fees_high_usd ?? g.total_fcc_fees_low_usd).toLocaleString()}`
+                        : '—'}
+                  </div>
+                  {g.total_fcc_fees_usd == null && g.total_fcc_fees_low_usd != null && (
+                    <div style={{ color: '#64748b', fontSize: 8 }}>{g.annual_reg_fee_tier ?? 'population-dependent (§1.1153)'}</div>
+                  )}
                 </div>
                 <div>
                   <span style={{ color: '#94a3b8', fontSize: 9 }}>WITH CONSULTING</span>
@@ -11601,7 +11658,13 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   {g.fee_items.map((fi, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
                       <span style={{ color: fi.required ? '#cbd5e1' : '#64748b', fontSize: 9 }}>{fi.item}{!fi.required ? ' *' : ''}</span>
-                      <span style={{ color: '#94a3b8', fontSize: 9 }}>${(fi.fee_usd || 0).toLocaleString()}</span>
+                      <span style={{ color: '#94a3b8', fontSize: 9 }}>
+                        {fi.fee_usd != null
+                          ? `$${fi.fee_usd.toLocaleString()}`
+                          : fi.fee_low_usd != null
+                            ? `$${fi.fee_low_usd.toLocaleString()}–$${(fi.fee_high_usd ?? fi.fee_low_usd).toLocaleString()}`
+                            : '—'}
+                      </span>
                     </div>
                   ))}
                   <div style={{ color: '#475569', fontSize: 9, marginTop: 2 }}>* conditional fee</div>
@@ -11664,7 +11727,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div><span style={{ color: '#6b7280' }}>Total Copper:</span> <b>{g.copper_kg} kg AWG #10</b></div>
                 <div><span style={{ color: '#6b7280' }}>Towers:</span> <b>{g.n_towers}</b></div>
                 <div><span style={{ color: '#6b7280' }}>Install Cost:</span> <b>${(g.cost_estimates?.total_system_low_usd ?? 0).toLocaleString()}–${(g.cost_estimates?.total_system_high_usd ?? 0).toLocaleString()}</b></div>
-                <div><span style={{ color: '#6b7280' }}>Proof Required:</span> <b style={{ color: g.proof_of_performance_required ? '#dc2626' : '#16a34a' }}>{g.proof_of_performance_required ? 'Yes (§73.151)' : 'No'}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Proof Required:</span> <b style={{ color: requirementColor(g.proof_of_performance_required ?? null) }}>{g.proof_of_performance_required === true ? 'Yes (§73.151)' : g.proof_of_performance_required === false ? 'No' : 'Not evaluated'}</b></div>
               </div>
               {Array.isArray(g.checklist) && g.checklist.length > 0 && (
                 <details style={{ marginBottom: 5 }}>
@@ -11853,11 +11916,11 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ background: '#0d0a1a', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
                   <div><span style={{ color: '#9ca3af' }}>FCC class:</span> <strong style={{ color: '#c4b5fd' }}>{n.fcc_class || '—'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>Clear channel:</span> <strong style={{ color: n.is_clear_channel ? '#fbbf24' : '#22c55e' }}>{n.is_clear_channel ? 'Yes' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Clear channel:</span> <strong style={{ color: requirementColor(n.is_clear_channel ?? null) }}>{n.is_clear_channel ? 'Yes' : 'No'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>DA pattern:</span> <strong>{n.is_da_pattern ? 'Yes' : 'No'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>Night power reduction:</span> <strong style={{ color: n.power_reduction_required ? '#ef4444' : '#22c55e' }}>{n.power_reduction_required ? 'Required' : 'Not required'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>Pattern switch req'd:</span> <strong style={{ color: n.pattern_switch_required ? '#ef4444' : '#22c55e' }}>{n.pattern_switch_required ? 'Yes (DA-N)' : 'No'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>ASID required:</span> <strong style={{ color: asid?.required ? '#ef4444' : '#22c55e' }}>{asid?.required ? 'Yes' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Night power reduction:</span> <strong style={{ color: requirementColor(n.power_reduction_required ?? null) }}>{n.power_reduction_required ? 'Required' : 'Not required'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Pattern switch req'd:</span> <strong style={{ color: requirementColor(n.pattern_switch_required ?? null) }}>{n.pattern_switch_required ? 'Yes (DA-N)' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>ASID required:</span> <strong style={{ color: requirementColor(asid?.required ?? null) }}>{asid?.required ? 'Yes' : 'No'}</strong></div>
                   <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#9ca3af' }}>Night operation:</span> <span style={{ color: '#d1d5db', fontSize: 10 }}>{n.nighttime_obligation?.night_operation}</span></div>
                 </div>
               </div>
@@ -11934,7 +11997,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
                   <div><span style={{ color: '#9ca3af' }}>Frequency:</span> <strong>{r.frequency_mhz != null ? `${r.frequency_mhz} MHz` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>TPO:</span> <strong>{r.tpo_kw != null ? `${r.tpo_kw} kW` : '—'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>MPE eval required:</span> <strong style={{ color: r.mpe_evaluation_required ? '#ef4444' : '#22c55e' }}>{r.mpe_evaluation_required ? `Yes (≥${r.mpe_threshold_kw} kW)` : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>MPE eval required:</span> <strong style={{ color: requirementColor(r.mpe_evaluation_required ?? null) }}>{r.mpe_evaluation_required ? `Yes (≥${r.mpe_threshold_kw} kW)` : 'No'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>GP MPE limit:</span> <strong>{r.mpe_limit_gp_mwcm2 != null ? `${r.mpe_limit_gp_mwcm2} mW/cm²` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>GP exclusion zone:</span> <strong style={{ color: '#f87171' }}>{r.exclusion_radius_gp_m != null ? `${r.exclusion_radius_gp_m} m` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Occupational zone:</span> <strong style={{ color: '#fca5a5' }}>{r.exclusion_radius_occ_m != null ? `${r.exclusion_radius_occ_m} m` : '—'}</strong></div>
@@ -11974,7 +12037,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div><span style={{ color: '#9ca3af' }}>Tower height:</span> <strong>{t.tower_height_m != null ? `${t.tower_height_m} m (${t.tower_height_ft} ft)` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Weight class:</span> <strong style={{ color: wc[t.tower_weight_class] || '#9ca3af' }}>{t.tower_weight_class || '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Design standard:</span> <strong style={{ fontSize: 10 }}>{t.design_standard || 'TIA-222-H'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>ASR required:</span> <strong style={{ color: t.asr_required ? '#ef4444' : '#22c55e' }}>{t.asr_required ? 'Yes (§17.7)' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>ASR required:</span> <strong style={{ color: requirementColor(t.asr_required ?? null) }}>{t.asr_required ? 'Yes (§17.7)' : 'No'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Wind exposure:</span> <strong>{t.selected_exposure?.id} — {t.selected_exposure?.basic_wind_speed_mph} mph</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Ice zone:</span> <strong>{t.ice_zone || '—'} ({t.ice_load_psf != null ? `${t.ice_load_psf} psf` : '—'})</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Est. structural cost:</span> <strong style={{ color: '#f59e0b' }}>{t.total_structural_cost_usd != null ? `$${t.total_structural_cost_usd.toLocaleString()}` : '—'}</strong></div>
@@ -12055,7 +12118,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               <div style={{ background: '#0d0a1a', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
                   <div><span style={{ color: '#9ca3af' }}>Tower height est.:</span> <strong>{ins.tower_height_m != null ? `${ins.tower_height_m} m` : '—'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>ASR required:</span> <strong style={{ color: ins.asr_required ? '#ef4444' : '#22c55e' }}>{ins.asr_required ? 'Yes (§17.7)' : 'No (< 200 ft)'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>ASR required:</span> <strong style={{ color: requirementColor(ins.asr_required ?? null) }}>{ins.asr_required ? 'Yes (§17.7)' : 'No (< 200 ft)'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Total insured value:</span> <strong style={{ color: '#a78bfa' }}>{ins.total_insured_value_usd != null ? `$${ins.total_insured_value_usd.toLocaleString()}` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Annual premium est.:</span> <strong style={{ color: '#f59e0b' }}>{ins.total_annual_premium_usd != null ? `$${ins.total_annual_premium_usd.toLocaleString()}/yr` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Coverage lines:</span> <strong>{ins.n_coverage_lines ?? '—'} ({ins.n_required_lines ?? '—'} required)</strong></div>
@@ -12099,7 +12162,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div><span style={{ color: '#9ca3af' }}>Tower height est.:</span> <strong>{s.tower_height_m != null ? `${s.tower_height_m} m` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Fence radius:</span> <strong>{s.fence_radius_m != null ? `${s.fence_radius_m} m` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Perimeter:</span> <strong style={{ color: '#fb923c' }}>{s.perimeter_m != null ? `${s.perimeter_m} m` : '—'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>MPE eval req'd:</span> <strong style={{ color: s.mpe_evaluation_required ? '#ef4444' : '#22c55e' }}>{s.mpe_evaluation_required ? `Yes (≥${s.mpe_threshold_kw} kW)` : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>MPE eval req'd:</span> <strong style={{ color: requirementColor(s.mpe_evaluation_required ?? null) }}>{s.mpe_evaluation_required ? `Yes (≥${s.mpe_threshold_kw} kW)` : 'No'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Components:</span> <strong>{s.n_components ?? '—'} ({s.n_required_components ?? '—'} required)</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Total capex:</span> <strong style={{ color: '#f59e0b' }}>{s.total_capex_usd != null ? `$${s.total_capex_usd.toLocaleString()}` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Annual maint.:</span> <strong>{s.annual_maintenance_usd != null ? `$${s.annual_maintenance_usd.toLocaleString()}/yr` : '—'}</strong></div>
@@ -12212,7 +12275,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
                   <div><span style={{ color: '#9ca3af' }}>Channel class:</span> <strong style={{ color: chanColors[f.channel_class] || '#d1d5db' }}>{f.channel_class || '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Coord. zone:</span> <strong style={{ color: '#f472b6' }}>{f.coordination_zone_km != null ? `${f.coordination_zone_km} km` : '—'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>NIF required:</span> <strong style={{ color: f.nif_required ? '#ef4444' : '#22c55e' }}>{f.nif_required ? 'Yes (clear channel)' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>NIF required:</span> <strong style={{ color: requirementColor(f.nif_required ?? null) }}>{f.nif_required ? 'Yes (clear channel)' : 'No'}</strong></div>
                   {f.nif_required && <div><span style={{ color: '#9ca3af' }}>NIF area:</span> <strong>{f.nif_service_area_km2 != null ? `${f.nif_service_area_km2.toLocaleString()} km²` : '—'}</strong></div>}
                   <div><span style={{ color: '#9ca3af' }}>Required coord. items:</span> <strong>{f.n_required_items ?? '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Coord. timeline:</span> <strong>{f.coordination_timeline?.total_days != null ? `~${f.coordination_timeline.total_days} days` : '—'}</strong></div>
@@ -12261,8 +12324,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div><span style={{ color: '#9ca3af' }}>Recommended:</span> <strong style={{ color: '#c4b5fd' }}>{rec.label || '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Equipment cost:</span> <strong>{s.equip_cost_usd != null ? `$${s.equip_cost_usd.toLocaleString()}` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Total STL cost:</span> <strong style={{ color: '#818cf8' }}>{s.total_stl_cost_usd != null ? `$${s.total_stl_cost_usd.toLocaleString()}` : '—'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>LOS required:</span> <strong style={{ color: rec.los_required ? '#f59e0b' : '#22c55e' }}>{rec.los_required ? 'Yes' : 'No'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>FCC license:</span> <strong style={{ color: rec.fcc_license_required ? '#f59e0b' : '#22c55e' }}>{rec.fcc_license_required ? 'Required' : 'Not required'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>LOS required:</span> <strong style={{ color: requirementColor(rec.los_required ?? null) }}>{rec.los_required ? 'Yes' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>FCC license:</span> <strong style={{ color: requirementColor(rec.fcc_license_required ?? null) }}>{rec.fcc_license_required ? 'Required' : 'Not required'}</strong></div>
                 </div>
               </div>
               <div style={{ marginBottom: 6 }}>
@@ -12306,7 +12369,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div><span style={{ color: '#9ca3af' }}>Total filings:</span> <strong>{r.n_total_filings ?? '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Required:</span> <strong style={{ color: '#fde047' }}>{r.n_required_filings ?? '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Total FCC fees:</span> <strong style={{ color: '#f97316' }}>{r.total_required_fees_usd != null ? `$${r.total_required_fees_usd.toLocaleString()}` : '—'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>ASR required:</span> <strong style={{ color: r.needs_asr ? '#ef4444' : '#22c55e' }}>{r.needs_asr ? 'Yes' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>ASR required:</span> <strong style={{ color: requirementColor(r.needs_asr ?? null) }}>{r.needs_asr ? 'Yes' : 'No'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>DA pattern:</span> <strong style={{ color: r.is_da ? '#f59e0b' : '#9ca3af' }}>{r.is_da ? 'DA — proof required' : 'NDA'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Clear channel:</span> <strong style={{ color: r.is_clear_channel ? '#fbbf24' : '#9ca3af' }}>{r.is_clear_channel ? 'Yes (NIF study)' : 'No'}</strong></div>
                 </div>
@@ -12410,7 +12473,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                         <td style={{ padding: '2px 4px', color: '#d1d5db' }}>{tier.label}</td>
                         <td style={{ padding: '2px 4px', textAlign: 'center', color: compColor[tier.compatibility] || '#9ca3af', fontWeight: 700, fontSize: 9 }}>{tier.compatibility?.replace(/_/g, ' ')}</td>
                         <td style={{ padding: '2px 4px', textAlign: 'center', color: diffColor[tier.approval_difficulty] || '#9ca3af' }}>{tier.approval_difficulty}</td>
-                        <td style={{ padding: '2px 4px', textAlign: 'center', color: tier.variance_likely ? '#f97316' : '#22c55e' }}>{tier.variance_likely ? 'Yes' : 'No'}</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'center', color: requirementColor(tier.variance_likely ?? null) }}>{tier.variance_likely ? 'Yes' : 'No'}</td>
                         <td style={{ padding: '2px 4px', textAlign: 'right', color: '#9ca3af' }}>{tier.timeline_months}</td>
                       </tr>
                     ))}
@@ -12553,7 +12616,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div><span style={{ color: '#9ca3af' }}>Terrain class:</span> <strong style={{ color }}>{tc.label || '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Δh roughness:</span> <strong>{tc.delta_h_m != null ? `${tc.delta_h_m} m` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Extra path loss:</span> <strong style={{ color: tc.path_loss_extra_db > 5 ? '#f97316' : '#d1d5db' }}>{tc.path_loss_extra_db != null ? `+${tc.path_loss_extra_db} dB` : '—'}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>Prop. study req.:</span> <strong style={{ color: t.propagation_study_required ? '#f87171' : '#22c55e' }}>{t.propagation_study_required ? 'Yes (ITM)' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Prop. study req.:</span> <strong style={{ color: requirementColor(t.propagation_study_required ?? null) }}>{t.propagation_study_required ? 'Yes (ITM)' : 'No'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Eff. 2 mV/m reach:</span> <strong>{t.effective_2mvm_coverage_km != null ? `${t.effective_2mvm_coverage_km} km` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Cov. reduction:</span> <strong>{t.coverage_reduction_factor != null ? `${(t.coverage_reduction_factor * 100).toFixed(0)}%` : '—'}</strong></div>
                 </div>
@@ -12616,7 +12679,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   <div><span style={{ color: '#9ca3af' }}>Std height fraction:</span> <strong>{a.standard_height_fraction != null ? `${(a.standard_height_fraction * 100).toFixed(1)}%λ` : '—'}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Std height:</span> <strong style={{ color: '#a78bfa' }}>{fmtM(a.standard_height_m)} / {fmtFt(a.standard_height_ft)}</strong></div>
                   <div><span style={{ color: '#9ca3af' }}>Electrical degrees:</span> <strong style={{ color: '#a78bfa' }}>{fmtDeg(a.standard_elec_deg)}</strong></div>
-                  <div><span style={{ color: '#9ca3af' }}>Base loading needed:</span> <strong style={{ color: a.base_loading_needed ? '#f59e0b' : '#22c55e' }}>{a.base_loading_needed ? 'Yes' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Base loading needed:</span> <strong style={{ color: requirementColor(a.base_loading_needed ?? null) }}>{a.base_loading_needed ? 'Yes' : 'No'}</strong></div>
                   {a.base_loading_needed && <div><span style={{ color: '#9ca3af' }}>Est. coil inductance:</span> <strong>{a.base_coil_uh_est != null ? `${a.base_coil_uh_est} µH` : '—'}</strong></div>}
                 </div>
               </div>
@@ -12671,10 +12734,14 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* Population Demographics Overlay */}
         {candidate.population_demographics_overlay && (() => {
           const p = candidate.population_demographics_overlay;
-          const fmtN = n => n != null ? n.toLocaleString() : '—';
+          // Disc-proxy population: coarsen when the canonical population
+          // basis says screening/low; exact only for filing-grade sources.
+          const fmtN = n => n != null
+            ? (approxString(Number(n), canonicalPopTier(candidate)) ?? Number(n).toLocaleString())
+            : '—';
           return (
             <div>
-              <div className="rack-eyebrow mb-1">Population Demographics Overlay (§73.24j · Census ACS)</div>
+              <div className="rack-eyebrow mb-1">Population Demographics Overlay (§73.24(i) · Census ACS)</div>
               <div className="rack-panel p-3 mb-3">
                 <div className="text-xs text-blue-200 mb-2">
                   Coverage population estimates at {p.frequency_khz} kHz, {p.tpo_kw} kW, σ={p.sigma_msm} mS/m.
@@ -13722,7 +13789,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           const srcColor  = s => s === 'POLYGON' ? 'text-emerald-400' : s === 'CENTROID_ONLY' ? 'text-blue-300' : 'text-amber-400';
           return (
             <div>
-              <div className="rack-eyebrow mb-1">Community of License Profile (§73.24j)</div>
+              <div className="rack-eyebrow mb-1">Community of License Profile (§73.24(i))</div>
               {/* Geo tier chip */}
               <div className="flex flex-wrap gap-1.5 mb-2">
                 <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${tierBg(cp.geographic_tier)} ${tierColor(cp.geographic_tier)}`}>
@@ -13853,7 +13920,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               {/* Key dimensions */}
               <div className="grid grid-cols-3 gap-1 mb-2">
                 {[
-                  { label: 'Optimal radial (λ/4)', value: `${gs.optimal_radial_length_m} m` },
+                  { label: 'FCC std radial (0.35λ)', value: `${gs.optimal_radial_length_m} m` },
                   { label: 'Min radial (λ/8)',      value: `${gs.minimum_radial_length_m} m` },
                   { label: 'Burial depth',           value: gs.burial_depth_recommended }
                 ].map(m => (

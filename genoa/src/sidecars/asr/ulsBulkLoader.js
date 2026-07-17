@@ -33,7 +33,14 @@ import unzipper from 'unzipper';
 const BULK_URL = process.env.ASR_BULK_URL
               || 'https://data.fcc.gov/download/pub/uls/complete/r_tower.zip';
 
-const FT_PER_M = 0.3048;
+// Data-semantics version of what this loader writes into asr_towers.
+// Bump whenever the MEANING of stored values changes (not just the code),
+// so already-populated databases are force-re-ingested on next boot:
+// the server treats asr_load_state.loader_version !== LOADER_DATA_VERSION
+// as stale.
+export const LOADER_DATA_VERSION = 2; // v2: RA heights stored as meters (v1 wrongly converted ft→m)
+
+
 
 // Decode FCC coordinate triple (degrees, minutes, seconds, hemisphere)
 // to signed decimal degrees.  Empty fields yield null.
@@ -47,9 +54,14 @@ function dms(d, m, s, hemi){
   return deg;
 }
 
-function ftToM(ft){
-  const f = parseFloat(ft);
-  return Number.isFinite(f) ? f * FT_PER_M : null;
+// FCC ULS r_tower RA-record height fields are ALREADY in meters (the ASR
+// database is metric per the FCC ASR data dictionary) — parse them as-is.
+// A previous revision multiplied by 0.3048 as if they were feet, storing
+// every tower height 3.28× too small and defeating downstream §17.7 /
+// Part 17 checks.
+function metersAsIs(v){
+  const f = parseFloat(v);
+  return Number.isFinite(f) ? f : null;
 }
 
 function parseDate(s){
@@ -218,8 +230,9 @@ export async function runBulkLoad(pool, log = console){
     await client.query(`
       INSERT INTO asr_load_state (id, last_loaded_at, last_source_url, last_source_etag,
                                   last_source_last_modified, records_total, records_with_coords,
-                                  records_with_owner, load_duration_seconds, load_error)
-      VALUES (1, now(), $1, $2, $3, $4, $5, $6, $7, NULL)
+                                  records_with_owner, load_duration_seconds, load_error,
+                                  loader_version)
+      VALUES (1, now(), $1, $2, $3, $4, $5, $6, $7, NULL, $8)
       ON CONFLICT (id) DO UPDATE SET
         last_loaded_at = EXCLUDED.last_loaded_at,
         last_source_url = EXCLUDED.last_source_url,
@@ -229,9 +242,10 @@ export async function runBulkLoad(pool, log = console){
         records_with_coords = EXCLUDED.records_with_coords,
         records_with_owner = EXCLUDED.records_with_owner,
         load_duration_seconds = EXCLUDED.load_duration_seconds,
-        load_error = NULL
+        load_error = NULL,
+        loader_version = EXCLUDED.loader_version
     `, [BULK_URL, etag, lastMod ? new Date(lastMod) : null,
-        towers.size, nWithCoords, nWithOwner, elapsed]);
+        towers.size, nWithCoords, nWithOwner, elapsed, LOADER_DATA_VERSION]);
 
     // 4. Archive the raw zip + rotate off anything > 28 days.  The
     //    archive lets operators diff this week's data against any of
@@ -326,10 +340,10 @@ function handleRA(f, towers){
     structure_address:        emptyToNull(f[23]),
     structure_city:           emptyToNull(f[24]),
     structure_state:          emptyToNull(f[25]),
-    height_of_structure_m:    ftToM(f[28]),
-    ground_elevation_m:       ftToM(f[29]),
-    overall_height_agl_m:     ftToM(f[30]),            // overall_height_above_ground
-    overall_height_amsl_m:    ftToM(f[31]),            // overall_height_amsl
+    height_of_structure_m:    metersAsIs(f[28]),
+    ground_elevation_m:       metersAsIs(f[29]),
+    overall_height_agl_m:     metersAsIs(f[30]),       // overall_height_above_ground (meters in ULS)
+    overall_height_amsl_m:    metersAsIs(f[31]),       // overall_height_amsl (meters in ULS)
     structure_type:           emptyToNull(f[32]),
     date_faa_determination:   parseDate(f[33]),
     faa_study_number:         emptyToNull(f[34]),

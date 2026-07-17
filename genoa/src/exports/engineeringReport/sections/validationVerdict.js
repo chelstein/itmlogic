@@ -184,16 +184,19 @@ export function buildValidationVerdictSection(exhibit){
   }
 
 
+  // Radial parity is a property of the projection engine (verified in the
+  // repository's golden suite), NOT a per-exhibit measurement — no exhibit
+  // evidence feeds it here, so it must not be reported as a per-exhibit PASS.
   components.push({
     name:   'Radial parity (per-radial spherical-vs-Karney delta)',
-    status: 'PASS',
-    detail: 'WGS-84 Karney (2013) projection; bit-exact round-trip residual < 1 mm at FCC scales (golden-suite locked)'
+    status: 'SKIP',
+    detail: 'Engine property, not a per-exhibit test: WGS-84 Karney (2013) projection round-trip residual < 1 mm is locked by the repository golden suite, not re-verified per exhibit.'
   });
 
   // Terrain source
   //
   // §73.184 AM groundwave is by definition a flat-earth FCC curve over
-  // assumed conductivity (47 CFR §73.183 / §73.190 Figure M3 / R3) —
+  // assumed conductivity (47 CFR §73.190 Figure M3 conductivity maps) —
   // terrain elevation is NOT an input to the AM contour calculation.
   // So for AM exhibits, "no terrain attached" is the expected outcome,
   // not a warning condition.  Report it as SKIP with the regulatory
@@ -211,7 +214,7 @@ export function buildValidationVerdictSection(exhibit){
     components.push({
       name:   'Terrain source',
       status: 'SKIP',
-      detail: '§73.184 AM groundwave does not use terrain — FCC curve over assumed conductivity per §73.183 / §73.190.  No DEM lookup is required or performed for AM exhibits.'
+      detail: '§73.184 AM groundwave does not use terrain — FCC curve over assumed conductivity per §73.184 / §73.190 Figure M3.  No DEM lookup is required or performed for AM exhibits.'
     });
   } else {
     components.push({
@@ -618,13 +621,13 @@ export function buildValidationVerdictSection(exhibit){
     // parity check hits (geo.fcc.gov) is FM-only — it exposes the FM
     // tvfm_curves engine.  AM exhibits have no equivalent public
     // distance endpoint; the FCC AM toolset is groundwave conductivity
-    // graphs (§73.183/§73.184) and NIF/RSS skywave (§73.190), not a
+    // graphs (§73.184) and NIF/RSS skywave (§73.190), not a
     // distance API.  So the "engineer of record should re-run with the
     // live parity check" guidance is FM-specific; for AM the engine-
     // reference computation IS the canonical record.
     const svc = String(exhibit.station_inputs?.service || '').toUpperCase();
     if (svc === 'AM'){
-      interpretation = 'Genoa\'s computed groundwave / NIF results pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  No FCC public distance endpoint exists for AM (§73.183/§73.184 groundwave and §73.190 skywave are graph-based, not distance-API-based), so engine-reference computation is the canonical record for AM exhibits at tier-3.';
+      interpretation = 'Genoa\'s computed groundwave / NIF results pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  No FCC public distance endpoint exists for AM (§73.184 groundwave field strength graphs and §73.190 skywave curves are graph-based, not distance-API-based), so engine-reference computation is the canonical record for AM exhibits at tier-3.';
     } else {
       interpretation = 'Genoa\'s computed contour distances pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  The live geo.fcc.gov parity check fell back to tier-3 code-identity verification (curve dataset SHA-256 matches upstream fcc/contours-api-node commit).  Code-identity is strong evidence of parity but is NOT a live cross-check; engineer of record should re-run with the live parity check before filing if definitive cross-verification is required.';
     }
@@ -670,14 +673,16 @@ export function buildValidationVerdictSection(exhibit){
   };
   const findComponent = (prefix) =>
     components.find((x) => typeof x?.name === 'string' && x.name.startsWith(prefix)) || null;
-  // Computational = curve_validation + radial_parity.  Both PASS ⇒ PASS.
+  // Computational = curve_validation; radial parity is an engine property
+  // (status SKIP) and is neutral in the reduction — only an explicit FAIL
+  // on either component fails the category.
   const cvStatus = compStatuses('Curve validation (golden suite)');
   const rpStatus = compStatuses('Radial parity (per-radial spherical-vs-Karney delta)');
-  const computational = (cvStatus === 'PASS' && (rpStatus === 'PASS' || rpStatus == null))
-    ? { status: 'PASS',         detail: 'golden suite + per-radial geometry verified' }
+  const computational = (cvStatus === 'PASS' && rpStatus !== 'FAIL')
+    ? { status: 'PASS',         detail: 'golden suite verified; projection parity locked by repository golden suite' }
     : (cvStatus === 'FAIL' || rpStatus === 'FAIL')
       ? { status: 'FAIL',         detail: 'internal math did not pass; do not file' }
-      : { status: 'INCOMPLETE',   detail: 'curve validation or radial parity not attached' };
+      : { status: 'INCOMPLETE',   detail: 'curve validation not attached' };
 
   // External parity = fcc_cross_check + fcc_parity + FORTRAN parity.
   // Tier-3 SHA-fallback shows up as "FALLBACK"; we report that as

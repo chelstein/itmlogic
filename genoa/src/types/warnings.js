@@ -133,7 +133,7 @@ export const WARNING_CODES = Object.freeze({
 
   FCC_CLASS_DEFAULTED:           { severity: 'info', phase: 'engine',
     title: 'FCC class not supplied — Class A default applied',
-    description: 'No FCC class was provided; §73.215 contour protection used the Class A protected-field default (60 dBu).  Class A is the most protective option; using it is conservative and will not produce false-pass results, but may flag interference pairs that a lower-class station (C, C0, C1, C2, B, B1) would be permitted to fail under the actual applicable threshold (54 dBu).  Supply inputs.fcc_class for a class-specific study.' },
+    description: 'No FCC class was provided; §73.215 contour protection used the 60 dBu protected-field default.  Per §73.215(a)(1), 60 dBu (1.0 mV/m) is the correct protected contour for all classes EXCEPT Class B (54 dBu / 0.5 mV/m) and Class B1 (57 dBu / 0.7 mV/m).  If the station is actually Class B or B1, its true protected contour extends beyond the 60 dBu ring and the defaulted study can MISS incoming interference between the class-correct contour and the 60 dBu contour — the default is NOT conservative for B/B1 subjects.  Supply inputs.fcc_class for a defensible study.' },
 
   SIDECAR_UNAVAILABLE:           { severity: 'warning', phase: 'sidecar',
     title: 'Optional sidecar unavailable',
@@ -330,8 +330,8 @@ export const WARNING_CODES = Object.freeze({
     description: 'The engine resolved to SHA "uncommitted" because no Docker .build_sha, GIT_COMMIT_SHA env-var, or .git/HEAD was found at startup.  The build_attestation.sha field is non-unique; two exhibits with different code may share the same "uncommitted" SHA.  Deploy via Docker or set GIT_COMMIT_SHA to fix.' },
 
   SIGMA_CLAMP: { severity: 'warning', phase: 'engine',
-    title: 'AM σ rounded or clamped to FCC M3 grid (47 CFR §73.184)',
-    description: 'The §73.184 groundwave grid is keyed on integer σ ∈ {1..8} mS/m (Figure M3).  The typed conductivity was rounded to the nearest grid value, or clamped to the 1 / 8 mS/m boundary for out-of-range soils (wet/marine commonly ≥10 mS/m).  Distances reflect the boundary curve, not the typed σ.  See exhibit.evidence.ground_constants for the input vs. used values.' },
+    title: 'AM σ rounded or clamped to FCC M3 conductivity grid (47 CFR §73.190 Figure M3)',
+    description: 'The §73.184 groundwave grid is keyed on integer σ ∈ {1..8} mS/m (§73.190 Figure M3).  The typed conductivity was rounded to the nearest grid value, or clamped to the 1 / 8 mS/m boundary for out-of-range soils (wet/marine commonly ≥10 mS/m).  Distances reflect the boundary curve, not the typed σ.  See exhibit.evidence.ground_constants for the input vs. used values.' },
 
   // ─── AM nighttime NIF (§73.182) warning codes ────────────────────────────
 
@@ -483,12 +483,12 @@ export const WARNING_CODES = Object.freeze({
     description: 'Two inputs or evidence sources provide different values for the same engineering field and the conflict was not automatically resolved.  The engineer of record must identify the authoritative value and reconcile the conflict before filing.' },
 
   OET65_REQUIRED: { severity: 'warning', phase: 'engine',
-    title: 'OET-65 RF exposure evaluation required (47 CFR §1.1310)',
-    description: 'This station\'s ERP and frequency combination meets or exceeds the §1.1310 threshold requiring a formal RF exposure (MPE) evaluation per OET Bulletin 65.  The evaluation has not been performed or has not been attached to this exhibit.  A signed OET-65 compliance study is required for filing.' },
+    title: 'OET-65 RF exposure evaluation required (47 CFR §1.1307(b))',
+    description: 'This station\'s ERP and frequency combination meets or exceeds the §1.1307(b) threshold requiring a formal RF exposure (MPE) evaluation per OET Bulletin 65 (MPE limits per §1.1310 Table 1).  The evaluation has not been performed or has not been attached to this exhibit.  A signed OET-65 compliance study is required for filing.' },
 
   OET65_MISSING: { severity: 'info', phase: 'engine',
     title: 'OET-65 RF exposure evaluation not attached',
-    description: 'No OET-65 RF exposure study is attached to this exhibit.  If the station\'s ERP and frequency place it above the §1.1310 evaluation threshold, an OET-65 study is required; otherwise this is advisory only.' },
+    description: 'No OET-65 RF exposure study is attached to this exhibit.  If the station\'s ERP and frequency place it above the §1.1307(b) evaluation threshold, an OET-65 study is required; otherwise this is advisory only.' },
 
   SDR_MISSING: { severity: 'info', phase: 'evidence',
     title: 'No SDR field-measurement captures attached',
@@ -532,7 +532,11 @@ export const WARNING_CODES = Object.freeze({
 
   REACH_PLACEHOLDER: { severity: 'warning', phase: 'engine',
     title: 'Identical daytime reach values across many candidates — propagation may be flat',
-    description: 'More than 10 candidates share the same daytime reach estimate.  This is expected when the screening engine has no per-site ground conductivity raster and uses the same regional σ bin for all points.  The reach values are not differentiating candidates by propagation geometry; per-site DEM conductivity integration is required for filing-grade reach estimates.' }
+    description: 'More than 10 candidates share the same daytime reach estimate.  This is expected when the screening engine has no per-site ground conductivity raster and uses the same regional σ bin for all points.  The reach values are not differentiating candidates by propagation geometry; per-site DEM conductivity integration is required for filing-grade reach estimates.' },
+
+  INTERNALLY_INCONSISTENT_CANDIDATE: { severity: 'blocker', phase: 'engine',
+    title: 'Candidate result is internally inconsistent',
+    description: 'The canonical invariant validator (src/engine/am/canonical/validation.js) found cross-field contradictions inside a candidate result (e.g. a NIF decision simultaneously required and NOT_REQUIRED, tower-height basis divergence between modules, or cost totals that are not the sum of their components).  The candidate is forced to status_category REVIEW_REQUIRED, internally_consistent is set to false, and no advancement recommendation is issued until the inconsistency is resolved.' }
 });
 
 export class W {

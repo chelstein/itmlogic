@@ -22,7 +22,7 @@ export function buildAssumptionsSection(exhibit){
   // Service vocabulary divides everything below.  AM exhibits MUST NOT
   // mention HAAT, ERP, or §73.313 — those are FM/TV concepts under
   // §73.316 / §73.333.  AM uses TPO, RMS field at 1 km, and ground
-  // conductivity σ under §73.183 / §73.184.  Leaking the FM vocabulary
+  // conductivity σ under §73.184.  Leaking the FM vocabulary
   // into an AM exhibit reads as FM-engine architecture poking through.
   const svc  = String(s.service || '').toUpperCase();
   const isAm = svc === 'AM' || svc === 'AX';
@@ -36,7 +36,7 @@ export function buildAssumptionsSection(exhibit){
   // Coordinate / propagation method line — service-specific second sentence.
   const coordLine = `Coordinate datum is ${datum} decimal degrees.  All spacing distances are great-circle per §73.208 using the Karney 2013 WGS-84 geodesic.`;
   const propLine  = isAm
-    ? `Field-strength predictions follow ${propMethod}.  Contour distances are computed by §73.184 grid inversion (bivariate σ × distance interpolation per Figure M3) at ${radialStep}° radial steps.`
+    ? `Field-strength predictions follow ${propMethod}.  Contour distances are computed by §73.184 grid inversion (bivariate σ × distance interpolation per §73.190 Figure M3) at ${radialStep}° radial steps.`
     : (function(){
         const interpField = ip.along_field || 'logarithmic';
         const interpHaat  = ip.along_haat  || 'linear';

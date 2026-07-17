@@ -1,5 +1,6 @@
 import React from 'react';
 import RackPanel from '../RackPanel.jsx';
+import { latSuffix, lonSuffix } from './format.js';
 
 // OptimizerInputsPanel — left rail.  Pure controlled component;
 // owns no fetch logic.  Goals checkboxes that are not yet wired
@@ -154,14 +155,14 @@ export default function OptimizerInputsPanel({
             value={inputs.current_site?.lat}
             onChange={(v) => onChange('current_site', { ...inputs.current_site, lat: v })}
             step="0.0001"
-            suffix="°N"
+            suffix={latSuffix(inputs.current_site?.lat)}
           />
           <NumField
             label="Current lon"
             value={inputs.current_site?.lon}
             onChange={(v) => onChange('current_site', { ...inputs.current_site, lon: v })}
             step="0.0001"
-            suffix="°E"
+            suffix={lonSuffix(inputs.current_site?.lon)}
           />
         </div>
         {/* Optional COL centroid — overrides default (current_site as proxy). */}
@@ -177,14 +178,14 @@ export default function OptimizerInputsPanel({
               value={inputs.col_centroid?.lat ?? ''}
               onChange={(v) => onChange('col_centroid', { ...(inputs.col_centroid || {}), lat: v === '' ? undefined : v })}
               step="0.0001"
-              suffix="°N"
+              suffix={latSuffix(inputs.col_centroid?.lat)}
             />
             <NumField
               label="COL lon"
               value={inputs.col_centroid?.lon ?? ''}
               onChange={(v) => onChange('col_centroid', { ...(inputs.col_centroid || {}), lon: v === '' ? undefined : v })}
               step="0.0001"
-              suffix="°E"
+              suffix={lonSuffix(inputs.col_centroid?.lon)}
             />
           </div>
         </fieldset>

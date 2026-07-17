@@ -55,7 +55,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { runBulkLoad } from './ulsBulkLoader.js';
+import { runBulkLoad, LOADER_DATA_VERSION } from './ulsBulkLoader.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.SIDECAR_PORT) || 8087;
@@ -95,11 +95,14 @@ async function ensureSchema(){
 }
 
 async function maybeRunBulkLoad(){
-  const r = await pool.query(`SELECT records_total, last_loaded_at FROM asr_load_state WHERE id = 1`);
+  const r = await pool.query(`SELECT records_total, last_loaded_at, loader_version FROM asr_load_state WHERE id = 1`);
   const row = r.rows[0];
   const forced = process.env.ASR_FORCE_RELOAD === '1';
+  // loader_version mismatch = the stored data's SEMANTICS predate the current
+  // loader (e.g. v1 wrongly converted RA heights ft→m); force a re-ingest.
   const stale = !row
     || !row.records_total
+    || row.loader_version !== LOADER_DATA_VERSION
     || (row.last_loaded_at && (Date.now() - new Date(row.last_loaded_at).getTime()) > LOAD_REFRESH_DAYS * 24 * 3600 * 1000);
   if (!stale && !forced){
     console.log(`[asr-sidecar] DB has ${row.records_total} towers loaded ${row.last_loaded_at}; skipping refresh`);

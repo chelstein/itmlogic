@@ -536,7 +536,7 @@ export function parsePublicFileFolder(j, url){
     'Public-and-Broadcasting-Procedure-Manual'
   ];
   const present = REQUIRED.filter(name =>
-    folderNames.some(fn => fn.toLowerCase().includes(name.toLowerCase().replace(/['’]/g, '')))
+    folderNames.some(fn => fn.toLowerCase().replace(/['’]/g, '').includes(name.toLowerCase().replace(/['’]/g, '')))
   );
   const missing = REQUIRED.filter(name => !present.includes(name));
   return {

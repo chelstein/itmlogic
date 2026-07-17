@@ -332,14 +332,14 @@ test('buildCountyOverlaySection: paragraphs mention dataset path and SHA256', as
   const joined = sec.paragraphs.join(' ');
   assert.match(joined, /us_counties_fcc\.geojson/, 'must mention dataset filename');
   assert.match(joined, /SHA-256/, 'must mention SHA-256');
-  assert.match(joined, /3207/, 'must mention valid KML file count');
+  assert.match(joined, /\d+ valid FCC KML boundary files/, 'must mention the derived valid KML file count');
 });
 
-// ── KAZM / Yavapai sample output ──────────────────────────────────────────────
-// KAZM 1550 kHz, Prescott AZ — transmitter at approximately 34.57°N 112.47°W,
-// within Yavapai County.  A 0.5 mV/m contour radius of ~120 km would typically
-// cover Yavapai, Coconino, Maricopa, and La Paz counties in AZ.
-// We test the station-center point and a larger polygon for coverage.
+// ── Yavapai County / Prescott AZ sample output ──────────────────────────────
+// Test fixture uses a Prescott AZ proxy polygon (34.50–34.65°N, 112.40–112.50°W)
+// within Yavapai County.  KAZM is actually 780 kHz in Sedona/Cottonwood AZ
+// (34.86°N 111.82°W, Yavapai County) — this polygon covers the Prescott area
+// of the same county.  A 0.5 mV/m contour at 780 kHz / 5 kW covers ~35 km.
 
 test('KAZM sample: station at Prescott AZ centroid is within Yavapai', async () => {
   _resetCache();
@@ -578,8 +578,8 @@ test('PRODUCTION-PINNED: MARICOPA, AZ area ~23901 km² (±1%)', { skip: !REAL_DA
     `MARICOPA area ${area.toFixed(0)} km² must be within 1% of 23901 km²`);
 });
 
-// KAZM regional bbox (±2° around Prescott AZ) intersects 6 counties on the
-// production dataset: COCONINO, GILA, LA PAZ, MARICOPA, MOHAVE, YAVAPAI.
+// Regional bbox covering central/NW Arizona (±2° around Prescott AZ area) intersects
+// 6 counties on the production dataset: COCONINO, GILA, LA PAZ, MARICOPA, MOHAVE, YAVAPAI.
 // This pins the bbox-prefilter + turf intersection step on real boundaries.
 test('PRODUCTION-PINNED: KAZM 2-degree region intersects 6 AZ counties', { skip: !REAL_DATASET_PRESENT ? 'real dataset not mounted' : false }, async () => {
   _resetCache();

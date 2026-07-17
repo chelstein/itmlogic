@@ -42,8 +42,8 @@ export const FCC_CITES = Object.freeze({
   }),
   AM_GROUNDWAVE_SIGNALS: Object.freeze({
     rule: '§73.183',
-    caption: 'Groundwave signals',
-    subject: 'Groundwave propagation definitions; how groundwave field strength is determined for AM allocation work.',
+    caption: 'Groundwave field strength for interference',
+    subject: 'Groundwave field strength thresholds used to determine interference; daytime and nighttime protection levels (0.5 mV/m, 0.1 mV/m, etc.) for AM allocation.',
     verified_at: '2026-05-23'
   }),
   AM_GROUNDWAVE_GRAPHS: Object.freeze({
@@ -227,7 +227,7 @@ export const AM_NIGHTTIME_BASIS = Object.freeze([
 export const AM_DAYTIME_BASIS = Object.freeze([
   FCC_CITES.AM_ALLOCATION_STANDARDS,    // §73.182 — classes
   FCC_CITES.AM_GROUNDWAVE_SIGNALS,      // §73.183 — groundwave definitions
-  FCC_CITES.AM_GROUNDWAVE_GRAPHS,       // §73.184 — Figure M3
+  FCC_CITES.AM_GROUNDWAVE_GRAPHS,       // §73.184 — groundwave graphs (uses §73.190 Figure M3 conductivity)
   FCC_CITES.AM_INTERFERING_SIGNAL,      // §73.185 — interfering signal math
   FCC_CITES.AM_DAYTIME_RADIATION_LIMIT  // §73.187 — daytime-radiation limits
 ]);

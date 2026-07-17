@@ -277,7 +277,7 @@ export const BERRY_SKYWAVE_PROVENANCE = Object.freeze({
   regulation:    '47 CFR §73.190(c) (Berry analytical formula, EXPLICITLY permitted in lieu of Figure 2)',
   modeled: [
     'SS-1 (50%) skywave field strength via closed-form analytical approximation',
-    'SS-2 (10%) skywave via 1.4× scaling of the 50% result',
+    'SS-2 (10%) skywave via +6 dB (×1.995) scaling of the 50% result per §73.190(c) percent-time charts',
     'Per-station replay-deterministic input_sha256 (same inputs → same hex)'
   ],
   not_modeled: [

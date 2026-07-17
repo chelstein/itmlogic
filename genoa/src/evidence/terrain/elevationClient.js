@@ -195,7 +195,7 @@ export async function computeHaatMultiSource({
   }
 
   const haat_per_radial = computeHaatPerRadial({
-    elevations: primaryResult.elevations,
+    elevations: primary.elevations,
     radials_deg, samples, tx_amsl_m
   });
 
@@ -220,8 +220,8 @@ export async function computeHaatMultiSource({
   }
 
   return {
-    provider:         primaryResult.source_id,
-    dem_source:       ELEVATION_SOURCES.find(s => s.id === primaryResult.source_id)?.dataset,
+    provider:         primary.source_id,
+    dem_source:       ELEVATION_SOURCES.find(s => s.id === primary.source_id)?.dataset,
     regulation:       '47 CFR §73.313(d) arc-averaged HAAT',
     arc:              { from_km, to_km, samples, method: 'equal-spacing, Karney WGS-84 geodesic' },
     tx:               { lat: tx_lat, lon: tx_lon, amsl_m: tx_amsl_m },

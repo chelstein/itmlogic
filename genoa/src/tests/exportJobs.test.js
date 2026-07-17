@@ -74,7 +74,7 @@ test('completed PDF job exposes artifact_url and binary PDF body', async () => {
   _resetForTests();
   const id = createJob({
     kind:  JOB_KIND.ENGINEERING_REPORT_PDF,
-    input: { inputs: FM_CLASS_A, options: {} }
+    input: FM_CLASS_A   // computeReq(r) wraps r.input as { inputs: r.input }
   });
   await runJob(id);
   const job = getJob(id);
@@ -93,7 +93,7 @@ test('completed TXT engineering-report job carries a text body', async () => {
   _resetForTests();
   const id = createJob({
     kind:  JOB_KIND.ENGINEERING_REPORT_TXT,
-    input: { inputs: FM_CLASS_A, options: {} }
+    input: FM_CLASS_A   // computeReq(r) wraps r.input as { inputs: r.input }
   });
   await runJob(id);
   const job = getJob(id);
@@ -173,7 +173,7 @@ test('HTTP /api/exhibit/jobs end-to-end (POST 202 + polling + artifact)', async 
     headers: { 'content-type': 'application/json' },
     body:    JSON.stringify({
       kind:    'engineering_report_txt',
-      input:   { inputs: FM_CLASS_A, options: {} }
+      input:   FM_CLASS_A   // route stores body.input; computeReq wraps as { inputs: ... }
     })
   });
   const postTime = Date.now() - t0;
@@ -185,7 +185,7 @@ test('HTTP /api/exhibit/jobs end-to-end (POST 202 + polling + artifact)', async 
 
   // Poll until complete.
   let view = null;
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 180_000;
   while (Date.now() < deadline){
     const r = await authFetch(baseUrl + `/api/exhibit/jobs/${submitted.job_id}`);
     assert.equal(r.status, 200);

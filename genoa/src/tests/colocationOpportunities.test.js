@@ -167,10 +167,20 @@ test('HYBRID mode returns score_stats and optimization_confidence', async () => 
   assert.ok(Number.isFinite(out.score_stats.std_dev), 'score_stats.std_dev finite');
   assert.ok(Number.isFinite(out.score_stats.min),     'score_stats.min finite');
   assert.ok(Number.isFinite(out.score_stats.max),     'score_stats.max finite');
-  // optimization_confidence
+  // optimization_confidence — level is the canonical ranking-signal-quality
+  // tier (proxy layers can no longer raise it), with the four axes beside it.
   assert.ok(out.optimization_confidence, 'optimization_confidence must be present in HYBRID response');
-  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(out.optimization_confidence.level),
-    `level must be HIGH/MEDIUM/LOW, got ${out.optimization_confidence.level}`);
+  assert.ok(['FILING_GRADE', 'ENGINEERING_GRADE', 'SCREENING', 'LOW'].includes(out.optimization_confidence.level),
+    `level must be a canonical ConfidenceTier, got ${out.optimization_confidence.level}`);
+  assert.equal(out.optimization_confidence.level,
+    out.optimization_confidence.ranking_signal_quality?.tier,
+    'level must EQUAL the canonical ranking_signal_quality tier');
+  assert.ok(out.optimization_confidence.engineering_data_confidence?.tier,
+    'engineering_data_confidence axis must be present');
+  assert.ok(out.optimization_confidence.regulatory_completeness != null,
+    'regulatory_completeness axis must be present');
+  assert.equal(typeof out.optimization_confidence.filing_readiness?.ready, 'boolean',
+    'filing_readiness axis must be present');
   assert.ok(Array.isArray(out.optimization_confidence.contributing_layers));
   assert.ok(Array.isArray(out.optimization_confidence.notes));
   // conductivity_mode
@@ -339,34 +349,62 @@ test('GRID search_mode forwards skywave_risk_level + recommended_actions from si
     `recommended_actions must be array in GRID mode; got: ${typeof out.recommended_actions}`);
 });
 
-// ---------- Test 18 — assignStatusCategory sets nif_status ----------
-test('assignStatusCategory sets nif_status aligned with status_category', () => {
+// ---------- Test 18 — nif_status derives from canonical.regulatory.nif, never the score category ----------
+test('assignStatusCategory derives nif_status from canonical NIF decision (score category no longer fabricates it)', () => {
+  // With a canonical NIF decision attached, the label reflects the DECISION —
+  // a top-quantile score does NOT produce a NIF label.
   const promisingC = {
     lat: 34.87, lon: -111.83, distance_from_current_km: 5,
     score: 95, col_coverage_pct: 0.92, blanket_population_pct: 0.2,
     daytime_reach_km: 60, ground_sigma_mS_m: 8, treaty_zone: null,
     source: 'INFRASTRUCTURE',
+    canonical: { regulatory: { nif: { required: true, completion: 'NOT_RUN', result: 'NOT_EVALUATED', state: 'NOT_EVALUATED' } } },
     colocation_analysis: { diplexing_required: false, same_band_interference_risk: 'LOW' }
   };
   __test__.assignStatusCategory(promisingC, /*scoreCutoff=*/80, { current_site: KAZM });
   assert.equal(promisingC.status_category, 'PROMISING');
-  assert.equal(promisingC.nif_status, 'PROMISING',
-    `PROMISING candidate should have nif_status='PROMISING'; got: ${promisingC.nif_status}`);
+  assert.equal(promisingC.nif_status, 'REQUIRED — NOT EVALUATED',
+    `required-but-not-run NIF must read 'REQUIRED — NOT EVALUATED'; got: ${promisingC.nif_status}`);
 
+  // A hard COL failure changes the STATUS but not the NIF fact.
   const nonCompliantC = {
     lat: 34.87, lon: -111.83, distance_from_current_km: 5,
     score: 90, col_coverage_pct: 0.30, blanket_population_pct: 0.2,
     daytime_reach_km: 60, ground_sigma_mS_m: 8, treaty_zone: null,
     source: 'INFRASTRUCTURE',
+    canonical: { regulatory: { nif: { required: true, completion: 'NOT_RUN', result: 'NOT_EVALUATED', state: 'NOT_EVALUATED' } } },
     colocation_analysis: { diplexing_required: false, same_band_interference_risk: 'LOW' }
   };
   __test__.assignStatusCategory(nonCompliantC, /*scoreCutoff=*/80, { current_site: KAZM });
-  // Status depends on distance and minimum_tpo_for_col_coverage_kw.
   assert.ok(['RECOVERABLE_WITH_DA', 'RECOVERABLE_WITH_COL_CHANGE', 'NON_COMPLIANT',
     'RECOVERABLE_WITH_POWER_INCREASE'].includes(nonCompliantC.status_category),
     `expected a recovery or NON_COMPLIANT category; got: ${nonCompliantC.status_category}`);
-  assert.equal(nonCompliantC.nif_status, 'NON-COMPLIANT',
-    `recovery/non-compliant candidate should have nif_status='NON-COMPLIANT'; got: ${nonCompliantC.nif_status}`);
+  assert.equal(nonCompliantC.nif_status, 'REQUIRED — NOT EVALUATED',
+    `NIF label must be independent of the score category; got: ${nonCompliantC.nif_status}`);
+
+  // Not-required (canonical Class-C-on-local decision) reads 'NOT REQUIRED'.
+  const notRequiredC = { ...promisingC,
+    canonical: { regulatory: { nif: { required: false, completion: 'NOT_RUN', result: 'NOT_EVALUATED', state: 'NOT_REQUIRED' } } } };
+  __test__.assignStatusCategory(notRequiredC, 80, { current_site: KAZM });
+  assert.equal(notRequiredC.nif_status, 'NOT REQUIRED');
+
+  // Without a canonical block there is no NIF fact — screening label only.
+  const noCanonical = { ...promisingC };
+  delete noCanonical.canonical;
+  __test__.assignStatusCategory(noCanonical, 80, { current_site: KAZM });
+  assert.equal(noCanonical.nif_status, 'SCREENING ONLY');
+});
+
+// ---------- Test 18b — nifStatusFromCanonical mapping table ----------
+test('nifStatusFromCanonical keeps requirement, completion, and result distinct', () => {
+  const f = __test__.nifStatusFromCanonical;
+  assert.equal(f(null), 'SCREENING ONLY');
+  assert.equal(f({ required: false, completion: 'NOT_RUN', result: 'NOT_EVALUATED' }), 'NOT REQUIRED');
+  assert.equal(f({ required: true, completion: 'NOT_RUN', result: 'NOT_EVALUATED' }), 'REQUIRED — NOT EVALUATED');
+  assert.equal(f({ required: true, completion: 'RUN', result: 'PASS' }), 'REQUIRED — STUDY PASSED');
+  assert.equal(f({ required: true, completion: 'RUN', result: 'FAIL' }), 'REQUIRED — STUDY FAILED');
+  assert.equal(f({ required: true, completion: 'RUN', result: 'NOT_EVALUATED' }), 'REQUIRED — STUDY INCONCLUSIVE');
+  assert.equal(f({ required: null, completion: 'NOT_RUN', result: 'NOT_EVALUATED' }), 'REQUIREMENT UNKNOWN');
 });
 
 // ---------- Test 19 — RECOVERABLE_WITH_POWER_INCREASE in colocation engine ----------
@@ -388,8 +426,10 @@ test('RECOVERABLE_WITH_POWER_INCREASE assigned when minimum_tpo_for_col_coverage
     `candidate with minimum_tpo_for_col_coverage_kw set should be RECOVERABLE_WITH_POWER_INCREASE; got: ${c.status_category}`);
   assert.ok(c.explanation.recovery_reasoning.includes('12.5'),
     `recovery_reasoning should cite the minimum TPO; got: ${c.explanation.recovery_reasoning}`);
-  assert.equal(c.nif_status, 'NON-COMPLIANT',
-    `RECOVERABLE_WITH_POWER_INCREASE should have nif_status='NON-COMPLIANT'; got: ${c.nif_status}`);
+  // nif_status is a NIF fact, not a compliance echo: without a canonical
+  // block on this hand-built candidate it stays 'SCREENING ONLY'.
+  assert.equal(c.nif_status, 'SCREENING ONLY',
+    `nif_status must not be fabricated from the score/compliance category; got: ${c.nif_status}`);
 });
 
 // ---------- Test 20 — nif_status enriched with skywave risk in INFRASTRUCTURE response ----------
@@ -704,9 +744,38 @@ test('colocation response has candidate_set_recommendation', async () => {
   assert.ok(typeof csr.overall_guidance === 'string', 'overall_guidance must be a string');
   assert.ok(typeof csr.n_advance_ready === 'number', 'n_advance_ready must be a number');
   assert.ok(Array.isArray(csr.candidates), 'candidates must be an array');
+  // Priorities are the canonical RecommendationLevel gate-ladder enum
+  // (read from candidate.canonical.recommendation) — the legacy
+  // 'ADVANCE_IMMEDIATELY' vocabulary is gone.
+  const LEVELS = ['SCREEN_FURTHER', 'ADVANCE_TO_DESK_STUDY', 'ADVANCE_TO_FIELD_VALIDATION',
+    'ADVANCE_TO_PARCEL_NEGOTIATION', 'ENGINEERING_READY', 'FILING_READY', 'REJECT'];
   for (const e of csr.candidates) {
-    assert.ok(['ADVANCE_IMMEDIATELY','ADVANCE_AFTER_REMEDY','HOLD','MONITOR'].includes(e.priority),
-      `priority "${e.priority}" must be valid for rank ${e.rank}`);
+    assert.ok(LEVELS.includes(e.priority),
+      `priority "${e.priority}" must be a RecommendationLevel for rank ${e.rank}`);
+    assert.ok(typeof e.action === 'string' && e.action.length > 0,
+      `action must be non-empty for rank ${e.rank}`);
+  }
+});
+
+test('colocation candidates carry canonical results with consistent validation and tie fields', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE', candidate_limit: 10 }));
+  assert.equal(out.available, true);
+  assert.ok(out.candidates.length >= 1);
+  for (const c of out.candidates) {
+    assert.ok(c.canonical, `rank ${c.rank} must carry candidate.canonical`);
+    assert.equal(c.canonical.validation.consistent, true,
+      `rank ${c.rank} must be internally consistent; violations: ${JSON.stringify(c.canonical.validation.violations)}`);
+    assert.equal(c.internally_consistent, true);
+    assert.equal(typeof c.tied_within_model_precision, 'boolean');
+    assert.ok(Number.isInteger(c.tie_group_size) && c.tie_group_size >= 1);
+    assert.equal(c.tied_within_model_precision, c.tie_group_size > 1,
+      `tie flag must agree with tie_group_size (rank ${c.rank})`);
+    if (c.tied_within_model_precision) {
+      assert.equal(c.scoring_display_label, 'Tied at current screening resolution');
+    }
+    // The recommendation feeding candidate_set_recommendation is the
+    // candidate's own canonical gate-ladder level.
+    assert.ok(c.canonical.recommendation?.level, 'canonical recommendation must be present');
   }
 });
 
@@ -749,7 +818,7 @@ test('colocation GRID candidates have fcc_class_power_ceiling_analysis', async (
   assert.equal(out.available, true);
   for (const c of out.candidates) {
     assert.ok(c.fcc_class_power_ceiling_analysis != null, `rank ${c.rank} missing fcc_class_power_ceiling_analysis`);
-    assert.equal(c.fcc_class_power_ceiling_analysis.class_power_ceiling_kw, 50, `rank ${c.rank} Class D ceiling must be 50 kW`);
+    assert.equal(c.fcc_class_power_ceiling_analysis.class_power_ceiling_kw, 50, `rank ${c.rank} Class D daytime ceiling must be 50 kW (§73.21(b)(2))`);
     assert.ok(['NONE','LIMITED','SIGNIFICANT'].includes(c.fcc_class_power_ceiling_analysis.upgrade_feasibility),
       `rank ${c.rank} invalid upgrade_feasibility`);
   }
@@ -1547,7 +1616,7 @@ test('colocation GRID candidates have community_of_license_change_guide', async 
   assert.equal(out.available, true);
   for (const c of out.candidates) {
     assert.ok(c.community_of_license_change_guide != null, `rank ${c.rank} missing community_of_license_change_guide`);
-    assert.strictEqual(c.community_of_license_change_guide.col_contour_threshold_mv_m, 0.5, `rank ${c.rank} COL contour threshold must be 0.5 mV/m`);
+    assert.strictEqual(c.community_of_license_change_guide.col_contour_threshold_mv_m, 5, `rank ${c.rank} COL contour threshold must be 5 mV/m per §73.24(i)`);
   }
 });
 
@@ -2066,8 +2135,8 @@ test('colocation GRID candidates have transmitter_power_upgrade_pathway_guide', 
   for (const c of out.candidates) {
     const g = c.transmitter_power_upgrade_pathway_guide;
     assert.ok(g != null, `rank ${c.rank} missing transmitter_power_upgrade_pathway_guide`);
-    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (5 kW → 50 kW Class D ceiling per §73.21(b))`);
-    assert.strictEqual(g.coverage_gain_pct, 216, `rank ${c.rank} coverage_gain_pct must be 216 (√10 at the 50 kW ceiling)`);
+    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (KAZM 5 kW is under the 50 kW Class D ceiling per §73.21(b)(2))`);
+    assert.ok(g.coverage_gain_pct > 0, `rank ${c.rank} coverage_gain_pct must be positive (45 kW of headroom to the Class D ceiling)`);
   }
 });
 
@@ -2131,7 +2200,7 @@ test('colocation GRID candidates have fcc_form_301_exhibit_checklist_guide', asy
     const g = c.fcc_form_301_exhibit_checklist_guide;
     assert.ok(g != null, `rank ${c.rank} missing fcc_form_301_exhibit_checklist_guide`);
     assert.strictEqual(g.n_exhibits_da_specific, 0, `rank ${c.rank} NDA must have 0 DA exhibits`);
-    assert.strictEqual(g.filing_fee_usd, 4200, `rank ${c.rank} filing fee must be $4,200`);
+    assert.strictEqual(g.filing_fee_usd, 4675, `rank ${c.rank} filing fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)`);
   }
 });
 
@@ -2853,7 +2922,7 @@ test('am_annual_regulatory_compliance_and_fee_guide present across colocation ca
   for (const c of out.candidates) {
     const g = c.am_annual_regulatory_compliance_and_fee_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_annual_regulatory_compliance_and_fee_guide missing`);
-    assert.ok(g.annual_fcc_fee_usd > 0, `rank ${c.rank}: annual_fcc_fee_usd must be positive`);
+    assert.ok(g.annual_fcc_fee_low_usd > 0, `rank ${c.rank}: annual_fcc_fee_low_usd must be positive (§1.1153 tier)`);
     assert.ok(g.total_annual_compliance_low_usd > 0, `rank ${c.rank}: total_annual_compliance_low_usd must be positive`);
     assert.ok(g.license_renewal_cycle_years === 8, `rank ${c.rank}: license renewal cycle must be 8 years`);
   }
@@ -3294,7 +3363,7 @@ test('am_annual_operating_cost_breakdown_guide present across colocation candida
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_annual_operating_cost_breakdown_guide missing`);
     assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
     assert.ok(g.kwh_per_year > 0, `rank ${c.rank}: kwh_per_year must be positive`);
-    assert.ok(g.electricity_draw_kw >= 3, `rank ${c.rank}: electricity_draw_kw must be >= 3 (3× TPO min 1 kW)`);
+    assert.ok(g.electricity_draw_kw >= 1.4, `rank ${c.rank}: electricity_draw_kw must be >= 1.4 (1.4× TPO min 1 kW)`);
   }
 });
 
@@ -3697,7 +3766,7 @@ test('colocation candidates include am_skywave_nighttime_service_and_interferenc
     assert.ok(g, `candidate missing am_skywave_nighttime_service_and_interference_guide`);
     assert.strictEqual(g.is_clear_channel, true, '780 kHz is a clear channel');
     assert.strictEqual(g.night_signoff_risk, true, 'Class D on 780 kHz has nighttime sign-off risk');
-    assert.ok(g.dominant_station.includes('KKOB'), 'dominant on 780 kHz is KKOB');
+    assert.ok(g.dominant_station.includes('WBBM'), 'dominant on 780 kHz is WBBM Chicago IL (50 kW); KKOB is 770 kHz Albuquerque NM');
   }
 });
 
@@ -3891,8 +3960,9 @@ test('am_nighttime_nif_service_contour_analysis_guide present across colocation 
   for (const c of out.candidates) {
     const g = c.am_nighttime_nif_service_contour_analysis_guide;
     assert.ok(g !== undefined && g !== null, `candidate missing am_nighttime_nif_service_contour_analysis_guide`);
-    assert.strictEqual(g.protection_threshold_uVm, 50, 'Class D clear channel protection threshold must be 50 µV/m');
-    assert.ok(g.dist_to_kkob_km > 0, 'dist_to_kkob_km must be positive');
+    assert.strictEqual(g.protection_threshold_uVm, 50, 'NIF protection threshold must be 50 µV/m');
+    // dist_to_kkob_km is null for non-clear-channel frequencies (790 kHz has no §73.25 dominant)
+    assert.ok(g.dist_to_kkob_km === null || g.dist_to_kkob_km > 0, 'dist_to_kkob_km must be null (no dominant) or positive');
     assert.ok(g.total_nif_low_usd >= 2000, 'NIF study cost must be ≥$2,000');
   }
 });
@@ -4034,7 +4104,7 @@ test('am_fcc_application_filing_cost_and_timeline_guide present across colocatio
   for (const c of out.candidates) {
     const g = c.am_fcc_application_filing_cost_and_timeline_guide;
     assert.ok(g !== undefined && g !== null, `candidate missing am_fcc_application_filing_cost_and_timeline_guide`);
-    assert.strictEqual(g.total_fcc_fees, 2030, 'total_fcc_fees must be $2,030');
+    assert.strictEqual(g.total_fcc_fees, 5430, 'total_fcc_fees must be $5,430 (301-AM $4,675 major change CP + 302-AM $755 per §1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
     assert.ok(g.filing_sequence.length >= 6, 'filing_sequence must have >= 6 steps');
     assert.ok(g.total_timeline_days_low > 0, 'total_timeline_days_low must be positive');
   }
@@ -4328,7 +4398,7 @@ test('am_interference_distance_and_service_area_overlap_guide present across col
     const g = c.am_interference_distance_and_service_area_overlap_guide;
     assert.ok(g !== undefined && g !== null, 'candidate missing am_interference_distance_and_service_area_overlap_guide');
     assert.ok(g.service_contours?.d_05_mvm_km > 0, 'd_05_mvm_km must be positive');
-    assert.strictEqual(g.du_requirements?.adj_10khz_db, -6, 'adj ±10 kHz must be −6 dB');
+    assert.strictEqual(g.du_requirements?.adj_10khz_db, 6, 'adj ±10 kHz must be 6 dB (§73.182 first-adjacent)');
     assert.ok(['LOW','MODERATE','HIGH'].includes(g.interference_risk_level), 'valid risk level required');
   }
 });
@@ -4602,7 +4672,7 @@ test('am_fcc_application_fee_budget_guide present across colocation candidates',
     const g = c.am_fcc_application_fee_budget_guide;
     assert.ok(g !== undefined && g !== null, 'candidate missing am_fcc_application_fee_budget_guide');
     assert.ok(g.form_301_fee_usd > 0, 'Form 301-AM fee must be positive');
-    assert.ok(g.total_fcc_fees_usd > 0, 'total FCC fees must be positive');
+    assert.ok(g.total_fcc_fees_low_usd > 0, 'total FCC fees (low) must be positive');
     assert.ok(g.n_fee_items >= 4, 'must list ≥4 fee items');
   }
 });

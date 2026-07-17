@@ -151,12 +151,22 @@ export async function augmentRankingWithCoverage(rankingResult, ctx = {}){
 // ---------------------------------------------------------------------------
 
 function toSplatTx(c){
+  // SPLAT wants the antenna height ABOVE GROUND at the tx site (it reads
+  // ground elevation from its own DEM).  HAAT (height above average
+  // terrain) is neither AGL nor AMSL — use a real AGL field when the
+  // comparator row carries one, and fall back to HAAT only as a labeled
+  // proxy (exact on flat terrain, approximate elsewhere).
+  const agl = Number.isFinite(Number(c.antenna_agl_m)) ? Number(c.antenna_agl_m)
+            : Number.isFinite(Number(c.rcagl_m))       ? Number(c.rcagl_m)
+            : Number(c.haat_m);
   return {
     call:             c.call         || null,
     lat:              Number(c.lat),
     lon:              Number(c.lon),
-    amsl_m:           Number(c.haat_m),
-    antenna_height_m: Number(c.haat_m),
+    antenna_height_m: agl,
+    antenna_height_basis: Number.isFinite(Number(c.antenna_agl_m)) || Number.isFinite(Number(c.rcagl_m))
+                            ? 'agl_from_record'
+                            : 'haat_proxy (no AGL height in comparator record; exact on flat terrain)',
     frequency_mhz:    Number(c.frequency_mhz ?? c.frequency),
     erp_kw:           Number(c.erp_kw),
     polarization:     c.polarization || 'V'

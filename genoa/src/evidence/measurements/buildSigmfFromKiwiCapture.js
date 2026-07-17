@@ -13,7 +13,9 @@
 //   a sigmf-meta object that parseSigmfMeta accepts as `calibrated:true`.
 //
 // CALIBRATION CHAIN
-//   Mirrors src/evidence/sdrCalibration.js applyCalibration():
+//   Delegates to the shared helper src/evidence/sdrCalibration.js
+//   rssiToFieldDbu() (the single source of the physics, also used by
+//   applyCalibration()):
 //     E_dBu = RSSI_dBm − LNA_gain − antenna_gain + cable_loss + AF
 //   where AF = antenna_factor_db_per_m if known, else 107 dB
 //   (50Ω matched-antenna default for an isotropic receiver).  Same
@@ -31,7 +33,8 @@
 //                                          parseSigmfMeta to extract the
 //                                          measurement.
 
-const POWER_TO_FIELD_DB = 107;     // dBm→dBu, 50Ω matched-antenna default
+import { rssiToFieldDbu, POWER_TO_FIELD_DB } from '../sdrCalibration.js';
+
 const KIWI_DEFAULT_RATE = 12000;   // Hz; KiwiSDR's stock AM-mode demod rate
 
 // Canonical ZTR capture-audio URL.  ZTR's app serves captured audio
@@ -122,16 +125,15 @@ export function buildSigmfFromKiwiCapture({
     field_dBu   = +(20 * Math.log10(Math.max(mvm * 1000, 1e-9))).toFixed(2);
     field_basis = 'direct_field_strength_reading_mvm';
   } else if (Number.isFinite(rssi_dbm)){
-    const af = Number.isFinite(antenna_factor_db_per_m)
-                  ? Number(antenna_factor_db_per_m)
-                  : POWER_TO_FIELD_DB;
-    field_dBu   = +(Number(rssi_dbm)
-                  - Number(lna_gain_db || 0)
-                  - Number(antenna_gain_dbi || 0)
-                  + Number(cable_loss_db || 0)
-                  + af).toFixed(2);
-    field_basis = Number.isFinite(antenna_factor_db_per_m)
-                    ? 'rssi_to_field_chain (antenna_factor_db_per_m)'
+    // Two-stage conversion (dBm + 107 = dBµV at 50 Ω, then + AF = dBµV/m;
+    // AF already encodes antenna gain) — shared physics lives in
+    // sdrCalibration.js rssiToFieldDbu().
+    const chain = rssiToFieldDbu({
+      rssi_dbm, lna_gain_db, antenna_gain_dbi, cable_loss_db, antenna_factor_db_per_m
+    });
+    field_dBu   = +chain.field_dBu.toFixed(2);
+    field_basis = chain.hasAF
+                    ? `rssi_to_field_chain (${POWER_TO_FIELD_DB} dB dBm→dBµV + antenna_factor_db_per_m)`
                     : `rssi_to_field_chain (${POWER_TO_FIELD_DB} dB matched-antenna default)`;
   } else {
     throw new Error('buildSigmfFromKiwiCapture: must supply rssi_dbm OR field_dBu_override OR field_mvm_override');

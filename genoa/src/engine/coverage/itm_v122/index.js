@@ -66,13 +66,33 @@ export function buildProp({
   en0           = 301.0,
   ipol          = 1,
   eps_dielect   = 15.0,
-  sgm_conduct   = 0.005
+  sgm_conduct   = 0.005,
+  zsys          = 0
 } = {}){
   const prop = makeProp();
   prop.hg[0] = tx_height_m;
   prop.hg[1] = rx_height_m;
-  qlrps(frequency_mhz, 0, en0, ipol, eps_dielect, sgm_conduct, prop);
+  qlrps(frequency_mhz, zsys, en0, ipol, eps_dielect, sgm_conduct, prop);
   return prop;
+}
+
+// Mean profile elevation used to altitude-correct surface refractivity,
+// exactly as the C++ reference computes it in point_to_point_ITM
+// (itwom3.0.cpp):
+//   ja = (long)(3.0 + 0.1 * elev[0]);  jb = np - ja + 6;
+//   zsys = mean(elev[ja-1 .. jb-1]);
+// qlrps then applies ens = en0 · exp(−zsys / 9460).  Passing zsys = 0
+// (the previous behavior) skips the altitude correction and shifts
+// horizon distances / beyond-horizon losses at high-elevation sites.
+export function zsysFromProfile(profile){
+  if (!profile || profile.length < 3) return 0;
+  const np = profile[0];
+  const ja = Math.trunc(3.0 + 0.1 * np);
+  const jb = np - ja + 6;
+  if (jb < ja) return 0;
+  let sum = 0;
+  for (let i = ja - 1; i < jb; i++) sum += profile[i];
+  return sum / (jb - ja + 1);
 }
 
 // Single-call point-to-point ITM v1.2.2 run.
@@ -105,7 +125,8 @@ export function pointToPoint({
   mdvar        = 12,
 } = {}){
   const prop  = buildProp({
-    tx_height_m, rx_height_m, frequency_mhz, en0, ipol, eps_dielect, sgm_conduct
+    tx_height_m, rx_height_m, frequency_mhz, en0, ipol, eps_dielect, sgm_conduct,
+    zsys: zsysFromProfile(profile)
   });
   const propa = makePropa();
   const propv = makePropv();
@@ -189,7 +210,8 @@ export function pointToPointItwom({
   ptx                   = null,
 } = {}){
   const prop  = buildProp({
-    tx_height_m, rx_height_m, frequency_mhz, en0, ipol, eps_dielect, sgm_conduct
+    tx_height_m, rx_height_m, frequency_mhz, en0, ipol, eps_dielect, sgm_conduct,
+    zsys: zsysFromProfile(profile)
   });
   prop.cch  = canopy_height_m;
   prop.encc = canopy_refractivity_n;

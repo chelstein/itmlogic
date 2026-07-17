@@ -273,3 +273,179 @@ test('PR-CITE2 — repository-wide: no rendered §73.x placeholder anywhere unde
   assert.equal(offenders.length, 0,
     `the literal "§73.x" appears in rendered text of: ${offenders.join(', ')}`);
 });
+
+// ── CFR-AUDIT (batches 88–92): nonexistent Part 73 sections stay dead ─
+
+test('CFR-AUDIT — no source file cites a nonexistent/repealed §73.35xx section', () => {
+  // These sections either never existed or were repealed and must not be
+  // cited as live rules anywhere in the source tree:
+  //   §73.3522 — does not exist (minor-mod processing is §73.3571(e))
+  //   §73.3525 — does not exist (application fees: 47 U.S.C. §158 / FCC fee schedule)
+  //   §73.3556 — removed 2020 (former program-duplication rule)
+  //   §73.3561 — does not exist (no CFR rule sets FCC review timelines)
+  //   §73.3562 — does not exist (COL change: §73.3533 + §73.3571)
+  //   §73.3597 — does not exist (assignment processing: §73.3580/§73.3584/§73.3591)
+  // Comments are stripped first so historical notes remain allowed.
+  const BANNED = [/§73\.3522/, /§73\.3525/, /§73\.3556/, /§73\.3561/, /§73\.3562/, /§73\.3597/];
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/exports/**/*.js' 'src/review/**/*.js' 'src/components/**/*.jsx' 'src/ui/*.jsx' 'src/data/**/*.json'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean);
+  assert.ok(files.length > 0, 'glob should match at least one source file');
+  const offenders = [];
+  for (const rel of files){
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    const stripped = src
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const re of BANNED){
+      if (re.test(stripped)) offenders.push(`${rel} (${re.source})`);
+    }
+  }
+  assert.equal(offenders.length, 0,
+    `nonexistent/repealed CFR sections cited in: ${offenders.join('; ')}`);
+});
+
+test('CFR-AUDIT — AM engine/UI never cite the FM application-processing rule §73.3573', () => {
+  // §73.3573 is real but FM-only.  AM application processing is §73.3571.
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  const offenders = files.filter(rel =>
+    /§73\.3573/.test(readFileSync(join(repoRoot, rel), 'utf8')));
+  assert.equal(offenders.length, 0,
+    `AM-context files cite FM rule §73.3573 (use §73.3571): ${offenders.join(', ')}`);
+});
+
+test('CFR-AUDIT — AM engine/UI DA pattern sections never cite FM-only §73.316 as the rule (only as clarifying FM note)', () => {
+  // §73.316 is the FM transmitting antenna systems rule.  AM DA patterns are governed by §73.150.
+  // AM engine/SiteOptimizer files may mention §73.316 ONLY in comments that explicitly
+  // note "§73.316 is FM" — not as the operative cited rule in rule: '...' fields or
+  // note/description strings that direct the user to file under §73.316.
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  // Allow §73.316 only when it is followed immediately by a phrase making clear it is FM-only
+  // (e.g., "§73.316 is FM", "§73.316 (FM)", "not §73.316 which applies to FM").
+  // Ban any occurrence that appears as the operative rule without such a qualifier.
+  const FM_ONLY_QUALIFIER = /§73\.316\s*(is FM|governs FM|\(FM\)|not AM|applies to FM| — FM|\/§73\.150|which applies to FM)/;
+  const BARE_316 = /§73\.316(?!\s*(is FM|governs FM|\(FM\)|not AM|applies to FM| — FM|\/§73\.150|which applies to FM))/;
+  const offenders = files.filter(rel => {
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    if (!BARE_316.test(src)) return false;
+    // Check each line — allow comment lines that explain FM context
+    const lines = src.split('\n');
+    return lines.some((line, i) => {
+      if (!BARE_316.test(line)) return false;
+      // Permit comment lines that contain "§73.316 is FM / not AM" anywhere on the line
+      if (/§73\.316.*(?:is FM|governs FM|\(FM\)|not AM|applies to FM|FM —|FM,|FM\/|\/§73\.150)/.test(line)) return false;
+      if (/(?:is FM|governs FM|not AM|applies to FM|FM —|FM,|FM\/|§73\.316.*FM).*§73\.316/.test(line)) return false;
+      return true;
+    });
+  });
+  assert.equal(offenders.length, 0,
+    `AM-context files cite FM DA rule §73.316 as operative rule (use §73.150): ${offenders.join(', ')}`);
+});
+
+test('CFR-AUDIT — AM engine/UI never cite FM-only §73.209 or §73.213 as operative AM channel rules', () => {
+  // §73.209 = FM 2nd-adjacent channel protection rule (FM only)
+  // §73.213 = FM 3rd-adjacent channel protection rule (FM only)
+  // AM adjacent-channel D/U requirements are in §73.182(r) / §73.37(a).
+  // These sections may appear only in comments explicitly noting "is FM" / "not AM".
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  const BARE_FM_ADJ = /§73\.(209|213)(?!.*(?:is FM|FM 2nd|FM 3rd|\(FM\)|not AM|applies to FM|FM —|FM rule))/;
+  const offenders = files.filter(rel => {
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    if (!BARE_FM_ADJ.test(src)) return false;
+    const lines = src.split('\n');
+    return lines.some(line => {
+      if (!BARE_FM_ADJ.test(line)) return false;
+      // Allow lines that explicitly state FM-only context
+      if (/§73\.(209|213).*(?:is FM|FM 2nd|FM 3rd|\(FM\)|not AM|applies to FM|FM —|FM rule)/.test(line)) return false;
+      if (/(?:is FM|FM 2nd|FM 3rd|not AM|applies to FM).*§73\.(209|213)/.test(line)) return false;
+      return true;
+    });
+  });
+  assert.equal(offenders.length, 0,
+    `AM-context files cite FM channel rules §73.209/§73.213 as operative AM rules (use §73.182(r)/§73.37): ${offenders.join(', ')}`);
+});
+
+// ── CFR-AUDIT: §73.24(i) vs §73.24j label drift ─────────────────────
+
+test('CFR-AUDIT — AM engine/UI never use the bare shorthand "§73.24j" (should be §73.24(i))', () => {
+  // The rule for AM principal community coverage is §73.24(i).
+  // §73.24(j) is the general public-interest standard (not the coverage rule).
+  // The file section_73_24j.js is a legacy-named file that IMPLEMENTS §73.24(i).
+  // Any label/note/cite string using the bare "§73.24j" form (without the
+  // parenthesized (i)) is a citation error.  Allow only the legacy filename
+  // reference in comments.
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  // Ban §73.24j in rendered strings; allow only in comments that reference the legacy filename
+  const BARE_24J = /§73\.24j/;
+  const offenders = files.filter(rel => {
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    if (!BARE_24J.test(src)) return false;
+    const lines = src.split('\n');
+    return lines.some(line => {
+      if (!BARE_24J.test(line)) return false;
+      // Allow comment lines that reference the legacy file / legacy label
+      if (/^\s*\/\//.test(line) && /legacy|section_73_24j|file.name|filename/.test(line)) return false;
+      return true;
+    });
+  });
+  assert.equal(offenders.length, 0,
+    `AM-context files use bare "§73.24j" shorthand (use §73.24(i)): ${offenders.join(', ')}`);
+});
+
+test('CFR-AUDIT — AM engine/UI never use the bare shorthand "§73.24g" (should be §73.24(g))', () => {
+  // §73.24(g) is the blanketing interference rule.  The bare shorthand §73.24g
+  // (without parentheses) omits the paragraph marker and could be confused with
+  // the subsection letter.  All rendered citations must use the parenthesized form.
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/components/**/*.jsx'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean).filter(rel =>
+    rel.includes('src/engine/am/') || rel.includes('src/components/ui/SiteOptimizer/'));
+  assert.ok(files.length > 0, 'glob should match at least one AM source file');
+  const BARE_24G = /§73\.24g/;
+  const offenders = files.filter(rel => {
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    if (!BARE_24G.test(src)) return false;
+    const lines = src.split('\n');
+    return lines.some(line => {
+      if (!BARE_24G.test(line)) return false;
+      if (/^\s*\/\//.test(line) && /legacy|section_73_24g|file.name|filename/.test(line)) return false;
+      return true;
+    });
+  });
+  assert.equal(offenders.length, 0,
+    `AM-context files use bare "§73.24g" shorthand (use §73.24(g)): ${offenders.join(', ')}`);
+});

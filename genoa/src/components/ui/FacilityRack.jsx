@@ -10,7 +10,7 @@ const SERVICES = [
   { v: 'FM',   label: 'FM full-service' },
   { v: 'LPFM', label: 'LPFM (§73.811)'  },
   { v: 'FX',   label: 'FM translator (§74.1204)' },
-  { v: 'AM',   label: 'AM (§73.183 groundwave)' }
+  { v: 'AM',   label: 'AM (§73.184 groundwave)' }
 ];
 // FCC class options vary by service — AM gets A/B/C/D, FM gets the
 // alphabet soup.  Showing the FM list to an AM operator means an AM
@@ -28,7 +28,7 @@ const FCC_CLASSES_BY_SERVICE = {
   FM:   ['A', 'B1', 'B', 'C3', 'C2', 'C1', 'C0', 'C'],
   FX:   ['A', 'B1', 'B', 'C3', 'C2', 'C1', 'C0', 'C'],   // translators inherit primary class
   LPFM: ['L1'],
-  TV:   ['LP', 'CP', 'LD']                                // low-power TV classes (placeholder)
+  TV:   ['LP', 'CA', 'LD']                                // FCC LPTV/Class A TV station types (LP=LPTV analog, CA=Class A TV, LD=LPTV digital)
 };
 const FCC_CLASSES_DEFAULT = ['A', 'B1', 'B', 'C3', 'C2', 'C1', 'C0', 'C', 'D', 'L1'];
 function classesFor(service){
@@ -318,11 +318,11 @@ export default function FacilityRack({
         </div>
         {inputs.service === 'AM' ? (
           <>
-            {/* AM uses 47 CFR §73.183 groundwave — TPO drives the
+            {/* AM uses 47 CFR §73.184 groundwave — TPO drives the
                 unattenuated RMS field at 1 km, ground conductivity
                 (AM σ below) drives the propagation curve.  ERP/HAAT
                 are FM/TV concepts and don't apply.  Internal field
-                is still erp_kw so the engine's existing §73.183 math
+                is still erp_kw so the engine's existing §73.184 math
                 keeps working untouched (for non-DA AM, TPO ≈ "ERP"
                 for the inverse-distance reference). */}
             <div>

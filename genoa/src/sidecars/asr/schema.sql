@@ -101,6 +101,15 @@ CREATE TABLE IF NOT EXISTS asr_load_state (
   records_with_coords     BIGINT,
   records_with_owner      BIGINT,
   load_duration_seconds   INTEGER,
-  load_error              TEXT
+  load_error              TEXT,
+  -- Data-semantics version of the loader that populated asr_towers
+  -- (ulsBulkLoader.js LOADER_DATA_VERSION).  A mismatch at boot forces a
+  -- full re-ingest so unit-semantics fixes (e.g. v2: RA heights stored as
+  -- meters; v1 wrongly converted ft→m) propagate to existing databases.
+  loader_version          INTEGER
 );
+
+-- Migration for databases created before loader_version existed
+-- (schema.sql is applied idempotently at every boot).
+ALTER TABLE asr_load_state ADD COLUMN IF NOT EXISTS loader_version INTEGER;
 

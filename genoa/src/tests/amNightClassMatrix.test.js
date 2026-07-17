@@ -68,9 +68,11 @@ function makeFakeFacility(primaries){
    Class A SS-1 0.5 mV/m floor (nifContour.evaluateReceiver)
    ============================================================ */
 
-test('Class A: SS-1 0.5 mV/m floor lifts the desired field used for protection', async () => {
-  // Far-from-tx receiver: raw desired field is tiny.  With Class A,
-  // evaluateReceiver clamps the protection-check desired up to 500 µV/m.
+test('Class A: 0.5 mV/m service-extent floor binds the REQUIRED field (§73.182(a))', async () => {
+  // Far-from-tx receiver: raw desired field is tiny (~12 µV/m) — well
+  // outside the station's 0.5 mV/m protected contour.  Class A protection
+  // TERMINATES at that contour, so the required field floors at 500 µV/m
+  // and the receiver must FAIL (it is not part of protected service).
   const proposedA = {
     lat: 40.0, lon: -75.0, freq_khz: 660, erp_kw: 50, fcc_class: 'A'
   };
@@ -81,9 +83,6 @@ test('Class A: SS-1 0.5 mV/m floor lifts the desired field used for protection',
     freq_khz: 660, erp_kw: 5,
     relation: 'co_channel', fcc_class: 'B'
   }];
-  // Receiver ~600 km north of proposed — raw desired field at that
-  // range with the inverse-distance fake is ~12 µV/m, well below the
-  // 500 µV/m floor.
   const v = await evaluateReceiver({
     fccamClient: makeFakeFccam(),
     proposed: proposedA, interferers,
@@ -91,17 +90,19 @@ test('Class A: SS-1 0.5 mV/m floor lifts the desired field used for protection',
     duDbByRelation: { co_channel: 26 }
   });
   assert.equal(v.ok, true);
-  // Class A floor applied flag on every check.
   for (const c of v.checks){
+    // The 500 µV/m floor binds (RSS·D/U requirement is smaller here).
     assert.equal(c.class_a_floor_applied, true,
       `class_a_floor_applied missing on ${c.relation}`);
-    // desired_uv_m is the floored value used in checkProtection.
-    assert.ok(c.desired_uv_m >= 500 - 1e-9,
-      `floored desired should be ≥ 500, got ${c.desired_uv_m}`);
-    // raw desired is preserved separately so the appendix can show both.
+    assert.ok(c.required_uv_m >= 500 - 1e-9,
+      `required field should floor at 500 µV/m, got ${c.required_uv_m}`);
+    // desired stays the RAW field — never inflated.
     assert.ok(Number.isFinite(c.desired_uv_m_raw));
-    assert.ok(c.desired_uv_m_raw < c.desired_uv_m,
-      'raw desired should be smaller than floored desired in this scenario');
+    assert.equal(c.desired_uv_m, c.desired_uv_m_raw);
+    assert.ok(c.desired_uv_m < 500, 'raw desired stays below the floor here');
+    // Outside the 0.5 mV/m contour → not protected service → fail.
+    assert.equal(c.pass, false,
+      'receiver beyond the 0.5 mV/m contour must not count as protected service');
   }
 });
 
@@ -128,9 +129,10 @@ test('Class B: SS-1 floor is NOT applied (Class B is protected to 2.5 mV/m via �
   }
 });
 
-test('Class A floor: floor never DOWNgrades a desired field above 500 µV/m', async () => {
-  // Close-in receiver — raw desired field is >> 500 µV/m.  The floor
-  // should be a no-op (Math.max).
+test('Class A floor: close-in receiver passes — floor may bind required but not the verdict', async () => {
+  // Close-in receiver — raw desired field is >> 500 µV/m, comfortably
+  // inside the 0.5 mV/m protected contour, so the receiver passes even
+  // when the 500 µV/m service floor is the binding requirement.
   const proposedA = {
     lat: 40.0, lon: -75.0, freq_khz: 660, erp_kw: 50, fcc_class: 'A'
   };
@@ -148,10 +150,12 @@ test('Class A floor: floor never DOWNgrades a desired field above 500 µV/m', as
   });
   assert.equal(v.ok, true);
   for (const c of v.checks){
-    // Floor is a no-op here; flag should be false because raw ≥ floor.
-    assert.equal(c.class_a_floor_applied, false,
-      `floor should be no-op when raw desired exceeds 500 µV/m`);
+    // desired is never inflated.
     assert.equal(c.desired_uv_m, c.desired_uv_m_raw);
+    assert.ok(c.desired_uv_m > 500, 'close-in raw desired exceeds the floor');
+    assert.ok(c.required_uv_m >= 500 - 1e-9,
+      'Class A required field never drops below the 0.5 mV/m service floor');
+    assert.equal(c.pass, true, 'close-in receiver inside the 0.5 mV/m contour must pass');
   }
 });
 

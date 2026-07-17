@@ -39,6 +39,7 @@ test('runCurveReferenceValidation with deliberately-wrong fixture FAILS', async 
     tolerance_km: 0.1,
     cases: [
       { id: 'wrong.case', service: 'FM', mode: '50,50', erp_kw: 100, haat_m: 561,
+        frequency_mhz: 100.7,
         target_dBu: 60, expected_distance_km: 9999.0 }
     ]
   }));

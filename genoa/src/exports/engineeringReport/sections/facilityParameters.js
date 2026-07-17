@@ -41,7 +41,7 @@ export function buildFacilityParametersSection(exhibit){
     : '—';
 
   // AM stations use ground conductivity (σ, mS/m), not HAAT — the
-  // groundwave engine reads §73.184 Figure M3 curves keyed on σ.  FM/FX
+  // groundwave engine reads §73.184 curves keyed on §73.190 Figure M3 σ.  FM/FX
   // stations use HAAT per §73.313.  Building one section that prints
   // both fields for both services would just be lying.
   const isAm = String(s.service || '').toUpperCase() === 'AM';
@@ -56,12 +56,12 @@ export function buildFacilityParametersSection(exhibit){
     : ['HAAT', fmt(haatDisplay, 'm')];
   const terrainRow = isAm
     ? ['Allocation basis',
-       'Groundwave field strength per §73.184 / §73.183; no terrain elevation model required']
+       'Groundwave field strength per §73.184 M3 conductivity curves; no terrain elevation model required']
     : ['Terrain source',
        ev.terrain?.source || (ev.terrain_haat_per_radial?.length ? 'per-radial DEM' : 'flat HAAT (CONSTANT_HAAT_ASSUMED)')];
 
-  // AM parameter vocabulary differs from FM/TV.  Per 47 CFR §73.183 /
-  // §73.184 an AM allocation is described by transmitter power (TPO),
+  // AM parameter vocabulary differs from FM/TV.  Per 47 CFR §73.184
+  // an AM allocation is described by transmitter power (TPO),
   // unattenuated RMS field at 1 km (inverse-distance reference field),
   // ground conductivity σ, and antenna mode (DA / NDA).  ERP and HAAT
   // are FM/TV terms and don't apply.  Field labels diverge accordingly.

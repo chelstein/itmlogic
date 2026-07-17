@@ -173,8 +173,13 @@ export function saalos(d, prop, propa){
   } else {
     // Tx antenna at or below canopy height: a different empirical
     // model (no ray-tracing iteration; closed-form in pd, cch, tgh).
+    // Parity note: the C++ reference (itwom3.0.cpp) computes
+    // exp(1/prop.cch - prop.tgh), which by C precedence is
+    // exp((1/cch) − tgh) — NOT exp(1/(cch−tgh)).  We mirror the
+    // reference exactly per this port's line-for-line parity contract,
+    // even though the C expression may itself be an upstream typo.
     q = (prop.cch - prop.tgh)
-      * (2.06943 - 1.56184 * Math.exp(1 / mymax(1e-9, prop.cch - prop.tgh)));
+      * (2.06943 - 1.56184 * Math.exp(1 / mymax(1e-9, prop.cch) - prop.tgh));
     q = q + (17.98 - 0.84224 * (prop.cch - prop.tgh)) * Math.exp(-0.00000061 * pd);
     arte = q + 1.34795 * 20 * Math.log10(pd + 1.0);
     arte = arte

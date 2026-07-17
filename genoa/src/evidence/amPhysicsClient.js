@@ -48,7 +48,7 @@
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
-// FCC §73.190 Figure R3 default ground conductivity for unmeasured
+// FCC §73.190 Figure M3 default ground conductivity for unmeasured
 // continental US soil (mS/m).  Used only when the facility/input
 // does not supply a measured value.  The evidence block records
 // 'default' as the source so reviewers see the assumption.

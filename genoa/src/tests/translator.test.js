@@ -84,14 +84,19 @@ test('Channel relationship classification is exact', () => {
   assert.equal(byCall.far.pass, true);
 });
 
-test('Class B/C primary uses 54 dBu protected contour', () => {
-  // A Class B/C station gets a 54 dBu protected field, not 60 dBu.
-  const primary = classAPrimary({ frequency_mhz: 100.1, lat: 37.0902, lon: -98.0 });
-  primary.fcc_class = 'C';
-  const r = checkTranslatorInterference({ translator: TRANSLATOR, primaries: [primary] });
-  const s = r.studies[0];
-  assert.equal(s.primary_protected_field_dbu, 54,
-    'Class C primary must use the 54 dBu protected contour');
+test('Class B primary uses 54 dBu; Class C uses 60 dBu (§73.215(a)(1))', () => {
+  // Only Class B (54 dBu) and B1 (57 dBu) have reduced protected fields;
+  // Class C and all other classes are protected to 60 dBu (1.0 mV/m).
+  const primaryB = classAPrimary({ frequency_mhz: 100.1, lat: 37.0902, lon: -98.0 });
+  primaryB.fcc_class = 'B';
+  const rB = checkTranslatorInterference({ translator: TRANSLATOR, primaries: [primaryB] });
+  assert.equal(rB.studies[0].primary_protected_field_dbu, 54,
+    'Class B primary must use the 54 dBu protected contour');
+  const primaryC = classAPrimary({ frequency_mhz: 100.1, lat: 37.0902, lon: -98.0 });
+  primaryC.fcc_class = 'C';
+  const rC = checkTranslatorInterference({ translator: TRANSLATOR, primaries: [primaryC] });
+  assert.equal(rC.studies[0].primary_protected_field_dbu, 60,
+    'Class C primary must use the 60 dBu protected contour per §73.215(a)(1)');
 });
 
 test('Translator inputs missing -> structured failure, no fabrication', () => {
@@ -139,10 +144,12 @@ test('Engine integration: FX exhibit emits §74.1204(c) D/U gate table', async (
   assert.equal(meta.du_gates_db.second_adjacent, -40);
   assert.equal(meta.du_gates_db.third_adjacent,  -40);
   assert.equal(meta.du_gates_db.if_offset,       -40);
-  // Class-dependent protected field thresholds.
+  // Class-dependent protected field thresholds per §73.215(a)(1):
+  // B 54 dBu, B1 57 dBu, all other classes 60 dBu.
   assert.equal(meta.protected_field_thresholds_dbu.A,  60);
   assert.equal(meta.protected_field_thresholds_dbu.B,  54);
-  assert.equal(meta.protected_field_thresholds_dbu.C,  54);
+  assert.equal(meta.protected_field_thresholds_dbu.B1, 57);
+  assert.equal(meta.protected_field_thresholds_dbu.C,  60);
   assert.equal(meta.protected_field_thresholds_dbu.LP100, 60);
 });
 

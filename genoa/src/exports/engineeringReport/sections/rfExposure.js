@@ -1,6 +1,6 @@
 // RF Exposure section — 47 CFR §1.1307, §1.1310 (OET-65).
 //
-// FCC §1.1310 requires categorical evaluation of MPE for broadcast
+// FCC §1.1307(b) requires categorical evaluation of MPE for broadcast
 // transmitters above 1 kW ERP.  H&D-style exhibits typically dedicate
 // a one-page Section 7 to this with controlled / uncontrolled distance
 // limits and a near-field flag.  Genoa's compute attaches an `oet65`
@@ -19,7 +19,7 @@ export function buildRfExposureSection(exhibit){
       type:    'paragraphs',
       heading: 'Radiofrequency Exposure (OET-65 / §1.1310)',
       paragraphs: [
-        'Per 47 CFR §1.1307(b)(1), the subject facility falls within the categorical evaluation thresholds of §1.1310 for routine RF-exposure compliance.  An OET-65 evaluation is required prior to filing.',
+        'Per 47 CFR §1.1307(b)(1), the subject facility falls within the categorical evaluation requirements of §1.1307(b) for routine RF-exposure compliance (MPE limits from §1.1310 Table 1).  An OET-65 evaluation is required prior to filing.',
         'No OET-65 evaluation block is attached to this exhibit (exhibit.oet65 is absent).  The engineer of record must perform a controlled / uncontrolled-environment MPE assessment per OET Bulletin 65 (1997) Supplement A — including controlled compliance distance, uncontrolled compliance distance, and a near-field reactive-region check at antenna mounting heights below 10 m AGL — and attach that as a separate exhibit to the LMS application.'
       ]
     };

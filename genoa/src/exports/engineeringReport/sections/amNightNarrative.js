@@ -271,7 +271,7 @@ export const AM_NIGHT_NARRATIVE_PROVENANCE = Object.freeze({
   ],
   not_modeled: [
     'LLM-generated prose (deterministic templates only — keeps replay stable)',
-    'Per-pair §73.215-style polygon-overlap commentary (separate showing module)'
+    'Per-pair §73.182 NIF-contour polygon-overlap commentary (separate showing module)'
   ],
   license_basis: '17 USC §105 (FCC rules + technical tables, US Government public domain)'
 });

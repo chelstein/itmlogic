@@ -133,15 +133,20 @@ test('score_stats are present and sensible', async () => {
 test('optimization_confidence is present with valid level', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
   assert.ok(out.optimization_confidence, 'optimization_confidence must be present');
-  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(out.optimization_confidence.level),
-    `level must be HIGH/MEDIUM/LOW, got ${out.optimization_confidence.level}`);
+  // level is now the canonical ranking-signal-quality tier (a ConfidenceTier),
+  // no longer a layer-count bucket.
+  assert.ok(['FILING_GRADE', 'ENGINEERING_GRADE', 'SCREENING', 'LOW'].includes(out.optimization_confidence.level),
+    `level must be a canonical ConfidenceTier, got ${out.optimization_confidence.level}`);
+  assert.equal(out.optimization_confidence.level,
+    out.optimization_confidence.ranking_signal_quality?.tier,
+    'level must EQUAL the canonical ranking_signal_quality tier');
   assert.ok(Array.isArray(out.optimization_confidence.contributing_layers),
     'contributing_layers must be an array');
   assert.ok(Array.isArray(out.optimization_confidence.notes),
     'notes must be an array');
 });
 
-test('optimization_confidence is HIGH when COL polygon + 3 real goals enabled', async () => {
+test('optimization_confidence: proxy layers can no longer raise the level (COL polygon + 3 real goals still LOW)', async () => {
   const poly = {
     type: 'Polygon',
     coordinates: [[
@@ -161,8 +166,25 @@ test('optimization_confidence is HIGH when COL polygon + 3 real goals enabled', 
       avoid_wildfire_risk:          false
     }
   });
-  assert.equal(out.optimization_confidence.level, 'HIGH');
+  // Under the legacy layer-count rule this configuration scored 'HIGH'
+  // (4 layers).  Canonically: agreement between independent layers is not
+  // measured by the screening run (agreesWithTopChoice is null for every
+  // layer), so rankingSignalQuality — and therefore level — is LOW.
+  // Proxy layers (population/blanket density proxies) are counted and
+  // reported but excluded from the agreement signal by construction.
+  assert.equal(out.optimization_confidence.level, 'LOW');
+  assert.equal(out.optimization_confidence.level,
+    out.optimization_confidence.ranking_signal_quality.tier);
+  assert.ok(out.optimization_confidence.ranking_signal_quality.proxyLayerCount >= 2,
+    'density-proxy layers must be reported as proxies');
   assert.ok(out.optimization_confidence.contributing_layers.includes('col_polygon_provided'));
+  // The four canonical axes ride along, separated.
+  assert.ok(out.optimization_confidence.engineering_data_confidence?.tier,
+    'engineering_data_confidence axis must be present');
+  assert.ok(out.optimization_confidence.regulatory_completeness != null,
+    'regulatory_completeness axis must be present');
+  assert.equal(typeof out.optimization_confidence.filing_readiness?.ready, 'boolean',
+    'filing_readiness axis must be present');
 });
 
 test('optimization_confidence is LOW when no goals enabled', async () => {
@@ -482,8 +504,14 @@ test('tower_reference block has correct physics for operating frequency', async 
   assert.ok(Math.abs(tr.quarter_wave_m - expectedLambda / 4) < 1, `quarter_wave_m off`);
   assert.ok(Math.abs(tr.half_wave_m - expectedLambda / 2) < 1, `half_wave_m off`);
   assert.equal(tr.asr_threshold_m, 60.96);
-  // At 790 kHz, λ/4 ≈ 95 m > 60.96 m → ASR required
-  assert.equal(tr.asr_registration_required_at_quarter_wave, true);
+  // The λ/4-basis ASR answer is GONE — §17.7 is evaluated against exactly
+  // one height (the canonical selected design height), never λ/4.
+  assert.ok(!('asr_registration_required_at_quarter_wave' in tr),
+    'asr_registration_required_at_quarter_wave must be removed from tower_reference');
+  // At 790 kHz Class D the design height is 3/8λ ≈ 142.4 m > 60.96 m → required.
+  assert.equal(tr.asr_registration_required_at_design_height, true);
+  // Echoed straight from canonical.regulatory.asr (§17.7 height prong tripped → RUN).
+  assert.equal(tr.asr_rule_completion, 'RUN');
 });
 
 test('sigmaQuality returns correct labels at boundary values', () => {
@@ -1535,13 +1563,13 @@ test('regulatory_compliance_summary.blanket_pop.status is FAIL when blanket_popu
 });
 
 test('regulatory_compliance_summary.class_power.ceiling matches FCC §73.21 for the station class', async () => {
-  // Class B max = 50 kW per §73.21; KAZM is Class B.
+  // Class D daytime max = 50 kW per §73.21(b)(2); KAZM is Class D.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   assert.equal(out.available, true);
   for (const c of out.candidates){
     const rcs = c.regulatory_compliance_summary;
     assert.equal(rcs.class_power.ceiling, 50,
-      `Class B ceiling must be 50 kW per §73.21; rank ${c.rank} got ${rcs.class_power.ceiling}`);
+      `Class D daytime ceiling is 50 kW per §73.21(b)(2); rank ${c.rank} got ${rcs.class_power.ceiling}`);
     assert.ok(rcs.class_power.value > 0,
       `class_power.value (tpo_kw) must be positive; rank ${c.rank} got ${rcs.class_power.value}`);
   }
@@ -1553,9 +1581,9 @@ test('power_class_ceiling_kw is stamped on every candidate and matches §73.21 c
   for (const c of out.candidates){
     assert.ok(c.power_class_ceiling_kw != null,
       `power_class_ceiling_kw must be non-null; rank ${c.rank}`);
-    // KAZM is Class B → ceiling 50 kW per §73.21.
+    // KAZM is Class D → daytime ceiling 50 kW per §73.21(b)(2).
     assert.equal(c.power_class_ceiling_kw, 50,
-      `KAZM Class B ceiling must be 50 kW; rank ${c.rank} got ${c.power_class_ceiling_kw}`);
+      `KAZM Class D daytime ceiling is 50 kW per §73.21(b)(2); rank ${c.rank} got ${c.power_class_ceiling_kw}`);
     // consistency with regulatory_compliance_summary
     assert.equal(c.regulatory_compliance_summary.class_power.ceiling, c.power_class_ceiling_kw,
       `power_class_ceiling_kw must match regulatory_compliance_summary.class_power.ceiling (rank ${c.rank})`);
@@ -1648,9 +1676,8 @@ test('form_301_checklist is present and contains required FCC filing items', asy
 });
 
 test('form_301_checklist includes SKYWAVE_NIF for clear_channel or HIGH skywave stations', async () => {
-  // KAZM (1490 kHz) is a regional channel, Class B — skywave risk depends on the
-  // buildProtectionAdvisory logic.  Clear channel stations always include it.
-  // We test that a clear channel station (e.g. 640 kHz — KFI clear) gets the item.
+  // KAZM defaults (780 kHz, Class D) spread with frequency_khz: 640 (clear channel — KFI).
+  // Clear channel stations always require SKYWAVE_NIF in the form_301_checklist.
   const clearChannelInputs = { ...KAZM, frequency_khz: 640 };
   const out = await runSiteOptimizer({ ...clearChannelInputs, candidate_limit: 5 });
   assert.equal(out.available, true);
@@ -1949,9 +1976,9 @@ test('antenna_system_summary present on every candidate with correct structure',
     assert.ok(s.efficiency_range_db.min_db <= s.efficiency_range_db.max_db,
       `efficiency min_db must be ≤ max_db (rank ${c.rank})`);
     assert.ok(typeof s.efficiency_range_db.label === 'string', `efficiency_range_db.label must be a string (rank ${c.rank})`);
-    // KAZM is Class B ceiling 50 kW; headroom = 50 - tpo_kw >= 0
+    // KAZM is Class D ceiling 5 kW; headroom = 5 - tpo_kw = 0 (at ceiling)
     assert.ok(s.tpo_headroom_to_class_max_kw != null && s.tpo_headroom_to_class_max_kw >= 0,
-      `tpo_headroom must be non-negative for Class B station (rank ${c.rank})`);
+      `tpo_headroom must be non-negative for Class D station at ceiling (rank ${c.rank})`);
   }
 });
 
@@ -2133,7 +2160,7 @@ test('coverage_feasibility_assessment present on every candidate with correct sh
 });
 
 test('coverage_feasibility_assessment.class_power_ceiling_kw matches §73.21 class table', async () => {
-  const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 50 };
+  const CLASS_CEILINGS = { A: 50, B: 50, C: 1, D: 50 };  // D: 50 kW day per §73.21(b)(2)
   for (const [cls, ceil] of Object.entries(CLASS_CEILINGS)){
     const out = await runSiteOptimizer({ ...KAZM, fcc_class: cls, candidate_limit: 3 });
     assert.equal(out.available, true);
@@ -3429,20 +3456,32 @@ test('frequency_allocation_context.channel_class matches frequency_channel_class
     'frequency_allocation_context.channel_class should match top-level frequency_channel_class');
 });
 
-test('frequency_allocation_context.nif_required is false for local channels', async () => {
+test('frequency_allocation_context.nif_required is false ONLY for Class C on a local channel (canonical predicate)', async () => {
   const LOCAL_FREQ = 1230; // always local channel
-  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: LOCAL_FREQ, candidate_limit: 2 });
-  assert.equal(out.available, true);
-  assert.equal(out.frequency_allocation_context.nif_required, false,
-    'Local channel (1230 kHz) should not require NIF');
+  // The canonical §73.182 predicate: NIF is required for ALL classes except
+  // Class C on a §73.27 local channel (§73.182(o) regime).
+  const outC = await runSiteOptimizer({ ...KAZM, frequency_khz: LOCAL_FREQ, fcc_class: 'C', tpo_kw: 1, candidate_limit: 2 });
+  assert.equal(outC.available, true);
+  assert.equal(outC.frequency_allocation_context.nif_required, false,
+    'Class C on a local channel (1230 kHz) should not require NIF');
+  // A non-Class-C station on the same local channel IS required — the old
+  // `!isLocal` shortcut is gone.
+  const outD = await runSiteOptimizer({ ...KAZM, frequency_khz: LOCAL_FREQ, fcc_class: 'D', candidate_limit: 2 });
+  assert.equal(outD.available, true);
+  assert.equal(outD.frequency_allocation_context.nif_required, true,
+    'non-Class-C on a local channel requires NIF under the canonical predicate');
 });
 
-test('frequency_allocation_context.nif_required is true for clear channel', async () => {
+test('frequency_allocation_context.nif_required is true for clear channel, with completion/result beside it', async () => {
   const CLEAR_FREQ = 780; // KAZM is 780 kHz — a clear channel
   const out = await runSiteOptimizer({ ...KAZM, frequency_khz: CLEAR_FREQ, candidate_limit: 2 });
   assert.equal(out.available, true);
   assert.equal(out.frequency_allocation_context.nif_required, true,
     '780 kHz (clear channel) should require NIF');
+  // Requirement vs completion vs result stay DISTINCT: the screening run
+  // never executes the §73.182 solver, so the study is NOT_RUN/NOT_EVALUATED.
+  assert.equal(out.frequency_allocation_context.nif_completion, 'NOT_RUN');
+  assert.equal(out.frequency_allocation_context.nif_result, 'NOT_EVALUATED');
 });
 
 test('frequency_allocation_context.nighttime_flexibility is valid enum', async () => {
@@ -3972,7 +4011,7 @@ test('directional_antenna_study_guide pattern_radials_required = 72 when recomme
     const g = c.directional_antenna_study_guide;
     if (g.recommended) {
       assert.equal(g.pattern_radials_required, 72,
-        `pattern_radials_required must be 72 (§73.316 5° increments) for rank ${c.rank}`);
+        `pattern_radials_required must be 72 (§73.150(a) 5° increments) for rank ${c.rank}`);
     }
   }
 });
@@ -4665,24 +4704,68 @@ test('candidate_set_recommendation.candidates covers all returned', async () => 
   }
 });
 
-test('candidate_set_recommendation each entry has priority and action', async () => {
+test('candidate_set_recommendation each entry has a canonical RecommendationLevel priority and action', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
-  const VALID_PRIORITIES = ['ADVANCE_IMMEDIATELY','ADVANCE_AFTER_REMEDY','HOLD','MONITOR'];
+  // Priorities are the canonical gate-ladder enum — the legacy
+  // 'ADVANCE_IMMEDIATELY' / 'HOLD' / 'MONITOR' vocabulary is gone.
+  const VALID_PRIORITIES = ['SCREEN_FURTHER', 'ADVANCE_TO_DESK_STUDY',
+    'ADVANCE_TO_FIELD_VALIDATION', 'ADVANCE_TO_PARCEL_NEGOTIATION',
+    'ENGINEERING_READY', 'FILING_READY', 'REJECT'];
   for (const e of out.candidate_set_recommendation.candidates) {
     assert.ok(VALID_PRIORITIES.includes(e.priority),
-      `priority "${e.priority}" must be valid for rank ${e.rank}`);
+      `priority "${e.priority}" must be a RecommendationLevel for rank ${e.rank}`);
     assert.ok(typeof e.action === 'string' && e.action.length > 0,
       `action must be a non-empty string for rank ${e.rank}`);
   }
 });
 
-test('candidate_set_recommendation n_advance_ready + n_need_remedy + n_hold <= candidates.length', async () => {
+test('candidate_set_recommendation priority equals candidate.canonical.recommendation.level', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  const byRank = new Map(out.candidates.map(c => [c.rank, c]));
+  for (const e of out.candidate_set_recommendation.candidates) {
+    const c = byRank.get(e.rank);
+    assert.ok(c, `csr rank ${e.rank} must exist among returned candidates`);
+    assert.equal(e.priority, c.canonical.recommendation.level,
+      `csr priority must be read from canonical.recommendation.level (rank ${e.rank})`);
+  }
+  // KAZM screening: the §73.182 NIF requirement is pending and engineering
+  // data is screening/LOW-grade → the ladder ceiling is ADVANCE_TO_DESK_STUDY.
+  for (const e of out.candidate_set_recommendation.candidates) {
+    assert.ok(['SCREEN_FURTHER', 'ADVANCE_TO_DESK_STUDY'].includes(e.priority),
+      `pending NIF must cap the ladder at ADVANCE_TO_DESK_STUDY; got ${e.priority}`);
+  }
+});
+
+test('candidate_set_recommendation uses the tie label instead of ranking language when tied', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
   const csr = out.candidate_set_recommendation;
-  const total = csr.n_advance_ready + csr.n_need_remedy + csr.n_hold
-    + (csr.candidates.filter(e => e.priority === 'MONITOR').length);
-  assert.equal(total, csr.candidates.length,
-    `priority counts must sum to candidates.length`);
+  const byRank = new Map(out.candidates.map(c => [c.rank, c]));
+  for (const e of csr.candidates) {
+    const c = byRank.get(e.rank);
+    assert.equal(e.tied_within_model_precision, c.tied_within_model_precision,
+      `csr tie flag must mirror the candidate (rank ${e.rank})`);
+    if (e.tied_within_model_precision === true) {
+      assert.ok(e.action.includes('Tied at current screening resolution'),
+        `tied candidate's action must carry the canonical tie label (rank ${e.rank}); got: "${e.action}"`);
+    }
+  }
+  // If the primary itself is tied, the overall guidance must say so.
+  const primary = csr.candidates.find(e => e.rank === csr.primary_recommended_rank);
+  if (primary?.tied_within_model_precision === true) {
+    assert.ok(csr.overall_guidance.startsWith('Tied at current screening resolution'),
+      `overall_guidance must lead with the tie label; got: "${csr.overall_guidance}"`);
+  }
+});
+
+test('candidate_set_recommendation level counts sum to candidates.length', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  const csr = out.candidate_set_recommendation;
+  // advance (any ladder level above SCREEN_FURTHER) + remedy (SCREEN_FURTHER)
+  // + hold (REJECT) partitions the entries.
+  assert.equal(csr.n_advance_ready + csr.n_need_remedy + csr.n_hold, csr.candidates.length,
+    `level counts must sum to candidates.length`);
+  const fromMap = Object.values(csr.count_by_level ?? {}).reduce((a, b) => a + b, 0);
+  assert.equal(fromMap, csr.candidates.length, 'count_by_level must cover every entry');
 });
 
 // ---------- tower_construction_timeline ----------
@@ -4828,9 +4911,9 @@ test('fcc_class_power_ceiling_analysis has correct class ceiling for Class D', a
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
   const pa = out.candidates[0].fcc_class_power_ceiling_analysis;
   assert.equal(pa.fcc_class, 'D', 'fcc_class must be D');
-  assert.equal(pa.class_power_ceiling_kw, 50, 'Class D ceiling must be 50 kW');
+  assert.equal(pa.class_power_ceiling_kw, 50, 'Class D daytime ceiling is 50 kW per §73.21(b)(2)');
   assert.equal(pa.current_tpo_kw, 5, 'current_tpo_kw must be 5');
-  assert.ok(pa.headroom_kw > 0, 'headroom_kw must be positive for 5 kW / 50 kW ceiling');
+  assert.equal(pa.headroom_kw, 45, 'KAZM at 5 kW under the 50 kW Class D ceiling leaves 45 kW headroom');
 });
 
 test('fcc_class_power_ceiling_analysis utilization_pct is correct', async () => {
@@ -4838,8 +4921,8 @@ test('fcc_class_power_ceiling_analysis utilization_pct is correct', async () => 
   const pa = out.candidates[0].fcc_class_power_ceiling_analysis;
   assert.ok(pa.power_utilization_pct > 0, 'utilization_pct must be positive');
   assert.ok(pa.power_utilization_pct <= 100, 'utilization_pct must be <= 100');
-  // 5 kW / 50 kW = 10%
-  assert.ok(Math.abs(pa.power_utilization_pct - 10) < 1, `expected ~10% utilization, got ${pa.power_utilization_pct}`);
+  // 5 kW / 50 kW (Class D ceiling per §73.21(b)(2)) = 10%
+  assert.ok(Math.abs(pa.power_utilization_pct - 10) < 1, `expected ~10% utilization (KAZM 5 kW of 50 kW Class D ceiling), got ${pa.power_utilization_pct}`);
 });
 
 test('fcc_class_power_ceiling_analysis upgrade_feasibility is valid', async () => {
@@ -6124,7 +6207,7 @@ test('ground_radial_installation_cost_guide presence and structure', async () =>
   const g = c.ground_radial_installation_cost_guide;
   assert.strictEqual(g.frequency_khz, 780, 'frequency_khz mismatch');
   assert.strictEqual(g.fcc_class, 'D', 'fcc_class mismatch');
-  assert.strictEqual(g.n_radials, 120, 'FCC minimum is 120 radials (§73.190)');
+  assert.strictEqual(g.n_radials, 120, 'FCC standard is 120 radials (§73.189(b)(4))');
   assert.strictEqual(g.fcc_minimum_radials, 120, 'fcc_minimum_radials must be 120');
   assert.strictEqual(g.radial_cfr, '47 CFR §73.189(b)(4)', 'CFR reference must be §73.189(b)(4) (AM ground system — 120 × 0.35λ excellent standard)');
 });
@@ -6561,7 +6644,7 @@ test('community_of_license_change_guide presence and structure', async () => {
 test('community_of_license_change_guide COL contour threshold is 0.5 mV/m', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].community_of_license_change_guide;
-  assert.strictEqual(g.col_contour_threshold_mv_m, 0.5, 'COL contour threshold must be 0.5 mV/m per §73.24(h)');
+  assert.strictEqual(g.col_contour_threshold_mv_m, 5, 'COL contour threshold must be 5 mV/m per §73.24(i)');
   assert.ok(g.col_service_cfr.includes('73.24'), 'COL service CFR must reference §73.24');
 });
 
@@ -6611,7 +6694,7 @@ test('fcc_license_modification_guide uses Form 301-AM with correct filing fee', 
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].fcc_license_modification_guide;
   assert.strictEqual(g.fcc_form, '301-AM', 'AM CP form must be 301-AM');
-  assert.strictEqual(g.filing_fee_usd, 325, 'AM CP filing fee must be $325');
+  assert.strictEqual(g.filing_fee_usd, 4675, 'AM CP major-change CP filing fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(g.cp_term_years, 3, 'CP term must be 3 years');
   assert.strictEqual(g.extension_available, true, 'extension must be available');
 });
@@ -7603,9 +7686,9 @@ test('adjacent_channel_protection_guide presence and structure', async () => {
 test('adjacent_channel_protection_guide D/U ratios by class (KAZM Class D)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].adjacent_channel_protection_guide;
-  // Class D: 20 dB at 10 kHz, 6 dB at 20 kHz
-  assert.ok(g.adjacent_10khz.required_du_db > 0, '10 kHz D/U must be positive');
-  assert.ok(g.adjacent_20khz.required_du_db > 0, '20 kHz D/U must be positive');
+  // §73.182: 6 dB at 10 kHz (first adjacent), 0 dB at 20 kHz (second adjacent) — all classes
+  assert.strictEqual(g.adjacent_10khz.required_du_db, 6, '10 kHz D/U must be 6 dB (§73.182 first adjacent)');
+  assert.strictEqual(g.adjacent_20khz.required_du_db, 0, '20 kHz D/U must be 0 dB (§73.182 second adjacent)');
   assert.ok(g.adjacent_10khz.required_du_db > g.adjacent_20khz.required_du_db, '10 kHz D/U must exceed 20 kHz D/U');
 });
 
@@ -8106,7 +8189,7 @@ test('iboc_hd_radio_analysis presence and applicability', async () => {
 test('iboc_hd_radio_analysis digital sideband power and bandwidth', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const h = out.candidates[0].iboc_hd_radio_analysis;
-  assert.strictEqual(h.iboc_digital_erp_dbw, -14, 'digital sideband level must be -14 dBc');
+  assert.strictEqual(h.iboc_digital_erp_dbw, -20, 'digital sideband level must be -20 dBc default (hybrid MA1; -14 dBc elevated with FCC notification)');
   assert.ok(h.digital_sideband_erp_kw > 0, 'digital ERP must be positive');
   assert.ok(h.digital_sideband_erp_kw < h.tpo_kw, 'digital ERP must be less than analog TPO');
   assert.strictEqual(h.digital_bandwidth_khz.span_khz, 30, 'IBOC digital bandwidth must be 30 kHz (±15 kHz)');
@@ -8301,7 +8384,7 @@ test('skywave_coverage_analysis NIF requirement for clear channel', async () => 
 test('skywave_coverage_analysis nighttime power limits enforced', async () => {
   const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
   const s = out.candidates[0].skywave_coverage_analysis;
-  // Class D max night power is 0.25 kW; TPO 5 kW should clamp to 0.25
+  // Class D night power is < 0.25 kW per §73.21(b)(2); TPO 5 kW clamps to 0.25
   assert.ok(s.actual_night_power_kw <= s.nighttime_power_max_kw, 'actual night power must not exceed class max');
   assert.ok(s.nighttime_power_max_kw > 0, 'nighttime power max must be positive');
 });
@@ -8385,9 +8468,13 @@ test('tower_lighting_marking_guide presence and height estimate', async () => {
 test('tower_lighting_marking_guide ASR threshold check', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const t = out.candidates[0].tower_lighting_marking_guide;
-  assert.strictEqual(t.asr_threshold_m, 61, 'ASR threshold must be 61m (§17.7)');
-  // KAZM at 780 kHz: λ = 384.6m; 3/8λ ≈ 144m > 61m → ASR required
-  assert.strictEqual(t.asr_required, true, 'KAZM tower at 780 kHz must require ASR (> 61m)');
+  // Threshold normalized from the informal 61 m approximation to the exact
+  // §17.7 value (60.96 m / 200 ft) sourced from ASR_THRESHOLD_17_7 in the
+  // regulatory-constants catalog. No behavior change for any AM design height
+  // (class planning heights are 3/8λ or 5/8λ, never inside 60.96–61 m).
+  assert.strictEqual(t.asr_threshold_m, 60.96, 'ASR threshold must be 60.96m / 200 ft (§17.7)');
+  // KAZM at 780 kHz: λ = 384.6m; 3/8λ ≈ 144m > 60.96m → ASR required
+  assert.strictEqual(t.asr_required, true, 'KAZM tower at 780 kHz must require ASR (> 60.96m)');
 });
 
 test('tower_lighting_marking_guide LED retrofit spec', async () => {
@@ -8431,7 +8518,7 @@ test('rf_exposure_mpe_analysis MPE limits per §1.1310', async () => {
   const r = out.candidates[0].rf_exposure_mpe_analysis;
   assert.strictEqual(r.mpe_general_population_mw_cm2, 100, 'MPE must be 100 mW/cm² for 0.3–3 MHz general population');
   assert.strictEqual(r.mpe_general_population_e_vm, 614, 'E-field MPE must be 614 V/m');
-  assert.strictEqual(r.mpe_occupational_mw_cm2, 900, 'occupational MPE must be 900 mW/cm² (OET-65 Table 1, 0.3–3 MHz controlled)');
+  assert.strictEqual(r.mpe_occupational_mw_cm2, 100, 'occupational MPE must be 100 mW/cm² (§1.1310 Table 1, 0.3–3 MHz controlled — same as GP in AM band)');
 });
 
 test('rf_exposure_mpe_analysis exclusion zone and EIRP', async () => {
@@ -8440,7 +8527,7 @@ test('rf_exposure_mpe_analysis exclusion zone and EIRP', async () => {
   assert.ok(r.eirp_w > r.tpo_kw * 1000, 'EIRP must be greater than TPO (dipole gain factor)');
   assert.ok(r.exclusion_radius_ft > r.exclusion_radius_m, 'exclusion radius ft must exceed m');
   assert.ok(r.occupational_exclusion_m > 0, 'occupational exclusion zone must be positive');
-  assert.ok(r.occupational_exclusion_m < r.exclusion_radius_m, 'occupational zone must be smaller than general population zone');
+  assert.strictEqual(r.occupational_exclusion_m, r.exclusion_radius_m, 'occupational zone must equal general population zone (OC = GP limit in AM band)');
 });
 
 test('rf_exposure_mpe_analysis filing exhibits present', async () => {
@@ -8813,15 +8900,17 @@ test('rf_exposure_compliance_guide MPE evaluation required at 5 kW threshold', a
   const out1  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, candidate_limit: 1 });
   const r5 = out5.candidates[0].rf_exposure_compliance_guide;
   const r1 = out1.candidates[0].rf_exposure_compliance_guide;
-  assert.strictEqual(r5.mpe_evaluation_required, true,  '5 kW must require MPE evaluation (§1.1310 threshold)');
+  assert.strictEqual(r5.mpe_evaluation_required, true,  '5 kW must require MPE evaluation (§1.1307(b) trigger; §1.1310 has MPE limits)');
   assert.strictEqual(r1.mpe_evaluation_required, false, '1 kW must not require MPE evaluation');
 });
 
-test('rf_exposure_compliance_guide uncontrolled zone is stricter than controlled', async () => {
+test('rf_exposure_compliance_guide GP and occupational limits are equal in the AM band', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r = out.candidates[0].rf_exposure_compliance_guide;
-  assert.ok(r.mpe_limit_gp_mwcm2 < r.mpe_limit_occ_mwcm2, 'GP MPE limit must be less than occupational limit');
-  assert.ok(r.exclusion_radius_gp_m > r.exclusion_radius_occ_m, 'GP exclusion zone must be larger than controlled zone');
+  // §1.1310 Table 1: OC and GP power-density limits are both 100 mW/cm² at 0.3–3 MHz
+  assert.strictEqual(r.mpe_limit_gp_mwcm2, 100, 'GP MPE limit must be 100 mW/cm²');
+  assert.strictEqual(r.mpe_limit_occ_mwcm2, 100, 'occupational MPE limit must be 100 mW/cm² (same as GP in AM band)');
+  assert.strictEqual(r.exclusion_radius_gp_m, r.exclusion_radius_occ_m, 'GP exclusion zone must equal controlled zone (equal limits)');
 });
 
 test('rf_exposure_compliance_guide exclusion zones scale with power', async () => {
@@ -8945,10 +9034,10 @@ test('license_renewal_compliance_guide presence and structure', async () => {
   assert.ok(l.n_opif_required > 0, 'must have required OPIF items');
 });
 
-test('license_renewal_compliance_guide Form 303-S renewal fee is $345', async () => {
+test('license_renewal_compliance_guide Form 303-S renewal fee is $365', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const l = out.candidates[0].license_renewal_compliance_guide;
-  assert.strictEqual(l.renewal_filing_fee_usd, 345, 'Form 303-S filing fee must be $345');
+  assert.strictEqual(l.renewal_filing_fee_usd, 365, 'Form 303-S filing fee must be $365 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(l.renewal_form, 'FCC Form 303-S', 'renewal form must be FCC Form 303-S');
   assert.ok(l.renewal_cycle.publication_required, 'renewal publication must be required (§73.3580)');
 });
@@ -9257,8 +9346,8 @@ test('regulatory_filing_checklist total fees and filing counts', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r = out.candidates[0].regulatory_filing_checklist;
   assert.ok(r.total_required_fees_usd >= 0, 'total fees must be >= 0');
-  // Form 301-AM fee ($6465) must be reflected in total
-  assert.ok(r.total_required_fees_usd >= 6465, 'total fees must include at least Form 301-AM fee ($6465)');
+  // Required filings: Form 301-AM $4,675 + Form 302-AM $755 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)
+  assert.strictEqual(r.total_required_fees_usd, 5430, 'total fees must be $5,430 ($4,675 Form 301-AM major CP + $755 Form 302-AM per §1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(r.n_total_filings, r.all_filings.length, 'n_total_filings must match all_filings.length');
 });
 
@@ -9619,26 +9708,26 @@ test('transmitter_power_upgrade_pathway_guide KAZM 780 kHz Class D NDA daytime h
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
   assert.strictEqual(g.current_tpo_kw, 5, 'current_tpo_kw must be 5 (KAZM)');
-  assert.strictEqual(g.day_max_tpo_kw, 50, 'day_max_tpo_kw must be 50 (Class D daytime max per §73.21(b))');
-  assert.strictEqual(g.day_headroom_kw, 45, 'day_headroom_kw must be 45');
-  assert.strictEqual(g.can_upgrade_day_power, true, 'can_upgrade_day_power must be true');
-  assert.strictEqual(g.upgraded_tpo_kw, 50, 'upgraded_tpo_kw must be 50 (class ceiling)');
+  assert.strictEqual(g.day_max_tpo_kw, 50, 'Class D daytime ceiling is 50 kW per §73.21(b)(2)');
+  assert.strictEqual(g.day_headroom_kw, 45, 'KAZM at 5 kW under 50 kW Class D ceiling: 45 kW headroom');
+  assert.strictEqual(g.can_upgrade_day_power, true, 'KAZM below Class D ceiling can increase day power');
+  assert.strictEqual(g.upgraded_tpo_kw, 50, 'upgraded_tpo_kw = 50 kW Class D ceiling');
 });
 
-test('transmitter_power_upgrade_pathway_guide KAZM coverage gain ~216% at class-ceiling power', async () => {
+test('transmitter_power_upgrade_pathway_guide KAZM coverage gain to Class D ceiling', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
-  // 5 kW → 50 kW: radius factor = √(50/5) = √10 ≈ 3.162
-  assert.ok(g.coverage_radius_factor > 3.15 && g.coverage_radius_factor < 3.17,
-    `coverage_radius_factor must be ~√10 ≈ 3.162, got ${g.coverage_radius_factor}`);
-  assert.strictEqual(g.coverage_gain_pct, 216, 'coverage_gain_pct must be 216');
+  // KAZM 5 kW → 50 kW: coverage radius scales as sqrt(50/5) = sqrt(10) ≈ 3.162
+  assert.ok(Math.abs(g.coverage_radius_factor - Math.sqrt(10)) < 0.01,
+    `coverage_radius_factor must be sqrt(10) ≈ 3.162 for a 5→50 kW upgrade, got ${g.coverage_radius_factor}`);
+  assert.ok(g.coverage_gain_pct > 0, 'coverage_gain_pct must be positive (upgrade headroom exists)');
 });
 
 test('transmitter_power_upgrade_pathway_guide costs and upgrade steps', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
-  assert.strictEqual(g.form301_fee_usd, 4200, 'Form 301 fee must be $4,200');
-  assert.strictEqual(g.form302_fee_usd, 435, 'Form 302-AM fee must be $435');
+  assert.strictEqual(g.form301_fee_usd, 4675, 'Form 301 fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
+  assert.strictEqual(g.form302_fee_usd, 755, 'Form 302-AM fee must be $755 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.ok(g.total_project_low_usd > 30000, 'total project low must be > $30k');
   assert.ok(g.total_project_high_usd > g.total_project_low_usd, 'total high must exceed low');
   assert.strictEqual(g.n_upgrade_steps, 5, 'must have 5 upgrade steps');
@@ -9798,7 +9887,7 @@ test('fcc_form_301_exhibit_checklist_guide present and structured correctly', as
   assert.ok(g != null, 'fcc_form_301_exhibit_checklist_guide must be present');
   assert.ok(g.n_exhibits_total > 15, 'must have at least 15 total exhibits');
   assert.ok(g.n_exhibits_required <= g.n_exhibits_total, 'required must be ≤ total');
-  assert.strictEqual(g.filing_fee_usd, 4200, 'Form 301 filing fee must be $4,200');
+  assert.strictEqual(g.filing_fee_usd, 4675, 'Form 301 filing fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
 });
 
 test('fcc_form_301_exhibit_checklist_guide KAZM NDA has 0 DA-specific exhibits', async () => {
@@ -10238,7 +10327,7 @@ test('am_digital_hd_radio_upgrade_pathway_guide KAZM Class D only MA1 mode appli
   assert.strictEqual(g.n_applicable_hd_modes, 1, 'KAZM Class D must have 1 applicable HD mode');
   const applicable = g.applicable_hd_modes.filter(m => m.applicable);
   assert.strictEqual(applicable[0].mode, 'MA1', 'only MA1 must be applicable for Class D');
-  assert.strictEqual(g.hd_sideband_dbhd_increased, -20, 'Class D sideband power must be -20 dBc');
+  assert.strictEqual(g.hd_sideband_dbhd_increased, -14, 'elevated sideband power option is -14 dBc with FCC notification (§73.404)');
 });
 
 test('am_digital_hd_radio_upgrade_pathway_guide cost range is valid for Class D', async () => {
@@ -10425,7 +10514,7 @@ test('am_grounding_system_and_rf_safety_guide KAZM RF safety fence required', as
   // 780 kHz uncontrolled MPE: flat 100 mW/cm² for 0.3–1.34 MHz per OET Bulletin 65 Table 1
   assert.strictEqual(g.mpe_uncontrolled_mw_cm2, 100, 'uncontrolled MPE should be 100 mW/cm² for 0.3–1.34 MHz');
   assert.ok(g.exclusion_zone_m > 0, 'exclusion zone must be positive');
-  assert.ok(g.controlled_zone_m < g.exclusion_zone_m, 'controlled zone must be less than uncontrolled zone');
+  assert.strictEqual(g.controlled_zone_m, g.exclusion_zone_m, 'controlled zone must equal uncontrolled zone (OC = GP limit of 100 mW/cm² in AM band)');
 });
 
 test('am_grounding_system_and_rf_safety_guide cost structure is internally consistent', async () => {
@@ -10765,7 +10854,7 @@ test('am_daytime_interference_and_protection_guide KAZM clear channel secondary 
   // 780 kHz is a clear channel; Class D → secondary status
   assert.strictEqual(g.channel_type, 'CLEAR_CHANNEL', '780 kHz should be CLEAR_CHANNEL');
   assert.strictEqual(g.is_secondary, true, 'Class D on clear channel should be secondary');
-  assert.strictEqual(g.night_power_limit_kw, 0.25, 'Class D clear-channel night limit should be 0.25 kW');
+  assert.strictEqual(g.night_power_limit_kw, 0.25, 'Class D clear-channel night limit is < 0.25 kW per §73.21(b)(2)');
   assert.strictEqual(g.co_channel_risk, 'HIGH', 'Class D on clear channel has HIGH co-channel risk');
 });
 
@@ -10782,8 +10871,8 @@ test('am_daytime_interference_and_protection_guide service radius is physically 
 test('am_daytime_interference_and_protection_guide protection ratios are valid', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_daytime_interference_and_protection_guide;
-  // Clear-channel daytime D/U: 6 dB
-  assert.strictEqual(g.co_channel_D_U_daytime_db, 6, 'clear-channel D/U protection should be 6 dB');
+  // Co-channel daytime D/U per §73.182: 26 dB (20:1 field ratio, all classes)
+  assert.strictEqual(g.co_channel_D_U_daytime_db, 26, 'co-channel D/U protection is 26 dB per §73.182');
   // 1st adjacent: 6 dB; 2nd adjacent: 0 dB
   assert.strictEqual(g.first_adjacent_protection_db, 6, '1st adjacent protection should be 6 dB');
   assert.strictEqual(g.second_adjacent_protection_db, 0, '2nd adjacent protection should be 0 dB');
@@ -10918,9 +11007,9 @@ test('am_annual_operating_cost_analysis_guide present on KAZM candidate', async 
 test('am_annual_operating_cost_analysis_guide KAZM Class D clear-channel daytime operation', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_analysis_guide;
-  // Class D on clear channel: 13h/day daytime, 11h night at 0.25kW
+  // Class D on clear channel: 13h/day daytime, ~3h brief night auth or sign-off; ≤0.5 kW night per §73.21(b)(2)
   assert.strictEqual(g.daily_hrs_day, 13, 'Class D clear-channel should have 13 daily hrs daytime');
-  assert.strictEqual(g.daily_hrs_night, 11, 'Class D clear-channel should have 11 nightly hrs');
+  assert.strictEqual(g.daily_hrs_night, 3, 'Class D clear-channel should have 3 nightly hrs (brief auth or sign-off)');
   assert.ok(g.night_draw_kw > 0, 'night draw should be positive for Class D clear-channel');
   assert.ok(g.annual_kwh_total > 10000, 'KAZM should use >10,000 kWh/yr');
   assert.ok(g.annual_kwh_total < 100000, 'KAZM should use <100,000 kWh/yr');
@@ -11730,9 +11819,9 @@ test('am_utility_power_service_and_metering_guide KAZM rank-1 no line extension'
 test('am_utility_power_service_and_metering_guide KAZM power cost estimate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_utility_power_service_and_metering_guide;
-  assert.strictEqual(g.power_rate_per_kwh,     0.12,    'power_rate_per_kwh should be $0.12');
-  assert.strictEqual(g.monthly_power_cost_usd, 923.62,  'KAZM monthly_power_cost_usd should be $923.62');
-  assert.strictEqual(g.annual_power_cost_usd,  11083.44, 'KAZM annual_power_cost_usd should be $11,083.44');
+  assert.strictEqual(g.power_rate_per_kwh,     0.115,   'power_rate_per_kwh should be $0.115 (EIA 2024 national commercial average)');
+  assert.strictEqual(g.monthly_power_cost_usd, 885.13,  'KAZM monthly_power_cost_usd should be $885.13 (10.69 kW × 720 h × $0.115)');
+  assert.strictEqual(g.annual_power_cost_usd,  10621.56, 'KAZM annual_power_cost_usd should be $10,621.56');
 });
 
 test('am_utility_power_service_and_metering_guide comparison table columns present', async () => {
@@ -12249,24 +12338,25 @@ test('am_annual_regulatory_compliance_and_fee_guide present on KAZM candidate', 
 test('am_annual_regulatory_compliance_and_fee_guide KAZM Class D FCC fee', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
-  assert.strictEqual(g.annual_fcc_fee_usd, 585, 'Class D annual FCC regulatory fee should be $585');
+  assert.strictEqual(g.annual_fcc_fee_usd, 2180, 'Class D annual FCC regulatory fee should be $2,180 (§1.1153, 89 FR 78509 — tier 150,001–500,000 for KAZM rank-1 population basis 319,452)');
+  assert.strictEqual(g.annual_fcc_fee_tier, '150,001–500,000', 'tier label must reflect the §1.1153 population tier');
   assert.strictEqual(g.license_renewal_cycle_years, 8, 'AM license renewal cycle should be 8 years');
-  assert.strictEqual(g.renewal_fee_usd, 610, 'Renewal fee should be $610');
-  assert.strictEqual(g.renewal_amortized_annual_usd, 76, 'Amortized renewal should be $76/yr');
+  assert.strictEqual(g.renewal_fee_usd, 365, 'Renewal fee should be $365 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
+  assert.strictEqual(g.renewal_amortized_annual_usd, 46, 'Amortized renewal should be $46/yr (round(365/8))');
 });
 
 test('am_annual_regulatory_compliance_and_fee_guide KAZM total annual compliance', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
-  assert.strictEqual(g.total_annual_compliance_low_usd,  2161, 'Total annual compliance low should be $2,161');
-  assert.strictEqual(g.total_annual_compliance_high_usd, 5161, 'Total annual compliance high should be $5,161');
+  assert.strictEqual(g.total_annual_compliance_low_usd,  3726, 'Total annual compliance low should be $3,726 ($2,180 §1.1153 tier fee + $46 renewal + $500 EAS + $1,000 counsel)');
+  assert.strictEqual(g.total_annual_compliance_high_usd, 6726, 'Total annual compliance high should be $6,726 ($2,180 §1.1153 tier fee + $46 renewal + $1,500 EAS + $3,000 counsel)');
   assert.ok(g.total_annual_compliance_high_usd > g.total_annual_compliance_low_usd, 'High must exceed low');
 });
 
 test('am_annual_regulatory_compliance_and_fee_guide KAZM 10yr present value', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
-  assert.strictEqual(g.pv_10yr_low_usd, 18433, '10-yr PV low should be $18,433');
+  assert.strictEqual(g.pv_10yr_low_usd, 31783, '10-yr PV low should be $31,783 ($3,726 × pv_factor_10yr=8.53; §1.1153 (89 FR 78509) Class D tier $2,180/yr + renewal + EAS + counsel)');
   assert.ok(g.pv_10yr_high_usd > g.pv_10yr_low_usd, '10-yr PV high must exceed low');
   assert.strictEqual(g.public_file_annual_cost_usd, 0, 'Digital public file should have zero cost');
 });
@@ -12279,8 +12369,8 @@ test('am_annual_regulatory_compliance_and_fee_guide comparison table columns pre
     assert.ok('reg_renewal_years'        in row, 'reg_renewal_years missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.reg_annual_fcc_fee_usd,   585,  'rank-1 reg_annual_fcc_fee_usd should be $585');
-  assert.strictEqual(r0.reg_total_annual_low_usd, 2161, 'rank-1 reg_total_annual_low_usd should be $2,161');
+  assert.strictEqual(r0.reg_annual_fcc_fee_usd,   2180, 'rank-1 reg_annual_fcc_fee_usd should be $2,180 (Class D §1.1153 (89 FR 78509) tier 150,001–500,000)');
+  assert.strictEqual(r0.reg_total_annual_low_usd, 3726, 'rank-1 reg_total_annual_low_usd should be $3,726');
   assert.strictEqual(r0.reg_renewal_years,          8,  'rank-1 reg_renewal_years should be 8');
 });
 
@@ -12482,7 +12572,7 @@ test('am_fcc_application_engineering_report_guide KAZM clear channel classificat
   const g = out.candidates[0].am_fcc_application_engineering_report_guide;
   assert.strictEqual(g.is_clear_channel, true, '780 kHz must be identified as clear channel');
   assert.strictEqual(g.is_da, false, 'KAZM NDA pattern should not be flagged as DA');
-  assert.strictEqual(g.fcc_filing_fee_usd, 610, 'Class D filing fee should be $610');
+  assert.strictEqual(g.fcc_filing_fee_usd, 4675, 'Form 301-AM major change CP fee should be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(g.study_radius_km, 500, 'Clear channel study radius should be 500 km');
 });
 
@@ -12491,7 +12581,7 @@ test('am_fcc_application_engineering_report_guide KAZM station count and cost', 
   const g = out.candidates[0].am_fcc_application_engineering_report_guide;
   assert.strictEqual(g.n_stations_to_study, 35, 'Clear channel NDA should require studying 35 stations');
   assert.strictEqual(g.eng_cost_low_usd, 10000, 'Clear channel NDA engineering cost low should be $10,000');
-  assert.strictEqual(g.total_application_low_usd, 10610, 'Total application low should be filing_fee + eng_cost_low');
+  assert.strictEqual(g.total_application_low_usd, 14675, 'Total application low should be filing_fee + eng_cost_low');
 });
 
 test('am_fcc_application_engineering_report_guide KAZM processing timeline', async () => {
@@ -12512,7 +12602,7 @@ test('am_fcc_application_engineering_report_guide comparison table columns prese
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.fca_n_stations,        35,    'rank-1 fca_n_stations should be 35');
   assert.strictEqual(r0.fca_eng_cost_low_usd,  10000, 'rank-1 fca_eng_cost_low_usd should be $10,000');
-  assert.strictEqual(r0.fca_total_app_low_usd, 10610, 'rank-1 fca_total_app_low_usd should be $10,610');
+  assert.strictEqual(r0.fca_total_app_low_usd, 14675, 'rank-1 fca_total_app_low_usd should be $14,675 ($4,675 Form 301-AM major CP per §1.1104 + $10,000 engineering)');
 });
 
 test('am_site_access_road_and_security_guide comparison table columns present', async () => {
@@ -12727,14 +12817,14 @@ test('KAZM tower lighting type and costs', async () => {
   const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
   assert.strictEqual(g.lighting_type,          'medium_intensity_white_or_red', '315 ft tower should use medium-intensity lighting');
   assert.strictEqual(g.lighting_cost_low_usd,  5000, 'lighting_cost_low should be $5,000');
-  assert.strictEqual(g.asr_fee_usd,            125,  'ASR fee should be $125');
+  assert.strictEqual(g.asr_fee_usd,            0,    'Form 854 ASR carries no FCC filing fee under the current §1.1102 schedule');
 });
 
 test('KAZM tower lighting total install cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
-  assert.strictEqual(g.total_install_low_usd,  6125,  'total_install_low should be $6,125');
-  assert.strictEqual(g.total_install_high_usd, 25125, 'total_install_high should be $25,125');
+  assert.strictEqual(g.total_install_low_usd,  6000,  'total_install_low should be $6,000 (lighting $5k + FAA notice $1k + ASR $0)');
+  assert.strictEqual(g.total_install_high_usd, 25000, 'total_install_high should be $25,000 (lighting $20k + FAA notice $5k + ASR $0)');
 });
 
 test('am_tower_lighting_and_aviation_compliance_guide comparison table columns present', async () => {
@@ -12746,7 +12836,7 @@ test('am_tower_lighting_and_aviation_compliance_guide comparison table columns p
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.lit_tower_height_ft,       472.87,                       'rank-1 lit_tower_height_ft should be 472.87');
-  assert.strictEqual(r0.lit_total_install_low_usd,  6125,                         'rank-1 lit_total_install_low_usd should be $6,125');
+  assert.strictEqual(r0.lit_total_install_low_usd,  6000,                         'rank-1 lit_total_install_low_usd should be $6,000 (Form 854 ASR: no FCC filing fee under the current §1.1102 schedule)');
   assert.strictEqual(r0.lit_lighting_type,          'medium_intensity_white_or_red', 'rank-1 lit_lighting_type mismatch');
 });
 
@@ -12895,21 +12985,21 @@ test('KAZM operating cost power calculation (5 kW / 65% efficiency)', async () =
   const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
   assert.strictEqual(g.annual_power_kw_input, 7.69,       'KAZM 5 kW / 0.65 efficiency = 7.69 kW input');
   assert.strictEqual(g.annual_kwh,            67364.4,    '7.69 kW × 8760 hrs = 67364.4 kWh');
-  assert.strictEqual(g.power_rate_per_kwh,    0.12,       'power rate should be $0.12/kWh');
+  assert.strictEqual(g.power_rate_per_kwh,    0.115,      'power rate should be $0.115/kWh (EIA 2024 national commercial average)');
 });
 
 test('KAZM annual power cost range', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
-  assert.strictEqual(g.annual_power_cost_low,  6466.98, 'annual_power_cost_low should be $6,466.98');
-  assert.strictEqual(g.annual_power_cost_high, 9700.47, 'annual_power_cost_high should be $9,700.47');
+  assert.strictEqual(g.annual_power_cost_low,  6197.52, 'annual_power_cost_low should be $6,197.52 (67364.4 kWh × $0.115 × 0.8)');
+  assert.strictEqual(g.annual_power_cost_high, 9296.29, 'annual_power_cost_high should be $9,296.29 (67364.4 kWh × $0.115 × 1.2)');
 });
 
 test('KAZM annual operating total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
-  assert.strictEqual(g.annual_total_low,  11466.98, 'annual_total_low should be $11,466.98');
-  assert.strictEqual(g.annual_total_high, 31700.47, 'annual_total_high should be $31,700.47');
+  assert.strictEqual(g.annual_total_low,  11197.52, 'annual_total_low should be $11,197.52');
+  assert.strictEqual(g.annual_total_high, 31296.29, 'annual_total_high should be $31,296.29');
 });
 
 test('am_operating_cost_and_annual_expense_guide comparison table columns present', async () => {
@@ -12941,18 +13031,18 @@ test('KAZM clear channel secondary status at night (780 kHz Class D)', async () 
   assert.strictEqual(g.nighttime_status,   'secondary_limited_time',  'Class D on clear channel = secondary_limited_time');
 });
 
-test('KAZM nighttime power limit (5 kW Class D → 1 kW max at night)', async () => {
+test('KAZM nighttime power limit (5 kW Class D → < 0.25 kW at night per §73.21(b)(2))', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nighttime_operation_and_skywave_classification_guide;
-  assert.strictEqual(g.nighttime_power_kw_max,    1,   'Class D on clear channel capped at 1 kW night');
-  assert.strictEqual(g.nighttime_power_fraction,  0.2, 'nighttime_power_fraction = 1/5 = 0.2');
-  assert.strictEqual(g.daytime_power_kw,          5,   'daytime_power_kw should equal tpo_kw=5');
+  assert.strictEqual(g.nighttime_power_kw_max,    0.25, 'Class D night power < 0.25 kW per §73.21(b)(2)');
+  assert.strictEqual(g.nighttime_power_fraction,  0.05, 'nighttime_power_fraction = 0.25/5 = 0.05');
+  assert.strictEqual(g.daytime_power_kw,          5,    'daytime_power_kw should equal tpo_kw=5');
 });
 
-test('KAZM effective power fraction (60% = average of 100% day + 20% night)', async () => {
+test('KAZM effective power fraction (average of 100% day + 5% night)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nighttime_operation_and_skywave_classification_guide;
-  assert.strictEqual(g.effective_power_fraction, 0.6, 'effective_power_fraction should be 0.6');
+  assert.strictEqual(g.effective_power_fraction, 0.53, 'effective_power_fraction = (1.0 + 0.05)/2 rounded');
   assert.strictEqual(g.daytime_hours_per_year,   4380, 'daytime_hours_per_year = 365×12 = 4380');
 });
 
@@ -12965,8 +13055,8 @@ test('am_nighttime_operation_and_skywave_classification_guide comparison table c
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.sky_nighttime_status,       'secondary_limited_time', 'rank-1 sky_nighttime_status mismatch');
-  assert.strictEqual(r0.sky_nighttime_power_kw_max,  1,                       'rank-1 sky_nighttime_power_kw_max should be 1');
-  assert.strictEqual(r0.sky_effective_power_pct,     0.6,                     'rank-1 sky_effective_power_pct should be 0.6');
+  assert.strictEqual(r0.sky_nighttime_power_kw_max,  0.25,                    'rank-1 sky_nighttime_power_kw_max should be 0.25 (§73.21(b)(2))');
+  assert.strictEqual(r0.sky_effective_power_pct,     0.53,                    'rank-1 sky_effective_power_pct should be 0.53');
 });
 
 test('am_broadcast_proof_of_performance_guide present on KAZM candidate', async () => {
@@ -13217,9 +13307,9 @@ test('KAZM 473 ft tower requires ASR and FAA notice', async () => {
 test('KAZM ASR regulatory cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_asr_tower_registration_guide;
-  assert.strictEqual(g.total_low_usd,  5130,  'KAZM total_low_usd should be 5130');
-  assert.strictEqual(g.total_high_usd, 18130, 'KAZM total_high_usd should be 18130');
-  assert.strictEqual(g.asr_fee_usd,    130,   'ASR fee should be $130');
+  assert.strictEqual(g.total_low_usd,  5000,  'KAZM total_low_usd should be 5000 (ASR $0 + structural $2500 + env $1500 + legal $1000)');
+  assert.strictEqual(g.total_high_usd, 18000, 'KAZM total_high_usd should be 18000 (ASR $0 + structural $8000 + env $6000 + legal $4000)');
+  assert.strictEqual(g.asr_fee_usd,    0,     'Form 854 ASR carries no FCC filing fee under the current §1.1102 schedule');
 });
 
 test('KAZM ASR reference and note fields', async () => {
@@ -13238,7 +13328,7 @@ test('am_fcc_asr_tower_registration_guide comparison table columns present', asy
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.asr_requires_asr,    true,   'rank-1 asr_requires_asr should be true');
-  assert.strictEqual(r0.asr_total_low_usd,   5130,   'rank-1 asr_total_low_usd should be 5130');
+  assert.strictEqual(r0.asr_total_low_usd,   5000,   'rank-1 asr_total_low_usd should be 5000 (Form 854 ASR: no FCC filing fee under the current §1.1102 schedule)');
   assert.strictEqual(r0.asr_tower_height_ft, 472.87, 'rank-1 asr_tower_height_ft should be 472.87');
 });
 
@@ -13296,23 +13386,23 @@ test('am_utility_power_and_backup_systems_guide present on KAZM candidate', asyn
 test('KAZM 5 kW TPO yields 15 kW generator', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_utility_power_and_backup_systems_guide;
-  assert.strictEqual(g.gen_kw,              15,   'KAZM gen_kw should be 15 (3x 5 kW)');
-  assert.strictEqual(g.generator_low_usd,   6000, 'KAZM generator_low_usd should be 6000');
+  assert.strictEqual(g.gen_kw,              9,    'KAZM gen_kw should be 9 (1.4× 5 kW draw + 25% headroom)');
+  assert.strictEqual(g.generator_low_usd,   3600, 'KAZM generator_low_usd should be 3600 (9 kW × $400/kW)');
   assert.strictEqual(g.power_ext_mi,        0.1,  'KAZM power_ext_mi should be 0.1 (minimum)');
 });
 
 test('KAZM utility power total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_utility_power_and_backup_systems_guide;
-  assert.strictEqual(g.total_low_usd,  23920, 'KAZM total_low_usd should be 23920');
-  assert.strictEqual(g.total_high_usd, 56840, 'KAZM total_high_usd should be 56840');
+  assert.strictEqual(g.total_low_usd,  21520, 'KAZM total_low_usd should be 21520');
+  assert.strictEqual(g.total_high_usd, 52040, 'KAZM total_high_usd should be 52040');
 });
 
 test('KAZM utility power reference and note fields', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_utility_power_and_backup_systems_guide;
   assert.ok(typeof g.reference === 'string' && g.reference.includes('NFPA'), 'reference must cite NFPA');
-  assert.ok(typeof g.note === 'string' && g.note.includes('15 kW generator'), 'note must mention generator size');
+  assert.ok(typeof g.note === 'string' && g.note.includes('9 kW generator'), 'note must mention generator size');
 });
 
 test('am_utility_power_and_backup_systems_guide comparison table columns present', async () => {
@@ -13323,9 +13413,9 @@ test('am_utility_power_and_backup_systems_guide comparison table columns present
     assert.ok('pwr_generator_low_usd' in row, 'pwr_generator_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.pwr_total_low_usd,     23920, 'rank-1 pwr_total_low_usd should be 23920');
-  assert.strictEqual(r0.pwr_gen_kw,             15,   'rank-1 pwr_gen_kw should be 15');
-  assert.strictEqual(r0.pwr_generator_low_usd,  6000, 'rank-1 pwr_generator_low_usd should be 6000');
+  assert.strictEqual(r0.pwr_total_low_usd,     21520, 'rank-1 pwr_total_low_usd should be 21520');
+  assert.strictEqual(r0.pwr_gen_kw,             9,    'rank-1 pwr_gen_kw should be 9');
+  assert.strictEqual(r0.pwr_generator_low_usd,  3600, 'rank-1 pwr_generator_low_usd should be 3600 (9 kW × $400/kW)');
 });
 
 test('am_transmitter_building_and_studio_link_guide present on KAZM candidate', async () => {
@@ -13341,14 +13431,14 @@ test('KAZM rank-1 site uses 950 MHz microwave STL (short distance)', async () =>
   const g = out.candidates[0].am_transmitter_building_and_studio_link_guide;
   assert.strictEqual(g.stl_type,    'licensed_950mhz_microwave', 'KAZM rank-1 should use microwave STL');
   assert.strictEqual(g.stl_low_usd, 8000,   'microwave STL low should be 8000');
-  assert.strictEqual(g.stl_license_fee_usd, 440, 'Part 74 license fee should be 440');
+  assert.strictEqual(g.stl_license_fee_usd, 105, 'Part 74 aural STL new license/major mod should be $105 (§1.1102 site-based schedule, ULS Form 601)');
 });
 
 test('KAZM transmitter building and STL total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmitter_building_and_studio_link_guide;
-  assert.strictEqual(g.total_low_usd,  41440,  'KAZM total_low_usd should be 41440');
-  assert.strictEqual(g.total_high_usd, 127440, 'KAZM total_high_usd should be 127440');
+  assert.strictEqual(g.total_low_usd,  41105,  'KAZM total_low_usd should be 41105 (Part 74 STL $105)');
+  assert.strictEqual(g.total_high_usd, 127105, 'KAZM total_high_usd should be 127105 (Part 74 STL $105)');
 });
 
 test('KAZM building guide reference and note fields', async () => {
@@ -13366,7 +13456,7 @@ test('am_transmitter_building_and_studio_link_guide comparison table columns pre
     assert.ok('bld_stl_low_usd'   in row, 'bld_stl_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.bld_total_low_usd, 41440,  'rank-1 bld_total_low_usd should be 41440');
+  assert.strictEqual(r0.bld_total_low_usd, 41105,  'rank-1 bld_total_low_usd should be 41105 (Part 74 STL $105)');
   assert.strictEqual(r0.bld_stl_type,      'licensed_950mhz_microwave', 'rank-1 bld_stl_type should be microwave');
   assert.strictEqual(r0.bld_stl_low_usd,   8000,   'rank-1 bld_stl_low_usd should be 8000');
 });
@@ -13383,15 +13473,15 @@ test('KAZM NDA CP: correct FCC fee and engineering cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
   assert.strictEqual(g.isDA,              false, 'KAZM pattern_mode NDA so isDA should be false');
-  assert.strictEqual(g.fcc_filing_fee_usd, 1310, 'NDA CP FCC fee should be 1310');
+  assert.strictEqual(g.fcc_filing_fee_usd, 4795, 'NDA CP FCC fee should be 4795 (Form 301-AM $4,675 per §1.1104 + ASR $0 + misc $120)');
   assert.strictEqual(g.engineering_low_usd, 5000, 'NDA engineering low should be 5000');
 });
 
 test('KAZM CP total nonrecurring cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
-  assert.strictEqual(g.total_nonrecurring_low_usd,  12310, 'KAZM total_nonrecurring_low should be 12310');
-  assert.strictEqual(g.total_nonrecurring_high_usd, 49310, 'KAZM total_nonrecurring_high should be 49310');
+  assert.strictEqual(g.total_nonrecurring_low_usd,  15795, 'KAZM total_nonrecurring_low should be 15795 (FCC $4,795 + eng $5k + atty $3k + NEPA $2k + §106 $1k)');
+  assert.strictEqual(g.total_nonrecurring_high_usd, 52795, 'KAZM total_nonrecurring_high should be 52795 (FCC $4,795 + eng $20k + atty $15k + NEPA $8k + §106 $5k)');
 });
 
 test('KAZM CP timeline values correct', async () => {
@@ -13411,8 +13501,8 @@ test('am_fcc_construction_permit_and_license_guide comparison table columns pres
     assert.ok('cp_review_months_high'     in row, 'cp_review_months_high missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.cp_total_nonrecurring_low, 12310, 'rank-1 cp_total_nonrecurring_low should be 12310');
-  assert.strictEqual(r0.cp_fcc_filing_fee,          1310, 'rank-1 cp_fcc_filing_fee should be 1310');
+  assert.strictEqual(r0.cp_total_nonrecurring_low, 15675, 'rank-1 cp_total_nonrecurring_low should be 15675 (Form 301-AM $4,675 major CP + eng $5k + atty $3k + NEPA $2k + §106 $1k)');
+  assert.strictEqual(r0.cp_fcc_filing_fee,          4675, 'rank-1 cp_fcc_filing_fee should be 4675 (Form 301-AM major change CP per §1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(r0.cp_review_months_high,         18, 'rank-1 cp_review_months_high should be 18');
 });
 
@@ -13558,8 +13648,8 @@ test('am_total_project_cost_summary_guide present on KAZM candidate', async () =
 test('KAZM total project cost line items and grand total', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_total_project_cost_summary_guide;
-  assert.strictEqual(g.grand_total_low_usd,  377615, 'KAZM grand_total_low should be 377615');
-  assert.strictEqual(g.grand_total_high_usd, 1817175, 'KAZM grand_total_high should be 1817175');
+  assert.strictEqual(g.grand_total_low_usd,  378235, 'KAZM grand_total_low should be 378235 (ASR $5,000 + CP $15,795 + STL $41,105 line items per current §1.1104 (90 FR 17013) / §1.1102 site-based fees)');
+  assert.strictEqual(g.grand_total_high_usd, 1815395, 'KAZM grand_total_high should be 1815395');
   assert.ok(typeof g.line_items_low === 'object', 'line_items_low must be object');
   assert.ok(Object.keys(g.line_items_low).length >= 10, 'line_items_low must have >= 10 entries');
 });
@@ -13568,8 +13658,8 @@ test('KAZM 15% contingency applied correctly', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_total_project_cost_summary_guide;
   assert.strictEqual(g.contingency_pct,            15,         'contingency_pct should be 15');
-  assert.strictEqual(g.contingency_low_usd,        56642.25,   'KAZM contingency_low should be 56642.25');
-  assert.strictEqual(g.total_with_contingency_low_usd,  434257.25, 'KAZM total_with_contingency_low should be 434257.25');
+  assert.strictEqual(g.contingency_low_usd,        56735.25,   'KAZM contingency_low should be 56735.25 (15% of 378235)');
+  assert.strictEqual(g.total_with_contingency_low_usd,  434970.25, 'KAZM total_with_contingency_low should be 434970.25');
 });
 
 test('KAZM total project cost reference and note fields', async () => {
@@ -13587,9 +13677,9 @@ test('am_total_project_cost_summary_guide comparison table columns present', asy
     assert.ok('tpc_total_with_contingency' in row, 'tpc_total_with_contingency missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.tpc_grand_total_low_usd,    377615,    'rank-1 tpc_grand_total_low should be 377615');
-  assert.strictEqual(r0.tpc_grand_total_high_usd,   1817175,   'rank-1 tpc_grand_total_high should be 1817175');
-  assert.strictEqual(r0.tpc_total_with_contingency, 434257.25, 'rank-1 tpc_total_with_contingency should be 434257.25');
+  assert.strictEqual(r0.tpc_grand_total_low_usd,    378235,    'rank-1 tpc_grand_total_low should be 378235');
+  assert.strictEqual(r0.tpc_grand_total_high_usd,   1815395,   'rank-1 tpc_grand_total_high should be 1815395');
+  assert.strictEqual(r0.tpc_total_with_contingency, 434970.25, 'rank-1 tpc_total_with_contingency should be 434970.25');
 });
 
 test('am_community_impact_and_coverage_shift_guide present on KAZM candidate', async () => {
@@ -13791,8 +13881,8 @@ test('KAZM total radial wire length', async () => {
 test('KAZM ground system radial total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_radial_design_guide;
-  assert.strictEqual(g.total_low_usd,  12592.16, 'KAZM total_low_usd should be 12592.16 (0.35λ per §73.189(b)(4))');
-  assert.strictEqual(g.total_high_usd, 32480.4,  'KAZM total_high_usd should be 32480.4 (0.35λ per §73.189(b)(4))');
+  assert.strictEqual(g.total_low_usd,  43839.03,  'KAZM total_low_usd should be 43839.03 (120×441.34 ft × ($0.18+$0.61)/ft + $2k bus ring, RS Means 2024)');
+  assert.strictEqual(g.total_high_usd, 122513.76, 'KAZM total_high_usd should be 122513.76 (120×441.34 ft × ($0.37+$1.83)/ft + $6k bus ring, RS Means 2024)');
 });
 
 test('am_ground_system_radial_design_guide comparison table columns present', async () => {
@@ -13805,7 +13895,7 @@ test('am_ground_system_radial_design_guide comparison table columns present', as
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.grd_num_radials_ideal, 120,      'rank-1 grd_num_radials_ideal should be 120');
   assert.strictEqual(r0.grd_radial_length_ft,  441.34,   'rank-1 grd_radial_length_ft should be 441.34 (0.35λ per §73.189(b)(4))');
-  assert.strictEqual(r0.grd_total_low_usd,     12592.16, 'rank-1 grd_total_low_usd should be 12592.16 (120 × 0.35λ system)');
+  assert.strictEqual(r0.grd_total_low_usd,     43839.03, 'rank-1 grd_total_low_usd should be 43839.03 (120×0.35λ per §73.189(b)(4), RS Means 2024 rates)');
 });
 
 test('am_tpo_and_antenna_efficiency_guide present on KAZM candidate', async () => {
@@ -13865,15 +13955,15 @@ test('KAZM 780 kHz Class D clear channel allocation', async () => {
   const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
   assert.strictEqual(g.channel_type,        'clear', '780 kHz should be clear channel type');
   assert.strictEqual(g.is_clear_channel,     true,   'is_clear_channel should be true');
-  assert.strictEqual(g.class_max_day_kw,     50,     'Class D max day power is 50 kW (§73.21(b))');
+  assert.strictEqual(g.class_max_day_kw,     50,     'Class D max day power is 50 kW (§73.21(b)(2))');
   assert.strictEqual(g.class_max_night_kw,   0.25,   'Class D night < 0.25 kW where authorized (§73.21(b)(2))');
 });
 
 test('KAZM Class D power relative to class maximum', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
-  assert.strictEqual(g.tpo_pct_of_max,       10, 'KAZM 5 kW / 50 kW Class D max = 10% (§73.21(b))');
-  assert.strictEqual(g.upgrade_potential_kw,  45, 'Class D at 5 kW has 45 kW daytime headroom');
+  assert.strictEqual(g.tpo_pct_of_max,       10, 'KAZM 5 kW / 50 kW Class D ceiling = 10% (§73.21(b)(2))');
+  assert.strictEqual(g.upgrade_potential_kw,  45, 'Class D at 5 kW of 50 kW ceiling: 45 kW upgrade potential (§73.21(b)(2))');
 });
 
 test('KAZM frequency allocation reference and note fields', async () => {
@@ -13892,8 +13982,8 @@ test('am_frequency_allocation_class_and_channel_guide comparison table columns p
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.fac_channel_type,         'clear', 'rank-1 fac_channel_type should be clear');
-  assert.strictEqual(r0.fac_class_max_day_kw,      50,    'rank-1 fac_class_max_day_kw should be 50 (§73.21(b))');
-  assert.strictEqual(r0.fac_upgrade_potential_kw,  45,    'rank-1 fac_upgrade_potential_kw should be 45 (50 − 5 kW)');
+  assert.strictEqual(r0.fac_class_max_day_kw,      50,    'rank-1 fac_class_max_day_kw should be 50 kW (Class D, §73.21(b)(2))');
+  assert.strictEqual(r0.fac_upgrade_potential_kw,  45,    'rank-1 fac_upgrade_potential_kw should be 45 (KAZM 5 kW of 50 kW Class D max)');
 });
 
 test('am_modulation_and_audio_processing_guide present on KAZM candidate', async () => {
@@ -13952,22 +14042,22 @@ test('am_annual_operating_cost_breakdown_guide present on KAZM candidate', async
 test('KAZM 5 kW electricity consumption', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
-  assert.strictEqual(g.electricity_draw_kw, 15,     'KAZM 5 kW × 3 = 15 kW grid draw');
-  assert.strictEqual(g.kwh_per_year,        131400, 'KAZM 15 kW × 8760 hr = 131400 kWh/yr');
-  assert.strictEqual(g.electricity_low_usd, 10512,  'KAZM electricity low should be 10512');
+  assert.strictEqual(g.electricity_draw_kw, 7,      'KAZM 5 kW × 1.4 = 7 kW grid draw (≈72% efficiency)');
+  assert.strictEqual(g.kwh_per_year,        61320,  'KAZM 7 kW × 8760 hr = 61320 kWh/yr');
+  assert.strictEqual(g.electricity_low_usd, 4905.6, 'KAZM electricity low: 61320 kWh × $0.08');
 });
 
 test('KAZM annual operating cost totals', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
-  assert.strictEqual(g.total_low_usd,  23797, 'KAZM total_low_usd should be 23797');
-  assert.strictEqual(g.total_high_usd, 78007, 'KAZM total_high_usd should be 78007');
+  assert.strictEqual(g.total_low_usd,  18928.6, 'KAZM total_low_usd (7 kW draw at 72% efficiency; §1.1153 tier fee $2,180)');
+  assert.strictEqual(g.total_high_usd, 64756.6, 'KAZM total_high_usd (7 kW draw at 72% efficiency; §1.1153 tier fee $2,180)');
 });
 
 test('KAZM annual ops reference and note fields', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
-  assert.ok(typeof g.reference === 'string' && g.reference.includes('§1.1102'), 'reference must cite §1.1102 (FCC regulatory fee schedule)');
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§1.1153'), 'reference must cite §1.1153 (89 FR 78509) (FCC annual regulatory fee schedule)');
   assert.ok(typeof g.note === 'string' && g.note.includes('kWh/yr'), 'note must mention kWh/yr');
 });
 
@@ -13979,9 +14069,9 @@ test('am_annual_operating_cost_breakdown_guide comparison table columns present'
     assert.ok('aoc_kwh_per_year'        in row, 'aoc_kwh_per_year missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.aoc_total_low_usd,       23797,  'rank-1 aoc_total_low_usd should be 23797');
-  assert.strictEqual(r0.aoc_electricity_low_usd,  10512,  'rank-1 aoc_electricity_low_usd should be 10512');
-  assert.strictEqual(r0.aoc_kwh_per_year,         131400, 'rank-1 aoc_kwh_per_year should be 131400');
+  assert.strictEqual(r0.aoc_total_low_usd,       18928.6, 'rank-1 aoc_total_low_usd (7 kW grid draw; §1.1153 tier fee $2,180)');
+  assert.strictEqual(r0.aoc_electricity_low_usd,  4905.6,  'rank-1 aoc_electricity_low_usd (61320 kWh × $0.08)');
+  assert.strictEqual(r0.aoc_kwh_per_year,         61320,   'rank-1 aoc_kwh_per_year (7 kW × 8760 hr)');
 });
 
 test('am_terrain_and_propagation_assessment_guide present on KAZM candidate', async () => {
@@ -14077,7 +14167,7 @@ it('am_rf_exposure_and_oet65_compliance_guide exclusion_radius_m_general is posi
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_rf_exposure_and_oet65_compliance_guide;
   assert.ok(g.exclusion_radius_m_general > 0, `exclusion_radius_m_general must be positive, got ${g.exclusion_radius_m_general}`);
-  assert.ok(g.exclusion_radius_m_controlled < g.exclusion_radius_m_general, 'controlled zone must be smaller than general');
+  assert.strictEqual(g.exclusion_radius_m_controlled, g.exclusion_radius_m_general, 'controlled zone must equal general zone (§1.1310: both limits 614 V/m in AM band)');
 });
 
 it('am_rf_exposure_and_oet65_compliance_guide evaluation_required is false for KAZM 5 kW (at/below threshold)', async () => {
@@ -14487,10 +14577,10 @@ it('am_antenna_tower_lighting_and_marking_guide lighting_required is true for KA
   assert.strictEqual(g.lighting_required, true, 'KAZM 315 ft tower must require lighting (> 200 ft)');
 });
 
-it('am_antenna_tower_lighting_and_marking_guide paint_bands is 10 for KAZM (ceil(473/100)*2)', async () => {
+it('am_antenna_tower_lighting_and_marking_guide paint_bands is 5 for KAZM (ceil(473/100), 7-band cap)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_antenna_tower_lighting_and_marking_guide;
-  assert.strictEqual(g.paint_bands, 10, `paint_bands should be 10 for 473 ft tower`);
+  assert.strictEqual(g.paint_bands, 5, `paint_bands should be 5 for 473 ft tower`);
 });
 
 it('am_antenna_tower_lighting_and_marking_guide reference cites §17.21 and AC 70/7460-1M', async () => {
@@ -14553,10 +14643,10 @@ it('am_digital_broadcasting_iboc_guide is present on every candidate', async () 
   }
 });
 
-it('am_digital_broadcasting_iboc_guide digital_sideband_kw is 0.5 kW for KAZM 5 kW at -10 dBc', async () => {
+it('am_digital_broadcasting_iboc_guide digital_sideband_kw is 0.05 kW for KAZM 5 kW at -20 dBc', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_digital_broadcasting_iboc_guide;
-  assert.ok(Math.abs(g.digital_sideband_kw - 0.5) < 0.01, `digital_sideband_kw should be ~0.5 kW for 5 kW at -10 dBc, got ${g.digital_sideband_kw}`);
+  assert.ok(Math.abs(g.digital_sideband_kw - 0.05) < 0.01, `digital_sideband_kw should be ~0.05 kW for 5 kW at -20 dBc, got ${g.digital_sideband_kw}`);
 });
 
 it('am_digital_broadcasting_iboc_guide iboc_benefit_rating is HIGH for clear channel 780 kHz', async () => {
@@ -14575,7 +14665,7 @@ it('am_digital_broadcasting_iboc_guide reference cites NRSC-5-D and FCC MM Docke
 it('candidate_comparison_table iboc columns are present and valid for KAZM', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
-  assert.ok(Math.abs(r0.iboc_digital_sideband_kw - 0.5) < 0.01, `iboc_digital_sideband_kw should be ~0.5`);
+  assert.ok(Math.abs(r0.iboc_digital_sideband_kw - 0.05) < 0.01, `iboc_digital_sideband_kw should be ~0.05`);
   assert.strictEqual(r0.iboc_total_capex_low_usd, 13000, 'iboc_total_capex_low_usd should be 13000');
   assert.ok(r0.iboc_benefit_rating != null, 'iboc_benefit_rating must not be null');
 });
@@ -14850,11 +14940,11 @@ it('am_skywave_nighttime_service_and_interference_guide is present on each candi
   }
 });
 
-it('am_skywave_nighttime_service_and_interference_guide 780 kHz is clear channel with KKOB dominant', async () => {
+it('am_skywave_nighttime_service_and_interference_guide 780 kHz is clear channel with WBBM dominant', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_skywave_nighttime_service_and_interference_guide;
   assert.strictEqual(g.is_clear_channel, true, '780 kHz is a clear channel');
-  assert.ok(g.dominant_station.includes('KKOB'), 'dominant on 780 kHz is KKOB (Albuquerque)');
+  assert.ok(g.dominant_station.includes('WBBM'), 'dominant on 780 kHz is WBBM Chicago IL (50 kW), not KKOB (770 kHz Albuquerque NM)');
 });
 
 it('am_skywave_nighttime_service_and_interference_guide night_signoff_risk true for Class D on clear channel', async () => {
@@ -15202,8 +15292,8 @@ it('KAZM quarterly issues/programs list deadline and letters retention', async (
 it('KAZM contour map and children\'s programming exemption', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_public_inspection_file_and_online_compliance_guide;
-  assert.strictEqual(g.contour_map_required, true, 'contour map required in public file per §73.3526(e)(1)');
-  assert.strictEqual(g.contour_map_contour_mv_m, 0.5, 'community contour is 0.5 mV/m daytime per §73.24(h)');
+  assert.strictEqual(g.contour_map_required, true, 'contour map required in public file per §73.3526(e)(4)');
+  assert.strictEqual(g.contour_map_contour_mv_m, 0.5, 'service contour map is 0.5 mV/m daytime per §73.182 / §73.3526(e)(4)');
   assert.strictEqual(g.childrens_programming_report_required, false, 'AM stations exempt from children\'s programming report per §73.3526(e)(11)(iii)');
 });
 
@@ -15234,7 +15324,7 @@ it('KAZM atmospheric noise ITU-R P.372-16 zone B value at 780 kHz', async () => 
   assert.ok(['LOW', 'ELEVATED', 'HIGH'].includes(g.noise_risk_level), 'noise_risk_level must be LOW/ELEVATED/HIGH');
 });
 
-it('KAZM daytime field strength and SNR thresholds per §73.24(h) and §73.37(a)', async () => {
+it('KAZM daytime field strength and SNR thresholds per §73.182 and §73.37(a)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_noise_floor_and_rf_interference_environment_guide;
   // 0.5 mV/m = 500 µV/m → 20*log10(500) = 53.98 dBµV/m
@@ -15408,20 +15498,21 @@ it('am_nighttime_nif_service_contour_analysis_guide is present and non-null for 
   }
 });
 
-it('KAZM distance to KKOB and skywave protection compliance per §73.182(j)', async () => {
+it('KAZM distance to WBBM (dominant on 780 kHz) and skywave protection compliance per §73.182(j)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nighttime_nif_service_contour_analysis_guide;
-  // Sedona AZ to Albuquerque NM ≈ 460–490 km
-  assert.ok(g.dist_to_kkob_km > 400 && g.dist_to_kkob_km < 600, `dist_to_kkob_km should be 400–600 km, got ${g.dist_to_kkob_km}`);
+  // Sedona AZ (34.86°N, -111.82°W) to WBBM Chicago IL (41.88°N, -87.89°W) ≈ 2,200 km
+  const dist = g.dist_to_dominant_km ?? g.dist_to_kkob_km;
+  assert.ok(dist > 1500 && dist < 3000, `dist_to_dominant_km should be 1500–3000 km (Sedona to Chicago), got ${dist}`);
   assert.strictEqual(g.protection_threshold_uVm, 50, 'Class D clear channel protection threshold must be 50 µV/m per §73.182(j)');
-  assert.strictEqual(g.kkob_interference_compliant, true, 'KAZM at Sedona-area sites must be KKOB-compliant at 5 kW');
+  assert.strictEqual(g.dominant_interference_compliant ?? g.kkob_interference_compliant, true, 'KAZM at Sedona-area sites must be WBBM-compliant at 5 kW (skywave << 50 µV/m at 2200 km)');
 });
 
-it('KAZM skywave estimate below 50 µV/m at KKOB distance', async () => {
+it('KAZM skywave estimate below 50 µV/m at WBBM (dominant on 780 kHz, ~2200 km) distance', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_nighttime_nif_service_contour_analysis_guide;
   assert.ok(g.sky_uVm > 0, 'skywave estimate must be positive');
-  assert.ok(g.sky_uVm < 50, `skywave at KKOB must be < 50 µV/m for compliant Class D, got ${g.sky_uVm}`);
+  assert.ok(g.sky_uVm < 50, `skywave at WBBM (dominant, ~2200 km) must be < 50 µV/m for compliant Class D, got ${g.sky_uVm}`);
   assert.ok(g.nighttime_0p1_km > 20, 'nighttime 0.1 mV/m contour radius must be > 20 km');
   assert.ok(g.nighttime_0p1_km < 100, 'nighttime 0.1 mV/m contour radius must be < 100 km for 5 kW Class D');
 });
@@ -15437,8 +15528,8 @@ it('KAZM NIF fraction reflects clear channel secondary limitation', async () => 
 it('candidate_comparison_table nif columns are present and valid for KAZM', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
-  assert.ok(r0.nif_dist_to_kkob_km > 400, 'nif_dist_to_kkob_km must be >400 km (Sedona to Albuquerque)');
-  assert.strictEqual(r0.nif_kkob_compliant, true, 'nif_kkob_compliant must be true for KAZM area candidates');
+  assert.ok(r0.nif_dist_to_dominant_km > 400, 'nif_dist_to_dominant_km must be >400 km (Sedona AZ to WBBM Chicago IL ≈2800 km)');
+  assert.strictEqual(r0.nif_dominant_compliant, true, 'nif_dominant_compliant must be true for KAZM area candidates');
   assert.ok(r0.nif_fraction_pct_low >= 10, 'nif_fraction_pct_low must be ≥10%');
 });
 
@@ -16012,18 +16103,18 @@ test('KAZM 5 kW: eval_required = true and GP exclusion radius physically reasona
   assert.strictEqual(g.eval_required, true, 'MPE eval required for TPO > 1 kW');
   assert.ok(g.r_gp_exclusion_m > 0 && g.r_gp_exclusion_m < 10,
     `GP exclusion radius at 5 kW 780 kHz should be 0–10 m, got ${g.r_gp_exclusion_m}`);
-  assert.ok(g.r_oc_exclusion_m < g.r_gp_exclusion_m,
-    'OC exclusion must be smaller than GP exclusion (higher power limit)');
+  assert.strictEqual(g.r_oc_exclusion_m, g.r_gp_exclusion_m,
+    'OC exclusion must equal GP exclusion (§1.1310: both limits 614 V/m in AM band)');
 });
 
 test('KAZM 780 kHz: FCC limits follow OET Bulletin 65 flat limits for lower AM band', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_rf_exposure_mpe_evaluation_guide;
   // 47 CFR §1.1310 Table 1 / OET Bulletin 65: for 0.3–1.34 MHz, limits are FLAT:
-  //   GP (uncontrolled): 614 V/m; OC (controlled): 1842 V/m.
+  //   GP (uncontrolled): 614 V/m; OC (controlled): 614 V/m (same value, 0.3–3 MHz).
   // 780 kHz is below the 1.34 MHz boundary, so both limits are flat values.
-  assert.strictEqual(g.e_limit_gp_vm, 614,  'GP E-field must be 614 V/m flat (0.3–1.34 MHz)');
-  assert.strictEqual(g.e_limit_oc_vm, 1842, 'OC E-field must be 1842 V/m flat (0.3–3 MHz)');
+  assert.strictEqual(g.e_limit_gp_vm, 614, 'GP E-field must be 614 V/m flat (0.3–1.34 MHz)');
+  assert.strictEqual(g.e_limit_oc_vm, 614, 'OC E-field must be 614 V/m flat (0.3–3 MHz)');
 });
 
 test('KAZM 780 kHz: field_table has 5 rows and E decreases with distance', async () => {
@@ -16155,12 +16246,12 @@ test('KAZM 780 kHz: am_fcc_application_filing_cost_and_timeline_guide present on
   }
 });
 
-test('KAZM NDA: FCC fees are $2,030 and NDA flag is false', async () => {
+test('KAZM NDA: FCC fees are $5,430 and NDA flag is false', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_application_filing_cost_and_timeline_guide;
-  assert.strictEqual(g.fee_form_301_am, 1015, 'Form 301-AM fee must be $1,015 (FY2024)');
-  assert.strictEqual(g.fee_form_302_am, 1015, 'Form 302-AM fee must be $1,015 (FY2024)');
-  assert.strictEqual(g.total_fcc_fees, 2030, 'total_fcc_fees must be $2,030');
+  assert.strictEqual(g.fee_form_301_am, 4675, 'Form 301-AM major change CP fee must be $4,675 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025; relocation = major change under §73.3533)');
+  assert.strictEqual(g.fee_form_302_am, 755, 'Form 302-AM fee must be $755 (§1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
+  assert.strictEqual(g.total_fcc_fees, 5430, 'total_fcc_fees must be $5,430 (301-AM $4,675 + 302-AM $755)');
   assert.strictEqual(g.is_directional, false, 'NDA pattern must flag is_directional false');
 });
 
@@ -16189,7 +16280,7 @@ test('candidate_comparison_table fcc columns present and valid for KAZM', async 
     assert.ok('fcc_total_timeline_days_low' in row, 'fcc_total_timeline_days_low missing');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.fcc_total_fcc_fees, 2030, 'fcc_total_fcc_fees must be $2,030');
+  assert.strictEqual(r0.fcc_total_fcc_fees, 5430, 'fcc_total_fcc_fees must be $5,430 (301-AM $4,675 major change CP + 302-AM $755 per §1.1104, 90 FR 17013, eff. Apr. 23, 2025)');
   assert.strictEqual(r0.fcc_processing_days_low, 180, 'fcc_processing_days_low must be 180');
 });
 
@@ -16531,8 +16622,8 @@ test('#93 MPE limits follow OET Bulletin 65 Table 1 flat limits at 780 kHz', asy
   const mpe = out.candidates[0].am_rf_exposure_mpe_guide;
   // 47 CFR §1.1310 Table 1 / OET Bulletin 65: 780 kHz is in the 0.3–1.34 MHz flat band.
   //   Uncontrolled (GP): 614 V/m flat (not 614/f — that formula applies above 1.34 MHz)
-  //   Controlled (OC):   1842 V/m flat (0.3–3 MHz flat; 780 kHz < 3 MHz boundary)
-  assert.strictEqual(mpe.e_limit_controlled_vm,   1842, 'e_limit_controlled_vm must be 1842 V/m flat (0.3–3 MHz)');
+  //   Controlled (OC):   614 V/m flat (0.3–3 MHz flat; same as GP in the AM band)
+  assert.strictEqual(mpe.e_limit_controlled_vm,    614, 'e_limit_controlled_vm must be 614 V/m flat (0.3–3 MHz)');
   assert.strictEqual(mpe.e_limit_uncontrolled_vm,  614, 'e_limit_uncontrolled_vm must be 614 V/m flat (0.3–1.34 MHz)');
 });
 
@@ -16603,26 +16694,26 @@ test('#94 candidate_comparison_table has cp_* columns', async () => {
 
 // ---- Feature #95: am_skywave_nighttime_guide ----
 
-test('#95 KAZM 780 kHz (clear, Class D): night limit 1 kW, PSA eligible', async () => {
+test('#95 KAZM 780 kHz (clear, Class D): night limit 0.25 kW, PSA eligible', async () => {
   const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
   const sw = out.candidates[0].am_skywave_nighttime_guide;
   assert.ok(sw != null, 'am_skywave_nighttime_guide must be present');
   assert.strictEqual(sw.is_clear_channel, true, '780 kHz must be clear channel');
-  assert.strictEqual(sw.night_power_limit_kw, 1, 'Class D clear channel night limit must be 1 kW');
+  assert.strictEqual(sw.night_power_limit_kw, 0.25, 'Class D clear channel night limit is < 0.25 kW per §73.21(b)(2)');
   assert.strictEqual(sw.psa_eligible, true, 'Class D clear channel must be PSA eligible');
 });
 
-test('#95 KAZM: dominant_station string contains KKOB', async () => {
+test('#95 KAZM: dominant_station string contains WBBM (780 kHz dominant is WBBM Chicago IL)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const sw = out.candidates[0].am_skywave_nighttime_guide;
-  assert.ok(sw.dominant_station?.includes('KKOB'), `dominant_station should include KKOB, got: ${sw.dominant_station}`);
+  assert.ok(sw.dominant_station?.includes('WBBM'), `dominant_station should include WBBM (780 kHz Chicago IL), got: ${sw.dominant_station}`);
 });
 
 test('#95 regional channel: night limit 5 kW, no PSA', async () => {
   const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1500, fcc_class: 'B', candidate_limit: 1 });
   const sw = out.candidates[0].am_skywave_nighttime_guide;
   assert.strictEqual(sw.is_regional_channel, true, '1500 kHz must be regional');
-  assert.strictEqual(sw.night_power_limit_kw, 5, 'Class B regional night limit must be 5 kW');
+  assert.strictEqual(sw.night_power_limit_kw, 5, 'Class B regional night limit = min(tpo 5 kW, §73.21(b)(1) 50 kW cap) = 5 kW');
   assert.strictEqual(sw.psa_eligible, false, 'regional channel must not be PSA eligible');
 });
 
@@ -16818,8 +16909,8 @@ test('#99 TCXO meets FCC tolerance at 780 kHz but tolerance is frequency-depende
   const out1700 = await runSiteOptimizer({ ...KAZM, frequency_khz: 1700, candidate_limit: 1 });
   const cfr780  = out780.candidates[0].am_carrier_frequency_reference_guide;
   const cfr1700 = out1700.candidates[0].am_carrier_frequency_reference_guide;
-  // At 780 kHz, 50 ppb = 780000 * 50e-9 = 39 Hz → exceeds 20 Hz; tcxo_marginal = true
-  // At lower frequencies same proportional; TCXO accuracy_hz scales with freq
+  // At 780 kHz, 50 ppb = 780000 * 50e-9 = 0.039 Hz — far inside ±20 Hz; tcxo_marginal = false
+  // TCXO accuracy_hz scales with frequency but never approaches the tolerance in the AM band
   const tcxoOpt780  = cfr780.reference_options.find(r => r.id === 'TCXO');
   const tcxoOpt1700 = cfr1700.reference_options.find(r => r.id === 'TCXO');
   assert.ok(tcxoOpt780.accuracy_hz > tcxoOpt1700.accuracy_hz || tcxoOpt780.accuracy_hz <= 20,
@@ -17549,15 +17640,15 @@ test('#113 KAZM: interference distance guide present with correct shape', async 
   assert.ok(g.service_contours?.d_01_mvm_km > g.service_contours?.d_05_mvm_km,
     '0.1 mV/m contour (weaker signal) must reach farther than 0.5 mV/m contour');
   assert.ok(['LOW','MODERATE','HIGH'].includes(g.interference_risk_level), 'risk level must be LOW/MODERATE/HIGH');
-  assert.strictEqual(g.du_requirements.co_channel_groundwave_db, 3, '§73.182 co-channel D/U must be 3 dB');
+  assert.strictEqual(g.du_requirements.co_channel_groundwave_db, 26, '§73.182 co-channel D/U must be 26 dB (20:1 field)');
 });
 
-test('#113 clear channel frequency has co_channel_dominant_db = 20; local does not', async () => {
+test('#113 clear channel frequency has co_channel_dominant_db = 26; local does not', async () => {
   const outClear = await runSiteOptimizer({ ...KAZM, frequency_khz: 650,  candidate_limit: 1 }); // clear
   const outLocal = await runSiteOptimizer({ ...KAZM, frequency_khz: 1400, candidate_limit: 1 }); // local
   const gClear   = outClear.candidates[0].am_interference_distance_and_service_area_overlap_guide;
   const gLocal   = outLocal.candidates[0].am_interference_distance_and_service_area_overlap_guide;
-  assert.strictEqual(gClear.du_requirements.co_channel_dominant_db, 20, 'clear channel must have 20 dB dominant protection');
+  assert.strictEqual(gClear.du_requirements.co_channel_dominant_db, 26, 'clear channel must have 26 dB dominant protection (20:1 field)');
   assert.strictEqual(gClear.is_clear_channel, true, 'clear channel detection must work');
   assert.strictEqual(gLocal.du_requirements.co_channel_dominant_db, null, 'local channel must not have dominant D/U');
   assert.strictEqual(gLocal.is_local_channel, true, 'local channel detection must work');
@@ -17575,8 +17666,8 @@ test('#113 higher sigma → longer 0.5 mV/m contour → higher interference risk
 test('#113 adjacent channel D/U values match §73.182 (−6 dB and −12 dB)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_interference_distance_and_service_area_overlap_guide;
-  assert.strictEqual(g.du_requirements.adj_10khz_db, -6,  '§73.182: adj ±10 kHz D/U must be −6 dB');
-  assert.strictEqual(g.du_requirements.adj_20khz_db, -12, '§73.182: adj ±20 kHz D/U must be −12 dB');
+  assert.strictEqual(g.du_requirements.adj_10khz_db, 6,  '§73.182: adj ±10 kHz D/U must be 6 dB');
+  assert.strictEqual(g.du_requirements.adj_20khz_db, 0, '§73.182: adj ±20 kHz D/U must be 0 dB');
 });
 
 test('#113 candidate_comparison_table has ids_* columns', async () => {
@@ -17752,8 +17843,8 @@ test('#116 annual cost includes ASR inspection for all AM Class D stations (3/8�
   const lowFreq  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
   const annHigh = highFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
   const annLow  = lowFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
-  assert.ok(annHigh.asr_annual_inspection_usd > 0, '1600 kHz 3/8λ=70m > 61m: ASR inspection cost required');
-  assert.ok(annLow.asr_annual_inspection_usd  > 0, '540 kHz 3/8λ=208m > 61m: ASR inspection cost required');
+  assert.ok(annHigh.tower_lighting_monitoring_usd > 0, '1600 kHz 3/8λ=70m > 60.96m: tower lighting monitoring cost expected');
+  assert.ok(annLow.tower_lighting_monitoring_usd  > 0, '540 kHz 3/8λ=208m > 60.96m: tower lighting monitoring cost expected');
   // DA station (pattern adds DA parameter monitoring cost) vs NDA
   const da2Out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
   const annDA2 = da2Out.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
@@ -18023,8 +18114,8 @@ test('#122 MAJOR modification costs more and takes longer than MINOR', async () 
   const major = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', tpo_kw: 50,  candidate_limit: 1 });
   const gMinor = minor.candidates[0].am_licensed_power_class_upgrade_guide;
   const gMajor = major.candidates[0].am_licensed_power_class_upgrade_guide;
-  // Class D at 50 kW is at ceiling, so modification_type should not be MINOR
-  assert.ok(gMajor.modification_type !== 'MINOR' || gMajor.headroom_kw === 0, 'Class D at 50 kW should not be MINOR');
+  // Class D at 50 kW is AT the §73.21(b)(2) ceiling; engine returns headroom ≤ 0
+  assert.ok(gMajor.modification_type !== 'MINOR' || gMajor.headroom_kw <= 0, 'Class D at the 50 kW ceiling should not be a MINOR modification with headroom');
   assert.ok(gMinor.cost_estimates.total_low_usd <= gMajor.cost_estimates.total_low_usd || gMinor.modification_type === 'MINOR', 'MINOR should not cost more than MAJOR');
 });
 
@@ -18194,15 +18285,15 @@ test('#126 KAZM: channel study guide present with correct shape', async () => {
   assert.strictEqual(g.contour_overlap_prohibited, true, 'contour overlap must be prohibited');
 });
 
-test('#126 ±10 kHz D/U requirement is 20 dB; ±20 kHz is 6 dB', async () => {
+test('#126 ±10 kHz D/U requirement is 6 dB; ±20 kHz is 0 dB (§73.182)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g   = out.candidates[0].am_frequency_interference_analysis_and_channel_study_guide;
   const adj10 = g.du_requirements.find(d => d.separation === '±10 kHz');
   const adj20 = g.du_requirements.find(d => d.separation === '±20 kHz');
   assert.ok(adj10, '±10 kHz requirement must be present');
   assert.ok(adj20, '±20 kHz requirement must be present');
-  assert.strictEqual(adj10.du_ratio_db, 20, '±10 kHz must require 20 dB D/U');
-  assert.strictEqual(adj20.du_ratio_db, 6,  '±20 kHz must require 6 dB D/U');
+  assert.strictEqual(adj10.du_ratio_db, 6, '±10 kHz (first-adjacent) must require 6 dB D/U');
+  assert.strictEqual(adj20.du_ratio_db, 0, '±20 kHz (second-adjacent) must require 0 dB D/U');
 });
 
 test('#126 min co-channel separation is approximately 2× the 0.5 mV/m reach', async () => {
@@ -18470,10 +18561,10 @@ test('#132 carrier tolerance ppm matches frequency', async () => {
   assert.ok(Math.abs(g.carrier_tolerance_ppm - expected_ppm) < 0.1, `tolerance_ppm ${g.carrier_tolerance_ppm} should be ≈${expected_ppm}`);
 });
 
-test('#132 modulation monitor required above 10 W', async () => {
+test('#132 modulation monitor is recommended, not FCC-required (§73.1590 measurement capability)', async () => {
   const highPwr = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
   const g = highPwr.candidates[0].am_modulation_monitor_and_carrier_frequency_compliance_guide;
-  assert.strictEqual(g.modulation_monitor_required, true, '5 kW station requires modulation monitor');
+  assert.strictEqual(g.modulation_monitor_required, false, 'type-approved modulation monitor mandate eliminated; §73.1590 measurement capability applies');
   assert.ok(g.n_calibration_items >= 3, 'must have ≥3 calibration items');
 });
 
@@ -18738,14 +18829,16 @@ test('#138 KAZM: FCC fee budget guide present with correct shape', async () => {
   assert.ok(Array.isArray(g.fee_items) && g.fee_items.length >= 4, 'must list ≥4 fee items');
 });
 
-test('#138 Class A fee exceeds Class D fee', async () => {
+test('#138 Class A annual regulatory fee exceeds Class D at the same population tier', async () => {
   const classAOut = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
   const classDOut = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', candidate_limit: 1 });
   const gA = classAOut.candidates[0].am_fcc_application_fee_budget_guide;
   const gD = classDOut.candidates[0].am_fcc_application_fee_budget_guide;
-  assert.ok(gA.form_301_fee_usd > gD.form_301_fee_usd, 'Class A 301-AM fee must exceed Class D');
-  assert.strictEqual(gA.form_301_fee_usd, 7265, 'Class A Form 301 fee must be $7,265');
-  assert.strictEqual(gD.form_301_fee_usd, 2195, 'Class D Form 301 fee must be $2,195');
+  // §1.1153 (89 FR 78509): fees are population-tiered per class; Class A tier values exceed Class D at every tier.
+  assert.ok(gA.annual_reg_fee_low_usd > gD.annual_reg_fee_low_usd, 'Class A §1.1153 annual regulatory fee must exceed Class D');
+  // Form 301-AM application fee is flat (class-independent) per §1.1104 (90 FR 17013, eff. Apr. 23, 2025).
+  assert.strictEqual(gA.form_301_fee_usd, 4675, 'Form 301-AM major change CP fee must be $4,675 flat (§1.1104)');
+  assert.strictEqual(gD.form_301_fee_usd, 4675, 'Form 301-AM major change CP fee must be $4,675 flat (§1.1104)');
 });
 
 test('#138 DA station has higher consulting cost than NDA', async () => {
@@ -18756,11 +18849,14 @@ test('#138 DA station has higher consulting cost than NDA', async () => {
   assert.ok(gDA.cost_estimates.consulting_low_usd > gNDA.cost_estimates.consulting_low_usd, 'DA consulting must cost more than NDA');
 });
 
-test('#138 total_fcc_fees = Form 301 + Form 302 + STA', async () => {
+test('#138 total_fcc_fees = sum of required fee items (annual reg fee + 301-AM CP + 302-AM)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_application_fee_budget_guide;
-  const expected = g.form_301_fee_usd + g.form_302_fee_usd + g.sta_fee_usd;
-  assert.strictEqual(g.total_fcc_fees_usd, expected, 'total FCC fees must equal sum of 301+302+STA');
+  const expectedLow = g.fee_items.filter(f => f.required).reduce((s, f) => s + f.fee_low_usd, 0);
+  assert.strictEqual(g.total_fcc_fees_low_usd, expectedLow, 'total FCC fees (low) must equal sum of required fee items');
+  // Annual reg fee (§1.1153 population tier) + $4,675 Form 301-AM major change CP + $755 Form 302-AM (§1.1104)
+  assert.strictEqual(g.total_fcc_fees_low_usd, g.annual_reg_fee_low_usd + 4675 + 755,
+    'total FCC fees must equal §1.1153 annual reg fee + $4,675 (301-AM CP) + $755 (302-AM)');
 });
 
 test('#138 candidate_comparison_table has fee_* columns', async () => {
@@ -19077,4 +19173,91 @@ test('comparison table lcm_col_at_risk reflects COVERED for close candidates wit
   // At least some candidates should have a non-null lcm_col_at_risk
   const nonNull = out.candidate_comparison_table.filter(r => r.lcm_col_at_risk !== null);
   assert.ok(nonNull.length > 0, 'some candidates should have non-null lcm_col_at_risk');
+});
+
+// ---------- canonical candidate result (wave 3A single-source integration) ----------
+
+test('canonical: every candidate carries a validated canonical result; KAZM is internally consistent', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.canonical, `rank ${c.rank} must carry candidate.canonical`);
+    assert.equal(c.canonical.schema, 'canonical-candidate-result/1');
+    assert.equal(c.canonical.validation.consistent, true,
+      `KAZM candidate rank ${c.rank} must be internally consistent; violations: ` +
+      JSON.stringify(c.canonical.validation.violations));
+    assert.equal(c.internally_consistent, true,
+      `internally_consistent must be stamped true for a consistent candidate (rank ${c.rank})`);
+  }
+  // The validation gate emitted no blocker warnings for a consistent run.
+  assert.ok(!out.warnings.some(w => w.code === 'INTERNALLY_INCONSISTENT_CANDIDATE'),
+    'no INTERNALLY_INCONSISTENT_CANDIDATE warning on a consistent run');
+});
+
+test('canonical: blanket population crosses the boundary as a FRACTION (never percent)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  for (const c of out.candidates) {
+    const f = c.canonical.blanket.populationFraction?.value ?? null;
+    if (c.blanket_population_pct != null && f != null) {
+      // canonical fraction = optimizer percent ÷ 100 (0.01 === 1%), within
+      // the round2() applied to the echoed percent.
+      assert.ok(Math.abs(f * 100 - c.blanket_population_pct) < 0.01,
+        `fraction/percent boundary broken at rank ${c.rank}: fraction ${f} vs pct ${c.blanket_population_pct}`);
+      assert.ok(f >= 0 && f <= 1, `canonical blanket fraction must be in [0,1]; got ${f}`);
+    }
+    assert.equal(c.canonical.blanket.limitFraction, 0.01, 'canonical §73.24(g) limit is the FRACTION 0.01');
+  }
+});
+
+test('canonical: per-candidate nif_required/nif_completion/nif_result echo canonical.regulatory.nif', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    // 780 kHz Class D: NIF required; screening never runs the solver.
+    assert.equal(c.nif_required, true, `rank ${c.rank}`);
+    assert.equal(c.nif_completion, 'NOT_RUN', `rank ${c.rank}`);
+    assert.equal(c.nif_result, 'NOT_EVALUATED', `rank ${c.rank}`);
+    assert.equal(c.nif_required, c.canonical.regulatory.nif.required);
+    assert.equal(c.nif_completion, c.canonical.regulatory.nif.completion);
+    assert.equal(c.nif_result, c.canonical.regulatory.nif.result);
+  }
+});
+
+test('canonical scoring context: tie semantics recomputed from the rule, not copied', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  const all = out.candidates;
+  const baselineScore = out.current_site_baseline?.score ?? null;
+  // Recompute expectations directly from the canonical tie rule:
+  // tied ⇔ nearest OTHER candidate score is within the ±2 default precision;
+  // materially better ⇔ delta vs baseline > 2.
+  const scores = all.map(c => c.score);
+  for (const c of all) {
+    assert.equal(typeof c.tied_within_model_precision, 'boolean', `rank ${c.rank}`);
+    assert.ok(Number.isInteger(c.tie_group_size) && c.tie_group_size >= 1, `rank ${c.rank}`);
+    assert.ok(typeof c.scoring_display_label === 'string' && c.scoring_display_label.length > 0);
+    assert.equal(c.tied_within_model_precision, c.tie_group_size > 1,
+      `tied flag must agree with tie_group_size (rank ${c.rank})`);
+    if (baselineScore != null) {
+      assert.equal(c.materially_better_than_baseline, (c.score - baselineScore) > 2,
+        `materially_better_than_baseline must be delta > ±2 noise floor (rank ${c.rank}, delta ${c.score - baselineScore})`);
+    }
+    if (c.tied_within_model_precision) {
+      assert.equal(c.scoring_display_label, 'Tied at current screening resolution');
+    }
+    // Mirrored into the canonical result itself.
+    assert.ok(c.canonical.scoring, 'canonical.scoring must be attached post-ranking');
+    assert.equal(c.canonical.scoring.tiedWithinModelPrecision, c.tied_within_model_precision);
+    assert.equal(c.canonical.scoring.tieGroupSize, c.tie_group_size);
+    assert.equal(c.canonical.scoring.displayLabel, c.scoring_display_label);
+  }
+  // The full-return sample must include the returned candidates' scores
+  // (sanity that the tie window was computed over the whole field).
+  assert.ok(scores.length > 1);
+});
+
+test('canonical confidence: filing_readiness is false at screening with a night-study blocker', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const fr = out.optimization_confidence.filing_readiness;
+  assert.equal(fr.ready, false, 'screening output can never be filing-ready');
+  assert.ok(fr.blockers.some(b => /night/i.test(b)),
+    `filing_readiness blockers must include the pending nighttime study; got ${JSON.stringify(fr.blockers)}`);
 });

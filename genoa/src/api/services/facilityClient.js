@@ -975,7 +975,7 @@ export function makeFacilityClient({
 // ZTR's broadcast_stations table does not carry the FCC AM service class
 // (A / B / C / D) — see normalizeZtrRow's `fcc_class: null` below.  Without
 // that field, the AM-night orchestrator (§73.182 NIF + §73.99 PSRA/PSSA)
-// refuses to run because §73.183 D/U protection ratios are class-dependent
+// refuses to run because §73.182 Table 1 D/U ratios (and §73.183 protected-contour levels) are class-dependent
 // and there is no defensible default.
 //
 // To make the form populate automatically (so the operator doesn't have to

@@ -103,7 +103,7 @@ export default function TelemetryRack({ exhibit }) {
         {String(s.service || '').toUpperCase() === 'AM' ? (
           <>
             {/* AM: transmitter power + ground conductivity drive the
-                §73.183 groundwave field.  Show TPO and σ, not ERP/HAAT. */}
+                §73.184 groundwave field.  Show TPO and σ, not ERP/HAAT. */}
             <MetricReadout label="TPO"         value={s.erp_kw ?? '—'}            unit="kW"   tone="gold" />
             <MetricReadout label="σ (ground)"  value={s.ground_sigma_mS_m ?? '—'} unit="mS/m" tone="gold" />
           </>
@@ -141,7 +141,7 @@ export default function TelemetryRack({ exhibit }) {
           <div className="font-mono text-[11px] text-textDim italic">
             {pop.attempt_status === 'failed'
               ? `Census API failed: ${pop.attempt_error || 'unknown'}`
-              : 'Placeholder — computing exhibit will fetch real Census data'}
+              : 'Not yet computed — Census/ACS data will be fetched when the exhibit is run'}
           </div>
         )}
       </RackPanel>

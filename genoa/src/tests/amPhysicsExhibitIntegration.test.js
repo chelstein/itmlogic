@@ -74,7 +74,7 @@ test('client: known KAZM-style input shape matches the live sidecar contract', a
       return { ok: true, json: async () => SAMPLE_OK };
     }
   });
-  // KAZM AM 780 kHz, default §73.190 Figure R3 soil 8 mS/m, NEC EPR 15.
+  // KAZM AM 780 kHz, default §73.190 Figure M3 soil 8 mS/m, NEC EPR 15.
   await c.runSomnec({
     epr:           DEFAULT_EPR,
     sig_s_m:       DEFAULT_GROUND_SIGMA_MS_M / 1000,

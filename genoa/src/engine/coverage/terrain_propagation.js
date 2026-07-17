@@ -244,31 +244,32 @@ export function terrainPathLoss({
  * computed terrain path-loss into a predicted field strength in dBu.
  *
  * Derivation:
- *   EIRP(dBm) = 10·log10(ERP_W × 1.64) + 30
- *             = 10·log10(ERP_kW)       + 30 + 2.15 + 30
- *             = 10·log10(ERP_kW)       + 62.15
- *   E(dBμV/m) at distance d, accounting for path loss L:
- *     E = EIRP(dBm) - L(dB) + 77.2     (free-space dipole reference)
- *   The 77.2 dB constant is from the conversion EIRP(dBm) → field
- *   strength at the receiver (50-Ω reference, dipole gain).
+ *   Free-space FIELD STRENGTH is frequency-independent.  For a
+ *   dipole-referenced ERP of P kW at distance d km:
+ *     E(V/m)  = √(49.2 · P_W) / d_m
+ *     E(dBµV/m) at 1 km for 1 kW = 106.92 dBu
+ *   so
+ *     E_dBu = 106.92 + 10·log10(ERP_kW) - 20·log10(d_km) - L_terrain_extra_db
+ *   where L_terrain_extra_db = se_db + ke_db  (loss above free-space).
  *
- *   Or simply, in field-strength terms:
- *     E_dBu = 106.92 + 10·log10(ERP_kW) - 20·log10(d_km) - 20·log10(f_MHz)
- *           - L_terrain_extra_db
- *   where L_terrain_extra_db = se_db + ke_db  (above free-space).
+ *   This matches the FCC's own vendored curve code (tvfm_curves.js:
+ *   field = 106.92 − 20·log10(distance) + erp_db — no frequency term).
+ *   A previous revision subtracted an extra 20·log10(f_MHz), which
+ *   belongs to the PATH-LOSS (received power) form of the Friis
+ *   equation, not the field-strength form — it under-predicted field
+ *   by ~40 dB at FM frequencies and pulled every ITM-aware contour
+ *   drastically inward.
  */
 export function predictFieldStrengthDbu({
   erp_kw, distance_km, frequency_mhz, terrain_extra_loss_db = 0
 }){
   const erp = Math.max(Number(erp_kw), 1e-9);
   const d   = Math.max(Number(distance_km), 1e-3);
-  const f   = Number(frequency_mhz);
-  // Standard FCC-style FSL field strength (matches §73.333 free-space
-  // computation): E(dBu) = 106.92 + 10·log10(ERP_kW) - 20·log10(d) - 20·log10(f)
+  // Free-space field strength (frequency-independent):
+  // E(dBu) = 106.92 + 10·log10(ERP_kW) - 20·log10(d_km) - terrain excess loss
   return 106.92
        + 10 * Math.log10(erp)
        - 20 * Math.log10(d)
-       - 20 * Math.log10(f)
        - Number(terrain_extra_loss_db);
 }
 

@@ -52,7 +52,7 @@ function methodFor(service){
     case 'FM':   return { method: FM_CONTOUR_METHODS.F50_50, regs: ['§73.313', '§73.333'] };
     case 'LPFM': return { method: LPFM_METHOD,                regs: ['§73.811', '§73.333'] };
     case 'FX':   return { method: FX_METHOD,                  regs: ['§74.1204', '§73.333'] };
-    case 'AM':   return { method: '47 CFR §73.183 / §73.184 groundwave', regs: ['§73.183', '§73.184'] };
+    case 'AM':   return { method: '47 CFR §73.184 groundwave M3 conductivity curves', regs: ['§73.184', '§73.183'] };
     default: throw new Error(`unknown service: ${service}`);
   }
 }
@@ -617,7 +617,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     primary:           null,
     protected:         null,
     model:             null,
-    method:            'placeholder',
+    method:            'model_estimate',
     source:            null,
     informational_only: true,
     disclaimer:        'INFORMATIONAL ONLY.  FCC broadcast filings (§73.207, §73.215, §74.1204, §73.187, §73.811) do not require population data; compliance is determined by distance and field-strength tests.  Where a Census/ACS dispatch is supplied, the persons figure is the licensee\'s best estimate of audience reach within the protected contour and is not a regulatory determination.'
@@ -679,13 +679,13 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.software_versions = SOFTWARE_VERSIONS;
   // AM groundwave runs through src/engine/am/groundwave.js, which
   // reads the vendored FCC gwave.js grid keyed on (σ × distance per
-  // §73.184 Figure M3).  The prior label "(engine NOT IMPLEMENTED)"
+  // §73.184 / §73.190 Figure M3).  The prior label "(engine NOT IMPLEMENTED)"
   // was stale — left over from a pre-2.0 scaffolding branch — and is
   // a P1 misleading-metadata bug in the engineering statement.
   const interpBlock = (service === 'AM')
     ? { along_field: 'σ × distance grid',
         along_haat:  'n/a',
-        source:      '47 CFR §73.184 groundwave (vendored gwave.js; bivariate over σ × distance per Figure M3)' }
+        source:      '47 CFR §73.184 groundwave (vendored gwave.js; bivariate over σ × distance per §73.190 Figure M3)' }
     : (fmEngine === 'fcc-canonical' ? FM_INTERP_FCC : FM_INTERP);
 
   // AM exhibits MUST stamp the AM curve_dataset provenance (gwave.js
@@ -871,7 +871,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     }
   }
 
-  // §73.24(g)/(j) and international border — run BEFORE warnings are frozen
+  // §73.24(g)/(i) and international border — run BEFORE warnings are frozen
   // so failures raise blockers that score in filing_readiness.  Previously
   // these ran after readiness() was computed, making them invisible to the
   // badge and score (G-001, G-002, G-007 audit fixes).

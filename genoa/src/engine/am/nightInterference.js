@@ -27,6 +27,8 @@
 //   - 47 CFR §73.182(k) — RSS aggregation, 25% exclusion threshold
 //   - 47 CFR §73.182(s) — definition of "interfering signal"
 
+import { AM_DU_RATIOS_73_182 } from '../regulatory/regulatoryConstants.js';
+
 export const RSS_EXCLUSION_FRACTION = 0.25;
 
 /**
@@ -137,8 +139,7 @@ export function rssAggregate(interferers, opts = {}){
  * applicable to the station's class.
  *
  * D/U (Desired-to-Undesired) ratios per 47 CFR §73.182 / §73.183:
- *   - Class A clear (co-channel):  26 dB nighttime
- *   - Class B / D (co-channel):    20 dB nighttime
+ *   - Co-channel (all classes):    26 dB nighttime (20:1 field ratio)
  *   - 1st-adjacent (10 kHz):        0 dB
  *   - 2nd-adjacent (20 kHz):      -26 dB
  *   - 3rd-adjacent (30 kHz):      -50 dB
@@ -189,11 +190,21 @@ export function checkProtection(desired_uv_m, rss_uv_m, du_db){
 export function standardDuDb(subjectClass, relation){
   const cls = String(subjectClass || '').toUpperCase();
   const rel = normalizeRelation(relation);
+  // §73.182 nighttime co-channel protection is a 20:1 FIELD ratio = 26 dB for
+  // all classes.  Values come from the shared regulatory-constants catalog
+  // (src/engine/regulatory/regulatoryConstants.js) — never re-declare them here.
+  const DU = AM_DU_RATIOS_73_182;
+  const duRow = {
+    co_channel:      DU.co_channel_db,
+    first_adjacent:  0,   // nighttime first-adjacent (10 kHz): 0 dB
+    second_adjacent: DU.night_second_adjacent_db,
+    third_adjacent:  DU.night_third_adjacent_db
+  };
   const matrix = {
-    A: { co_channel: 26, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
-    B: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
-    C: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
-    D: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: null }
+    A: { ...duRow },
+    B: { ...duRow },
+    C: { ...duRow },
+    D: { ...duRow, third_adjacent: null }   // Class D 3rd-adjacent: not protected
   };
   const row = matrix[cls];
   if (!row) return null;

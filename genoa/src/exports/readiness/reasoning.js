@@ -393,7 +393,7 @@ function gen_coordinate_validation(exhibit) {
         { label: 'Latitude',  value: lat, path: 'station_inputs.lat' },
         { label: 'Longitude', value: lon, path: 'station_inputs.lon' },
       ],
-      rule:       '47 CFR §73.316 (site must be in licensed coverage area)',
+      rule:       'FCC Form 301 technical data (NAD83 transmitter coordinates)',
       required:   'Coordinates must be within the US service territory',
       result:     inUS ? 'PASS' : 'FAIL',
       source:     'station_inputs',
