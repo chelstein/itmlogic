@@ -294,11 +294,22 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           {onPromoteToStudio && candidate.status_category !== 'NON_COMPLIANT' && (
             <button
               onClick={() => {
+                // Auto-fill height/radial figures are sourced from
+                // candidate.canonical (the single source of truth) instead
+                // of the per-guide am_tower_lighting_and_painting_compliance_guide
+                // / am_ground_radial_system_design_guide objects, which can
+                // disagree with canonical and with each other — this feeds a
+                // real FCC filing autofill, so it must not carry a stale or
+                // contradicted figure (canonical-consistency-audit-followup,
+                // Group 2 item 6).
                 const ltg = candidate.am_tower_lighting_and_painting_compliance_guide;
                 const gnd = candidate.am_ground_radial_system_design_guide;
                 const imp = candidate.am_antenna_system_impedance_and_base_current_guide;
                 const gw  = candidate.am_propagation_groundwave_field_strength_estimate_guide;
                 const env = candidate.am_site_environmental_impact_and_permitting_guide;
+                const antenna = candidate.canonical?.antenna;
+                const ground  = candidate.canonical?.groundSystem?.selectedScenario;
+                const heightM = antenna?.selectedDesignHeightM?.value ?? null;
                 onPromoteToStudio({
                   lat: candidate.lat, lon: candidate.lon,
                   callsign, frequency_khz, tpo_kw,
@@ -306,16 +317,16 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   pattern_mode: pattern_mode ?? candidate.pattern_mode,
                   rank: candidate.rank,
                   status_category: candidate.status_category,
-                  // Auto-fill values derived from engine guides
+                  // Auto-fill values — canonical for height/radials/ASR, guide-derived for the rest
                   autofill: {
-                    tower_overall_height_agl_m:  ltg?.tower_height_m   ?? null,
-                    tower_overall_height_agl_ft: ltg?.tower_height_ft  ?? null,
-                    asr_required:                ltg?.asr_required     ?? null,
+                    tower_overall_height_agl_m:  heightM,
+                    tower_overall_height_agl_ft: heightM != null ? Math.round(heightM * 3.28084 * 100) / 100 : null,
+                    asr_required:                candidate.canonical?.regulatory?.asr?.required ?? null,
                     tower_lighting_type:         ltg?.lighting_type    ?? null,
-                    tower_painting_standard:     ltg?.asr_required     ? 'AC 70/7460-1L Chapter 3' : null,
+                    tower_painting_standard:     candidate.canonical?.regulatory?.asr?.required ? 'AC 70/7460-1L Chapter 3' : null,
                     faa_notification_required:   ltg?.faa_notification_required ?? null,
-                    n_radials_recommended:       gnd?.n_radials_full   ?? null,
-                    radial_length_ft:            gnd?.quarter_wave_ft  ?? null,
+                    n_radials_recommended:       ground?.radialCount   ?? null,
+                    radial_length_ft:            ground?.radialLengthM != null ? Math.round(ground.radialLengthM * 3.28084 * 100) / 100 : null,
                     ground_conductivity_msm:     gw?.conductivity_msm  ?? null,
                     base_current_a:              imp?.base_current_a   ?? null,
                     ct_rating_a:                 imp?.ct_rating_a      ?? null,
@@ -356,12 +367,23 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           if (!ltg && !gnd && !imp) return null;
           const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
           const fmtN = (n) => n != null ? Number(n).toLocaleString() : '—';
+          // Tower height, ASR requirement, and radial count/length are
+          // sourced from candidate.canonical — the single source of truth —
+          // instead of the per-guide objects, which can silently disagree
+          // with canonical (canonical-consistency-audit-followup, Group 2
+          // item 6). This preview feeds a real FCC filing autofill.
+          const antenna = candidate.canonical?.antenna;
+          const ground  = candidate.canonical?.groundSystem?.selectedScenario;
+          const asrRequired = candidate.canonical?.regulatory?.asr?.required ?? null;
+          const heightM = antenna?.selectedDesignHeightM?.value ?? null;
+          const heightFt = heightM != null ? heightM * 3.28084 : null;
+          const radialLengthFt = ground?.radialLengthM != null ? ground.radialLengthM * 3.28084 : null;
           const fields = [
-            { label: 'Tower height AGL', value: ltg ? `${fmtF(ltg.tower_height_m)} m (${fmtF(ltg.tower_height_ft, 0)} ft)` : '—', auto: !!ltg },
-            { label: 'ASR required (§17.7)', value: ltg ? (ltg.asr_required ? 'YES' : 'No') : '—', auto: !!ltg, warn: ltg?.asr_required },
+            { label: 'Tower height AGL', value: heightM != null ? `${fmtF(heightM)} m (${fmtF(heightFt, 0)} ft)` : '—', auto: heightM != null },
+            { label: 'ASR required (§17.7)', value: asrRequired != null ? (asrRequired ? 'YES' : 'No') : '—', auto: asrRequired != null, warn: asrRequired },
             { label: 'Tower lighting', value: ltg?.lighting_type?.replace(/_/g, ' ') ?? '—', auto: !!ltg },
-            { label: 'Tower painting', value: ltg?.asr_required ? 'AC 70/7460-1L Ch. 3' : 'Not required', auto: !!ltg },
-            { label: 'Radials recommended', value: gnd ? `${gnd.n_radials_full} × ${fmtF(gnd.quarter_wave_ft, 0)} ft` : '—', auto: !!gnd },
+            { label: 'Tower painting', value: asrRequired != null ? (asrRequired ? 'AC 70/7460-1L Ch. 3' : 'Not required') : '—', auto: asrRequired != null },
+            { label: 'Radials recommended', value: ground ? `${ground.radialCount} × ${fmtF(radialLengthFt, 0)} ft` : '—', auto: !!ground },
             { label: 'Base current (RMS)', value: imp ? `${fmtF(imp.base_current_a, 2)} A` : '—', auto: !!imp },
             { label: 'CT rating required', value: imp ? `${imp.ct_rating_a} A` : '—', auto: !!imp },
             { label: 'Ground conductivity', value: gw ? `${fmtF(gw.conductivity_msm, 1)} mS/m` : '—', auto: !!gw },
@@ -3534,14 +3556,24 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b', background: '#1e293b', borderRadius: 3, padding: '2px 6px' }}>SCREENING-GRADE</span>
               </div>
 
-              {/* Grand total banner */}
+              {/* Grand total banner — the ONE headline "Total Project Cost"
+                  figure is sourced from candidate.canonical.costs.total
+                  (canonical-consistency-audit-followup, Group 4 item 8),
+                  not this guide's own grand_total_*_usd. The line-items
+                  breakdown below remains as supplementary guide detail. */}
               <div style={{ background: '#1e293b', borderRadius: 6, padding: '10px 14px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', marginBottom: 2 }}>GRAND TOTAL (incl. contingency)</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', marginBottom: 2 }}>TOTAL PROJECT COST (incl. contingency)</div>
                   <div style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>
-                    {fmtRange(pf.grand_total_low_usd, pf.grand_total_high_usd)}
+                    {candidate.canonical?.costs?.total
+                      ? fmtRange(candidate.canonical.costs.total.low, candidate.canonical.costs.total.high)
+                      : fmtRange(pf.grand_total_low_usd, pf.grand_total_high_usd)}
                   </div>
-                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', marginTop: 2 }}>midpoint {fmtK(pf.grand_total_midpoint_usd)}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                    {candidate.canonical?.costs?.total
+                      ? `midpoint ${fmtK((candidate.canonical.costs.total.low + candidate.canonical.costs.total.high) / 2)}`
+                      : `midpoint ${fmtK(pf.grand_total_midpoint_usd)}`}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b' }}>Class {pf.fcc_class} · {pf.frequency_khz} kHz</div>
@@ -5342,12 +5374,20 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 ))}
               </div>
               <div style={{ borderTop: '1px solid #1e3a5f', paddingTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12 }}>
-                <span style={{ color: '#bae6fd', fontWeight: 600 }}>Grand total:</span>
+                <span style={{ color: '#bae6fd', fontWeight: 600 }}>Grand total (this guide, supplementary):</span>
                 <span style={{ color: '#e0f2fe', fontWeight: 600 }}>{fmtRange(g.grand_total_low_usd, g.grand_total_high_usd)}</span>
                 <span style={{ color: '#bae6fd' }}>+ {g.contingency_pct}% contingency:</span>
                 <span style={{ color: '#e0f2fe' }}>{fmt(g.contingency_low_usd)} – {fmt(g.contingency_high_usd)}</span>
-                <span style={{ color: '#7dd3fc', fontWeight: 700, fontSize: 13 }}>TOTAL (w/ contingency):</span>
-                <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 13 }}>{fmtRange(g.total_with_contingency_low_usd, g.total_with_contingency_high_usd)}</span>
+                {/* Headline "Total Project Cost" — sourced from
+                    candidate.canonical.costs.total (canonical-consistency-
+                    audit-followup, Group 4 item 8), not this guide's own
+                    total_with_contingency_*_usd. */}
+                <span style={{ color: '#7dd3fc', fontWeight: 700, fontSize: 13 }}>TOTAL PROJECT COST (canonical):</span>
+                <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 13 }}>
+                  {candidate.canonical?.costs?.total
+                    ? fmtRange(candidate.canonical.costs.total.low, candidate.canonical.costs.total.high)
+                    : fmtRange(g.total_with_contingency_low_usd, g.total_with_contingency_high_usd)}
+                </span>
               </div>
               {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#7dd3fc', fontStyle: 'italic' }}>{g.note}</div>}
             </div>
@@ -7859,15 +7899,24 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* Station Total Project Cost Pro Forma Guide */}
         {candidate.station_total_project_cost_pro_forma_guide && (() => {
           const g = candidate.station_total_project_cost_pro_forma_guide;
+          // Headline Total (low/high/typical) sourced from
+          // candidate.canonical.costs.total (canonical-consistency-audit-
+          // followup, Group 4 item 8) instead of this guide's own
+          // total_project_*_usd; the per-category breakdown table below
+          // remains as supplementary guide detail.
+          const canonTotal = candidate.canonical?.costs?.total;
+          const totalLow  = canonTotal?.low  ?? g.total_project_low_usd;
+          const totalHigh = canonTotal?.high ?? g.total_project_high_usd;
+          const totalTyp  = canonTotal ? (canonTotal.low + canonTotal.high) / 2 : g.total_project_typ_usd;
           return (
             <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #7dd3fc' }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#0c4a6e', marginBottom: 8 }}>
-                Station Relocation Pro Forma — Total Project Cost
+                Station Relocation Pro Forma — Total Project Cost{canonTotal ? ' (canonical)' : ''}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
-                <div><span style={{ color: '#6b7280' }}>Total (low):</span> <strong>${g.total_project_low_usd?.toLocaleString()}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Total (high):</span> <strong>${g.total_project_high_usd?.toLocaleString()}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Typical estimate:</span> <strong style={{ color: '#0369a1' }}>${g.total_project_typ_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Total (low):</span> <strong>${totalLow?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Total (high):</span> <strong>${totalHigh?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Typical estimate:</span> <strong style={{ color: '#0369a1' }}>${totalTyp?.toLocaleString()}</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Contingency:</span> <strong>{g.contingency_pct}%</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Timeline:</span> <strong>{g.total_timeline_months_low}–{g.total_timeline_months_high} months</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Tower height (λ/4):</span> <strong>{g.tower_height_m} m / {g.tower_height_ft} ft</strong></div>
