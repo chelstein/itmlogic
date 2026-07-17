@@ -30,10 +30,31 @@ export function build(gctx){ ... }        // pure; returns the guide object
 
 ## Registry
 
-`index.js` exports `GUIDE_BUILDERS` (key → build) and throws at import
-time if two modules claim the same key — making the duplicate-key
-clobbering class from the audit structurally impossible for migrated
-guides.
+`index.js` builds `GUIDE_BUILDERS`/`GUIDE_KEYS` via the exported
+`buildGuideRegistry(modules, reservedNames?)`, which throws at import
+time if:
+- two modules claim the same key (the duplicate-key clobbering class
+  from the audit), or
+- a module's key collides with a **reserved canonical-authoritative
+  field name** (`../canonical/reservedFieldNames.js`) — a guide may
+  never claim a key that reads from `candidate.canonical.*`
+  (`canonical`, `nif_status`, `nif_required`, `nif_completion`,
+  `nif_result`, and the response-level `optimization_confidence` /
+  `candidate_set_recommendation`).
+
+`buildGuideRegistry()` is unit-tested directly in
+`src/tests/guideRegistry.test.js` (duplicate-key rejection,
+reserved-name rejection, malformed-module rejection), separate from the
+production call in `index.js`.
+
+Guides not yet migrated into this registry (still inline IIFEs in
+`scoreCandidate()`) are covered by a **different, static** guarantee:
+`src/tests/canonicalContract.test.js` parses `siteOptimizer.js`'s actual
+source AST and proves the same two invariants (no duplicate top-level
+keys, no reserved-name collisions) across the return object's ~262+
+keys as they exist in source — this holds regardless of migration
+progress, so the "no guide may override a canonical field" guarantee
+does not wait on the full migration to be true.
 
 ## Migration recipe (per tranche)
 
@@ -44,5 +65,6 @@ guides.
 3. In `scoreCandidate()`, replace the inline IIFE with
    `key: GUIDE_BUILDERS[key](gctx)` (explicit call keeps object-literal
    ordering and readability).
-4. Gates: citation hygiene, then the guide's targeted tests, then the
-   full suite before commit.
+4. Gates: citation hygiene, `guideRegistry.test.js`,
+   `canonicalContract.test.js`, then the guide's targeted tests, then
+   the full suite before commit.
