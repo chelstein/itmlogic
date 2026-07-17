@@ -532,7 +532,11 @@ export const WARNING_CODES = Object.freeze({
 
   REACH_PLACEHOLDER: { severity: 'warning', phase: 'engine',
     title: 'Identical daytime reach values across many candidates — propagation may be flat',
-    description: 'More than 10 candidates share the same daytime reach estimate.  This is expected when the screening engine has no per-site ground conductivity raster and uses the same regional σ bin for all points.  The reach values are not differentiating candidates by propagation geometry; per-site DEM conductivity integration is required for filing-grade reach estimates.' }
+    description: 'More than 10 candidates share the same daytime reach estimate.  This is expected when the screening engine has no per-site ground conductivity raster and uses the same regional σ bin for all points.  The reach values are not differentiating candidates by propagation geometry; per-site DEM conductivity integration is required for filing-grade reach estimates.' },
+
+  INTERNALLY_INCONSISTENT_CANDIDATE: { severity: 'blocker', phase: 'engine',
+    title: 'Candidate result is internally inconsistent',
+    description: 'The canonical invariant validator (src/engine/am/canonical/validation.js) found cross-field contradictions inside a candidate result (e.g. a NIF decision simultaneously required and NOT_REQUIRED, tower-height basis divergence between modules, or cost totals that are not the sum of their components).  The candidate is forced to status_category REVIEW_REQUIRED, internally_consistent is set to false, and no advancement recommendation is issued until the inconsistency is resolved.' }
 });
 
 export class W {

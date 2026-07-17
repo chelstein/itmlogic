@@ -167,10 +167,20 @@ test('HYBRID mode returns score_stats and optimization_confidence', async () => 
   assert.ok(Number.isFinite(out.score_stats.std_dev), 'score_stats.std_dev finite');
   assert.ok(Number.isFinite(out.score_stats.min),     'score_stats.min finite');
   assert.ok(Number.isFinite(out.score_stats.max),     'score_stats.max finite');
-  // optimization_confidence
+  // optimization_confidence — level is the canonical ranking-signal-quality
+  // tier (proxy layers can no longer raise it), with the four axes beside it.
   assert.ok(out.optimization_confidence, 'optimization_confidence must be present in HYBRID response');
-  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(out.optimization_confidence.level),
-    `level must be HIGH/MEDIUM/LOW, got ${out.optimization_confidence.level}`);
+  assert.ok(['FILING_GRADE', 'ENGINEERING_GRADE', 'SCREENING', 'LOW'].includes(out.optimization_confidence.level),
+    `level must be a canonical ConfidenceTier, got ${out.optimization_confidence.level}`);
+  assert.equal(out.optimization_confidence.level,
+    out.optimization_confidence.ranking_signal_quality?.tier,
+    'level must EQUAL the canonical ranking_signal_quality tier');
+  assert.ok(out.optimization_confidence.engineering_data_confidence?.tier,
+    'engineering_data_confidence axis must be present');
+  assert.ok(out.optimization_confidence.regulatory_completeness != null,
+    'regulatory_completeness axis must be present');
+  assert.equal(typeof out.optimization_confidence.filing_readiness?.ready, 'boolean',
+    'filing_readiness axis must be present');
   assert.ok(Array.isArray(out.optimization_confidence.contributing_layers));
   assert.ok(Array.isArray(out.optimization_confidence.notes));
   // conductivity_mode
@@ -339,34 +349,62 @@ test('GRID search_mode forwards skywave_risk_level + recommended_actions from si
     `recommended_actions must be array in GRID mode; got: ${typeof out.recommended_actions}`);
 });
 
-// ---------- Test 18 — assignStatusCategory sets nif_status ----------
-test('assignStatusCategory sets nif_status aligned with status_category', () => {
+// ---------- Test 18 — nif_status derives from canonical.regulatory.nif, never the score category ----------
+test('assignStatusCategory derives nif_status from canonical NIF decision (score category no longer fabricates it)', () => {
+  // With a canonical NIF decision attached, the label reflects the DECISION —
+  // a top-quantile score does NOT produce a NIF label.
   const promisingC = {
     lat: 34.87, lon: -111.83, distance_from_current_km: 5,
     score: 95, col_coverage_pct: 0.92, blanket_population_pct: 0.2,
     daytime_reach_km: 60, ground_sigma_mS_m: 8, treaty_zone: null,
     source: 'INFRASTRUCTURE',
+    canonical: { regulatory: { nif: { required: true, completion: 'NOT_RUN', result: 'NOT_EVALUATED', state: 'NOT_EVALUATED' } } },
     colocation_analysis: { diplexing_required: false, same_band_interference_risk: 'LOW' }
   };
   __test__.assignStatusCategory(promisingC, /*scoreCutoff=*/80, { current_site: KAZM });
   assert.equal(promisingC.status_category, 'PROMISING');
-  assert.equal(promisingC.nif_status, 'PROMISING',
-    `PROMISING candidate should have nif_status='PROMISING'; got: ${promisingC.nif_status}`);
+  assert.equal(promisingC.nif_status, 'REQUIRED — NOT EVALUATED',
+    `required-but-not-run NIF must read 'REQUIRED — NOT EVALUATED'; got: ${promisingC.nif_status}`);
 
+  // A hard COL failure changes the STATUS but not the NIF fact.
   const nonCompliantC = {
     lat: 34.87, lon: -111.83, distance_from_current_km: 5,
     score: 90, col_coverage_pct: 0.30, blanket_population_pct: 0.2,
     daytime_reach_km: 60, ground_sigma_mS_m: 8, treaty_zone: null,
     source: 'INFRASTRUCTURE',
+    canonical: { regulatory: { nif: { required: true, completion: 'NOT_RUN', result: 'NOT_EVALUATED', state: 'NOT_EVALUATED' } } },
     colocation_analysis: { diplexing_required: false, same_band_interference_risk: 'LOW' }
   };
   __test__.assignStatusCategory(nonCompliantC, /*scoreCutoff=*/80, { current_site: KAZM });
-  // Status depends on distance and minimum_tpo_for_col_coverage_kw.
   assert.ok(['RECOVERABLE_WITH_DA', 'RECOVERABLE_WITH_COL_CHANGE', 'NON_COMPLIANT',
     'RECOVERABLE_WITH_POWER_INCREASE'].includes(nonCompliantC.status_category),
     `expected a recovery or NON_COMPLIANT category; got: ${nonCompliantC.status_category}`);
-  assert.equal(nonCompliantC.nif_status, 'NON-COMPLIANT',
-    `recovery/non-compliant candidate should have nif_status='NON-COMPLIANT'; got: ${nonCompliantC.nif_status}`);
+  assert.equal(nonCompliantC.nif_status, 'REQUIRED — NOT EVALUATED',
+    `NIF label must be independent of the score category; got: ${nonCompliantC.nif_status}`);
+
+  // Not-required (canonical Class-C-on-local decision) reads 'NOT REQUIRED'.
+  const notRequiredC = { ...promisingC,
+    canonical: { regulatory: { nif: { required: false, completion: 'NOT_RUN', result: 'NOT_EVALUATED', state: 'NOT_REQUIRED' } } } };
+  __test__.assignStatusCategory(notRequiredC, 80, { current_site: KAZM });
+  assert.equal(notRequiredC.nif_status, 'NOT REQUIRED');
+
+  // Without a canonical block there is no NIF fact — screening label only.
+  const noCanonical = { ...promisingC };
+  delete noCanonical.canonical;
+  __test__.assignStatusCategory(noCanonical, 80, { current_site: KAZM });
+  assert.equal(noCanonical.nif_status, 'SCREENING ONLY');
+});
+
+// ---------- Test 18b — nifStatusFromCanonical mapping table ----------
+test('nifStatusFromCanonical keeps requirement, completion, and result distinct', () => {
+  const f = __test__.nifStatusFromCanonical;
+  assert.equal(f(null), 'SCREENING ONLY');
+  assert.equal(f({ required: false, completion: 'NOT_RUN', result: 'NOT_EVALUATED' }), 'NOT REQUIRED');
+  assert.equal(f({ required: true, completion: 'NOT_RUN', result: 'NOT_EVALUATED' }), 'REQUIRED — NOT EVALUATED');
+  assert.equal(f({ required: true, completion: 'RUN', result: 'PASS' }), 'REQUIRED — STUDY PASSED');
+  assert.equal(f({ required: true, completion: 'RUN', result: 'FAIL' }), 'REQUIRED — STUDY FAILED');
+  assert.equal(f({ required: true, completion: 'RUN', result: 'NOT_EVALUATED' }), 'REQUIRED — STUDY INCONCLUSIVE');
+  assert.equal(f({ required: null, completion: 'NOT_RUN', result: 'NOT_EVALUATED' }), 'REQUIREMENT UNKNOWN');
 });
 
 // ---------- Test 19 — RECOVERABLE_WITH_POWER_INCREASE in colocation engine ----------
@@ -388,8 +426,10 @@ test('RECOVERABLE_WITH_POWER_INCREASE assigned when minimum_tpo_for_col_coverage
     `candidate with minimum_tpo_for_col_coverage_kw set should be RECOVERABLE_WITH_POWER_INCREASE; got: ${c.status_category}`);
   assert.ok(c.explanation.recovery_reasoning.includes('12.5'),
     `recovery_reasoning should cite the minimum TPO; got: ${c.explanation.recovery_reasoning}`);
-  assert.equal(c.nif_status, 'NON-COMPLIANT',
-    `RECOVERABLE_WITH_POWER_INCREASE should have nif_status='NON-COMPLIANT'; got: ${c.nif_status}`);
+  // nif_status is a NIF fact, not a compliance echo: without a canonical
+  // block on this hand-built candidate it stays 'SCREENING ONLY'.
+  assert.equal(c.nif_status, 'SCREENING ONLY',
+    `nif_status must not be fabricated from the score/compliance category; got: ${c.nif_status}`);
 });
 
 // ---------- Test 20 — nif_status enriched with skywave risk in INFRASTRUCTURE response ----------
@@ -704,9 +744,38 @@ test('colocation response has candidate_set_recommendation', async () => {
   assert.ok(typeof csr.overall_guidance === 'string', 'overall_guidance must be a string');
   assert.ok(typeof csr.n_advance_ready === 'number', 'n_advance_ready must be a number');
   assert.ok(Array.isArray(csr.candidates), 'candidates must be an array');
+  // Priorities are the canonical RecommendationLevel gate-ladder enum
+  // (read from candidate.canonical.recommendation) — the legacy
+  // 'ADVANCE_IMMEDIATELY' vocabulary is gone.
+  const LEVELS = ['SCREEN_FURTHER', 'ADVANCE_TO_DESK_STUDY', 'ADVANCE_TO_FIELD_VALIDATION',
+    'ADVANCE_TO_PARCEL_NEGOTIATION', 'ENGINEERING_READY', 'FILING_READY', 'REJECT'];
   for (const e of csr.candidates) {
-    assert.ok(['ADVANCE_IMMEDIATELY','ADVANCE_AFTER_REMEDY','HOLD','MONITOR'].includes(e.priority),
-      `priority "${e.priority}" must be valid for rank ${e.rank}`);
+    assert.ok(LEVELS.includes(e.priority),
+      `priority "${e.priority}" must be a RecommendationLevel for rank ${e.rank}`);
+    assert.ok(typeof e.action === 'string' && e.action.length > 0,
+      `action must be non-empty for rank ${e.rank}`);
+  }
+});
+
+test('colocation candidates carry canonical results with consistent validation and tie fields', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE', candidate_limit: 10 }));
+  assert.equal(out.available, true);
+  assert.ok(out.candidates.length >= 1);
+  for (const c of out.candidates) {
+    assert.ok(c.canonical, `rank ${c.rank} must carry candidate.canonical`);
+    assert.equal(c.canonical.validation.consistent, true,
+      `rank ${c.rank} must be internally consistent; violations: ${JSON.stringify(c.canonical.validation.violations)}`);
+    assert.equal(c.internally_consistent, true);
+    assert.equal(typeof c.tied_within_model_precision, 'boolean');
+    assert.ok(Number.isInteger(c.tie_group_size) && c.tie_group_size >= 1);
+    assert.equal(c.tied_within_model_precision, c.tie_group_size > 1,
+      `tie flag must agree with tie_group_size (rank ${c.rank})`);
+    if (c.tied_within_model_precision) {
+      assert.equal(c.scoring_display_label, 'Tied at current screening resolution');
+    }
+    // The recommendation feeding candidate_set_recommendation is the
+    // candidate's own canonical gate-ladder level.
+    assert.ok(c.canonical.recommendation?.level, 'canonical recommendation must be present');
   }
 });
 

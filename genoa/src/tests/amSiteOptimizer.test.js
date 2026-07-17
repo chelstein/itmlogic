@@ -133,15 +133,20 @@ test('score_stats are present and sensible', async () => {
 test('optimization_confidence is present with valid level', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
   assert.ok(out.optimization_confidence, 'optimization_confidence must be present');
-  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(out.optimization_confidence.level),
-    `level must be HIGH/MEDIUM/LOW, got ${out.optimization_confidence.level}`);
+  // level is now the canonical ranking-signal-quality tier (a ConfidenceTier),
+  // no longer a layer-count bucket.
+  assert.ok(['FILING_GRADE', 'ENGINEERING_GRADE', 'SCREENING', 'LOW'].includes(out.optimization_confidence.level),
+    `level must be a canonical ConfidenceTier, got ${out.optimization_confidence.level}`);
+  assert.equal(out.optimization_confidence.level,
+    out.optimization_confidence.ranking_signal_quality?.tier,
+    'level must EQUAL the canonical ranking_signal_quality tier');
   assert.ok(Array.isArray(out.optimization_confidence.contributing_layers),
     'contributing_layers must be an array');
   assert.ok(Array.isArray(out.optimization_confidence.notes),
     'notes must be an array');
 });
 
-test('optimization_confidence is HIGH when COL polygon + 3 real goals enabled', async () => {
+test('optimization_confidence: proxy layers can no longer raise the level (COL polygon + 3 real goals still LOW)', async () => {
   const poly = {
     type: 'Polygon',
     coordinates: [[
@@ -161,8 +166,25 @@ test('optimization_confidence is HIGH when COL polygon + 3 real goals enabled', 
       avoid_wildfire_risk:          false
     }
   });
-  assert.equal(out.optimization_confidence.level, 'HIGH');
+  // Under the legacy layer-count rule this configuration scored 'HIGH'
+  // (4 layers).  Canonically: agreement between independent layers is not
+  // measured by the screening run (agreesWithTopChoice is null for every
+  // layer), so rankingSignalQuality — and therefore level — is LOW.
+  // Proxy layers (population/blanket density proxies) are counted and
+  // reported but excluded from the agreement signal by construction.
+  assert.equal(out.optimization_confidence.level, 'LOW');
+  assert.equal(out.optimization_confidence.level,
+    out.optimization_confidence.ranking_signal_quality.tier);
+  assert.ok(out.optimization_confidence.ranking_signal_quality.proxyLayerCount >= 2,
+    'density-proxy layers must be reported as proxies');
   assert.ok(out.optimization_confidence.contributing_layers.includes('col_polygon_provided'));
+  // The four canonical axes ride along, separated.
+  assert.ok(out.optimization_confidence.engineering_data_confidence?.tier,
+    'engineering_data_confidence axis must be present');
+  assert.ok(out.optimization_confidence.regulatory_completeness != null,
+    'regulatory_completeness axis must be present');
+  assert.equal(typeof out.optimization_confidence.filing_readiness?.ready, 'boolean',
+    'filing_readiness axis must be present');
 });
 
 test('optimization_confidence is LOW when no goals enabled', async () => {
@@ -482,8 +504,14 @@ test('tower_reference block has correct physics for operating frequency', async 
   assert.ok(Math.abs(tr.quarter_wave_m - expectedLambda / 4) < 1, `quarter_wave_m off`);
   assert.ok(Math.abs(tr.half_wave_m - expectedLambda / 2) < 1, `half_wave_m off`);
   assert.equal(tr.asr_threshold_m, 60.96);
-  // At 790 kHz, λ/4 ≈ 95 m > 60.96 m → ASR required
-  assert.equal(tr.asr_registration_required_at_quarter_wave, true);
+  // The λ/4-basis ASR answer is GONE — §17.7 is evaluated against exactly
+  // one height (the canonical selected design height), never λ/4.
+  assert.ok(!('asr_registration_required_at_quarter_wave' in tr),
+    'asr_registration_required_at_quarter_wave must be removed from tower_reference');
+  // At 790 kHz Class D the design height is 3/8λ ≈ 142.4 m > 60.96 m → required.
+  assert.equal(tr.asr_registration_required_at_design_height, true);
+  // Echoed straight from canonical.regulatory.asr (§17.7 height prong tripped → RUN).
+  assert.equal(tr.asr_rule_completion, 'RUN');
 });
 
 test('sigmaQuality returns correct labels at boundary values', () => {
@@ -3428,20 +3456,32 @@ test('frequency_allocation_context.channel_class matches frequency_channel_class
     'frequency_allocation_context.channel_class should match top-level frequency_channel_class');
 });
 
-test('frequency_allocation_context.nif_required is false for local channels', async () => {
+test('frequency_allocation_context.nif_required is false ONLY for Class C on a local channel (canonical predicate)', async () => {
   const LOCAL_FREQ = 1230; // always local channel
-  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: LOCAL_FREQ, candidate_limit: 2 });
-  assert.equal(out.available, true);
-  assert.equal(out.frequency_allocation_context.nif_required, false,
-    'Local channel (1230 kHz) should not require NIF');
+  // The canonical §73.182 predicate: NIF is required for ALL classes except
+  // Class C on a §73.27 local channel (§73.182(o) regime).
+  const outC = await runSiteOptimizer({ ...KAZM, frequency_khz: LOCAL_FREQ, fcc_class: 'C', tpo_kw: 1, candidate_limit: 2 });
+  assert.equal(outC.available, true);
+  assert.equal(outC.frequency_allocation_context.nif_required, false,
+    'Class C on a local channel (1230 kHz) should not require NIF');
+  // A non-Class-C station on the same local channel IS required — the old
+  // `!isLocal` shortcut is gone.
+  const outD = await runSiteOptimizer({ ...KAZM, frequency_khz: LOCAL_FREQ, fcc_class: 'D', candidate_limit: 2 });
+  assert.equal(outD.available, true);
+  assert.equal(outD.frequency_allocation_context.nif_required, true,
+    'non-Class-C on a local channel requires NIF under the canonical predicate');
 });
 
-test('frequency_allocation_context.nif_required is true for clear channel', async () => {
+test('frequency_allocation_context.nif_required is true for clear channel, with completion/result beside it', async () => {
   const CLEAR_FREQ = 780; // KAZM is 780 kHz — a clear channel
   const out = await runSiteOptimizer({ ...KAZM, frequency_khz: CLEAR_FREQ, candidate_limit: 2 });
   assert.equal(out.available, true);
   assert.equal(out.frequency_allocation_context.nif_required, true,
     '780 kHz (clear channel) should require NIF');
+  // Requirement vs completion vs result stay DISTINCT: the screening run
+  // never executes the §73.182 solver, so the study is NOT_RUN/NOT_EVALUATED.
+  assert.equal(out.frequency_allocation_context.nif_completion, 'NOT_RUN');
+  assert.equal(out.frequency_allocation_context.nif_result, 'NOT_EVALUATED');
 });
 
 test('frequency_allocation_context.nighttime_flexibility is valid enum', async () => {
@@ -4664,24 +4704,68 @@ test('candidate_set_recommendation.candidates covers all returned', async () => 
   }
 });
 
-test('candidate_set_recommendation each entry has priority and action', async () => {
+test('candidate_set_recommendation each entry has a canonical RecommendationLevel priority and action', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
-  const VALID_PRIORITIES = ['ADVANCE_IMMEDIATELY','ADVANCE_AFTER_REMEDY','HOLD','MONITOR'];
+  // Priorities are the canonical gate-ladder enum — the legacy
+  // 'ADVANCE_IMMEDIATELY' / 'HOLD' / 'MONITOR' vocabulary is gone.
+  const VALID_PRIORITIES = ['SCREEN_FURTHER', 'ADVANCE_TO_DESK_STUDY',
+    'ADVANCE_TO_FIELD_VALIDATION', 'ADVANCE_TO_PARCEL_NEGOTIATION',
+    'ENGINEERING_READY', 'FILING_READY', 'REJECT'];
   for (const e of out.candidate_set_recommendation.candidates) {
     assert.ok(VALID_PRIORITIES.includes(e.priority),
-      `priority "${e.priority}" must be valid for rank ${e.rank}`);
+      `priority "${e.priority}" must be a RecommendationLevel for rank ${e.rank}`);
     assert.ok(typeof e.action === 'string' && e.action.length > 0,
       `action must be a non-empty string for rank ${e.rank}`);
   }
 });
 
-test('candidate_set_recommendation n_advance_ready + n_need_remedy + n_hold <= candidates.length', async () => {
+test('candidate_set_recommendation priority equals candidate.canonical.recommendation.level', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  const byRank = new Map(out.candidates.map(c => [c.rank, c]));
+  for (const e of out.candidate_set_recommendation.candidates) {
+    const c = byRank.get(e.rank);
+    assert.ok(c, `csr rank ${e.rank} must exist among returned candidates`);
+    assert.equal(e.priority, c.canonical.recommendation.level,
+      `csr priority must be read from canonical.recommendation.level (rank ${e.rank})`);
+  }
+  // KAZM screening: the §73.182 NIF requirement is pending and engineering
+  // data is screening/LOW-grade → the ladder ceiling is ADVANCE_TO_DESK_STUDY.
+  for (const e of out.candidate_set_recommendation.candidates) {
+    assert.ok(['SCREEN_FURTHER', 'ADVANCE_TO_DESK_STUDY'].includes(e.priority),
+      `pending NIF must cap the ladder at ADVANCE_TO_DESK_STUDY; got ${e.priority}`);
+  }
+});
+
+test('candidate_set_recommendation uses the tie label instead of ranking language when tied', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
   const csr = out.candidate_set_recommendation;
-  const total = csr.n_advance_ready + csr.n_need_remedy + csr.n_hold
-    + (csr.candidates.filter(e => e.priority === 'MONITOR').length);
-  assert.equal(total, csr.candidates.length,
-    `priority counts must sum to candidates.length`);
+  const byRank = new Map(out.candidates.map(c => [c.rank, c]));
+  for (const e of csr.candidates) {
+    const c = byRank.get(e.rank);
+    assert.equal(e.tied_within_model_precision, c.tied_within_model_precision,
+      `csr tie flag must mirror the candidate (rank ${e.rank})`);
+    if (e.tied_within_model_precision === true) {
+      assert.ok(e.action.includes('Tied at current screening resolution'),
+        `tied candidate's action must carry the canonical tie label (rank ${e.rank}); got: "${e.action}"`);
+    }
+  }
+  // If the primary itself is tied, the overall guidance must say so.
+  const primary = csr.candidates.find(e => e.rank === csr.primary_recommended_rank);
+  if (primary?.tied_within_model_precision === true) {
+    assert.ok(csr.overall_guidance.startsWith('Tied at current screening resolution'),
+      `overall_guidance must lead with the tie label; got: "${csr.overall_guidance}"`);
+  }
+});
+
+test('candidate_set_recommendation level counts sum to candidates.length', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  const csr = out.candidate_set_recommendation;
+  // advance (any ladder level above SCREEN_FURTHER) + remedy (SCREEN_FURTHER)
+  // + hold (REJECT) partitions the entries.
+  assert.equal(csr.n_advance_ready + csr.n_need_remedy + csr.n_hold, csr.candidates.length,
+    `level counts must sum to candidates.length`);
+  const fromMap = Object.values(csr.count_by_level ?? {}).reduce((a, b) => a + b, 0);
+  assert.equal(fromMap, csr.candidates.length, 'count_by_level must cover every entry');
 });
 
 // ---------- tower_construction_timeline ----------
@@ -19089,4 +19173,91 @@ test('comparison table lcm_col_at_risk reflects COVERED for close candidates wit
   // At least some candidates should have a non-null lcm_col_at_risk
   const nonNull = out.candidate_comparison_table.filter(r => r.lcm_col_at_risk !== null);
   assert.ok(nonNull.length > 0, 'some candidates should have non-null lcm_col_at_risk');
+});
+
+// ---------- canonical candidate result (wave 3A single-source integration) ----------
+
+test('canonical: every candidate carries a validated canonical result; KAZM is internally consistent', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.canonical, `rank ${c.rank} must carry candidate.canonical`);
+    assert.equal(c.canonical.schema, 'canonical-candidate-result/1');
+    assert.equal(c.canonical.validation.consistent, true,
+      `KAZM candidate rank ${c.rank} must be internally consistent; violations: ` +
+      JSON.stringify(c.canonical.validation.violations));
+    assert.equal(c.internally_consistent, true,
+      `internally_consistent must be stamped true for a consistent candidate (rank ${c.rank})`);
+  }
+  // The validation gate emitted no blocker warnings for a consistent run.
+  assert.ok(!out.warnings.some(w => w.code === 'INTERNALLY_INCONSISTENT_CANDIDATE'),
+    'no INTERNALLY_INCONSISTENT_CANDIDATE warning on a consistent run');
+});
+
+test('canonical: blanket population crosses the boundary as a FRACTION (never percent)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  for (const c of out.candidates) {
+    const f = c.canonical.blanket.populationFraction?.value ?? null;
+    if (c.blanket_population_pct != null && f != null) {
+      // canonical fraction = optimizer percent ÷ 100 (0.01 === 1%), within
+      // the round2() applied to the echoed percent.
+      assert.ok(Math.abs(f * 100 - c.blanket_population_pct) < 0.01,
+        `fraction/percent boundary broken at rank ${c.rank}: fraction ${f} vs pct ${c.blanket_population_pct}`);
+      assert.ok(f >= 0 && f <= 1, `canonical blanket fraction must be in [0,1]; got ${f}`);
+    }
+    assert.equal(c.canonical.blanket.limitFraction, 0.01, 'canonical §73.24(g) limit is the FRACTION 0.01');
+  }
+});
+
+test('canonical: per-candidate nif_required/nif_completion/nif_result echo canonical.regulatory.nif', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    // 780 kHz Class D: NIF required; screening never runs the solver.
+    assert.equal(c.nif_required, true, `rank ${c.rank}`);
+    assert.equal(c.nif_completion, 'NOT_RUN', `rank ${c.rank}`);
+    assert.equal(c.nif_result, 'NOT_EVALUATED', `rank ${c.rank}`);
+    assert.equal(c.nif_required, c.canonical.regulatory.nif.required);
+    assert.equal(c.nif_completion, c.canonical.regulatory.nif.completion);
+    assert.equal(c.nif_result, c.canonical.regulatory.nif.result);
+  }
+});
+
+test('canonical scoring context: tie semantics recomputed from the rule, not copied', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  const all = out.candidates;
+  const baselineScore = out.current_site_baseline?.score ?? null;
+  // Recompute expectations directly from the canonical tie rule:
+  // tied ⇔ nearest OTHER candidate score is within the ±2 default precision;
+  // materially better ⇔ delta vs baseline > 2.
+  const scores = all.map(c => c.score);
+  for (const c of all) {
+    assert.equal(typeof c.tied_within_model_precision, 'boolean', `rank ${c.rank}`);
+    assert.ok(Number.isInteger(c.tie_group_size) && c.tie_group_size >= 1, `rank ${c.rank}`);
+    assert.ok(typeof c.scoring_display_label === 'string' && c.scoring_display_label.length > 0);
+    assert.equal(c.tied_within_model_precision, c.tie_group_size > 1,
+      `tied flag must agree with tie_group_size (rank ${c.rank})`);
+    if (baselineScore != null) {
+      assert.equal(c.materially_better_than_baseline, (c.score - baselineScore) > 2,
+        `materially_better_than_baseline must be delta > ±2 noise floor (rank ${c.rank}, delta ${c.score - baselineScore})`);
+    }
+    if (c.tied_within_model_precision) {
+      assert.equal(c.scoring_display_label, 'Tied at current screening resolution');
+    }
+    // Mirrored into the canonical result itself.
+    assert.ok(c.canonical.scoring, 'canonical.scoring must be attached post-ranking');
+    assert.equal(c.canonical.scoring.tiedWithinModelPrecision, c.tied_within_model_precision);
+    assert.equal(c.canonical.scoring.tieGroupSize, c.tie_group_size);
+    assert.equal(c.canonical.scoring.displayLabel, c.scoring_display_label);
+  }
+  // The full-return sample must include the returned candidates' scores
+  // (sanity that the tie window was computed over the whole field).
+  assert.ok(scores.length > 1);
+});
+
+test('canonical confidence: filing_readiness is false at screening with a night-study blocker', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const fr = out.optimization_confidence.filing_readiness;
+  assert.equal(fr.ready, false, 'screening output can never be filing-ready');
+  assert.ok(fr.blockers.some(b => /night/i.test(b)),
+    `filing_readiness blockers must include the pending nighttime study; got ${JSON.stringify(fr.blockers)}`);
 });

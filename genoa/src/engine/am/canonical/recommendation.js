@@ -47,6 +47,7 @@
 
 import { RECOMMENDATION_LEVELS, CONFIDENCE_TIERS } from './types.js';
 import { collectRegulatoryDecisions } from './confidence.js';
+import { TIE_LABEL } from './scoring.js';
 
 const SOURCE = 'canonical/recommendation';
 
@@ -65,6 +66,70 @@ const RANK = Object.freeze(Object.fromEntries(GATE_LADDER.map((l, i) => [l, i]))
 /** Ladder rank of a level (REJECT has no rank). */
 export function ladderRank(level) {
   return Object.prototype.hasOwnProperty.call(RANK, level) ? RANK[level] : null;
+}
+
+/** Advisory action sentences keyed by RecommendationLevel. */
+const ADVISORY_ACTIONS = Object.freeze({
+  [RECOMMENDATION_LEVELS.REJECT]:
+    'Reject — a required regulatory decision actually ran and returned a verified failure.',
+  [RECOMMENDATION_LEVELS.SCREEN_FURTHER]:
+    'Screen further — the candidate result does not yet support an advancement recommendation.',
+  [RECOMMENDATION_LEVELS.ADVANCE_TO_DESK_STUDY]:
+    'Advance to desk study — required regulatory decision(s) (e.g. the §73.182 nighttime NIF study) have not run; at most a desk study is supportable.',
+  [RECOMMENDATION_LEVELS.ADVANCE_TO_FIELD_VALIDATION]:
+    'Advance to field validation — engineering inputs are screening-grade; field measurements (soil resistivity, COL geometry) are the next gate.',
+  [RECOMMENDATION_LEVELS.ADVANCE_TO_PARCEL_NEGOTIATION]:
+    'Advance to parcel negotiation — engineering gates cleared; secure site control next.',
+  [RECOMMENDATION_LEVELS.ENGINEERING_READY]:
+    'Engineering-ready — resolve the remaining filing-readiness blockers before preparing the application.',
+  [RECOMMENDATION_LEVELS.FILING_READY]:
+    'Filing-ready — all required decisions ran, inputs are filing-grade, and validation passed.',
+});
+
+/**
+ * Map a canonical recommendation (plus the canonical scoring context and
+ * the invariant-validation verdict) to the advisory entry shape used by
+ * candidate_set_recommendation in siteOptimizer.js AND
+ * colocationOpportunities.js.  SINGLE shared mapping — callers must not
+ * fork this logic (docs/architecture-contradiction-origins.md §10).
+ *
+ * The returned `priority` is always a RecommendationLevel enum value.
+ * When the scoring context says the candidate is tied within model
+ * precision, the action leads with the canonical tie label instead of
+ * ranking language.
+ *
+ * @param {Object}   p
+ * @param {?Object}  [p.recommendation]        candidate.canonical.recommendation
+ * @param {?Object}  [p.scoring]               candidate.canonical.scoring
+ * @param {boolean}  [p.internallyConsistent]  candidate.internally_consistent
+ * @returns {{ priority: string, action: string, tied: boolean, rationale: ?string }}
+ */
+export function advisoryFromCanonical({
+  recommendation = null,
+  scoring = null,
+  internallyConsistent = true,
+} = {}) {
+  // An internally inconsistent candidate can never advance — mirror gate V.
+  const level = internallyConsistent === false
+    ? RECOMMENDATION_LEVELS.SCREEN_FURTHER
+    : (recommendation?.level ?? RECOMMENDATION_LEVELS.SCREEN_FURTHER);
+
+  const tied = scoring?.tiedWithinModelPrecision === true;
+
+  let action = internallyConsistent === false
+    ? 'Hold for engineering review — the candidate result is internally inconsistent; the recommendation is suppressed until the contradiction is resolved.'
+    : (ADVISORY_ACTIONS[level] ?? ADVISORY_ACTIONS[RECOMMENDATION_LEVELS.SCREEN_FURTHER]);
+
+  if (tied) {
+    action = `${TIE_LABEL} — ranking cannot separate this candidate from its peers; the gate ladder (${level}) governs, not rank order. ${action}`;
+  }
+
+  return {
+    priority: level,
+    action,
+    tied,
+    rationale: recommendation?.rationale ?? null,
+  };
 }
 
 /**

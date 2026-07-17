@@ -32,6 +32,10 @@
 import { fccAmDistanceKm, fccAmFieldMvmAtDistance } from '../curves/fcc/index.mjs';
 import { detectInternationalBorder } from '../regulatory/internationalBorderDetect.js';
 import { lookupM3Conductivity, lookupM3ZoneFallback, m3LoadStatus } from './m3.js';
+import { buildCanonicalCandidateResult } from './canonical/buildCanonicalCandidateResult.js';
+import { deriveScoringContext, TIE_LABEL } from './canonical/scoring.js';
+import { advisoryFromCanonical, ladderRank } from './canonical/recommendation.js';
+import { RECOMMENDATION_LEVELS } from './canonical/types.js';
 import {
   amAnnualRegFeeUsd,
   ANNUAL_REG_FEES_1153,
@@ -291,6 +295,28 @@ export async function runSiteOptimizer(body = {}){
     finalizeLabels(c, scoreCutoff);
   }
 
+  // ---- 4b. Canonical invariant-validation gate ----
+  // canonical.validation ran in production mode inside scoreCandidate.
+  // An internally inconsistent candidate is never rendered as actionable:
+  // it is forced to REVIEW_REQUIRED and carries a blocker warning.
+  for (const c of scored){
+    const report = c.canonical?.validation ?? null;
+    c.internally_consistent = report ? report.consistent === true : false;
+    if (report && report.consistent !== true){
+      c.status_category = 'REVIEW_REQUIRED';
+      if (Array.isArray(c.status_labels) && !c.status_labels.includes(LABEL_REVIEW_REQUIRED)){
+        c.status_labels.push(LABEL_REVIEW_REQUIRED);
+      }
+      warnings.push({
+        code: 'INTERNALLY_INCONSISTENT_CANDIDATE',
+        message: `Candidate at (${c.lat}, ${c.lon}) violates ${report.violations.length} internal invariant(s): ` +
+          `${report.violations.map((v) => v.invariant).join(', ')} — status forced to REVIEW_REQUIRED and ` +
+          'advancement recommendation suppressed (see candidate.canonical.validation).',
+        blocking: true
+      });
+    }
+  }
+
   // Re-rank after labeling and assign rank index + score percentile.
   const nScored = scored.length;
   scored.forEach((c, i) => {
@@ -382,10 +408,22 @@ export async function runSiteOptimizer(body = {}){
       : confDist.LOW > nScoredTotal * 0.7 ? [`${pctLow}% of candidates scored at LOW confidence — upgrade conductivity raster and/or COL polygon for more reliable ranking.`]
       : [])
   ];
+  // Canonical confidence axes (station-level facts are identical across
+  // candidates, so any candidate's canonical block is representative).
+  // `level` now EQUALS the canonical ranking_signal_quality tier: counting
+  // enabled goal LAYERS is gone, and adding a PROXY layer can no longer
+  // raise confidence (see src/engine/am/canonical/confidence.js).
+  const _canonConf = scored[0]?.canonical ?? null;
   const optimization_confidence = {
-    level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
+    level: _canonConf?.confidence?.rankingSignalQuality?.tier ?? 'LOW',
     contributing_layers: confidenceLayers,
+    n_contributing_layers: nLayers,
     per_candidate_confidence: confDist,
+    // The four canonical confidence axes — kept SEPARATE, never collapsed.
+    ranking_signal_quality:      _canonConf?.confidence?.rankingSignalQuality ?? null,
+    engineering_data_confidence: _canonConf?.confidence?.engineeringDataConfidence ?? null,
+    regulatory_completeness:     _canonConf?.confidence?.regulatoryCompleteness ?? null,
+    filing_readiness:            _canonConf?.filingReadiness ?? null,
     notes: confidenceNotes
   };
 
@@ -459,6 +497,27 @@ export async function runSiteOptimizer(body = {}){
     }
   }
 
+  // ---- Canonical scoring context — ties are first-class ----
+  // Computed AFTER ranking with the baseline score + all scores, then
+  // stamped both at the candidate top level and into canonical.scoring
+  // (deriveScoringContext is the single tie/delta authority; a delta
+  // inside the model noise floor is never called "better").
+  {
+    const allScores = scored.map((c) => c.score);
+    for (const c of scored){
+      const sc = deriveScoringContext({
+        candidateScore: c.score,
+        baselineScore: baseline ? baseline.score : null,
+        allScores,
+      });
+      c.tied_within_model_precision     = sc.tiedWithinModelPrecision;
+      c.tie_group_size                  = sc.tieGroupSize;
+      c.materially_better_than_baseline = sc.materiallyBetterThanBaseline;
+      c.scoring_display_label           = sc.displayLabel;
+      if (c.canonical) c.canonical.scoring = sc;
+    }
+  }
+
   // Stamp col_coverage_gap_pct on candidates that fall below the 80% hard floor.
   // Tells the engineer how much additional coverage is needed to clear §73.24(i).
   for (const c of scored){
@@ -508,16 +567,26 @@ export async function runSiteOptimizer(body = {}){
   const ASR_THRESHOLD_M = ASR_THRESHOLD_17_7.height_m;
   const isHighClass_top = /^[AB]$/i.test(fcc_class);
   const design_h_m_top  = round2(lambda_m * (isHighClass_top ? 0.625 : 0.375));
-  const asr_required_design = design_h_m_top > ASR_THRESHOLD_M;
+  // ASR requirement reads from the canonical §17.7 rule — ONE height basis
+  // (the selected design height), one comparator.  The λ/4-basis ASR answer
+  // is gone: it was the contradiction class where one response carried
+  // asr_registration_required_at_quarter_wave=false beside asr_required=true
+  // (docs/architecture-contradiction-origins.md §6).  Station-level facts
+  // are identical across candidates, so any candidate is representative.
+  const _canonAsr = scored[0]?.canonical?.regulatory?.asr ?? null;
+  const asr_required_design = _canonAsr
+    ? _canonAsr.required === true
+    : design_h_m_top > ASR_THRESHOLD_M;
   const tower_reference = {
     wavelength_m:            lambda_m,
     quarter_wave_m,
     half_wave_m,
     typical_range_m:         `${quarter_wave_m}–${half_wave_m}`,
     asr_threshold_m:         ASR_THRESHOLD_M,
-    asr_registration_required_at_quarter_wave: quarter_wave_m > ASR_THRESHOLD_M,
     asr_registration_required_at_design_height: asr_required_design,
-    note: `AM Class ${fcc_class} planning height ${isHighClass_top ? '5/8λ' : '3/8λ'} = ${design_h_m_top} m at ${frequency_khz} kHz. Design height ${asr_required_design ? 'EXCEEDS' : 'is below'} the §17.7 ASR 200-ft (60.96 m) threshold.`
+    asr_rule_state:          _canonAsr?.state ?? null,
+    asr_rule_completion:     _canonAsr?.completion ?? null,
+    note: `AM Class ${fcc_class} planning height ${isHighClass_top ? '5/8λ' : '3/8λ'} = ${design_h_m_top} m at ${frequency_khz} kHz. Design height ${asr_required_design ? 'EXCEEDS' : 'is below'} the §17.7 ASR 200-ft (60.96 m) threshold (canonical.regulatory.asr).`
   };
 
   // ---- 9. Top-candidates summary ----
@@ -1883,10 +1952,19 @@ export async function runSiteOptimizer(body = {}){
       ? `${frequency_khz} kHz is a regional channel. Class B stations share the frequency with §73.37 co-channel protections; no single dominant station exists.`
       : `${frequency_khz} kHz is a local channel. Class C stations operate at 0.25–1 kW (§73.21(c)) unlimited time with simplified §73.37 separations.`;
 
-    // NIF obligation
-    const nif_obligation = isLocal
+    // §73.182 NIF requirement — read from canonical.regulatory.nif (the ONE
+    // predicate: required for all classes except Class C on a §73.27 local
+    // channel), replacing the local `!isLocal` re-derivation.  Station-level
+    // facts are identical across candidates, so any candidate is
+    // representative.
+    const _canonNif = scored[0]?.canonical?.regulatory?.nif ?? null;
+    const _nifRequired = _canonNif ? _canonNif.required : !isLocal;
+
+    // NIF obligation (text keyed off the canonical requirement).
+    const nif_obligation = _nifRequired === false
       ? 'NOT REQUIRED'
       : isClear ? 'REQUIRED — full Class A skywave NIF protection study (§73.182). High complexity; typically 6–12 consultant-weeks.'
+      : isLocal ? 'REQUIRED — §73.182 nighttime interference study (local channel, non-Class-C station).'
       : 'REQUIRED — Class B skywave NIF protection study (§73.182). Moderate complexity; typically 3–8 consultant-weeks.';
 
     // Power ceiling at this class
@@ -1922,7 +2000,9 @@ export async function runSiteOptimizer(body = {}){
       channel_class_label,
       channel_class_cfr,
       fcc_class,
-      nif_required: !isLocal,
+      nif_required:   _nifRequired,
+      nif_completion: _canonNif?.completion ?? null,
+      nif_result:     _canonNif?.result ?? null,
       nighttime_flexibility: isLocal ? 'HIGH' : isClear ? 'LOW' : 'MODERATE',
       adj_clear_channel_frequencies: adjChannels.length > 0 ? adjChannels : null,
       implications
@@ -2069,76 +2149,69 @@ export async function runSiteOptimizer(body = {}){
   // ---- 20. Candidate set recommendation ----
   // Response-level synthesized advisory on which candidates to advance and in what order.
   // Weighs score, gate verdict, cost tier, geographic diversity, and skywave risk.
+  // Priorities are the canonical RecommendationLevel gate-ladder enum
+  // (canonical/recommendation.js) — 'ADVANCE_IMMEDIATELY' style labels are
+  // gone: no advancement claim is made that the canonical gates (validation,
+  // required decisions, engineering-data tier, parcel data, filing
+  // readiness) do not support.
   const candidate_set_recommendation = (() => {
     const top5 = returned.slice(0, 5);
     if (!top5.length) return null;
 
-    // Build per-candidate recommendation entries.
+    // Build per-candidate recommendation entries from the canonical result.
     const entries = top5.map(c => {
-      const gateVerdict  = c.regulatory_gate_summary?.overall_verdict ?? 'UNKNOWN';
-      const gateFails    = c.regulatory_gate_summary?.fail_count ?? 0;
-      const costTier     = c.permit_and_engineering_cost_estimate?.cost_tier ?? null;
-      const skyAdvisory  = c.skywave_protection_advisory?.advisory_level ?? 'UNKNOWN';
-      const geoQ         = c.bearing_deg != null ? (['NE','SE','SW','NW'][Math.floor((((c.bearing_deg % 360) + 360) % 360) / 90)]) : null;
-      const colPct       = c.col_coverage_pct != null ? Math.round(c.col_coverage_pct * 100) : null;
-      const isProm       = c.status_category === 'PROMISING';
-      const isRec        = c.status_category?.startsWith('RECOVERABLE');
-      const isNonComp    = c.status_category === 'NON_COMPLIANT';
-
-      let action;
-      let priority;
-      if (gateFails > 0 || isNonComp) {
-        action   = `Hold — ${gateFails} gate failure(s) require engineering remediation before advancing. ${c.compliance_pathway?.recommended_action ?? 'Commission DA or power-increase study.'}`;
-        priority = 'HOLD';
-      } else if (isProm && gateVerdict === 'CONDITIONAL') {
-        action   = `Advance to full §73.182 NIF study + parcel investigation. Commission soil resistivity survey. ${skyAdvisory === 'CRITICAL' || skyAdvisory === 'HIGH' ? 'DA-N study required for nighttime operation.' : ''}`;
-        priority = 'ADVANCE_IMMEDIATELY';
-      } else if (isProm) {
-        action   = `Advance to NIF study + parcel investigation.`;
-        priority = 'ADVANCE_IMMEDIATELY';
-      } else if (isRec) {
-        action   = `Advance after resolving recovery path: ${c.compliance_pathway?.recommended_action ?? 'see compliance_pathway'}. Then commission NIF study.`;
-        priority = 'ADVANCE_AFTER_REMEDY';
-      } else {
-        action   = `Monitor — viable fallback site. Keep in reserve pending outcomes at higher-priority candidates.`;
-        priority = 'MONITOR';
-      }
-
+      const adv = advisoryFromCanonical({
+        recommendation: c.canonical?.recommendation ?? null,
+        scoring: c.canonical?.scoring ?? null,
+        internallyConsistent: c.internally_consistent !== false,
+      });
       return {
         rank: c.rank,
         status: c.status_category,
         score: c.score,
-        col_pct: colPct,
-        gate_verdict: gateVerdict,
-        gate_fail_count: gateFails,
-        cost_tier: costTier,
-        skywave_advisory: skyAdvisory,
-        quadrant: geoQ,
-        action,
-        priority
+        col_pct: c.col_coverage_pct != null ? Math.round(c.col_coverage_pct * 100) : null,
+        gate_verdict: c.regulatory_gate_summary?.overall_verdict ?? 'UNKNOWN',
+        gate_fail_count: c.regulatory_gate_summary?.fail_count ?? 0,
+        cost_tier: c.permit_and_engineering_cost_estimate?.cost_tier ?? null,
+        skywave_advisory: c.skywave_protection_advisory?.advisory_level ?? 'UNKNOWN',
+        quadrant: c.bearing_deg != null ? (['NE','SE','SW','NW'][Math.floor((((c.bearing_deg % 360) + 360) % 360) / 90)]) : null,
+        tied_within_model_precision: c.tied_within_model_precision ?? null,
+        action: adv.action,
+        priority: adv.priority   // canonical RecommendationLevel enum value
       };
     });
 
-    // Identify the primary recommended site.
-    const primary = entries.find(e => e.priority === 'ADVANCE_IMMEDIATELY') ?? entries[0];
+    // Primary = the entry with the highest canonical gate-ladder rank
+    // (score order breaks exact ladder ties since entries are score-sorted).
+    const primary = entries.reduce((best, e) =>
+      (ladderRank(e.priority) ?? -1) > (ladderRank(best.priority) ?? -1) ? e : best,
+      entries[0]);
 
-    // Count by priority tier.
-    const countByPriority = {};
+    // Count by canonical level.
+    const count_by_level = {};
     for (const e of entries) {
-      countByPriority[e.priority] = (countByPriority[e.priority] ?? 0) + 1;
+      count_by_level[e.priority] = (count_by_level[e.priority] ?? 0) + 1;
     }
+    // Aggregates: advanceable = any ladder level above SCREEN_FURTHER;
+    // remedy = SCREEN_FURTHER (more screening/remediation before any
+    // advancement); hold = REJECT (verified hard failure).
+    const n_advance_ready = entries.filter(e =>
+      (ladderRank(e.priority) ?? 0) > ladderRank(RECOMMENDATION_LEVELS.SCREEN_FURTHER)).length;
+    const n_need_remedy   = count_by_level[RECOMMENDATION_LEVELS.SCREEN_FURTHER] ?? 0;
+    const n_hold          = count_by_level[RECOMMENDATION_LEVELS.REJECT] ?? 0;
 
-    const n_advance_ready = countByPriority.ADVANCE_IMMEDIATELY ?? 0;
-    const n_need_remedy   = countByPriority.ADVANCE_AFTER_REMEDY ?? 0;
-    const n_hold          = countByPriority.HOLD ?? 0;
-
-    const overall_guidance = n_advance_ready >= 2
-      ? `${n_advance_ready} candidates are ready to advance. Initiate NIF studies at Rank ${entries.filter(e => e.priority === 'ADVANCE_IMMEDIATELY').map(e => e.rank).join(' and ')} in parallel to minimize timeline.`
-      : n_advance_ready === 1
-      ? `1 candidate (Rank ${primary.rank}) is ready to advance. Initiate NIF study and parcel investigation immediately.`
-      : n_need_remedy > 0
-      ? `No candidates are immediately advanceable. ${n_need_remedy} require engineering remediation first — prioritize Rank 1 remedy.`
-      : 'No viable candidates identified at this search radius and power level — expand radius or increase TPO.';
+    // When the canonical scoring context says the primary is tied within
+    // model precision, the guidance must say so — never ranking language.
+    const primaryTied = entries.find(e => e.rank === primary.rank)?.tied_within_model_precision === true;
+    const overall_guidance = primaryTied
+      ? `${TIE_LABEL} — the top candidates cannot be ranked against each other at screening precision. ` +
+        `Apply the canonical gate ladder instead of rank order: highest supportable level is ${primary.priority}.`
+      : n_advance_ready >= 1
+      ? `${n_advance_ready} candidate(s) clear the canonical gate ladder above SCREEN_FURTHER. ` +
+        `Highest supportable level: ${primary.priority} (Rank ${primary.rank}).`
+      : n_hold > 0
+      ? `${n_hold} candidate(s) carry a verified hard failure (REJECT). Remaining candidates require further screening before any advancement.`
+      : 'No candidate clears the canonical gate ladder above SCREEN_FURTHER — resolve pending required decisions and data-quality blockers before advancing any site.';
 
     return {
       overall_guidance,
@@ -2146,8 +2219,10 @@ export async function runSiteOptimizer(body = {}){
       n_advance_ready,
       n_need_remedy,
       n_hold,
+      count_by_level,
       candidates: entries,
-      note: 'This recommendation is a SCREENING-GRADE advisory based on automated scoring. A licensed broadcast engineer and FCC counsel must review before any site commitment or filing.'
+      note: 'Priorities are the canonical recommendation gate-ladder levels (candidate.canonical.recommendation). ' +
+        'This is a SCREENING-GRADE advisory: a licensed broadcast engineer and FCC counsel must review before any site commitment or filing.'
     };
   })();
 
@@ -2158,10 +2233,10 @@ export async function runSiteOptimizer(body = {}){
   const tower_construction_timeline = (() => {
     const isClear    = chanClass === 'clear_channel';
     const isRegional = chanClass === 'regional';
-    const qwM_tct      = (300000 / frequency_khz) / 4;  // λ/4 reference
-    const isHighCls_tct = /^[AB]$/i.test(fcc_class);
-    const designH_tct   = (300000 / frequency_khz) * (isHighCls_tct ? 0.625 : 0.375);
-    const asrReqd      = designH_tct > ASR_THRESHOLD_M;
+    const designH_tct   = (300000 / frequency_khz) * (/^[AB]$/i.test(fcc_class) ? 0.625 : 0.375);
+    // Same §17.7 answer everywhere: read the canonical-backed top-level flag
+    // instead of re-deriving a fourth local ASR trigger.
+    const asrReqd      = asr_required_design;
     const hasTreaty  = returned.some(c => !!c.treaty_zone);
     const needsDA    = returned.some(c => c.directional_antenna_study_guide?.recommended === true);
     const needsFullDA = returned.some(c => c.directional_antenna_study_guide?.study_type === 'FULL_DA_STUDY_DAY_NIGHT');
@@ -3202,6 +3277,101 @@ async function scoreCandidate(pt, ctx, warnings){
     treaty_zone, flags, score: score_final, score_breakdown
   });
 
+  // ── Canonical candidate result — the SINGLE SOURCE OF TRUTH ─────────
+  // (src/engine/am/canonical/; docs/architecture-contradiction-origins.md.)
+  // Every top-level regulatory / confidence / recommendation field on this
+  // candidate is an echo of `canonical` — never re-derive them locally.
+  //
+  // Conductivity provenance: tier follows ground_sigma_source /
+  // ground_sigma_filing_grade (GeoTIFF raster → FILING_GRADE, M3 zone
+  // table → SCREENING, hard default 4 mS/m → LOW).
+  const sigma_source_tier = _m3?.available
+    ? (ground_sigma_filing_grade === 'filing' ? 'FILING_GRADE' : 'SCREENING')
+    : 'LOW';
+
+  // UNIT BOUNDARY (§73.24(g)): the optimizer computes blanket population
+  // as a PERCENT (1.0 === 1%); the canonical pipeline carries a FRACTION
+  // (0.01 === 1%).  Convert exactly once, HERE, by dividing by 100 — the
+  // canonical result carries the fraction only.  Out-of-range percents
+  // (defensive) are passed as null so the rule reports NOT_EVALUATED
+  // instead of leaking a bad unit downstream.
+  const blanket_population_fraction =
+    (blanket_population_pct != null
+      && blanket_population_pct >= 0 && blanket_population_pct <= 100)
+      ? blanket_population_pct / 100
+      : null;
+
+  // Ranking layers for the canonical confidence axes.  Proxy layers are
+  // declared as proxies so they can NEVER raise rankingSignalQuality
+  // (canonical/confidence.js).  Cross-layer agreement is not measured by
+  // this screening run, so agreesWithTopChoice is null (never guessed).
+  const ranking_layers = [];
+  if (goals.maximize_col_coverage) ranking_layers.push({
+    name: 'col_coverage', isProxy: !community_of_license_polygon, agreesWithTopChoice: null });
+  if (goals.maximize_population) ranking_layers.push({
+    name: 'population_density_proxy', isProxy: true, agreesWithTopChoice: null });
+  if (goals.minimize_blanket_population) ranking_layers.push({
+    name: 'blanket_population_proxy', isProxy: true, agreesWithTopChoice: null });
+  if (goals.prefer_high_conductivity) ranking_layers.push({
+    name: 'conductivity', isProxy: ground_sigma_filing_grade !== 'filing', agreesWithTopChoice: null });
+  if (goals.avoid_wildfire_risk) ranking_layers.push({
+    name: 'wildfire_region_proxy', isProxy: true, agreesWithTopChoice: null });
+  if (goals.minimize_int_treaty_zone) ranking_layers.push({
+    name: 'treaty_zone_distance', isProxy: false, agreesWithTopChoice: null });
+
+  const canonical = buildCanonicalCandidateResult({
+    station: {
+      callsign: ctx.callsign ?? null,
+      frequency_khz,
+      fcc_class,
+      tpo_kw,
+      licensed_pattern_mode: pattern_mode,
+      latitude: current_site.lat,
+      longitude: current_site.lon,
+    },
+    candidate: {
+      latitude: pt.lat,
+      longitude: pt.lon,
+      distance_from_current_km: pt.distance_from_current_km ?? null,
+      land_use_class,
+      col_polygon_present: !!community_of_license_polygon,
+      parcel_data_present: null,    // parcel / zoning availability not checked at screening
+      near_airport_trigger: null,   // §17.7(c) airport prong not checked at screening
+    },
+    propagation: {
+      coverage_fraction: coverage_pct == null ? null : {
+        value: coverage_pct,
+        unit: 'fraction',
+        // COL geometry basis carries through from coverage_computed_from.
+        source: `siteOptimizer/scoreCandidate: ${coverage_computed_from}`,
+        confidence: community_of_license_polygon ? 'ENGINEERING_GRADE' : 'LOW',
+        assumptions: [`COL geometry basis: ${coverage_computed_from}`],
+      },
+      blanket_population_fraction: blanket_population_fraction == null ? null : {
+        value: blanket_population_fraction,
+        unit: 'fraction',
+        source: 'siteOptimizer/scoreCandidate: density-proxy (screening)',
+        confidence: 'LOW',
+        assumptions: ['converted from the optimizer PERCENT at the canonical boundary (÷100)'],
+      },
+      blanket_population_basis: 'density-proxy (screening)',
+      contour_distances_km: Object.fromEntries(groundwave_contour_table.map(
+        (r) => [`mv${String(r.mvm).replace('.', '_')}`, r.distance_km])),
+      sigma_msm,
+      sigma_source_tier,             // conductivity provenance (ground_sigma_source)
+      population_basis_tier: 'LOW',  // population basis: density-proxy (screening)
+      night_study_present: false,    // screening never runs the §73.182 solver
+      night_study_result: null,
+      ranking_layers,
+    },
+    options: {
+      groundScenarioKey: 'STANDARD_120',
+      screeningAssumptionMode: pattern_mode,
+      towersCount: 1,
+      validationMode: 'production',
+    },
+  });
+
   // v1 contract fields
   const candidate_id = `${round6(pt.lat)}_${round6(pt.lon)}`.replace(/\./g, 'd');
   const candidate_type = pt.candidate_type ?? 'grid';
@@ -3226,11 +3396,19 @@ async function scoreCandidate(pt, ctx, warnings){
     bearing_deg:         pt.bearing_deg ?? null,
     cardinal_direction:  cardinalDir(pt.bearing_deg ?? null),
     score: score_final,
+    // Canonical candidate result — single source of truth for regulatory,
+    // confidence, recommendation, and validation facts on this candidate.
+    canonical,
     candidate_narrative_summary,
     signal_propagation_profile,
     col_coverage_pct:        coverage_pct == null ? null : round2(coverage_pct),
     principal_community_5mvm_km,
     nif_status,
+    // §73.182 NIF requirement — echoes of canonical.regulatory.nif (the ONE
+    // predicate), replacing the divergent per-guide NIF predicates.
+    nif_required:   canonical.regulatory.nif.required,
+    nif_completion: canonical.regulatory.nif.completion,
+    nif_result:     canonical.regulatory.nif.result,
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
     estimated_daytime_population_served,
     population_reach_bands,

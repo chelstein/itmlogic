@@ -25,7 +25,7 @@ const GOAL_LABELS = {
   confidence_penalty: 'Confidence ↓'
 };
 
-export default function ScoreBreakdownChart({ breakdown, totalScore, baselineBreakdown, baselineTotalScore, rawComponents }){
+export default function ScoreBreakdownChart({ breakdown, totalScore, totalScoreDisplay = null, baselineBreakdown, baselineTotalScore, rawComponents }){
   const entries = Object.entries(breakdown || {});
   if (entries.length === 0){
     return (
@@ -108,7 +108,7 @@ export default function ScoreBreakdownChart({ breakdown, totalScore, baselineBre
             </span>
           )}
           <span className="font-mono text-[11px] text-textDim">
-            total <span className="text-cream">{(Number(totalScore) || 0).toFixed(1)}</span>
+            total <span className="text-cream">{totalScoreDisplay ?? (Number(totalScore) || 0).toFixed(1)}</span>
           </span>
         </div>
       </div>

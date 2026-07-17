@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import RackPanel from '../RackPanel.jsx';
 import StatusChip from './StatusChip.jsx';
 import { primaryStatus, rankColor } from './statusUtil.js';
+import { stateColor } from './format.js';
 
 // CandidateTable — sortable ranked-candidates ledger.  Click a column
 // header to sort; click a row to open the detail drawer.  Renders a
@@ -358,8 +359,9 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                     </td>
                     <td
                       className="px-2 py-1.5 text-right"
-                      style={{ color: c.blanket_population_pct > 1 ? '#ff5a5a' : c.blanket_population_pct > 0.5 ? '#ffb347' : '#63d471' }}
-                      title={c.blanket_population_pct != null ? `${c.blanket_population_pct.toFixed(3)}% (§73.24(g) limit: 1%)` : ''}
+                      style={{ /* engine's §73.24(g) risk tier — no UI-side threshold re-derivation */
+                        color: stateColor(c.blanket_pop_risk) }}
+                      title={c.blanket_population_pct != null ? `${c.blanket_population_pct.toFixed(3)}% (§73.24(g) limit: 1%)${c.blanket_pop_risk ? ` · risk: ${c.blanket_pop_risk}` : ''}` : ''}
                     >
                       {fmt('blanket_population_pct', c.blanket_population_pct)}
                     </td>
