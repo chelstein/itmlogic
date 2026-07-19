@@ -578,6 +578,24 @@ export async function runSiteOptimizer(body = {}){
   const asr_required_design = _canonAsr
     ? _canonAsr.required === true
     : design_h_m_top > ASR_THRESHOLD_M;
+  // Station-level canonical NIF decision (canonical-consistency-audit-
+  // followup, Phase 2 item 1) — reused by buildProtectionAdvisory(),
+  // buildProtectionRequirements(), buildRegulatoryTimeline(), and
+  // buildForm301Checklist() below instead of each independently
+  // re-deriving "is NIF required" from channel_class/fcc_class (which
+  // missed the canonical rule's Class-C-on-local-channel exemption nuance
+  // — every OTHER class on a local channel still requires NIF).  Station-
+  // level facts are identical across candidates, so any candidate's
+  // canonical.regulatory.nif is representative.
+  const _canonNifStation = scored[0]?.canonical?.regulatory?.nif ?? null;
+  // Station-level canonical proof-of-performance facts (candidate.
+  // canonical.proof, canonical/rules/proofOfPerformance.js) — reused by
+  // buildForm301Checklist()'s ANTENNA_STUDY item below instead of the
+  // hardcoded pre-audit text ("72 radials at 5° increments" for DA / "8
+  // radials at 45° intervals" for NDA), which conflated the §73.150
+  // pattern-table azimuth count with §73.151(a)/§73.186(a)(1) measurement
+  // radial counts (canonical-consistency-audit-followup, Phase 2 item 1).
+  const _canonProofStation = scored[0]?.canonical?.proof ?? null;
   const tower_reference = {
     wavelength_m:            lambda_m,
     quarter_wave_m,
@@ -598,7 +616,7 @@ export async function runSiteOptimizer(body = {}){
   // Human-readable §73.182 skywave and protection class guidance for the operator.
   const chanClass = frequencyChannelClass(frequency_khz);
   const { protection_class_advisory, skywave_risk_level } = buildProtectionAdvisory({
-    fcc_class, frequency_khz, channel_class: chanClass, pattern_mode
+    fcc_class, frequency_khz, channel_class: chanClass, pattern_mode, nif: _canonNifStation
   });
 
   // ---- 10b. Enrich nif_status with station-level skywave risk ----
@@ -638,7 +656,9 @@ export async function runSiteOptimizer(body = {}){
     // that depend on whether ANY promising candidate triggers a given requirement.
     has_treaty_candidates: scored.some(c => !!c.treaty_zone),
     any_poor_conductivity:  scored.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
-    any_zone_table_sigma:   scored.some(c => c.ground_sigma_filing_grade !== 'filing')
+    any_zone_table_sigma:   scored.some(c => c.ground_sigma_filing_grade !== 'filing'),
+    nif: _canonNifStation,
+    proof: _canonProofStation
   });
 
   // ---- 13. Candidate shortlist — top 3 PROMISING (or best available) candidates ----
@@ -2570,7 +2590,7 @@ export async function runSiteOptimizer(body = {}){
     recommended_actions,
     form_301_checklist,
     protection_requirements: buildProtectionRequirements({
-      fcc_class, frequency_khz, channel_class: chanClass
+      fcc_class, frequency_khz, channel_class: chanClass, nif: _canonNifStation
     }),
     minimum_spacing_reference: buildMinimumSpacingReference({ fcc_class, channel_class: chanClass }),
     regulatory_timeline_estimate: buildRegulatoryTimeline({
@@ -2578,7 +2598,8 @@ export async function runSiteOptimizer(body = {}){
       asr_required: asr_required_design,
       has_treaty_candidates: returned.some(c => !!c.treaty_zone),
       any_poor_sigma: returned.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
-      n_promising: candidate_count_by_status.PROMISING ?? 0
+      n_promising: candidate_count_by_status.PROMISING ?? 0,
+      nif: _canonNifStation
     }),
     tower_reference,
     inputs_echo: {
@@ -33582,11 +33603,19 @@ function buildMinimumSpacingReference({ fcc_class, channel_class }){
 // Weeks are realistic ranges based on FCC processing times (2022-2025 data) and
 // typical consulting/construction durations.  Not a legal guarantee.
 function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
-  asr_required, has_treaty_candidates, any_poor_sigma, n_promising }){
+  asr_required, has_treaty_candidates, any_poor_sigma, n_promising, nif = null }){
 
   const isClear = channel_class === 'clear_channel';
   const isLocal = channel_class === 'local';
   const highNif  = isClear || skywave_risk_level === 'HIGH';
+  // NIF requirement (whether the NIF_STUDY phase blocks at all) is read
+  // from canonical.regulatory.nif instead of !isLocal, which missed that
+  // non-Class-C stations on a local channel still require NIF
+  // (canonical-consistency-audit-followup, Phase 2 item 1). highNif above
+  // stays a separate COMPLEXITY signal (clear-channel/HIGH-skywave-risk
+  // studies take longer than a straightforward regional/local one) — it
+  // is not a duplicate of the requirement predicate.
+  const nifRequired = nif ? nif.required === true : !isLocal;
 
   const phases = [
     {
@@ -33615,13 +33644,15 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
     {
       id:    'NIF_STUDY',
       label: `§73.182 NIF protection study`,
-      weeks: highNif ? '8–20' : isLocal ? '0–2' : '4–10',
-      description: highNif
+      weeks: !nifRequired ? '0–2' : highNif ? '8–20' : '4–10',
+      description: !nifRequired
+        ? 'Local channel Class C — §73.182(o) exemption applies; NIF not required.'
+        : highNif
         ? `Clear-channel NIF study — complex skywave modeling required. Budget 8–20 weeks for consultant.`
         : isLocal
-        ? 'Local channel — §73.182 NIF not required.'
+        ? `Local channel — the §73.182(o) exemption is Class-C-only; NIF study still required for Class ${fcc_class}. Budget 4–10 weeks.`
         : `Regional channel NIF study — moderate complexity. Budget 4–10 weeks.`,
-      blocking: !isLocal
+      blocking: nifRequired
     },
     {
       id:    'TREATY_COORD',
@@ -33678,15 +33709,43 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
 }
 
 // Protection class advisory — §73.182 skywave risk guidance based on the
-// station's FCC class and channel type.  Returns { protection_class_advisory, skywave_risk_level }.
-function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, pattern_mode }){
+// station's FCC class and channel type.  Returns
+// { protection_class_advisory, skywave_risk_level, nif_required }.
+//
+// nif_required is read from canonical.regulatory.nif (candidate.canonical,
+// station-level — see _canonNifStation) instead of re-derived from
+// channel_class alone, which missed the canonical rule's nuance: the
+// §73.182(o) local-channel NIF exemption applies ONLY to Class C stations
+// — a Class A/B/D station on a local channel still requires NIF, even
+// though its skywave RISK LEVEL (a separate, qualitative propagation-risk
+// concept) is LOW at typical local-channel power (canonical-consistency-
+// audit-followup, Phase 2 item 1).
+function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, pattern_mode, nif = null }){
   const isDa = /DA/i.test(pattern_mode);
-  if (channel_class === 'local'){
+  const nifRequired = nif ? nif.required === true : (channel_class !== 'local');
+  if (channel_class === 'local' && !nifRequired){
     return {
       skywave_risk_level: 'LOW',
+      nif_required: false,
       protection_class_advisory:
         `Class ${fcc_class} on local channel (${frequency_khz} kHz, §73.27). ` +
-        `Maximum 250 W ERP. Skywave (§73.182) nighttime interference is minimal at this power level. ` +
+        `Maximum 250 W ERP. §73.182(o) local-channel exemption applies to Class C — no individual ` +
+        `nighttime interference showing (NIF) is required. ` +
+        `Focus engineering effort on §73.24(i) principal-community 5 mV/m daytime coverage.`
+    };
+  }
+  if (channel_class === 'local'){
+    // Non-Class-C station on a local channel: the §73.182(o) exemption
+    // does NOT apply, so canonical.regulatory.nif.required is true even
+    // though skywave risk is still low at typical local-channel power.
+    return {
+      skywave_risk_level: 'LOW',
+      nif_required: true,
+      protection_class_advisory:
+        `Class ${fcc_class} on local channel (${frequency_khz} kHz, §73.27). ` +
+        `Skywave interference risk is low at typical local-channel power, but the §73.182(o) local-` +
+        `channel NIF exemption applies only to Class C — a §73.182 nighttime interference showing ` +
+        `is still required for Class ${fcc_class}. ` +
         `Focus engineering effort on §73.24(i) principal-community 5 mV/m daytime coverage.`
     };
   }
@@ -33694,6 +33753,7 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
     if (fcc_class === 'A'){
       return {
         skywave_risk_level: 'HIGH',
+        nif_required: nifRequired,
         protection_class_advisory:
           `Class A dominant station on clear channel ${frequency_khz} kHz (§73.25). ` +
           `A full §73.182 nighttime skywave NIF contour study is required at the new site — ` +
@@ -33705,6 +33765,7 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
     }
     return {
       skywave_risk_level: 'HIGH',
+      nif_required: nifRequired,
       protection_class_advisory:
         `Class ${fcc_class} secondary station on clear channel ${frequency_khz} kHz (§73.25). ` +
         `The dominant Class A retains protected skywave status; your new site must NOT increase ` +
@@ -33716,6 +33777,7 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
   // Regional channel.
   return {
     skywave_risk_level: 'MODERATE',
+    nif_required: nifRequired,
     protection_class_advisory:
       `Class ${fcc_class} on regional channel ${frequency_khz} kHz (§73.26). ` +
       `Standard §73.182 nighttime interference screening required to show no increase in ` +
@@ -33728,7 +33790,7 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
 // Protection requirements summary — §73.182 co-channel / adjacent-channel rules.
 // Returns a structured object describing what protection the station receives
 // and what it must demonstrate before filing.
-function buildProtectionRequirements({ fcc_class, frequency_khz, channel_class }){
+function buildProtectionRequirements({ fcc_class, frequency_khz, channel_class, nif = null }){
   const isLocal = channel_class === 'local';
   const isClear = channel_class === 'clear_channel';
   const isRegional = channel_class === 'regional';
@@ -33793,10 +33855,16 @@ function buildProtectionRequirements({ fcc_class, frequency_khz, channel_class }
     });
   }
 
-  // NIF study requirement.
-  const nif_study_required = !isLocal;
-  const nif_study_notes = isLocal
-    ? 'Local channel stations do not typically require a §73.182 NIF study.'
+  // NIF study requirement — read from canonical.regulatory.nif (the ONE
+  // predicate: required for all classes except Class C on a §73.27 local
+  // channel) instead of !isLocal, which missed that non-Class-C stations
+  // on a local channel still require NIF (canonical-consistency-audit-
+  // followup, Phase 2 item 1).
+  const nif_study_required = nif ? nif.required === true : !isLocal;
+  const nif_study_notes = nif_study_required === false
+    ? 'Local channel Class C stations do not require a §73.182 NIF study (§73.182(o) exemption).'
+    : isLocal
+    ? `Local channel — the §73.182(o) exemption applies only to Class C, so a §73.182 NIF study is still required for Class ${fcc_class}.`
     : isClear && isClassA
     ? 'Full §73.182 NIF contour study required at new site to demonstrate dominant 0.5 mV/m skywave coverage is maintained.'
     : isClear
@@ -33988,7 +34056,7 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
   channel_class, skywave_risk_level, asr_registration_required,
   community_of_license_polygon, col_centroid,
   has_treaty_candidates = false, any_poor_conductivity = false,
-  any_zone_table_sigma = false }){
+  any_zone_table_sigma = false, nif = null, proof = null }){
   const items = [];
   const isDa = /DA/i.test(pattern_mode);
 
@@ -34000,14 +34068,26 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
     note: null
   });
 
+  // Proof-of-performance radial figures are read from canonical.proof
+  // (canonical/rules/proofOfPerformance.js) instead of hardcoded text —
+  // the pre-audit text here conflated the §73.150 72-azimuth PATTERN
+  // TABLE with §73.151(a)/§73.186(a)(1) MEASUREMENT radial counts, and
+  // stated an NDA proof radial count ("8 radials at 45° intervals") that
+  // does not match either rule (canonical-consistency-audit-followup,
+  // Phase 2 item 1).
+  const proofNote = proof && proof.proofType === 'DA_FULL_PROOF'
+    ? `§73.150(a) DA pattern required: theoretical horizontal radiation pattern table (§73.150), plus a full directional proof of performance — field-strength measurements on ${proof.radialCount}–12 radials per §73.151(a) (NOT the §73.150 72-azimuth pattern table, which is tabulated pattern data, not measurement radials), filed with FCC Form 302-AM.`
+    : proof && proof.proofType === 'NDA_FIELD_PROOF'
+    ? `Non-directional antenna — §73.45 antenna efficiency certification and an NDA field-strength proof of performance — measurements on ${proof.radialCount}+ radials, at least 15 measurements per radial, per §73.186(a)(1) — filed with FCC Form 302-AM.`
+    : isDa
+    ? '§73.150(a) DA pattern required: theoretical horizontal radiation pattern table, plus a full directional proof of performance per §73.151(a) (6-12 measurement radials, not the §73.150 72-azimuth pattern table).'
+    : 'Non-directional antenna — §73.45 antenna efficiency certification and an NDA field-strength proof of performance per §73.186(a)(1) (6+ radials, ≥15 measurements per radial) required.';
   items.push({
     id: 'ANTENNA_STUDY',
     description: `Design and model AM vertical antenna system for ${frequency_khz} kHz`,
     status: 'REQUIRED',
-    rule: isDa ? '47 CFR §73.150 / §73.154' : '47 CFR §73.45 / §73.154',
-    note: isDa
-      ? '§73.150(a) DA pattern required: horizontal radiation pattern table at 5° increments (72 radials, 0°–355°), theoretical and measured patterns (§73.154 proof)'
-      : 'Non-directional antenna — §73.45 antenna efficiency certification and §73.154 proof-of-performance (8 radials at 45° intervals) required'
+    rule: isDa ? '47 CFR §73.150 / §73.151(a)' : '47 CFR §73.45 / §73.186(a)(1)',
+    note: proofNote
   });
 
   const asrNote = asr_registration_required
@@ -34065,6 +34145,14 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
     note: null
   });
 
+  // NIF requirement (whether this item appears as REQUIRED at all) is
+  // read from canonical.regulatory.nif instead of channel_class/
+  // skywave_risk_level alone, which — being LOW risk for every local-
+  // channel station regardless of class — silently omitted this item
+  // entirely for a non-Class-C station on a local channel (canonical-
+  // consistency-audit-followup, Phase 2 item 1). skywave_risk_level still
+  // drives the note's complexity language.
+  const nifRequiredForChecklist = nif ? nif.required === true : (channel_class !== 'local');
   if (channel_class === 'clear_channel' || skywave_risk_level === 'HIGH'){
     items.push({
       id: 'SKYWAVE_NIF',
@@ -34082,6 +34170,17 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
       status: 'CONDITIONAL',
       rule: '47 CFR §73.182',
       note: `MODERATE skywave risk for Class ${fcc_class} on ${channel_class} channel — consult §73.182 protection ratios`
+    });
+  } else if (nifRequiredForChecklist){
+    // LOW skywave risk (e.g. local-channel power levels) but canonical
+    // still requires a NIF study — the §73.182(o) local-channel exemption
+    // is Class-C-only.
+    items.push({
+      id: 'SKYWAVE_NIF',
+      description: 'Prepare skywave interference analysis (NIF study) for nighttime operations',
+      status: 'REQUIRED',
+      rule: '47 CFR §73.182',
+      note: `Class ${fcc_class} on ${channel_class} channel — the §73.182(o) local-channel NIF exemption applies only to Class C, so a NIF study is still required even though skywave risk is LOW.`
     });
   }
 

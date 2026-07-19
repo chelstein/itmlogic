@@ -2096,13 +2096,32 @@ test('protection_requirements present in response with correct structure', async
     'adjacent_channel_advisory must include 1st adjacent lower protection_db');
 });
 
-test('protection_requirements.nif_study_required is false for local channel stations', async () => {
-  // Local channel (e.g., 1230 kHz).
-  const localInputs = { ...KAZM, frequency_khz: 1230 };
+test('protection_requirements.nif_study_required is false for local channel Class C stations (§73.182(o) exemption)', async () => {
+  // Rewired to canonical.regulatory.nif (canonical-consistency-audit-
+  // followup, Phase 2 item 1): the §73.182(o) local-channel NIF exemption
+  // applies ONLY to Class C — a non-Class-C station on a local channel
+  // still requires NIF (see the next test). This test now pins fcc_class
+  // explicitly to 'C' (the prior version relied on KAZM's default fcc_class
+  // 'D', which — per the corrected canonical-aware logic — actually DOES
+  // require NIF on a local channel; that was the pre-audit `!isLocal`
+  // bug this whole effort exists to eliminate).
+  const localInputs = { ...KAZM, frequency_khz: 1230, fcc_class: 'C' };
   const out = await runSiteOptimizer({ ...localInputs, candidate_limit: 5 });
   assert.equal(out.available, true);
   assert.strictEqual(out.protection_requirements.nif_study_required, false,
-    'Local channel stations should not require NIF study');
+    'Local channel Class C stations should not require NIF study (§73.182(o))');
+  assert.equal(out.protection_requirements.channel_class, 'local');
+});
+
+test('protection_requirements.nif_study_required is true for local channel NON-Class-C stations (§73.182(o) exemption is Class-C-only)', async () => {
+  // KAZM's default fcc_class is 'D' — the §73.182(o) local-channel
+  // exemption does not apply to Class D, so NIF is still required even
+  // though the channel is local.
+  const localInputs = { ...KAZM, frequency_khz: 1230 };
+  const out = await runSiteOptimizer({ ...localInputs, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.strictEqual(out.protection_requirements.nif_study_required, true,
+    'Local channel Class D stations still require NIF study (§73.182(o) exemption is Class-C-only)');
   assert.equal(out.protection_requirements.channel_class, 'local');
 });
 
