@@ -4309,7 +4309,12 @@ test('permit_and_engineering_cost_estimate soft_cost columns in comparison table
   for (const row of out.candidate_comparison_table) {
     assert.ok('soft_cost_low_usd' in row, 'soft_cost_low_usd must be in comparison table');
     assert.ok('soft_cost_high_usd' in row, 'soft_cost_high_usd must be in comparison table');
-    assert.ok('soft_cost_tier' in row, 'soft_cost_tier must be in comparison table');
+    // soft_cost_tier removed (canonical-consistency-audit-followup, Group 4
+    // item 7): it duplicated tower_cost_estimate's cost_tier as a second,
+    // independently-tiered cost-tier column in the same row. The single
+    // canonical-sourced cost_tier column (candidate.canonical.costs.total)
+    // is asserted below instead.
+    assert.ok('cost_tier' in row, 'cost_tier (single canonical-sourced tier column) must be in comparison table');
   }
 });
 
@@ -5126,7 +5131,12 @@ test('spectrum_interference_summary comparison table columns populated', async (
   for (const row of ct) {
     assert.ok('int_risk_tier' in row);
     assert.ok('int_protected_radius_km' in row);
-    assert.ok('int_nighttime_nif' in row);
+    // int_nighttime_nif removed (canonical-consistency-audit-followup, Group 3
+    // item 7): it was one of 5 independently-derived NIF-required booleans in
+    // the same row (also du_nif_required, sky_nif_required, fsc_nif_required,
+    // cpe_nif_required). Collapsed to the single canonical-sourced
+    // nif_required column (candidate.canonical.regulatory.nif.required).
+    assert.ok('nif_required' in row);
   }
 });
 
@@ -5325,7 +5335,11 @@ test('antenna_pattern_optimization_guide comparison table columns populated', as
   for (const row of ct) {
     assert.ok('ap_col_bearing_deg' in row);
     assert.ok('ap_col_field_nda_mvm' in row);
-    assert.ok('ap_da_recommended' in row);
+    // ap_da_recommended removed (canonical-consistency-audit-followup, Group
+    // 3 item 7): duplicated da_study_recommended as a second independent
+    // "is DA recommended" boolean in the same row. da_study_recommended is
+    // now sourced from candidate.canonical.antenna.patternModeRequired.
+    assert.ok('da_study_recommended' in row);
   }
 });
 
@@ -5664,7 +5678,11 @@ test('tower_structural_assessment_guide comparison table columns present', async
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('twr_wind_ice_zone' in row, 'twr_wind_ice_zone missing from comparison table');
-    assert.ok('twr_asr_required' in row, 'twr_asr_required missing from comparison table');
+    // twr_asr_required removed (canonical-consistency-audit-followup, Group 3
+    // item 7): one of 13 independently-derived ASR-required booleans in the
+    // same row. Collapsed to the single canonical-sourced asr_required_design
+    // column (candidate.canonical.regulatory.asr.required).
+    assert.ok('asr_required_design' in row, 'asr_required_design missing from comparison table');
     assert.ok('twr_faa_type' in row, 'twr_faa_type missing from comparison table');
   }
 });
@@ -6191,10 +6209,15 @@ test('tower_construction_contract_guide comparison table columns present', async
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('tccg_tower_height_ft' in row, `rank ${row.rank} missing tccg_tower_height_ft`);
-    assert.ok('tccg_cost_typ_usd' in row, `rank ${row.rank} missing tccg_cost_typ_usd`);
+    // tccg_cost_typ_usd removed (canonical-consistency-audit-followup, Group
+    // 4 item 7): one of 9 independently-computed "total cost" columns in the
+    // same row. Collapsed to the single canonical-sourced cost_low_usd/
+    // cost_high_usd columns (candidate.canonical.costs.total).
+    assert.ok('cost_low_usd' in row, `rank ${row.rank} missing cost_low_usd`);
+    assert.ok('cost_high_usd' in row, `rank ${row.rank} missing cost_high_usd`);
     assert.ok('tccg_timeline_weeks_typ' in row, `rank ${row.rank} missing tccg_timeline_weeks_typ`);
     assert.strictEqual(row.tccg_tower_height_ft, Math.round(144 * 3.281), `rank ${row.rank} tower height ft mismatch (3/8λ at 780 kHz)`);
-    assert.ok(row.tccg_cost_typ_usd > 0, `rank ${row.rank} typical cost must be positive`);
+    assert.ok(row.cost_low_usd > 0, `rank ${row.rank} canonical low-cost total must be positive`);
   }
 });
 
@@ -7313,7 +7336,11 @@ test('asr_registration_update_guide post-registration obligations include lighti
 test('asr_registration_update_guide comparison table columns present', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('asr_required_height' in row, 'asr_required_height missing from comparison table');
+    // asr_required_height removed (canonical-consistency-audit-followup,
+    // Group 3 item 7): one of 13 independently-derived ASR-required booleans
+    // in the same row. Collapsed to the single canonical-sourced
+    // asr_required_design column (candidate.canonical.regulatory.asr.required).
+    assert.ok('asr_required_design' in row, 'asr_required_design missing from comparison table');
     assert.ok('asr_tower_height_m' in row, 'asr_tower_height_m missing from comparison table');
     assert.ok('asr_faa_notify' in row, 'asr_faa_notify missing from comparison table');
   }
@@ -7984,11 +8011,22 @@ test('spacing_rule_compliance_guide verification checklist has required items', 
 });
 
 test('spacing_rule_compliance_guide comparison table columns present', async () => {
+  // spacing_risk_tier/spacing_n_required/spacing_chan_class removed
+  // (canonical-consistency-audit-followup, Group 3 item 7): this guide
+  // applied a §73.37 mileage table to the candidate's distance from the
+  // station's OWN current site, which canonical treats as a mis-framing —
+  // that distance is a transition-planning concern (construction overlap
+  // risk), never a §73.37 spacing eligibility verdict; canonical
+  // deliberately does not produce a real external-spacing verdict at
+  // screening (externalSpacingStudy stays NOT_EVALUATED). spacing_verdict
+  // now carries the single canonical overlap-risk framing
+  // (candidate.canonical.transition.constructionOverlapRisk) in place of
+  // this guide's own fabricated verdict.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('spacing_risk_tier' in row, 'spacing_risk_tier missing from comparison table');
-    assert.ok('spacing_n_required' in row, 'spacing_n_required missing from comparison table');
-    assert.ok('spacing_chan_class' in row, 'spacing_chan_class missing from comparison table');
+    assert.ok('spacing_verdict' in row, 'spacing_verdict missing from comparison table');
+    assert.ok(['HIGH', 'MODERATE', 'LOW', 'UNKNOWN'].includes(row.spacing_verdict),
+      `spacing_verdict must be a canonical overlap-risk tier, got: ${row.spacing_verdict}`);
   }
 });
 
@@ -8265,8 +8303,13 @@ test('co_channel_interference_budget mitigation strategies non-empty', async () 
 test('co_channel_interference_budget comparison table columns present', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('du_cc_spacing_km' in row,  'du_cc_spacing_km missing from comparison table');
-    assert.ok('du_nif_required' in row,   'du_nif_required missing from comparison table');
+    // du_cc_spacing_km removed (canonical-consistency-audit-followup, Group
+    // 3 item 7): a third independent §73.37 mileage-table figure against the
+    // station's OWN current site (see spacing_verdict, which now carries the
+    // single canonical overlap-risk framing instead).
+    // du_nif_required removed: duplicate of the single canonical-sourced
+    // nif_required column (candidate.canonical.regulatory.nif.required).
+    assert.ok('nif_required' in row,      'nif_required missing from comparison table');
     assert.ok('du_n_mitigations' in row,  'du_n_mitigations missing from comparison table');
   }
 });
@@ -8403,7 +8446,10 @@ test('skywave_coverage_analysis comparison table columns present', async () => {
   for (const row of out.candidate_comparison_table) {
     assert.ok('sky_50pct_km' in row,    'sky_50pct_km missing from comparison table');
     assert.ok('sky_1pct_km' in row,     'sky_1pct_km missing from comparison table');
-    assert.ok('sky_nif_required' in row,'sky_nif_required missing from comparison table');
+    // sky_nif_required removed (canonical-consistency-audit-followup, Group
+    // 3 item 7): duplicate of the single canonical-sourced nif_required
+    // column (candidate.canonical.regulatory.nif.required).
+    assert.ok('nif_required' in row,    'nif_required missing from comparison table');
   }
 });
 
@@ -8498,7 +8544,11 @@ test('tower_lighting_marking_guide comparison table columns present', async () =
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('tower_height_est_m' in row, 'tower_height_est_m missing from comparison table');
-    assert.ok('tower_asr_required' in row, 'tower_asr_required missing from comparison table');
+    // tower_asr_required removed (canonical-consistency-audit-followup,
+    // Group 3 item 7): one of 13 independently-derived ASR-required
+    // booleans in the same row. Collapsed to the single canonical-sourced
+    // asr_required_design column (candidate.canonical.regulatory.asr.required).
+    assert.ok('asr_required_design' in row, 'asr_required_design missing from comparison table');
     assert.ok('tower_faa_tier' in row,     'tower_faa_tier missing from comparison table');
   }
 });
@@ -8541,11 +8591,17 @@ test('rf_exposure_mpe_analysis filing exhibits present', async () => {
 });
 
 test('rf_exposure_mpe_analysis comparison table columns present', async () => {
+  // mpe_compliance_status/mpe_excl_radius_m removed (canonical-consistency-
+  // audit-followup, Group 3 item 7): canonical never issues an MPE
+  // compliance PASS/FAIL verdict (only a routine-evaluation-required
+  // decision), so this guide's fabricated compliance_status/exclusion_radius
+  // pair duplicated — and disagreed with — the single canonical-sourced
+  // fence_m column (candidate.canonical.rfExposure.recommendedFenceDistanceM),
+  // which now carries the one MPE distance figure in this row.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('mpe_compliance_status' in row, 'mpe_compliance_status missing from comparison table');
-    assert.ok('mpe_excl_radius_m' in row,     'mpe_excl_radius_m missing from comparison table');
-    assert.ok('mpe_eval_required' in row,      'mpe_eval_required missing from comparison table');
+    assert.ok('fence_m' in row,          'fence_m missing from comparison table');
+    assert.ok('mpe_eval_required' in row,'mpe_eval_required missing from comparison table');
   }
 });
 
@@ -8592,7 +8648,13 @@ test('station_relocation_cost_estimator subtotal + contingency = total', async (
 test('station_relocation_cost_estimator comparison table columns present', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('reloc_cost_low' in row,      'reloc_cost_low missing from comparison table');
+    // reloc_cost_low removed (canonical-consistency-audit-followup, Group 4
+    // item 7): one of 9 independently-computed "total cost" columns in the
+    // same row. Collapsed to the single canonical-sourced cost_low_usd
+    // column (candidate.canonical.costs.total). reloc_cost_high/
+    // reloc_cost_midpoint were not named in the audit's duplicate-column
+    // list and are left as-is.
+    assert.ok('cost_low_usd' in row,        'cost_low_usd missing from comparison table');
     assert.ok('reloc_cost_high' in row,     'reloc_cost_high missing from comparison table');
     assert.ok('reloc_cost_midpoint' in row, 'reloc_cost_midpoint missing from comparison table');
   }
@@ -8785,7 +8847,11 @@ test('insurance_liability_analysis comparison table columns present', async () =
   for (const row of out.candidate_comparison_table) {
     assert.ok('ins_total_value_usd'    in row, 'ins_total_value_usd missing from comparison table');
     assert.ok('ins_annual_premium_usd' in row, 'ins_annual_premium_usd missing from comparison table');
-    assert.ok('ins_asr_required'       in row, 'ins_asr_required missing from comparison table');
+    // ins_asr_required removed (canonical-consistency-audit-followup, Group
+    // 3 item 7): one of 13 independently-derived ASR-required booleans in
+    // the same row. Collapsed to the single canonical-sourced
+    // asr_required_design column (candidate.canonical.regulatory.asr.required).
+    assert.ok('asr_required_design'    in row, 'asr_required_design missing from comparison table');
   }
 });
 
@@ -9260,7 +9326,10 @@ test('frequency_spectrum_coordination comparison table columns present', async (
   for (const row of out.candidate_comparison_table) {
     assert.ok('fsc_channel_class' in row, 'fsc_channel_class missing from comparison table');
     assert.ok('fsc_coord_zone_km' in row, 'fsc_coord_zone_km missing from comparison table');
-    assert.ok('fsc_nif_required' in row,  'fsc_nif_required missing from comparison table');
+    // fsc_nif_required removed (canonical-consistency-audit-followup, Group
+    // 3 item 7): duplicate of the single canonical-sourced nif_required
+    // column (candidate.canonical.regulatory.nif.required).
+    assert.ok('nif_required' in row,      'nif_required missing from comparison table');
   }
 });
 
@@ -9738,7 +9807,11 @@ test('transmitter_power_upgrade_pathway_guide comparison table columns present',
   for (const row of out.candidate_comparison_table) {
     assert.ok('tpupg_day_headroom_kw'   in row, 'tpupg_day_headroom_kw missing from comparison table');
     assert.ok('tpupg_coverage_gain_pct' in row, 'tpupg_coverage_gain_pct missing from comparison table');
-    assert.ok('tpupg_total_low_usd'     in row, 'tpupg_total_low_usd missing from comparison table');
+    // tpupg_total_low_usd removed (canonical-consistency-audit-followup,
+    // Group 4 item 7): one of 9 independently-computed "total cost" columns
+    // in the same row. Collapsed to the single canonical-sourced
+    // cost_low_usd column (candidate.canonical.costs.total).
+    assert.ok('cost_low_usd'            in row, 'cost_low_usd missing from comparison table');
   }
 });
 
@@ -9782,7 +9855,13 @@ test('station_total_project_cost_pro_forma_guide contingency and subtotals consi
 test('station_total_project_cost_pro_forma_guide comparison table columns present', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('pfg_total_low_usd'     in row, 'pfg_total_low_usd missing from comparison table');
+    // pfg_total_low_usd removed (canonical-consistency-audit-followup, Group
+    // 4 item 7): one of 9 independently-computed "total cost" columns in the
+    // same row. Collapsed to the single canonical-sourced cost_low_usd
+    // column (candidate.canonical.costs.total). pfg_total_typ_usd/
+    // pfg_n_cost_categories were not named in the audit's duplicate-column
+    // list and are left as-is.
+    assert.ok('cost_low_usd'          in row, 'cost_low_usd missing from comparison table');
     assert.ok('pfg_total_typ_usd'     in row, 'pfg_total_typ_usd missing from comparison table');
     assert.ok('pfg_n_cost_categories' in row, 'pfg_n_cost_categories missing from comparison table');
   }
@@ -9917,7 +9996,11 @@ test('fcc_form_301_exhibit_checklist_guide comparison table columns present', as
   for (const row of out.candidate_comparison_table) {
     assert.ok('f301_n_required'   in row, 'f301_n_required missing from comparison table');
     assert.ok('f301_n_da_specific' in row, 'f301_n_da_specific missing from comparison table');
-    assert.ok('f301_asr_required' in row, 'f301_asr_required missing from comparison table');
+    // f301_asr_required removed (canonical-consistency-audit-followup,
+    // Group 3 item 7): one of 13 independently-derived ASR-required booleans
+    // in the same row. Collapsed to the single canonical-sourced
+    // asr_required_design column (candidate.canonical.regulatory.asr.required).
+    assert.ok('asr_required_design' in row, 'asr_required_design missing from comparison table');
   }
 });
 
@@ -10584,10 +10667,19 @@ test('am_antenna_tower_lighting_and_faa_guide cost structure is internally consi
 });
 
 test('am_antenna_tower_lighting_and_faa_guide comparison table columns present', async () => {
+  // ltg_asr_required removed (canonical-consistency-audit-followup, Group 3
+  // item 7): this key name was actually populated by a DIFFERENT guide
+  // (am_tower_lighting_and_painting_compliance_guide) that silently
+  // clobbered the earlier same-named key sourced from
+  // am_antenna_tower_lighting_and_faa_guide (plain JS object literals keep
+  // only the last duplicate key) — both were one of 13 independently-
+  // derived ASR-required booleans in the same row, and both are now
+  // collapsed into the single canonical-sourced asr_required_design column
+  // (candidate.canonical.regulatory.asr.required).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('ltg_type'                   in row, 'ltg_type missing from comparison table');
-    assert.ok('ltg_asr_required'           in row, 'ltg_asr_required missing from comparison table');
+    assert.ok('asr_required_design'        in row, 'asr_required_design missing from comparison table');
     assert.ok('ltg_total_initial_cost_low' in row, 'ltg_total_initial_cost_low missing from comparison table');
   }
 });
@@ -12658,7 +12750,14 @@ test('am_ground_system_installation_and_maintenance_guide comparison table colum
     assert.ok('gnd_recommended_radials' in row, 'gnd_recommended_radials missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.gnd_radial_length_ft,    441.34,   'rank-1 gnd_radial_length_ft should be 441.34 (0.35λ per §73.189(b)(4))');
+  // gnd_radial_length_ft/gnd_recommended_radials now read
+  // candidate.canonical.groundSystem.selectedScenario (canonical-consistency-
+  // audit-followup, Group 2 item 5) instead of this guide's own recompute —
+  // still 0.35λ / 120 radials for the STANDARD_120 scenario, but the exact
+  // feet figure shifts slightly (441.34 -> 441.67) because canonical rounds
+  // the wavelength once (antennaDesign.js wavelengthM) before deriving the
+  // radial length, rather than carrying an unrounded intermediate.
+  assert.strictEqual(r0.gnd_radial_length_ft,    441.67,   'rank-1 gnd_radial_length_ft should be 441.67 (0.35λ per §73.189(b)(4), canonical-sourced)');
   assert.strictEqual(r0.gnd_total_low_usd,        43868.64, 'rank-1 gnd_total_low_usd should be 43868.64 (0.35λ per §73.189(b)(4))');
   assert.strictEqual(r0.gnd_recommended_radials,  120,      'rank-1 gnd_recommended_radials should be 120');
 });
@@ -13320,14 +13419,18 @@ test('KAZM ASR reference and note fields', async () => {
 });
 
 test('am_fcc_asr_tower_registration_guide comparison table columns present', async () => {
+  // asr_requires_asr removed (canonical-consistency-audit-followup, Group 3
+  // item 7): one of 13 independently-derived ASR-required booleans in the
+  // same row. Collapsed to the single canonical-sourced asr_required_design
+  // column (candidate.canonical.regulatory.asr.required).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('asr_requires_asr'    in row, 'asr_requires_asr missing from comparison table');
+    assert.ok('asr_required_design' in row, 'asr_required_design missing from comparison table');
     assert.ok('asr_total_low_usd'   in row, 'asr_total_low_usd missing from comparison table');
     assert.ok('asr_tower_height_ft' in row, 'asr_tower_height_ft missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.asr_requires_asr,    true,   'rank-1 asr_requires_asr should be true');
+  assert.strictEqual(r0.asr_required_design, true,   'rank-1 asr_required_design should be true');
   assert.strictEqual(r0.asr_total_low_usd,   5000,   'rank-1 asr_total_low_usd should be 5000 (Form 854 ASR: no FCC filing fee under the current §1.1102 schedule)');
   assert.strictEqual(r0.asr_tower_height_ft, 472.87, 'rank-1 asr_tower_height_ft should be 472.87');
 });
@@ -13672,12 +13775,17 @@ test('KAZM total project cost reference and note fields', async () => {
 test('am_total_project_cost_summary_guide comparison table columns present', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('tpc_grand_total_low_usd'    in row, 'tpc_grand_total_low_usd missing from comparison table');
+    // tpc_grand_total_low_usd removed (canonical-consistency-audit-followup,
+    // Group 4 item 7): one of 9 independently-computed "total cost" columns
+    // in the same row. Collapsed to the single canonical-sourced
+    // cost_low_usd column (candidate.canonical.costs.total).
+    // tpc_grand_total_high_usd/tpc_total_with_contingency were not named in
+    // the audit's duplicate-column list and are left as-is.
+    assert.ok('cost_low_usd'               in row, 'cost_low_usd missing from comparison table');
     assert.ok('tpc_grand_total_high_usd'   in row, 'tpc_grand_total_high_usd missing from comparison table');
     assert.ok('tpc_total_with_contingency' in row, 'tpc_total_with_contingency missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.tpc_grand_total_low_usd,    378235,    'rank-1 tpc_grand_total_low should be 378235');
   assert.strictEqual(r0.tpc_grand_total_high_usd,   1815395,   'rank-1 tpc_grand_total_high should be 1815395');
   assert.strictEqual(r0.tpc_total_with_contingency, 434970.25, 'rank-1 tpc_total_with_contingency should be 434970.25');
 });
@@ -13755,14 +13863,20 @@ test('KAZM decommission reference and note fields', async () => {
 });
 
 test('am_transmitter_decommission_and_site_remediation_guide comparison table columns present', async () => {
+  // dcom_total_low_usd removed (canonical-consistency-audit-followup, Group
+  // 4 item 7): decommissioning cost is not a component of
+  // candidate.canonical.costs.total (new-site construction only), and this
+  // column was one of 9 independently-computed "total cost" figures
+  // confusingly co-mingled in the same row. dcom_total_demo_low_usd/
+  // dcom_num_towers were not named in the audit's duplicate-column list and
+  // are left as-is; there is no direct canonical replacement for the
+  // removed decommissioning total.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('dcom_total_low_usd'      in row, 'dcom_total_low_usd missing from comparison table');
     assert.ok('dcom_total_demo_low_usd' in row, 'dcom_total_demo_low_usd missing from comparison table');
     assert.ok('dcom_num_towers'         in row, 'dcom_num_towers missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.dcom_total_low_usd,      115500, 'rank-1 dcom_total_low should be 115500 (473 ft >400 ft)');
   assert.strictEqual(r0.dcom_total_demo_low_usd, 100000, 'rank-1 dcom_total_demo_low should be 100000 (>400 ft)');
   assert.strictEqual(r0.dcom_num_towers,          1,    'rank-1 dcom_num_towers should be 1');
 });
@@ -13886,16 +14000,21 @@ test('KAZM ground system radial total cost', async () => {
 });
 
 test('am_ground_system_radial_design_guide comparison table columns present', async () => {
+  // grd_num_radials_ideal/grd_radial_length_ft removed (canonical-
+  // consistency-audit-followup, Group 2 item 5): duplicates of
+  // gnd_recommended_radials/gnd_radial_length_ft, now sourced from
+  // candidate.canonical.groundSystem.selectedScenario. grd_total_low_usd was
+  // not named in the audit's duplicate-column list and is left as-is.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('grd_num_radials_ideal' in row, 'grd_num_radials_ideal missing from comparison table');
-    assert.ok('grd_radial_length_ft'  in row, 'grd_radial_length_ft missing from comparison table');
-    assert.ok('grd_total_low_usd'     in row, 'grd_total_low_usd missing from comparison table');
+    assert.ok('gnd_recommended_radials' in row, 'gnd_recommended_radials missing from comparison table');
+    assert.ok('gnd_radial_length_ft'    in row, 'gnd_radial_length_ft missing from comparison table');
+    assert.ok('grd_total_low_usd'       in row, 'grd_total_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.grd_num_radials_ideal, 120,      'rank-1 grd_num_radials_ideal should be 120');
-  assert.strictEqual(r0.grd_radial_length_ft,  441.34,   'rank-1 grd_radial_length_ft should be 441.34 (0.35λ per §73.189(b)(4))');
-  assert.strictEqual(r0.grd_total_low_usd,     43839.03, 'rank-1 grd_total_low_usd should be 43839.03 (120×0.35λ per §73.189(b)(4), RS Means 2024 rates)');
+  assert.strictEqual(r0.gnd_recommended_radials, 120,      'rank-1 gnd_recommended_radials should be 120');
+  assert.strictEqual(r0.gnd_radial_length_ft,    441.67,   'rank-1 gnd_radial_length_ft should be 441.67 (0.35λ per §73.189(b)(4), canonical-sourced)');
+  assert.strictEqual(r0.grd_total_low_usd,       43839.03, 'rank-1 grd_total_low_usd should be 43839.03 (120×0.35λ per §73.189(b)(4), RS Means 2024 rates)');
 });
 
 test('am_tpo_and_antenna_efficiency_guide present on KAZM candidate', async () => {
@@ -15923,14 +16042,18 @@ test('KAZM 780 kHz: total_lighting_low_usd and high are positive and ordered', a
 });
 
 test('candidate_comparison_table ltg columns present and valid for KAZM', async () => {
+  // ltg_asr_required removed (canonical-consistency-audit-followup, Group 3
+  // item 7): one of 13 independently-derived ASR-required booleans in the
+  // same row. Collapsed to the single canonical-sourced asr_required_design
+  // column (candidate.canonical.regulatory.asr.required).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('ltg_asr_required'          in row, 'ltg_asr_required missing from comparison table');
+    assert.ok('asr_required_design'       in row, 'asr_required_design missing from comparison table');
     assert.ok('ltg_lighting_type'         in row, 'ltg_lighting_type missing from comparison table');
     assert.ok('ltg_total_lighting_low_usd' in row, 'ltg_total_lighting_low_usd missing from comparison table');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.strictEqual(r0.ltg_asr_required, true, 'ltg_asr_required must be true for 780 kHz tower');
+  assert.strictEqual(r0.asr_required_design, true, 'asr_required_design must be true for 780 kHz tower');
   assert.ok(r0.ltg_total_lighting_low_usd > 0, 'ltg_total_lighting_low_usd must be positive');
 });
 
@@ -16317,9 +16440,14 @@ test('KAZM NDA proforma: DA variant has higher soft costs than NDA', async () =>
 });
 
 test('candidate_comparison_table proforma columns present and valid for KAZM', async () => {
+  // pf_grand_total_low_usd removed (canonical-consistency-audit-followup,
+  // Group 4 item 7): one of 9 independently-computed "total cost" columns in
+  // the same row. Collapsed to the single canonical-sourced cost_low_usd
+  // column (candidate.canonical.costs.total). The other pf_* columns were
+  // not named in the audit's duplicate-column list and are left as-is.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('pf_grand_total_low_usd'      in row, 'pf_grand_total_low_usd missing');
+    assert.ok('cost_low_usd'                in row, 'cost_low_usd missing');
     assert.ok('pf_grand_total_high_usd'     in row, 'pf_grand_total_high_usd missing');
     assert.ok('pf_grand_total_midpoint_usd' in row, 'pf_grand_total_midpoint_usd missing');
     assert.ok('pf_tower_height_ft'          in row, 'pf_tower_height_ft missing');
@@ -16327,8 +16455,8 @@ test('candidate_comparison_table proforma columns present and valid for KAZM', a
     assert.ok('pf_contingency_low_usd'      in row, 'pf_contingency_low_usd missing');
   }
   const r0 = out.candidate_comparison_table[0];
-  assert.ok(r0.pf_grand_total_low_usd > 0,                          'pf_grand_total_low_usd must be positive');
-  assert.ok(r0.pf_grand_total_high_usd > r0.pf_grand_total_low_usd, 'high must exceed low in comparison table');
+  assert.ok(r0.cost_low_usd > 0,                                     'cost_low_usd must be positive');
+  assert.ok(r0.pf_grand_total_high_usd > 0,                          'pf_grand_total_high_usd must be positive');
 });
 
 // ── Feature #87: am_site_access_and_land_use_guide ────────────────────────────
@@ -17177,12 +17305,17 @@ test('#104 Class A station requires NIF exhibit; Class C does not', async () => 
 });
 
 test('#104 candidate_comparison_table has cpe_* columns', async () => {
+  // cpe_asr_required removed (canonical-consistency-audit-followup, Group 3
+  // item 7): one of 13 independently-derived ASR-required booleans in the
+  // same row -> asr_required_design (candidate.canonical.regulatory.asr.required).
+  // cpe_nif_required removed: one of 5 independently-derived NIF-required
+  // booleans in the same row -> nif_required (candidate.canonical.regulatory.nif.required).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('cpe_n_required_exhibits' in row, 'cpe_n_required_exhibits missing');
-    assert.ok('cpe_asr_required'        in row, 'cpe_asr_required missing');
+    assert.ok('asr_required_design'     in row, 'asr_required_design missing');
     assert.ok('cpe_ea_required'         in row, 'cpe_ea_required missing');
-    assert.ok('cpe_nif_required'        in row, 'cpe_nif_required missing');
+    assert.ok('nif_required'            in row, 'nif_required missing');
     assert.ok('cpe_total_cost_low_usd'  in row, 'cpe_total_cost_low_usd missing');
   }
 });
@@ -17294,9 +17427,14 @@ test('#106 lower frequency → taller tower → longer wavelength', async () => 
 });
 
 test('#106 candidate_comparison_table has teh_* columns', async () => {
+  // teh_qwave_height_m removed (canonical-consistency-audit-followup, Group
+  // 2 item 5): a non-canonical height column (this guide's own λ/4 figure,
+  // which canonical never treats as the selected design height). Collapsed
+  // to the single canonical-sourced design_h_m column
+  // (candidate.canonical.antenna.selectedDesignHeightM).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('teh_qwave_height_m'  in row, 'teh_qwave_height_m missing');
+    assert.ok('design_h_m'          in row, 'design_h_m missing');
     assert.ok('teh_elec_height_deg' in row, 'teh_elec_height_deg missing');
     assert.ok('teh_radiation_r_ohm' in row, 'teh_radiation_r_ohm missing');
     assert.ok('teh_eff_typical_pct' in row, 'teh_eff_typical_pct missing');
@@ -17347,10 +17485,14 @@ test('#107 lower frequency station has longer radials and higher cost', async ()
 });
 
 test('#107 candidate_comparison_table has grs_* columns', async () => {
+  // grs_radial_length_m/grs_std_n_radials removed (canonical-consistency-
+  // audit-followup, Group 2 item 5): duplicates of gnd_radial_length_ft/
+  // gnd_recommended_radials, now sourced from
+  // candidate.canonical.groundSystem.selectedScenario.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('grs_radial_length_m'     in row, 'grs_radial_length_m missing');
-    assert.ok('grs_std_n_radials'       in row, 'grs_std_n_radials missing');
+    assert.ok('gnd_radial_length_ft'    in row, 'gnd_radial_length_ft missing');
+    assert.ok('gnd_recommended_radials' in row, 'gnd_recommended_radials missing');
     assert.ok('grs_std_wire_m'          in row, 'grs_std_wire_m missing');
     assert.ok('grs_std_cost_low_usd'    in row, 'grs_std_cost_low_usd missing');
     assert.ok('grs_std_efficiency_pct'  in row, 'grs_std_efficiency_pct missing');
@@ -17741,12 +17883,18 @@ test('#114 class_standard_height present and correct for Class D 1600 kHz', asyn
 });
 
 test('#114 candidate_comparison_table has tia_* columns', async () => {
+  // tia_asr_triggered_qw removed (canonical-consistency-audit-followup,
+  // Group 3 item 7): one of 13 independently-derived ASR-required booleans
+  // in the same row, and the only one still on a quarter-wave-only basis.
+  // Collapsed to the single canonical-sourced asr_required_design column
+  // (candidate.canonical.regulatory.asr.required, which uses the canonical
+  // selected design height, not a quarter-wave-only basis).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('tia_tower_height_ft'  in row, 'tia_tower_height_ft missing');
     assert.ok('tia_wind_speed_mph'   in row, 'tia_wind_speed_mph missing');
     assert.ok('tia_ice_thickness_in' in row, 'tia_ice_thickness_in missing');
-    assert.ok('tia_asr_triggered_qw' in row, 'tia_asr_triggered_qw missing');
+    assert.ok('asr_required_design'  in row, 'asr_required_design missing');
     assert.ok('tia_total_pe_low_usd' in row, 'tia_total_pe_low_usd missing');
   }
 });
@@ -17852,9 +18000,13 @@ test('#116 annual cost includes ASR inspection for all AM Class D stations (3/8�
 });
 
 test('#116 candidate_comparison_table has rdb_* columns', async () => {
+  // rdb_asr_required removed (canonical-consistency-audit-followup, Group 3
+  // item 7): one of 13 independently-derived ASR-required booleans in the
+  // same row. Collapsed to the single canonical-sourced asr_required_design
+  // column (candidate.canonical.regulatory.asr.required).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('rdb_asr_required'        in row, 'rdb_asr_required missing');
+    assert.ok('asr_required_design'     in row, 'asr_required_design missing');
     assert.ok('rdb_one_time_total_usd'  in row, 'rdb_one_time_total_usd missing');
     assert.ok('rdb_annual_total_low_usd' in row, 'rdb_annual_total_low_usd missing');
     assert.ok('rdb_n_annual_obligations' in row, 'rdb_n_annual_obligations missing');
@@ -18221,9 +18373,12 @@ test('#124 DA station has extra sampling maintenance task', async () => {
 });
 
 test('#124 candidate_comparison_table has gnd_* columns', async () => {
+  // gnd_total_radials removed (canonical-consistency-audit-followup, Group 2
+  // item 5): duplicate of gnd_recommended_radials, now sourced from
+  // candidate.canonical.groundSystem.selectedScenario.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('gnd_total_radials'     in row, 'gnd_total_radials missing');
+    assert.ok('gnd_recommended_radials' in row, 'gnd_recommended_radials missing');
     assert.ok('gnd_radial_length_ft'  in row, 'gnd_radial_length_ft missing');
     assert.ok('gnd_rehab_low_usd'     in row, 'gnd_rehab_low_usd missing');
     assert.ok('gnd_annual_low_usd'    in row, 'gnd_annual_low_usd missing');
@@ -18960,10 +19115,14 @@ test('#140 tower height triggers correct ASR requirement', async () => {
 });
 
 test('#140 candidate_comparison_table has faa_* columns', async () => {
+  // faa_asr_required removed (canonical-consistency-audit-followup, Group 3
+  // item 7): one of 13 independently-derived ASR-required booleans in the
+  // same row. Collapsed to the single canonical-sourced asr_required_design
+  // column (candidate.canonical.regulatory.asr.required).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('faa_tower_height_ft'          in row, 'faa_tower_height_ft missing');
-    assert.ok('faa_asr_required'             in row, 'faa_asr_required missing');
+    assert.ok('asr_required_design'          in row, 'asr_required_design missing');
     assert.ok('faa_lighting_type'            in row, 'faa_lighting_type missing');
     assert.ok('faa_lighting_install_low_usd' in row, 'faa_lighting_install_low_usd missing');
   }
@@ -19008,10 +19167,14 @@ test('#141 std_radial_len_m is 0.35 wavelength', async () => {
 });
 
 test('#141 candidate_comparison_table has gnd_* columns', async () => {
+  // gnd_std_n_radials/gnd_std_radial_len_m removed (canonical-consistency-
+  // audit-followup, Group 2 item 5): duplicates of gnd_recommended_radials/
+  // gnd_radial_length_ft (feet, not meters), now sourced from
+  // candidate.canonical.groundSystem.selectedScenario.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
-    assert.ok('gnd_std_n_radials'        in row, 'gnd_std_n_radials missing');
-    assert.ok('gnd_std_radial_len_m'     in row, 'gnd_std_radial_len_m missing');
+    assert.ok('gnd_recommended_radials'  in row, 'gnd_recommended_radials missing');
+    assert.ok('gnd_radial_length_ft'     in row, 'gnd_radial_length_ft missing');
     assert.ok('rfi_total_system_low_usd' in row, 'rfi_total_system_low_usd missing');
     assert.ok('gnd_proof_required'       in row, 'gnd_proof_required missing');
   }
