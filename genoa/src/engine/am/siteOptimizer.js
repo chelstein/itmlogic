@@ -2229,7 +2229,16 @@ export async function runSiteOptimizer(body = {}){
         col_pct: c.col_coverage_pct != null ? Math.round(c.col_coverage_pct * 100) : null,
         gate_verdict: c.regulatory_gate_summary?.overall_verdict ?? 'UNKNOWN',
         gate_fail_count: c.regulatory_gate_summary?.fail_count ?? 0,
-        cost_tier: c.permit_and_engineering_cost_estimate?.cost_tier ?? null,
+        // Rewired to candidate.canonical.costs.total (canonical-consistency-
+        // audit-followup, Group 4 item 6) instead of
+        // permit_and_engineering_cost_estimate's soft-cost-only tier, which
+        // was being used as the primary cost signal for a top-level
+        // recommendation despite excluding hard construction costs.
+        cost_tier: c.canonical?.costs?.total?.high == null ? null
+          : c.canonical.costs.total.high > 800000 ? 'VERY_HIGH'
+          : c.canonical.costs.total.high > 400000 ? 'HIGH'
+          : c.canonical.costs.total.high > 150000 ? 'MODERATE'
+          : 'LOW',
         skywave_advisory: c.skywave_protection_advisory?.advisory_level ?? 'UNKNOWN',
         quadrant: c.bearing_deg != null ? (['NE','SE','SW','NW'][Math.floor((((c.bearing_deg % 360) + 360) % 360) / 90)]) : null,
         tied_within_model_precision: c.tied_within_model_precision ?? null,
@@ -2462,24 +2471,24 @@ export async function runSiteOptimizer(body = {}){
     };
   })();
 
+  // Rewired to candidate.canonical.costs.total (canonical-consistency-audit-
+  // followup, Group 4 item 5) instead of summing permit_and_engineering_cost_
+  // estimate (soft) + tower_cost_estimate (hard) independently — those two
+  // guide totals are not guaranteed to reconcile with the single canonical
+  // cost model, which already sums ALL cost components (tower, ground
+  // system, transmitter building, transmitter/ATU, electrical/generator,
+  // site access/utilities, engineering, legal/filing, environmental,
+  // contingency) against the canonical selected design height and ground
+  // scenario. cost_tier thresholds unchanged.
   const total_project_cost_estimate = (() => {
     const rows = returned.slice(0, 5).map(c => {
-      const soft   = c.permit_and_engineering_cost_estimate;
-      const hard   = c.tower_cost_estimate;
-      if (!soft && !hard) return null;
-      const soft_low  = soft?.total_soft_cost_low_usd ?? 0;
-      const soft_high = soft?.total_soft_cost_high_usd ?? 0;
-      const hard_low  = hard?.total_low_usd ?? 0;
-      const hard_high = hard?.total_high_usd ?? 0;
-      const total_low  = Math.round(soft_low  + hard_low);
-      const total_high = Math.round(soft_high + hard_high);
+      const total = c.canonical?.costs?.total;
+      if (!total) return null;
+      const total_low  = Math.round(total.low);
+      const total_high = Math.round(total.high);
       return {
         rank:           c.rank,
         status:         c.status_category,
-        soft_cost_low:  soft_low,
-        soft_cost_high: soft_high,
-        hard_cost_low:  hard_low,
-        hard_cost_high: hard_high,
         total_low_usd:  total_low,
         total_high_usd: total_high,
         range_label:    `$${(total_low / 1000).toFixed(0)}k–$${(total_high / 1000).toFixed(0)}k`,
@@ -2497,7 +2506,7 @@ export async function runSiteOptimizer(body = {}){
       lowest_cost_candidate_rank: best?.rank ?? null,
       lowest_total_low_usd:  best?.total_low_usd ?? null,
       lowest_total_high_usd: best?.total_high_usd ?? null,
-      note: 'All figures 2024 USD, screening-grade. Does not include land/lease costs, transmitter equipment, or facility upgrades. Add 20–35% contingency for accurate project budgeting.'
+      note: 'All figures sourced from candidate.canonical.costs.total (canonical/costModel.js), screening-grade. Add contingency already folded into the canonical total (15% low / 25% high).'
     };
   })();
 
