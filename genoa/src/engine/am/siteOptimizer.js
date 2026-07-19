@@ -897,7 +897,20 @@ export async function runSiteOptimizer(body = {}){
     // does not produce that verdict (externalSpacingStudy stays
     // NOT_EVALUATED until a real co/adjacent-channel study runs).
     spacing_verdict:        c.canonical?.transition?.constructionOverlapRisk ?? null,
-    // Rewired to canonical.rfExposure.recommendedFenceDistanceM (candidate.canonical.rfExposure).
+    // canonical.rfExposure carries FOUR distinct boundaries (canonical-
+    // consistency-audit-followup, Phase 2 item 3) — each exposed as its
+    // own column so no consumer can conflate them:
+    //   rf_reactive_near_field_m — physics regime boundary (λ/2π); NEVER
+    //     a fence/exclusion distance.
+    //   rf_controlled_mpe_m — occupational MPE compliance distance.
+    //   rf_uncontrolled_mpe_m — general-population MPE compliance distance.
+    //   fence_m — the recommended fence (uncontrolled MPE distance, 3 m
+    //     practical minimum) — the ONE figure meant to be read as a
+    //     fence/exclusion recommendation.
+    rf_reactive_near_field_m: c.canonical?.rfExposure?.reactiveNearFieldBoundaryM?.value_m ?? null,
+    rf_controlled_mpe_m:    c.canonical?.rfExposure?.controlledMpeBoundaryM?.value_m ?? null,
+    rf_uncontrolled_mpe_m:  c.canonical?.rfExposure?.uncontrolledMpeBoundaryM?.value_m ?? null,
+    rf_evaluation_method:   c.canonical?.rfExposure?.evaluationMethod ?? null,
     fence_m:                c.canonical?.rfExposure?.recommendedFenceDistanceM?.value_m ?? null,
     blanket_km:             c.blanket_1000mvm_km ?? null,
     field_at_col_mvm:       c.field_at_col_centroid_mvm ?? null,

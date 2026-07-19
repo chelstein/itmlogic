@@ -312,6 +312,7 @@ export function buildCanonicalCandidateResult({
       controlledMpeBoundaryM: rfExposure.controlledMpeBoundaryM,
       uncontrolledMpeBoundaryM: rfExposure.uncontrolledMpeBoundaryM,
       recommendedFenceDistanceM: rfExposure.recommendedFenceDistanceM,
+      evaluationMethod: rfExposure.evaluationMethod,
     },
     blanket: {
       populationFraction: blanket.populationFraction,

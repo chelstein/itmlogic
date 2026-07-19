@@ -1477,28 +1477,42 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
-        {/* MPE RF exposure summary */}
-        {candidate.mpe_rf_exposure_summary && (() => {
-          const mpe = candidate.mpe_rf_exposure_summary;
+        {/* MPE RF exposure summary — the four distance figures are sourced
+            from candidate.canonical.rfExposure (canonical-consistency-
+            audit-followup, Phase 2 item 3) instead of this guide's own
+            near_field_boundary_m/far_field_exclusion_m/
+            recommended_fence_distance_m, which could silently disagree
+            with the canonical-sourced fence_m used elsewhere (comparison
+            table, filing autofill). The reactive near-field boundary is
+            explicitly labeled as NOT a fence/exclusion distance, matching
+            canonical's own labeling. mpe_limit_mw_cm2 (a regulatory limit
+            VALUE, not a distance) has no canonical equivalent and stays
+            guide-sourced. */}
+        {(candidate.mpe_rf_exposure_summary || candidate.canonical?.rfExposure) && (() => {
+          const mpe = candidate.mpe_rf_exposure_summary ?? {};
+          const rf = candidate.canonical?.rfExposure;
+          const reactiveNearField = rf?.reactiveNearFieldBoundaryM?.value_m ?? mpe.near_field_boundary_m;
+          const uncontrolledMpe   = rf?.uncontrolledMpeBoundaryM?.value_m ?? mpe.far_field_exclusion_m;
+          const fenceDistance     = rf?.recommendedFenceDistanceM?.value_m ?? mpe.recommended_fence_distance_m;
           return (
             <div>
               <div className="rack-eyebrow mb-1">RF exposure / MPE</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px]">
                 <div>
-                  <span className="text-textDim">Near-field boundary</span>{' '}
-                  <span className="text-cream">{mpe.near_field_boundary_m != null ? `${mpe.near_field_boundary_m} m` : '—'}</span>
+                  <span className="text-textDim">Reactive near-field boundary (NOT a fence distance)</span>{' '}
+                  <span className="text-cream">{reactiveNearField != null ? `${reactiveNearField} m` : '—'}</span>
                 </div>
                 <div>
-                  <span className="text-textDim">Far-field exclusion</span>{' '}
-                  <span className="text-cream">{mpe.far_field_exclusion_m != null ? `${mpe.far_field_exclusion_m} m` : '—'}</span>
+                  <span className="text-textDim">Uncontrolled (public) MPE distance</span>{' '}
+                  <span className="text-cream">{uncontrolledMpe != null ? `${uncontrolledMpe} m` : '—'}</span>
                 </div>
                 <div>
                   <span className="text-textDim">MPE limit</span>{' '}
                   <span className="text-cream">{mpe.mpe_limit_mw_cm2 != null ? `${mpe.mpe_limit_mw_cm2} mW/cm²` : '—'}</span>
                 </div>
                 <div>
-                  <span className="text-textDim">Fence distance</span>{' '}
-                  <span className="text-amber font-semibold">{mpe.recommended_fence_distance_m != null ? `${mpe.recommended_fence_distance_m} m` : '—'}</span>
+                  <span className="text-textDim">Recommended fence distance</span>{' '}
+                  <span className="text-amber font-semibold">{fenceDistance != null ? `${fenceDistance} m` : '—'}</span>
                 </div>
                 <div className="col-span-2 text-textDim/60 text-[9px] leading-tight mt-0.5">
                   {mpe.rule}

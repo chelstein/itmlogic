@@ -22,6 +22,32 @@ export const MIN_PRACTICAL_FENCE_M = 3;
 /** ERP above which routine RF evaluation is unambiguously required (kW). */
 export const ROUTINE_EVALUATION_ERP_KW = 1;
 
+/**
+ * How the RF-exposure boundaries were derived — a single top-level tag,
+ * distinct from the per-boundary `method` string on each labeledDistance
+ * (canonical-consistency-audit-followup, Phase 2 item 3).
+ *   ANALYTIC          — computed from the OET-65 closed-form distance
+ *                        formulas (oet65.complianceDistance_m /
+ *                        nearFieldBoundary_m); the normal case.
+ *   MEASUREMENT        — derived from an actual field survey. This engine
+ *                        has no field-measurement input path today — this
+ *                        tag is DOCUMENTED AS UNREACHABLE, not fabricated;
+ *                        see evaluateRfExposure()'s doc comment.
+ *   CONSERVATIVE_SCREEN — the analytic formula did not resolve (missing
+ *                        power/frequency) and a practical-minimum
+ *                        placeholder was substituted for the fence
+ *                        distance only — NOT a compliance result.
+ *   NOT_EVALUATED       — radiated power unknown; no boundary could be
+ *                        computed at all.
+ * @typedef {'ANALYTIC'|'MEASUREMENT'|'CONSERVATIVE_SCREEN'|'NOT_EVALUATED'} RfExposureEvaluationMethod
+ */
+export const RF_EXPOSURE_EVALUATION_METHODS = Object.freeze({
+  ANALYTIC:             'ANALYTIC',
+  MEASUREMENT:          'MEASUREMENT',
+  CONSERVATIVE_SCREEN:  'CONSERVATIVE_SCREEN',
+  NOT_EVALUATED:        'NOT_EVALUATED',
+});
+
 function labeledDistance({ value_m, label, method, assumptions }) {
   return {
     value_m,
@@ -52,6 +78,7 @@ function labeledDistance({ value_m, label, method, assumptions }) {
  *   controlledMpeBoundaryM: Object,
  *   uncontrolledMpeBoundaryM: Object,
  *   recommendedFenceDistanceM: Object,
+ *   evaluationMethod: RfExposureEvaluationMethod,
  *   evaluationRequired: Object,   // RegulatoryDecision
  * }}
  */
@@ -201,11 +228,21 @@ export function evaluateRfExposure({
     });
   }
 
+  // ── evaluationMethod — a single top-level tag for how the boundaries
+  // above were derived; see RF_EXPOSURE_EVALUATION_METHODS for the exact
+  // meaning of each value.
+  const evaluationMethod = !Number.isFinite(power_kw)
+    ? RF_EXPOSURE_EVALUATION_METHODS.NOT_EVALUATED
+    : (ctrl?.distance_m != null && unctrl?.distance_m != null)
+    ? RF_EXPOSURE_EVALUATION_METHODS.ANALYTIC
+    : RF_EXPOSURE_EVALUATION_METHODS.CONSERVATIVE_SCREEN;
+
   return {
     reactiveNearFieldBoundaryM,
     controlledMpeBoundaryM,
     uncontrolledMpeBoundaryM,
     recommendedFenceDistanceM,
+    evaluationMethod,
     evaluationRequired,
   };
 }

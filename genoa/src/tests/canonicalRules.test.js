@@ -278,6 +278,53 @@ test('rfExposure — four distinct labeled distances; λ/2π is never the fence'
   assert.ok(Math.abs(r.reactiveNearFieldBoundaryM.value_m - 61.17) < 1);
 });
 
+test('rfExposure — the four boundary values are never silently equal-and-conflated (canonical-consistency-audit-followup, Phase 2 item 3)', () => {
+  const r = evaluateRfExposure({ frequency_khz: 780, tpo_kw: 5 });
+  const vals = {
+    reactiveNearField: r.reactiveNearFieldBoundaryM.value_m,
+    controlledMpe: r.controlledMpeBoundaryM.value_m,
+    uncontrolledMpe: r.uncontrolledMpeBoundaryM.value_m,
+    fence: r.recommendedFenceDistanceM.value_m,
+  };
+  // fence and uncontrolledMpe MAY legitimately coincide (fence is defined
+  // as uncontrolledMpe floored at MIN_PRACTICAL_FENCE_M, so when
+  // uncontrolledMpe already exceeds the floor they ARE the same number by
+  // construction). controlledMpe and uncontrolledMpe MAY also legitimately
+  // coincide at some frequency/power combinations (both are OET-65
+  // ground-reflection distances computed from the same formula family
+  // with different MPE thresholds — physics, not a copy/paste bug); this
+  // test does not assert they always differ. What matters, and what the
+  // historical contradiction actually was, is that the reactive
+  // near-field figure (a physics REGIME boundary, lambda/2pi) must never
+  // equal any of the three MPE-derived distances at all — presenting it
+  // as if it were a public-exclusion/fence distance was the bug this
+  // rule replaces (docs/architecture-contradiction-origins.md §5).
+  assert.notEqual(vals.reactiveNearField, vals.controlledMpe,
+    'reactive near-field boundary must never equal the controlled MPE distance');
+  assert.notEqual(vals.reactiveNearField, vals.uncontrolledMpe,
+    'reactive near-field boundary must never equal the uncontrolled MPE distance');
+  assert.notEqual(vals.reactiveNearField, vals.fence,
+    'reactive near-field boundary must never equal the recommended fence distance');
+});
+
+test('rfExposure — evaluationMethod is a single top-level tag distinguishing ANALYTIC / CONSERVATIVE_SCREEN / NOT_EVALUATED', () => {
+  // Normal case: power and frequency resolve -> ANALYTIC.
+  const analytic = evaluateRfExposure({ frequency_khz: 780, tpo_kw: 5 });
+  assert.equal(analytic.evaluationMethod, 'ANALYTIC');
+
+  // Radiated power unknown (Number(undefined) = NaN; note Number(null) is
+  // 0, a *known* zero power, not "unknown" -- use undefined here) ->
+  // NOT_EVALUATED (no boundary can be computed at all).
+  const unknownPower = evaluateRfExposure({ frequency_khz: 780, tpo_kw: undefined });
+  assert.equal(unknownPower.evaluationMethod, 'NOT_EVALUATED');
+
+  // MEASUREMENT is documented as unreachable given this engine's inputs
+  // (no field-measurement input path exists) -- confirm it never appears.
+  for (const m of [analytic.evaluationMethod, unknownPower.evaluationMethod]) {
+    assert.notEqual(m, 'MEASUREMENT');
+  }
+});
+
 test('rfExposure — > 1 kW requires routine evaluation; ≤ 1 kW is WARN "exemption criteria must be verified"', () => {
   const big = evaluateRfExposure({ frequency_khz: 780, tpo_kw: 5 });
   assert.equal(big.evaluationRequired.required, true);
