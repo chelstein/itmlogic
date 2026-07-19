@@ -275,6 +275,19 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               {fmtCoord(candidate.lat, candidate.lon)}
             </span>
           </div>
+          {/* Scenario label — candidate.canonical.scenario.primaryScenarioLabel
+              (canonical-consistency-audit-followup, Phase 2 item 2): names
+              which of the several mixed configurations this report is
+              actually about, e.g. "5 kW daytime NDA relocation using a
+              144.23 m compact radiator". Prominent, immediately under the
+              rank/coordinates line. */}
+          {candidate.canonical?.scenario?.primaryScenarioLabel && (
+            <div className="font-display text-[13px] text-cream mt-1"
+              title={[candidate.canonical.scenario.operatingScenarioBasis, candidate.canonical.scenario.antennaDesignCategoryBasis].filter(Boolean).join(' ')}
+            >
+              {candidate.canonical.scenario.primaryScenarioLabel}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5 mt-2">
             {candidate.status_category && (
               <StatusChip status={candidate.status_category} dense />

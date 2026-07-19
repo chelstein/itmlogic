@@ -38,6 +38,7 @@ import { evaluateAsrFaa } from './rules/asrFaa.js';
 import { evaluateRfExposure } from './rules/rfExposure.js';
 import { evaluateBlanket } from './rules/blanket.js';
 import { evaluateCurrentSiteRelationship } from './rules/currentSiteOverlap.js';
+import { buildScenario } from './scenario.js';
 import { greatCircleKm } from '../skywave.js';
 
 const SOURCE = 'canonical/buildCanonicalCandidateResult';
@@ -253,6 +254,18 @@ export function buildCanonicalCandidateResult({
     ? deriveScoringContext(scoringInputs)
     : null;
 
+  // ── Stage 8b: scenario labeling — a naming layer, not a new selection ─
+  // (canonical-consistency-audit-followup, Phase 2 item 2). distanceKm===0
+  // is exactly how siteOptimizer.js's ensureCurrentSiteIncluded() marks
+  // the current/authorized-site row.
+  const scenario = buildScenario({
+    antennaDesign,
+    modeledMode,
+    nif,
+    isBaselineCandidate: distanceKm === 0,
+    tpo_kw,
+  });
+
   // ── Assemble the core (recommendation-free) result ──────────────────
   const result = {
     schema: 'canonical-candidate-result/1',
@@ -313,6 +326,7 @@ export function buildCanonicalCandidateResult({
     regulatory,
     costs,
     scoring,
+    scenario,
   };
 
   // ── Stage 9: validation pass 1 → confidence → recommendation ───────

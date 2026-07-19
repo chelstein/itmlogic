@@ -851,6 +851,13 @@ export async function runSiteOptimizer(body = {}){
   // Supplements `candidates` (which has full details) with a lighter structure.
   const candidate_comparison_table = returned.map(c => ({
     rank:                   c.rank,
+    // Single canonical-sourced scenario label (candidate.canonical.scenario
+    // — canonical-consistency-audit-followup, Phase 2 item 2): names which
+    // of the several mixed configurations this row is actually about, e.g.
+    // "5 kW daytime NDA relocation using a 144.23 m compact radiator".
+    primary_scenario_label: c.canonical?.scenario?.primaryScenarioLabel ?? null,
+    operating_scenario:     c.canonical?.scenario?.operatingScenario ?? null,
+    antenna_design_category: c.canonical?.scenario?.antennaDesignCategory ?? null,
     go_no_go:               c.site_viability_summary?.go_no_go ?? null,
     viability_confidence:   c.site_viability_summary?.confidence ?? null,
     lat:                    c.lat,
