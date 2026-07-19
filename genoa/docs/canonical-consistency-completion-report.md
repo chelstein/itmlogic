@@ -4,11 +4,12 @@
 **Scope:** TOP-LEVEL category-5 duplicate fields identified by four read-only
 audit passes over `src/engine/am/siteOptimizer.js`,
 `src/engine/am/colocationOpportunities.js`, and the SiteOptimizer UI
-components. Guide-internal (namespaced sub-object) duplicates were
-explicitly out of scope for this pass — see "What was NOT fixed" below.
+components (Phase 1), plus a Phase 2 extension request adding explicit
+scenario/antenna-design typing and a four-boundary RF-exposure model to
+the canonical pipeline. Guide-internal (namespaced sub-object) duplicates
+remain explicitly out of scope — see "What was NOT fixed" below.
 
-**Final commit on this branch:** `ace3613` (this report is committed
-separately after it, see the git log for the exact final hash).
+**Final commit on this branch (through Phase 2):** `7032583`.
 
 Commits in this effort, in order:
 ```
@@ -17,9 +18,120 @@ a2b0724  feat: guide-registry structural guarantees + static canonical contract 
 860c280  wip: rewire filing-autofill UI + remaining comparison-table/cost columns to canonical
 0dd742d  test: update comparison-table assertions for collapsed duplicate columns
 ace3613  canonical-consistency-audit-followup: finish Group 4 cost rewiring + add reconciliation proofs
+df5d47e  docs: add canonical-consistency-audit-followup completion report (draft)
+684810a  Phase 2 item 1: rewire remaining NIF-derivation functions to canonical.regulatory.nif
+2940ef2  Phase 2 item 2: add canonical.scenario (OperatingScenario/AntennaDesign labeling)
+7032583  Phase 2 item 3: RF exposure evaluationMethod + expose all 4 boundaries to consumers
 ```
 
-## Test counts (final, this branch)
+## Phase 2 addendum (post-Phase-1 extension)
+
+A larger follow-up spec arrived requesting the canonical pipeline be
+extended toward a more detailed TypeScript-shaped model (CandidateAnalysis,
+OperatingScenario/AntennaDesign union types, a 4-tier RF exposure model,
+ranking diagnostics, typed ground-system alternatives, a cost/schedule
+dependency graph, a developer truth panel, LLM narrative guardrails).
+Phase 2 scoped the three highest-priority, highest-real-world-risk items
+from that spec; the rest (ranking diagnostics/tie-grouping, ground-system
+alternatives typing, schedule dependency graph, developer truth panel,
+narrative guardrails) is explicitly deferred to a later phase, not
+attempted here.
+
+**Phase 2 item 1 — finished the remaining Group 3 NIF-derivation items**
+(commit `684810a`). `buildProtectionAdvisory()`, `buildProtectionRequirements()`,
+`buildRegulatoryTimeline()`, and `buildForm301Checklist()` all
+independently re-derived "is NIF required" from `channel_class`
+(`!isLocal`/`isLocal`) instead of `canonical.regulatory.nif`. This exposed
+a genuine, previously-shipping correctness bug, not just a duplication:
+the §73.182(o) local-channel NIF exemption applies **only to Class C**
+stations — a Class A/B/D station on a local channel has always required
+NIF, and these four functions silently said the opposite for every
+local-channel station regardless of class. All four now accept the
+station-level canonical NIF decision and gate on `nif.required`.
+`buildForm301Checklist()`'s `ANTENNA_STUDY` item text was also factually
+wrong (conflated the §73.150 72-azimuth pattern table with §73.151(a)/
+§73.186(a)(1) measurement-radial counts, and stated an NDA figure — "8
+radials at 45° intervals" — matching neither rule); it now reads
+`candidate.canonical.proof`. Two `amSiteOptimizer.test.js` assertions that
+encoded the old (incorrect) behavior were split into two tests: one
+pinning the real Class-C exemption case, one proving Class D on a local
+channel still requires NIF (documenting exactly why the old assertion was
+wrong, per the "fix implementation, not weaken assertions unless
+demonstrably incorrect" policy). **Not addressed:** `nighttime_classification`'s
+own independent `isLocal`-based NIF predicate (same bug pattern,
+discovered but never in the Phase 2 task list) and
+`regulatory_risk_score`'s `NIF_STUDY_REQUIRED` factor — both left
+untouched, out of explicit scope.
+
+**Phase 2 item 2 — `canonical.scenario`** (commit `2940ef2`). New
+`src/engine/am/canonical/scenario.js`, wired into
+`buildCanonicalCandidateResult.js` as `canonical.scenario`. A pure
+naming/labeling layer — it invents no new engineering selection, only
+names facts already assembled (antenna mode, selected design height, NIF
+decision).
+- `OperatingScenario` (`OPERATING_SCENARIOS` in `types.js`):
+  `CURRENT_AUTHORIZED_BASELINE`, `RELOCATION_NDA_DAY_ONLY`,
+  `RELOCATION_NDA_WITH_NIGHT_AUTHORITY`, `RELOCATION_DA_NIGHT`,
+  `RELOCATION_DA_FULL_TIME`, `POWER_UPGRADE_STUDY`.
+- `AntennaDesignCategory` (`ANTENNA_DESIGN_CATEGORIES` in `types.js`):
+  `QUARTER_WAVE`, `COMPACT`, `FIVE_EIGHTHS_WAVE`,
+  `EXISTING_STRUCTURE_COLOCATION`, `CUSTOM_DA_ARRAY`.
+- `primary_scenario_label` (plus the two raw enum values) added to
+  `candidate_comparison_table`; `CandidateDetailDrawer.jsx`'s header shows
+  the label prominently, e.g. *"5 kW daytime NDA relocation using a
+  144.23 m compact radiator"*.
+- **Documented, tested gaps, not fabricated:** `POWER_UPGRADE_STUDY` can
+  never be returned — the engine passes exactly one `tpo_kw` per run,
+  used identically for the baseline site and every relocation candidate,
+  so there is no distinct "currently authorized power" input to compare
+  against; `canonicalScenario.test.js` exhaustively sweeps the reachable
+  input space and asserts this enum member never appears. `DA_DAY`
+  (daytime-only directional) has no dedicated `OperatingScenario` member;
+  it falls back to `RELOCATION_DA_FULL_TIME` with an explicit
+  machine-checkable basis string flagging the gap rather than silently
+  mislabeling.
+
+**Phase 2 item 3 — RF-exposure boundary model** (commit `7032583`).
+`canonical.rfExposure` already produced four distinct labeled distances
+(`reactiveNearFieldBoundaryM`, `controlledMpeBoundaryM`,
+`uncontrolledMpeBoundaryM`, `recommendedFenceDistanceM`) from earlier work
+on this branch — that part of the requested "rebuild" was already done
+and did not need re-doing. What was actually missing: (1) a single
+top-level `evaluationMethod` tag (`ANALYTIC`/`CONSERVATIVE_SCREEN`/
+`NOT_EVALUATED`/`MEASUREMENT`, the last documented as unreachable — no
+field-measurement input path exists in this engine); (2) `candidate_comparison_table`
+only ever surfaced one of the four boundaries (`fence_m`) — the other
+three were computed but invisible at the top level, added as
+`rf_reactive_near_field_m`/`rf_controlled_mpe_m`/`rf_uncontrolled_mpe_m`/
+`rf_evaluation_method`; (3) `CandidateDetailDrawer.jsx`'s "RF exposure /
+MPE" summary panel was reading its own guide's numbers
+(`mpe_rf_exposure_summary`) rather than `canonical.rfExposure`, so it
+could silently show a different fence distance than the comparison table
+— rewired. A new test explicitly proves the four values are never
+silently equal-and-conflated (the reactive near-field boundary must never
+equal any MPE-derived distance — the actual historical bug this rule
+replaces); two of the test's initial assumptions were corrected against
+real physics-model output rather than the implementation being weakened
+to match a wrong assumption (documented inline: `controlledMpe`/
+`uncontrolledMpe` can legitimately coincide at some frequency/power
+combinations, and `tpo_kw: null` evaluates to a *known* zero power, not
+"unknown"). **Not touched:** the more detailed
+`am_rf_exposure_mpe_guide` panel elsewhere in `CandidateDetailDrawer.jsx`
+already labels its near-field/uncontrolled-distance figures distinctly
+(no conflation bug present) and was left as supplementary guide detail,
+consistent with the cost-panel precedent from Phase 1.
+
+## Phase 2 test counts
+
+| Suite | Result |
+|---|---|
+| `src/tests/canonicalScenario.test.js` (new) | 12/12 pass |
+| `src/tests/canonicalRules.test.js` (rfExposure additions) | 30/30 pass |
+| `src/tests/canonicalCore/Pipeline/Rules/Contract/Reconciliation/Scenario` combined | 133/133 pass |
+| `src/tests/amSiteOptimizer.test.js` (re-run after Phase 2) | 1901/1901 pass |
+| **Full repo suite**, re-run after Phase 2 | 4507 total — 4477 pass, 23 fail, 7 skipped. Same 23 pre-existing `countyBoundary.test.js` docker-fixture failures as Phase 1's run (down from 39 in the very first full-suite run because that run also counted `api.test.js`'s environment-dependent tests as failures rather than skips) — confirmed unrelated to any file touched in Phase 2. |
+
+## Test counts (Phase 1 baseline, superseded by the Phase 2 addendum above for amSiteOptimizer/full-suite counts)
 
 | Suite | Result |
 |---|---|
@@ -295,15 +407,27 @@ duplication (e.g., a guide's own internal radial-count field that
 disagrees with `canonical.groundSystem` but is never exposed at the guide's
 top level) remains unaudited technical debt.
 
-**Group 3 items 2–6** (`buildProtectionAdvisory`, `buildProtectionRequirements`,
-`buildRegulatoryTimeline`, the `engineering_summary` NIF statement, and
-`buildForm301Checklist`'s DA/NDA proof-radial text) — part of the original
-task assignment, not re-flagged in this session's remaining-work
-checklists, not touched. `buildForm301Checklist`'s `ANTENNA_STUDY` item
-still states the pre-audit (incorrect) proof-radial figures/text; the
-correct figures are now available at `canonical.proof` (used by the
-`proof_radials` comparison-table column) but the checklist's own prose was
-never updated to match.
+**Group 3 items 2–6 — FIXED in Phase 2 item 1** (`684810a`):
+`buildProtectionAdvisory`, `buildProtectionRequirements`,
+`buildRegulatoryTimeline`, and `buildForm301Checklist`'s `ANTENNA_STUDY`/
+`SKYWAVE_NIF` items all now read `canonical.regulatory.nif` /
+`canonical.proof` instead of independently re-deriving NIF requirement
+from `channel_class` or stating hardcoded (and factually wrong)
+proof-radial text. See the Phase 2 addendum above for the real
+correctness bug this uncovered (the §73.182(o) local-channel exemption is
+Class-C-only, not blanket-local). The `engineering_summary` NIF statement
+(originally listed as Group 3 item 5) turned out to already be correctly
+wired to `canonical.regulatory.nif` from earlier work on this branch —
+verified, not re-touched.
+
+**Newly discovered during Phase 2, NOT fixed** (same `!isLocal`/`isLocal`
+bug pattern as Group 3 items 2–6, but never named in any task list for
+this effort): `nighttime_classification`'s own independent
+`LOCAL_CHANNEL_KHZ.has(frequency_khz)`-based NIF predicate, and
+`regulatory_risk_score`'s `NIF_STUDY_REQUIRED` risk factor. Both are
+per-candidate blocks inside `scoreCandidate()`, distinct from the four
+functions fixed above, and were left untouched per "never touch anything
+not explicitly listed."
 
 **Group 1's colOk / recommended_next_step narratives / propagation
 confidence interval** — blocked, not fixed, for the documented reasons
