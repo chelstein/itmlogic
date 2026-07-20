@@ -606,8 +606,22 @@ test('top_candidates_summary is a non-empty string in the response', async () =>
   assert.equal(out.available, true);
   assert.ok(typeof out.top_candidates_summary === 'string' && out.top_candidates_summary.length > 20,
     `top_candidates_summary must be a non-empty string; got: ${JSON.stringify(out.top_candidates_summary)}`);
-  // Should mention rank 1 score and status
-  assert.ok(/Rank 1/.test(out.top_candidates_summary), 'summary must mention Rank 1');
+  // Should mention the top candidate's score and status. "Rank 1" only
+  // when the top scorer is a genuine relocation candidate -- when it is
+  // the current-site baseline (canonical-consistency-audit-followup,
+  // Phase 3 item 3), the summary correctly leads with "Current site
+  // (baseline)" instead, so a real relocation recommendation is never
+  // confused with "screening found a new site to move to." Accept either,
+  // since which one is correct depends on this run's actual top score,
+  // not a fixed assumption the prior "must mention Rank 1" assertion
+  // baked in.
+  const rank1 = out.candidates.find(c => c.rank === 1);
+  if (rank1?.is_baseline) {
+    assert.ok(/Current site \(baseline\)/.test(out.top_candidates_summary),
+      `summary must lead with "Current site (baseline)" when rank 1 is the baseline; got: ${out.top_candidates_summary}`);
+  } else {
+    assert.ok(/Rank 1/.test(out.top_candidates_summary), 'summary must mention Rank 1');
+  }
 });
 
 test('frequencyChannelClass classifies local, clear, and regional channels correctly', () => {

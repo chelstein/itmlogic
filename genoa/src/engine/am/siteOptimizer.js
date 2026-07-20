@@ -37,6 +37,7 @@ import { deriveScoringContext, TIE_LABEL } from './canonical/scoring.js';
 import { advisoryFromCanonical, ladderRank } from './canonical/recommendation.js';
 import { RECOMMENDATION_LEVELS } from './canonical/types.js';
 import { isDirectionalMode } from './canonical/rules/antennaMode.js';
+import { computeRankingDiagnostics } from './canonical/rankingDiagnostics.js';
 import {
   amAnnualRegFeeUsd,
   ANNUAL_REG_FEES_1153,
@@ -453,6 +454,21 @@ export async function runSiteOptimizer(body = {}){
   // Baseline = the score row for the current site (search by coord match).
   const baseline = scored.find((c) => coordsEqual(c, current_site)) || null;
 
+  // is_baseline (canonical-consistency-audit-followup, Phase 3 item 3):
+  // the current/authorized site is scored and ranked through the exact
+  // same grid-search pipeline as every relocation candidate (by design --
+  // it is how score_delta_vs_baseline etc. below are computed at all) and
+  // can therefore appear as an ordinary numbered row in candidates[]/
+  // candidate_comparison_table, including at rank 1, with nothing to
+  // distinguish it from a genuine relocation recommendation. Stamp an
+  // explicit flag (object-identity match against the same baseline
+  // reference canonical.scenario.operatingScenario already classifies as
+  // CURRENT_AUTHORIZED_BASELINE at the per-candidate level -- this is the
+  // same fact, exposed as a plain boolean for cheap consumer checks).
+  for (const c of scored){
+    c.is_baseline = baseline != null && c === baseline;
+  }
+
   // Stamp deltas vs baseline on every candidate (null if baseline unknown).
   if (baseline){
     const bBd = baseline.explanation?.score_breakdown ?? {};
@@ -494,6 +510,29 @@ export async function runSiteOptimizer(body = {}){
         daytime_reach_km:  (c.daytime_reach_km != null && baseline.daytime_reach_km != null)
           ? round2(c.daytime_reach_km - baseline.daytime_reach_km)
           : null,
+        // Extended (canonical-consistency-audit-followup, Phase 3 item 3)
+        // -- cost/timeline/confidence deltas, using values ALREADY
+        // computed elsewhere (candidate.canonical.costs.total,
+        // compliance_pathway.estimated_weeks_to_filing, score_confidence)
+        // rather than inventing a new measurement.
+        distance_km: c.distance_from_current_km ?? null,
+        cost_low_usd_delta: (c.canonical?.costs?.total?.low != null && baseline.canonical?.costs?.total?.low != null)
+          ? round2(c.canonical.costs.total.low - baseline.canonical.costs.total.low)
+          : null,
+        cost_high_usd_delta: (c.canonical?.costs?.total?.high != null && baseline.canonical?.costs?.total?.high != null)
+          ? round2(c.canonical.costs.total.high - baseline.canonical.costs.total.high)
+          : null,
+        timeline_weeks_to_filing_delta: (c.compliance_pathway?.estimated_weeks_to_filing != null && baseline.compliance_pathway?.estimated_weeks_to_filing != null)
+          ? round2(c.compliance_pathway.estimated_weeks_to_filing - baseline.compliance_pathway.estimated_weeks_to_filing)
+          : null,
+        // Confidence tiers are ORDINAL, not numeric -- report a
+        // change flag + both tiers rather than fabricating a numeric
+        // delta between category labels (LOW/MEDIUM/HIGH).
+        confidence_tier_changed: (c.score_confidence != null && baseline.score_confidence != null)
+          ? c.score_confidence !== baseline.score_confidence
+          : null,
+        confidence_tier_baseline: baseline.score_confidence ?? null,
+        confidence_tier_candidate: c.score_confidence ?? null,
       };
     }
   }
@@ -518,6 +557,14 @@ export async function runSiteOptimizer(body = {}){
       if (c.canonical) c.canonical.scoring = sc;
     }
   }
+
+  // ---- Ranking diagnostics (canonical-consistency-audit-followup,
+  // Phase 3 item 1) — computed ONCE across the full scored set, not
+  // per-candidate (contrast with tied_within_model_precision/tie_group_size
+  // above, which answer "is THIS candidate tied"). Uses the SAME tie
+  // epsilon canonical/scoring.js defaults to, so "tied" means one thing
+  // across both.
+  const ranking_diagnostics = computeRankingDiagnostics({ scored });
 
   // Stamp col_coverage_gap_pct on candidates that fall below the 80% hard floor.
   // Tells the engineer how much additional coverage is needed to clear §73.24(i).
@@ -665,9 +712,17 @@ export async function runSiteOptimizer(body = {}){
   // A compact summary for display and handoff to the engineering team.  Each entry
   // gets a 2-sentence action statement synthesized from the screening metrics.
   const candidate_shortlist = (() => {
+    // Exclude the current-site baseline row (canonical-consistency-audit-
+    // followup, Phase 3 item 3): the baseline can legitimately score
+    // PROMISING (the station may already be well-sited), but "Advance to
+    // full §73.182 NIF study and parcel investigation" / "Initiate treaty
+    // coordination" is nonsensical relocation advice for a site the
+    // station already occupies. is_baseline is sourced from
+    // canonical.scenario.operatingScenario (Phase 2) -- not a new judgment.
+    const relocationCandidates = returned.filter(c => !c.is_baseline);
     // Prefer PROMISING candidates; fall back to any non-NON_COMPLIANT if none exist.
-    const promising = returned.filter(c => c.status_category === 'PROMISING');
-    const pool = promising.length > 0 ? promising : returned.filter(c => c.status_category !== 'NON_COMPLIANT');
+    const promising = relocationCandidates.filter(c => c.status_category === 'PROMISING');
+    const pool = promising.length > 0 ? promising : relocationCandidates.filter(c => c.status_category !== 'NON_COMPLIANT');
     return pool.slice(0, 3).map(c => {
       const dist = c.distance_from_current_km != null ? `${c.distance_from_current_km.toFixed(1)} km ${c.cardinal_direction ?? ''}` : 'unknown distance';
       const col  = c.col_coverage_pct != null ? `${(c.col_coverage_pct * 100).toFixed(0)}%` : '?%';
@@ -857,6 +912,17 @@ export async function runSiteOptimizer(body = {}){
     // "5 kW daytime NDA relocation using a 144.23 m compact radiator".
     primary_scenario_label: c.canonical?.scenario?.primaryScenarioLabel ?? null,
     operating_scenario:     c.canonical?.scenario?.operatingScenario ?? null,
+    // canonical-consistency-audit-followup, Phase 3 item 3: true only for
+    // the current/authorized-site row (see is_baseline above) -- so this
+    // row can be excluded/labeled instead of read as an ordinary
+    // relocation candidate.
+    is_baseline:            c.is_baseline === true,
+    // canonical-consistency-audit-followup, Phase 3 item 1: 3+ candidates
+    // tied within the screening-resolution epsilon (canonical/scoring.js)
+    // -- "#rank" for these rows is display order, not a meaningful
+    // individual engineering rank.
+    tied_screening_group:   c.tied_within_model_precision === true && (c.tie_group_size ?? 0) >= 3,
+    tie_group_size:         c.tie_group_size ?? null,
     antenna_design_category: c.canonical?.scenario?.antennaDesignCategory ?? null,
     go_no_go:               c.site_viability_summary?.go_no_go ?? null,
     viability_confidence:   c.site_viability_summary?.confidence ?? null,
@@ -2566,6 +2632,10 @@ export async function runSiteOptimizer(body = {}){
     // never true here — but the flag now reads that real gate instead of
     // being a hardcoded constant that could silently drift from it.
     filing_ready:    scored.some((c) => c.canonical?.filingReadiness?.ready === true),
+    // canonical-consistency-audit-followup, Phase 3 item 1: how much of
+    // the 1..N ranking is actually meaningful at this screening
+    // resolution — see src/engine/am/canonical/rankingDiagnostics.js.
+    ranking_diagnostics,
     input: {
       callsign, frequency_khz, current_site, search_radius_km,
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
@@ -34373,7 +34443,13 @@ function buildTopSummary(top, baseline, nEvaluated){
   const distStr = r1.distance_from_current_km < 0.5
     ? 'at current location'
     : `${r1.distance_from_current_km.toFixed(0)} km ${card1 ? `${card1} of` : 'from'} current site`;
-  parts.push(`Rank 1 scores ${r1.score.toFixed(1)} (${r1.status_category || 'REVIEW_REQUIRED'}), ${distStr}, σ=${r1.ground_sigma_mS_m} mS/m (${r1.ground_sigma_quality || '—'})`);
+  // canonical-consistency-audit-followup, Phase 3 item 3: when the
+  // top-scoring row IS the current/authorized-site baseline, say so
+  // explicitly instead of letting "Rank 1 scores X.X" read as "this
+  // screening found a new site to move to."
+  parts.push(r1.is_baseline
+    ? `Current site (baseline) scores ${r1.score.toFixed(1)} (${r1.status_category || 'REVIEW_REQUIRED'}) — no relocation candidate in this search beat the status quo, σ=${r1.ground_sigma_mS_m} mS/m (${r1.ground_sigma_quality || '—'})`
+    : `Rank 1 scores ${r1.score.toFixed(1)} (${r1.status_category || 'REVIEW_REQUIRED'}), ${distStr}, σ=${r1.ground_sigma_mS_m} mS/m (${r1.ground_sigma_quality || '—'})`);
 
   // COL field at rank 1 if available.
   if (r1.field_at_col_centroid_mvm != null){

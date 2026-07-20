@@ -14006,14 +14006,25 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   </div>
                 ))}
               </div>
-              {/* Scenarios */}
-              <div className="font-mono text-[9px] text-textDim mb-1">Radial System Scenarios</div>
+              {/* Scenarios — this guide's own illustrative radial-system
+                  options (canonical-consistency-audit-followup, Phase 3
+                  item 2). NONE of these rows is the canonical selected
+                  ground-system design (candidate.canonical.groundSystem.
+                  selectedScenario, whose radialCount/radialLengthM already
+                  drive the comparison table, filing autofill, and
+                  tower_reference elsewhere in this file) — labeled
+                  "ALTERNATIVE (supplementary)" throughout so none of them
+                  reads as if it were the selected/authoritative design. */}
+              <div className="font-mono text-[9px] text-textDim mb-1">
+                Radial System Scenarios <span className="text-textDim/60">(supplementary — see canonical ground system for the selected design)</span>
+              </div>
               <div className="space-y-1 mb-2">
                 {gs.scenarios.map((s, i) => (
-                  <div key={s.label} className={`border rounded p-1.5 ${i === 0 ? 'border-blue-300/30 bg-blue-300/5' : 'border-rule bg-surface/50'}`}>
+                  <div key={s.label} className="border rounded p-1.5 border-rule bg-surface/50">
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="font-mono text-[8px] font-semibold text-textBright">{s.label}</span>
                       <div className="flex gap-2">
+                        <span className="font-mono text-[7px] uppercase tracking-rack text-textDim border border-rule rounded-sm px-1">ALTERNATIVE</span>
                         <span className="font-mono text-[8px] text-textDim">R_gnd={s.ground_loss_ohm} Ω</span>
                         <span className="font-mono text-[8px] text-blue-300 font-bold">{s.antenna_efficiency_pct}% eff</span>
                       </div>
