@@ -7,12 +7,14 @@ audit passes over `src/engine/am/siteOptimizer.js`,
 components (Phase 1); a Phase 2 extension adding explicit
 scenario/antenna-design typing and a four-boundary RF-exposure model;
 a Phase 3 extension adding ranking-diagnostics/tie-grouping, ground-system
-alternative labeling, and baseline-vs-candidate delta framing. Guide-internal
-(namespaced sub-object) duplicates remain explicitly out of scope — see
-"What was NOT fixed" below.
+alternative labeling, and baseline-vs-candidate delta framing; a Phase 4
+extension consolidating timeline/schedule estimates and investigating (and
+ruling out) LLM-narrative risk; and a Phase 5 extension adding a read-only
+developer truth-mode panel. Guide-internal (namespaced sub-object)
+duplicates remain explicitly out of scope — see "What was NOT fixed" below.
+**This is the final phase — Phases 1-5 cover the full original spec.**
 
-**Final commit on this branch (through Phase 4):** `191a6f4` (report commit
-follows this addendum).
+**Final commit on this branch (through Phase 5):** `d292754`.
 
 Commits in this effort, in order:
 ```
@@ -29,7 +31,322 @@ e3efdbc  docs: add Phase 2 addendum to completion report + final verified test c
 7307127  Phase 3: ranking diagnostics/tie-grouping, ground-system status labels, baseline-vs-candidate framing
 a9ed382  docs: add Phase 3 addendum to completion report + final verified test counts
 191a6f4  Phase 4 item 1: consolidate timeline/schedule estimates into canonical.schedule
+57dbdea  docs: add Phase 4 addendum to completion report + final verified test counts
+d292754  Phase 5: developer truth-mode panel (read-only diagnostic view)
 ```
+**15 commits total** (10 substantive code/test commits + 5 documentation
+commits), spanning `89ff552..d292754`.
+
+## FINAL SUMMARY — all 5 phases
+
+### Commits and files touched
+
+15 commits (listed above). Cumulative diff `89ff552..d292754` touches
+**29 files, +6,292 / -371 lines**:
+
+Engine / canonical pipeline:
+- `src/engine/am/siteOptimizer.js` (+921/-… — the largest single file,
+  touched in every phase)
+- `src/engine/am/colocationOpportunities.js`
+- `src/engine/am/canonical/buildCanonicalCandidateResult.js`
+- `src/engine/am/canonical/types.js`
+- `src/engine/am/canonical/groundSystem.js`
+- `src/engine/am/canonical/rules/rfExposure.js`
+- `src/engine/am/canonical/scenario.js` (new, Phase 2)
+- `src/engine/am/canonical/rankingDiagnostics.js` (new, Phase 3)
+- `src/engine/am/canonical/schedule.js` (new, Phase 4)
+- `src/engine/am/canonical/reservedFieldNames.js` (pre-existing branch work, not this effort's own)
+- `src/engine/am/guides/README.md`, `src/engine/am/guides/index.js` (pre-existing branch work)
+
+UI:
+- `src/components/ui/SiteOptimizer/CandidateDetailDrawer.jsx`
+- `src/components/ui/SiteOptimizer/CandidateTable.jsx`
+- `src/components/ui/SiteOptimizer/TowerReferencePanel.jsx`
+- `src/components/ui/SiteOptimizer/SiteOptimizerApp.jsx`
+- `src/components/ui/SiteOptimizer/TruthModePanel.jsx` (new, Phase 5)
+
+Tests (8 new files, 4 extended):
+- `src/tests/canonicalContract.test.js`, `canonicalReconciliation.test.js`,
+  `canonicalScenario.test.js`, `canonicalRankingDiagnostics.test.js`,
+  `canonicalSchedule.test.js` — all new.
+- `src/tests/amSiteOptimizer.test.js`, `canonicalPipeline.test.js`,
+  `canonicalRules.test.js`, `colocationOpportunities.test.js` — extended.
+- `src/tests/guideRegistry.test.js` — new (pre-existing branch work).
+- `src/tests/fixtures/kazmProductionPathSnapshot.json` — new regression
+  snapshot.
+
+`package.json` — one dependency line (`acorn`, pre-existing branch work
+supporting `guideRegistry.test.js`'s static parsing, not added by this
+effort).
+
+### Every real bug found and fixed (not just duplicate consolidation)
+
+These are genuine logic/regulatory errors this effort caught — distinct
+from "the same fact was computed in six places," these are places where
+the computation itself was **wrong**:
+
+1. **§73.182(o) NIF exemption misapplied to every local-channel station,
+   not just Class C** (Phase 4 item 1 investigation, fixed in the course
+   of the Phase-2-era NIF work / confirmed and further propagated in
+   Phase 4). `buildProtectionAdvisory()`, `buildProtectionRequirements()`,
+   `buildRegulatoryTimeline()`, and `buildForm301Checklist()` all treated
+   **every** station on a local channel as NIF-exempt (`!isLocal`), but
+   the real §73.182(o) exemption applies **only to Class C**. A Class
+   A/B/D station on a local channel has always required a NIF study; this
+   codebase said otherwise for every such station until fixed.
+2. **The current/authorized site could be ranked as an ordinary
+   relocation candidate, including at rank #1** (Phase 3 item 3). Verified
+   live: a KAZM run had the baseline score rank 1, and
+   `candidate_shortlist` was generating "Advance to full §73.182 NIF study
+   and parcel investigation" — nonsensical relocation advice for the
+   station's own already-authorized, already-built site.
+3. **A hardcoded, input-independent timeline constant** (Phase 4 item 1).
+   `station_total_project_cost_pro_forma_guide.total_timeline_months_low/
+   high` were literal `18`/`30` — never varying with frequency, class, ASR
+   requirement, treaty zone, or antenna mode, unlike every other timeline
+   figure in the file.
+4. **`TowerReferencePanel.jsx` read a prop name that never matched the
+   real API response** (Phase 2 item 7 / Group 2 item 7). The component
+   checked `tr.asr_registration_required_at_quarter_wave`, but
+   `siteOptimizer.js`'s `tower_reference` has always emitted
+   `asr_registration_required_at_design_height`. For every real production
+   API response this silently showed "ASR may not be required at λ/4"
+   regardless of the actual answer — a shipping bug, not just a naming
+   mismatch, since the two field names never once matched.
+5. **Timeline "totals" that ignored their own parallelism** (Phase 4 item
+   1). Multiple guides' code comments explicitly said phases run in
+   parallel (e.g. "ASR approval... typically runs concurrent with FCC
+   processing"), but the actual total computation summed every phase
+   sequentially anyway, contradicting the guide's own documented reasoning.
+6. **`ANTENNA_STUDY` filing-checklist item stated factually wrong proof-
+   of-performance figures** (Phase 4 item 1 / Group 3 item 6). Conflated
+   the §73.150 72-azimuth **pattern table** with §73.151(a)/§73.186(a)(1)
+   **measurement radial counts**, and stated an NDA figure ("8 radials at
+   45° intervals") that matches neither rule.
+7. **`sky_nif_required`/`du_nif_required`/etc. — 5 independently-derived
+   NIF-required booleans and 13 independently-derived ASR-required
+   booleans in one comparison-table row** (Phase 1, Group 3 item 7), one
+   of the 13 still computed on a quarter-wave-only basis rather than the
+   canonical selected design height — meaning a single exported row could
+   (and did) show contradictory ASR determinations depending on which
+   column a reader looked at.
+8. **`nif_status` silently overwritten by a compliance-category label**
+   (Phase 1, Group 3 item 1). `finalizeLabels()` clobbered the
+   canonical-derived NIF status field with
+   `PROMISING`/`NON-COMPLIANT`/`REVIEW REQUIRED` — a completely different
+   concept (score-based compliance category) — after it had already been
+   correctly set from `canonical.regulatory.nif`.
+9. **The confidence-dampening multiplier fed the ranking score from a
+   locally re-derived tier** that would have collapsed to a constant if
+   naively pointed at `canonical.confidence.engineeringDataConfidence.tier`
+   (Phase 1, Group 1 item 1) — not a bug in the old code per se, but a
+   near-miss: the obvious "just read canonical" fix would have silently
+   destroyed ranking differentiation for every candidate, because that
+   axis's collapsed tier is dominated by a population-basis input that is
+   unconditionally `LOW` at screening. Caught during implementation and
+   fixed correctly (reading the two relevant per-input tiers, not the
+   collapsed axis) rather than shipped as a regression.
+10. **`spacing_verdict` applied a §73.37 mileage table to the candidate's
+    distance from the station's OWN current site** (Phase 1, Group 3 item
+    7) — a mis-framing: that distance is a transition-planning question
+    (construction overlap, STA coordination), never an external-station
+    spacing eligibility verdict. Two more independent copies of the same
+    mis-framed computation (`du_cc_spacing_km`,
+    `spacing_risk_tier`/`spacing_n_required`) existed alongside it.
+
+### What from the original 23-section spec is genuinely NOT done
+
+**Explicitly, permanently out of scope by design (not a gap to close
+later without a fresh, separately-scoped effort):**
+- **The guide-internal long tail.** ~262 inline guide IIFEs in
+  `scoreCandidate()`'s return object each have their own private,
+  namespaced sub-object. This effort only ever audited and fixed
+  **top-level** fields (response fields, comparison-table columns, UI
+  headline values). A guide can still carry its own internal
+  recomputation of, say, a radial count deep inside its own sub-object,
+  disagreeing with `canonical.groundSystem`, and that internal figure is
+  never compared against canonical anywhere. `canonicalContract.test.js`/
+  `guideRegistry.test.js` prove no guide key can **collide with** (i.e.
+  silently overwrite) a reserved canonical-authoritative top-level field
+  name — that is a real, structural guarantee — but it is not an audit of
+  every guide's internal arithmetic. This was always the stated boundary,
+  reconfirmed in every phase's addendum.
+
+**Known gaps surfaced during the work, deliberately not fixed (documented
+with reasons in the phase addenda above):**
+- `site_viability_summary.colOk` and its `confidence` field, and several
+  per-candidate "recommended next step" narratives — blocked because
+  canonical has no §73.24(i) COL-coverage rule, and because
+  `canonical.recommendation.level`/`engineeringDataConfidence` collapse to
+  a constant ceiling during screening (would destroy real differentiation
+  if forced onto these fields without a genuine new canonical rule).
+- `nighttime_classification`'s own independent `isLocal`-based NIF
+  predicate and `regulatory_risk_score`'s `NIF_STUDY_REQUIRED` factor —
+  same bug pattern as real bug #1 above, discovered but never in any
+  phase's explicit task list, so never touched.
+- `SiteOptimizerApp.jsx`'s `DEMO_RESULT`/`DEMO_COLOCATION_RESULT` offline
+  mock payloads predate this entire effort and have **zero** `canonical`
+  keys; demo/offline mode will show degraded (but not wrong — see fix #4)
+  information until that mock data is regenerated from a real production
+  response.
+- No server-side JSON/CSV export exists specifically for AM site-optimizer
+  candidates; the only export is the client-side CSV builder in
+  `CandidateTable.jsx`, which does not include tower-height/radial/ASR
+  columns at all (documented gap in the Phase 1 reconciliation tests).
+- The client-side CSV export was not extended with schedule/scenario
+  columns either — the same `CandidateTable.jsx` limitation applies to
+  Phase 2-4's new fields.
+- Cost/schedule **dependency graph** visualization (distinct from the
+  schedule *model* itself, which is done) — never scoped into any phase;
+  Phase 4 built the schedule model and its phase-dependency data
+  (`blocking`/`parallelWith` flags per phase), but no UI renders it as an
+  actual Gantt/graph view.
+
+### For a human reviewer: what to independently verify before anything filing-adjacent
+
+**This codebase is explicitly screening-grade, not filing-grade — it says
+so in its own schema (`screening_only: true` on every response) and this
+report says so plainly.** Nothing in this effort changed that posture; if
+anything, several fixes made the screening-grade caveats more honest and
+more visible (e.g. `filingReadiness.ready` now genuinely reads a real
+gate instead of a hardcoded `false`, and is `false` for exactly the
+reasons the gate lists). Before any output from this tool is used for an
+actual FCC filing, a licensed broadcast engineer or FCC counsel should
+independently verify, at minimum:
+- **Every conductivity figure** — screening runs use either a GeoTIFF
+  raster (better) or the 15-zone M3 table fallback (`ground_sigma_filing_grade`
+  tells you which); neither is a substitute for an actual §73.190
+  conductivity measurement at the specific candidate site.
+- **The §73.182 nighttime interference (NIF) determination.**
+  `canonical.regulatory.nif` correctly states *whether* a study is
+  required (including the Class-C-only local-channel exemption fixed in
+  this effort) and *whether* one has been run — but this screening tool
+  **never runs the actual §73.182 skywave/RSS solver**. `night_study_present`
+  is hardcoded `false` for every screening candidate; a real NIF study
+  must still be commissioned and run before filing.
+- **COL (community-of-license) coverage**, when no `community_of_license_polygon`
+  is supplied — the engine falls back to a 10-km disc proxy, which is a
+  coarse approximation, not a filing-grade polygon overlap.
+- **The canonical antenna design height** — this is a class-typical
+  default (5/8λ for A/B, 3/8λ for C/D) or the operator's own
+  requested/host-structure height; it is explicitly *not* an optimized or
+  site-surveyed structural design. Real tower height, ASR registration,
+  and FAA study requirements depend on the actual as-built structure.
+- **All cost and schedule figures** — `canonical.costs`/`canonical.schedule`
+  are screening-grade parametric estimates (2026 base year, documented
+  multipliers reused from pre-existing guide logic) — get real bids and a
+  real project schedule before committing capital.
+- **The blanket-population and interference figures** — density-proxy
+  based at screening (never census-block-based); `canonical.blanket`'s
+  own decision object is explicitly capped at `WARN` (never a verified
+  `PASS`/`FAIL`) whenever its input basis is a proxy, precisely so this
+  can't be mistaken for a completed compliance showing.
+- **Guide-internal figures not covered by this effort's canonical audit**
+  (see "guide-internal long tail" above) — if a specific guide's own
+  number is being relied on for a filing decision, verify it independently;
+  only TOP-LEVEL fields were audited for cross-consistency in this pass.
+
+## Phase 5 addendum (developer truth-mode panel)
+
+**Developer truth-mode panel** (commit `d292754`). New
+`src/components/ui/SiteOptimizer/TruthModePanel.jsx` — an internal/
+developer-only panel making it possible to trace any visible number on a
+candidate back to the calculation that produced it.
+
+**Gating:** behind `?debug=1` on the page URL, checked in
+`CandidateDetailDrawer.jsx` via `new URLSearchParams(window.location.search)`.
+Not a build-time flag or environment variable — a runtime opt-in, chosen
+because this is a client-side SPA with no server-rendered "dev build"
+distinction to hook into, and a URL param is trivially shareable/toggleable
+by an engineer without a redeploy. The panel is **not rendered at all**
+(not just hidden via CSS) when the param is absent, so it adds zero
+client-side payload/risk in the normal candidate-review path beyond the
+one `URLSearchParams` check and the component import.
+
+**Read-only, verified by construction:** the panel contains no `<input>`,
+no `onChange`, no state mutation of any canonical value, no dispatch back
+into the app's candidate/result state — every value rendered is read
+directly from props and displayed as text or inside a collapsed
+`<pre>` JSON block. There is no code path in the component that can alter
+`candidate.canonical` or any other application state.
+
+**Contents (everything already exists on the candidate/response — nothing
+new is computed for this panel):**
+- `canonical.scenario` (Phase 2's `OperatingScenario`/`AntennaDesignCategory`
+  labels), with their `*Basis` explanation strings.
+- **Build/schema version.** This repo has **no separate engine/build-version
+  constant** — confirmed by search (no `ENGINE_VERSION`/`BUILD_VERSION`/
+  `APP_VERSION`/`SCHEMA_VERSION` anywhere in `src/engine/am/` or `src/api/`).
+  The panel states this plainly rather than inventing one, and surfaces
+  the two real version-like values that do exist: `package.json`'s
+  `name@version` (`genoa@2.0.0`, imported directly as a JSON module —
+  verified resolvable via both an `esbuild --bundle` check and a full
+  `npm run build`) and `canonical.schema`/`canonical.source`
+  (`'canonical-candidate-result/1'` / `'canonical/buildCanonicalCandidateResult'`),
+  which are the closest thing this codebase has to a versioned contract
+  tag on the data itself.
+- **Raw canonical sub-objects** — `regulatory`, `antenna`, `groundSystem`,
+  `costs`, `schedule`, `rfExposure`, `confidence`, `scoring`,
+  `recommendation`, `validation` — each rendered as a collapsed,
+  expand-on-click read-only JSON viewer, so a developer can inspect the
+  exact `EngineeringValue` (`value`/`unit`/`source`/`confidence`/
+  `assumptions`) behind any number shown elsewhere in the drawer.
+- **`ranking_diagnostics`** (Phase 3) — `rankingConfidence` + its basis
+  string, `evaluatedCandidates`, `uniqueScores`, `topScoreTieCount`,
+  `activeFeatures`/`zeroVarianceFeatures`, plus this specific candidate's
+  own tie fields (`tied_within_model_precision`, `tie_group_size`,
+  `scoring_display_label`) for cross-reference. Threaded through as a new
+  `rankingDiagnostics` prop, passed from `SiteOptimizerApp.jsx`'s
+  `result.ranking_diagnostics` (the response-level field is per-run, not
+  per-candidate, so it has to be passed down rather than read off
+  `candidate` directly).
+- **`canonical.validation`** — the `consistent` boolean plus the full
+  `violations` array (`invariant`/`detail`/`fields`) when any exist. This
+  is the exact same report `CanonicalStatusBanner` already summarizes at
+  the top of the drawer; the truth panel shows it unabridged.
+- **Provenance** — `canonical.regulatory`'s `RegulatoryDecision` objects,
+  each rendered with `state`/`required`/`completion`/`rationale`/
+  `ruleReferences`/`blockers`, plus a collapsed JSON view of `inputsUsed`.
+  This **is** the codebase's existing, real provenance mechanism
+  (`canonical/types.js`'s `ev()` and `decision()` constructors, which make
+  `source`/`confidence`/`assumptions` — and for decisions,
+  `rationale`/`ruleReferences`/`inputsUsed` — mandatory at construction
+  time) — not something invented for this panel. **Documented gap,
+  stated explicitly in the panel itself:** nothing beyond
+  source/confidence/assumptions/rationale/inputsUsed is tracked today —
+  there is no per-run request ID, no timestamped calculation log, and no
+  way to replay "what were the exact upstream engine inputs at the moment
+  this candidate was scored" beyond what's captured in those fields. That
+  is a real limitation of the current provenance model, reported
+  honestly rather than papered over with fabricated tracking data.
+
+**Build verification:** ran `npm run build` (Vite) to confirm the
+`package.json` JSON import resolves cleanly through the real production
+bundler, not just `esbuild --bundle=false`'s JSX-only transpile check —
+it does (112 modules transformed, succeeded). The incidental
+`src/ui/dist/` build-artifact changes produced by that verification run
+were reverted (`git checkout` + `git clean`) before committing, so the
+commit contains only the intended source changes.
+
+**Not touched:** no dedicated test file was added for `TruthModePanel.jsx`
+— consistent with this repo's existing convention (confirmed: none of
+`CanonicalStatusBanner.jsx`, `StatusChip.jsx`, `CandidateTable.jsx`, or
+`CandidateDetailDrawer.jsx` have dedicated test files either; only the
+pure-function helpers in `format.js` are unit-tested). Verification for
+this phase was the build/bundle checks above plus the standard full-suite
+re-run (Phase 5 touched no engine/canonical logic, UI-only).
+
+### Phase 5 test counts
+
+| Suite | Result |
+|---|---|
+| `npm run build` (Vite production build) | succeeded, 112 modules transformed |
+| `esbuild --bundle` resolution check (`TruthModePanel.jsx`, `CandidateDetailDrawer.jsx`) | resolved cleanly, including the `package.json` JSON import |
+| `src/tests/canonicalReconciliation.test.js` | 15/15 pass |
+| `src/tests/siteOptimizerUiFormat.test.js` | 25/25 pass |
+| `src/tests/amSiteOptimizer.test.js` (confirmed independently by the coordinator) | 1901/1901 pass |
+| **Full repo suite** (confirmed independently by the coordinator) | 4523 total — 4477 pass, 39 fail, 7 skipped (the coordinator's run environment reproduced the api.test.js server/DATABASE_URL-timing variance seen in some earlier runs — same 23 countyBoundary.test.js + up to 16 api.test.js pre-existing environmental gaps as every prior phase; confirmed no new regressions). |
+
 
 ## Phase 4 addendum (schedule consolidation; narrative-generation safety investigated)
 
