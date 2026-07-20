@@ -4,12 +4,15 @@
 **Scope:** TOP-LEVEL category-5 duplicate fields identified by four read-only
 audit passes over `src/engine/am/siteOptimizer.js`,
 `src/engine/am/colocationOpportunities.js`, and the SiteOptimizer UI
-components (Phase 1), plus a Phase 2 extension request adding explicit
-scenario/antenna-design typing and a four-boundary RF-exposure model to
-the canonical pipeline. Guide-internal (namespaced sub-object) duplicates
-remain explicitly out of scope — see "What was NOT fixed" below.
+components (Phase 1); a Phase 2 extension adding explicit
+scenario/antenna-design typing and a four-boundary RF-exposure model;
+a Phase 3 extension adding ranking-diagnostics/tie-grouping, ground-system
+alternative labeling, and baseline-vs-candidate delta framing. Guide-internal
+(namespaced sub-object) duplicates remain explicitly out of scope — see
+"What was NOT fixed" below.
 
-**Final commit on this branch (through Phase 2):** `7032583`.
+**Final commit on this branch (through Phase 3):** `7307127` (report commit
+follows this addendum).
 
 Commits in this effort, in order:
 ```
@@ -22,7 +25,113 @@ df5d47e  docs: add canonical-consistency-audit-followup completion report (draft
 684810a  Phase 2 item 1: rewire remaining NIF-derivation functions to canonical.regulatory.nif
 2940ef2  Phase 2 item 2: add canonical.scenario (OperatingScenario/AntennaDesign labeling)
 7032583  Phase 2 item 3: RF exposure evaluationMethod + expose all 4 boundaries to consumers
+e3efdbc  docs: add Phase 2 addendum to completion report + final verified test counts
+7307127  Phase 3: ranking diagnostics/tie-grouping, ground-system status labels, baseline-vs-candidate framing
 ```
+
+## Phase 3 addendum (ranking diagnostics, ground-system labeling, baseline framing)
+
+**Item 1 — ranking diagnostics / tie-grouping** (commit `7307127`). New
+`src/engine/am/canonical/rankingDiagnostics.js`, `computeRankingDiagnostics()`,
+called once across the FULL scored candidate set in `runSiteOptimizer()`
+(distinct from `canonical/scoring.js`'s existing per-candidate
+`tied_within_model_precision`/`tie_group_size` fields, which answer "is
+THIS candidate tied" — this module answers the global question once).
+Produces `evaluatedCandidates`, `uniqueScores` (sequential score
+clustering using the SAME ±2-point epsilon `canonical/scoring.js` already
+defaults to — one tie definition, not two), `topScoreTieCount`,
+`activeFeatures`/`zeroVarianceFeatures` (which `score_breakdown`
+sub-factors actually vary vs. are dead weight across the candidate set),
+and `rankingConfidence` (HIGH/MEDIUM/LOW/NONE). Thresholds are a
+documented judgment call, not hidden: LOW when ≥3 candidates tie within
+epsilon at the top score OR fewer than 1/3 of the run's sub-factors are
+active; MEDIUM at exactly 2 tied at the top OR <2/3 active; NONE for
+fewer than 2 candidates evaluated; HIGH otherwise. Exposed as the new
+top-level `ranking_diagnostics` response field, plus
+`tied_screening_group`/`tie_group_size` columns on
+`candidate_comparison_table`. `CandidateTable.jsx`'s rank cell now shows
+a "tied×N" badge for 3-way-or-more ties, with a tooltip explaining the
+rank number is display order at that point, not an individual
+engineering rank.
+
+**Item 2 — ground-system alternatives typing** (commit `7307127`).
+`canonical/groundSystem.js` already carried a `role` field
+(`SELECTED`/`ALTERNATIVE`) on every scenario from earlier work on this
+branch. Added `recommendationStatus` as an explicit alias using the
+spec's requested field name, rather than renaming the existing `role`
+field. `NOT_RECOMMENDED` is never emitted: the module is deliberately
+decision-free (see its own file header) and has no rule basis to
+disqualify the `COMPACT` or `EXTENDED` scenarios — inventing that
+judgment without a rule basis was explicitly out of scope, per this
+item's own instruction ("only if the rule engine already has a basis for
+this"). Separately, `CandidateDetailDrawer.jsx`'s
+`ground_system_design_guide` panel (a distinct, guide-internal scenario
+list — NOT the same data as `canonical.groundSystem`, different field
+names entirely) previously highlighted its first row with color only and
+no text label, implying it was "the" recommended design; it now carries
+an explicit "ALTERNATIVE" tag on every row plus a note pointing at the
+canonical selected design (already the source for the comparison table,
+filing autofill, and `tower_reference` since Phase 1) as authoritative.
+
+**Item 3 — baseline-vs-candidate delta framing** (commit `7307127`,
+investigated first as instructed). **Confirmed real bug, not
+already-handled:** the current/authorized site is scored and ranked
+through the identical `scoreCandidate()` pipeline as every relocation
+candidate (`baseline = scored.find(c => coordsEqual(c, current_site))` —
+literally the same array element, not a separate object) and can land at
+**any** rank, including #1, with nothing distinguishing it from a
+genuine relocation recommendation. Verified against a live KAZM run
+(`{frequency_khz:780, current_site:{34.86,-111.82}, tpo_kw:5, fcc_class:D}`):
+the baseline scored rank 1, and `candidate_shortlist` was generating
+"Advance to full §73.182 NIF study and parcel investigation" — nonsensical
+relocation advice for the operator's own already-authorized, already-built
+site. Fixes:
+- Added `c.is_baseline` (object-identity match against the same
+  `baseline` reference every existing delta computation already uses —
+  consistent with, not independent from, `canonical.scenario.
+  operatingScenario === CURRENT_AUTHORIZED_BASELINE` from Phase 2).
+- `candidate_shortlist` now excludes `is_baseline` rows before building
+  recommendation actions.
+- `buildTopSummary()` leads with "Current site (baseline) scores X.X...
+  no relocation candidate in this search beat the status quo" instead of
+  "Rank 1 scores X.X..." when the top-scoring row is the baseline.
+- Extended the **already-existing** per-candidate `delta` object (score,
+  population, COL field, conductivity, COL coverage, daytime reach vs.
+  baseline, from earlier work on this branch) with
+  `cost_low_usd_delta`/`cost_high_usd_delta` (from `canonical.costs.total`),
+  `timeline_weeks_to_filing_delta` (from `compliance_pathway.
+  estimated_weeks_to_filing`), and a `confidence_tier_changed` flag
+  (`score_confidence`) — extended the existing structure per the
+  instruction to "use existing baseline data already computed elsewhere,"
+  rather than adding a redundant new `baseline_delta` field duplicating
+  it.
+- `CandidateTable.jsx`'s rank cell shows a "baseline" badge (distinct
+  color from the tie badge) for the baseline row.
+- One `amSiteOptimizer.test.js` assertion hardcoded "summary must mention
+  Rank 1" — with the KAZM fixture, rank 1 genuinely IS the baseline in
+  that test's configuration, so the corrected (and now actual) text is
+  "Current site (baseline)...". The test now checks for whichever framing
+  is actually correct for that run's real top-scoring row, rather than
+  the prior fixed assumption.
+
+**Not touched (deliberately, per the Phase 3 scope boundary):** the
+cost/schedule dependency graph, developer truth panel, and LLM narrative
+guardrails — explicitly reserved for a later phase. `OptimizerMap.jsx`'s
+map markers (which also use `rankColor(c.rank)`) were not given a
+baseline/tie visual treatment — only `CandidateTable.jsx`, the primary
+ranked list, was in scope ("candidate list/table, wherever rank is
+displayed" was interpreted as the table; the map is a supplementary
+visualization, not re-audited here).
+
+## Phase 3 test counts
+
+| Suite | Result |
+|---|---|
+| `src/tests/canonicalRankingDiagnostics.test.js` (new) | 9/9 pass |
+| `src/tests/canonicalPipeline.test.js` (groundSystem `recommendationStatus` addition) | 23/23 pass |
+| `src/tests/canonicalReconciliation/Scenario/RankingDiagnostics/Contract/Pipeline/Core/Rules` combined | 143/143 pass |
+| `src/tests/amSiteOptimizer.test.js` (re-run after Phase 3) | 1901/1901 pass |
+| **Full repo suite**, re-run after Phase 3 | 4517 total — 4471 pass, 39 fail, 7 skipped. 23 are the same pre-existing `countyBoundary.test.js` docker-fixture failures as every prior run; the other 16 are `api.test.js` tests that need a live server/`DATABASE_URL` — this run counted them as failures rather than skips (an environment-timing difference between runs, not a regression: confirmed none of the 39 failing tests touch `siteOptimizer.js`, `colocationOpportunities.js`, any `canonical/*` file, or the two UI files changed in Phase 3). |
 
 ## Phase 2 addendum (post-Phase-1 extension)
 
