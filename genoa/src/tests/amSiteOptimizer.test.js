@@ -16411,11 +16411,23 @@ test('KAZM NDA: FCC fees are $5,430 and NDA flag is false', async () => {
   assert.strictEqual(g.is_directional, false, 'NDA pattern must flag is_directional false');
 });
 
-test('KAZM: timeline is 300–840 days (excl. construction) and filing sequence has 8 steps', async () => {
+test('KAZM: timeline (excl. construction) reads canonical.schedule and filing sequence has 8 steps', async () => {
+  // total_timeline_days_low/high rewired to canonical.schedule
+  // (canonical-consistency-audit-followup, Phase 4 item 1): timeToFiling +
+  // fccProcessingTime + proofAndLicensePeriod, converted weeks->days.
+  // The prior hardcoded 300/840 pinned this guide's own independent
+  // day-figure sum (nepa 30-90 + fcc_processing 180-540 + proof 60-120 +
+  // license_grant 30-90), which disagreed with every OTHER timeline guide
+  // in this file -- that was the exact contradiction this pass eliminates.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_application_filing_cost_and_timeline_guide;
-  assert.strictEqual(g.total_timeline_days_low, 300, 'total_timeline_days_low must be 300');
-  assert.strictEqual(g.total_timeline_days_high, 840, 'total_timeline_days_high must be 840');
+  const sched = out.candidates[0].canonical.schedule;
+  const expectedLow  = Math.round((sched.timeToFiling.value.low  + sched.fccProcessingTime.value.low  + sched.proofAndLicensePeriod.value.low)  * 7);
+  const expectedHigh = Math.round((sched.timeToFiling.value.high + sched.fccProcessingTime.value.high + sched.proofAndLicensePeriod.value.high) * 7);
+  assert.strictEqual(g.total_timeline_days_low, expectedLow,
+    `total_timeline_days_low must equal canonical.schedule-derived ${expectedLow}`);
+  assert.strictEqual(g.total_timeline_days_high, expectedHigh,
+    `total_timeline_days_high must equal canonical.schedule-derived ${expectedHigh}`);
   assert.strictEqual(g.filing_sequence.length, 8, 'filing_sequence must have 8 steps');
   assert.strictEqual(g.construction_days_allowed, 1095, 'CP window must be 3 years = 1095 days');
 });
@@ -16642,13 +16654,23 @@ test('KAZM clear-channel: FCC processing phase (6) is 52–156 weeks', async () 
   assert.strictEqual(phase6.weeks_high, 156, 'clear channel FCC processing weeks_high must be 156');
 });
 
-test('KAZM master timeline: total_weeks is parallel_critical + sequential', async () => {
+test('KAZM master timeline: total_weeks reads canonical.schedule.totalProjectDuration', async () => {
+  // total_weeks_low/high rewired to canonical.schedule.totalProjectDuration
+  // (canonical-consistency-audit-followup, Phase 4 item 1). This guide's
+  // own parallel_path_weeks_*/sequential_weeks_* arithmetic (phases 1-4
+  // combined with max(), phases 5-8 summed) was already methodologically
+  // sound -- unlike several other timeline guides in this file -- but it
+  // still produced a DIFFERENT NUMBER than every other guide due to
+  // independent multiplier choices, so the headline total now points at
+  // the single canonical figure instead; parallel_path_weeks_*/
+  // sequential_weeks_* remain as this guide's own supplementary
+  // critical-path detail (no longer equal to total_weeks_* by
+  // construction, which is the point).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const mt = out.candidates[0].am_relocation_master_timeline_guide;
-  const expected_low  = mt.parallel_path_weeks_low  + mt.sequential_weeks_low;
-  const expected_high = mt.parallel_path_weeks_high + mt.sequential_weeks_high;
-  assert.strictEqual(mt.total_weeks_low,  expected_low,  'total_weeks_low must be parallel + sequential');
-  assert.strictEqual(mt.total_weeks_high, expected_high, 'total_weeks_high must be parallel + sequential');
+  const sched = out.candidates[0].canonical.schedule.totalProjectDuration.value;
+  assert.strictEqual(mt.total_weeks_low,  sched.low,  'total_weeks_low must equal canonical.schedule.totalProjectDuration.low');
+  assert.strictEqual(mt.total_weeks_high, sched.high, 'total_weeks_high must equal canonical.schedule.totalProjectDuration.high');
 });
 
 test('candidate_comparison_table master timeline columns present for KAZM', async () => {

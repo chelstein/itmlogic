@@ -38,7 +38,9 @@ import { evaluateAsrFaa } from './rules/asrFaa.js';
 import { evaluateRfExposure } from './rules/rfExposure.js';
 import { evaluateBlanket } from './rules/blanket.js';
 import { evaluateCurrentSiteRelationship } from './rules/currentSiteOverlap.js';
+import { isClearChannel } from './rules/channelSets.js';
 import { buildScenario } from './scenario.js';
+import { deriveSchedule } from './schedule.js';
 import { greatCircleKm } from '../skywave.js';
 
 const SOURCE = 'canonical/buildCanonicalCandidateResult';
@@ -266,6 +268,21 @@ export function buildCanonicalCandidateResult({
     tpo_kw,
   });
 
+  // ── Stage 8c: schedule — ONE phase-dependency model, decision-free ───
+  // (canonical-consistency-audit-followup, Phase 4 item 1). Reuses inputs
+  // already derived above (isDirectional, asr.required) plus frequency_khz
+  // (station-level) and candidate.treaty_zone_present (optional; the
+  // candidate's own treaty-zone membership, already computed by every
+  // caller today as `treaty_zone` -- threaded through here, not a new
+  // measurement).
+  const schedule = deriveSchedule({
+    isDirectional,
+    isClearChannel: isClearChannel(frequency_khz),
+    asrRequired: asr.required === true,
+    treatyZonePresent: candidate.treaty_zone_present === true,
+    highPower: Number(tpo_kw) >= 25,
+  });
+
   // ── Assemble the core (recommendation-free) result ──────────────────
   const result = {
     schema: 'canonical-candidate-result/1',
@@ -328,6 +345,7 @@ export function buildCanonicalCandidateResult({
     costs,
     scoring,
     scenario,
+    schedule,
   };
 
   // ── Stage 9: validation pass 1 → confidence → recommendation ───────

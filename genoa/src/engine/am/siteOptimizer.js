@@ -38,6 +38,7 @@ import { advisoryFromCanonical, ladderRank } from './canonical/recommendation.js
 import { RECOMMENDATION_LEVELS } from './canonical/types.js';
 import { isDirectionalMode } from './canonical/rules/antennaMode.js';
 import { computeRankingDiagnostics } from './canonical/rankingDiagnostics.js';
+import { deriveSchedule } from './canonical/schedule.js';
 import {
   amAnnualRegFeeUsd,
   ANNUAL_REG_FEES_1153,
@@ -924,6 +925,18 @@ export async function runSiteOptimizer(body = {}){
     tied_screening_group:   c.tied_within_model_precision === true && (c.tie_group_size ?? 0) >= 3,
     tie_group_size:         c.tie_group_size ?? null,
     antenna_design_category: c.canonical?.scenario?.antennaDesignCategory ?? null,
+    // Single canonical-sourced schedule columns (candidate.canonical.
+    // schedule -- canonical-consistency-audit-followup, Phase 4 item 1).
+    // time_to_filing and fcc_processing are kept DISTINCT (never merged),
+    // per the schedule model's own design.
+    schedule_time_to_filing_weeks_low:  c.canonical?.schedule?.timeToFiling?.value?.low ?? null,
+    schedule_time_to_filing_weeks_high: c.canonical?.schedule?.timeToFiling?.value?.high ?? null,
+    schedule_fcc_processing_weeks_low:  c.canonical?.schedule?.fccProcessingTime?.value?.low ?? null,
+    schedule_fcc_processing_weeks_high: c.canonical?.schedule?.fccProcessingTime?.value?.high ?? null,
+    schedule_construction_weeks_low:    c.canonical?.schedule?.constructionPeriod?.value?.low ?? null,
+    schedule_construction_weeks_high:   c.canonical?.schedule?.constructionPeriod?.value?.high ?? null,
+    schedule_total_project_weeks_low:   c.canonical?.schedule?.totalProjectDuration?.value?.low ?? null,
+    schedule_total_project_weeks_high:  c.canonical?.schedule?.totalProjectDuration?.value?.high ?? null,
     go_no_go:               c.site_viability_summary?.go_no_go ?? null,
     viability_confidence:   c.site_viability_summary?.confidence ?? null,
     lat:                    c.lat,
@@ -2689,7 +2702,9 @@ export async function runSiteOptimizer(body = {}){
       has_treaty_candidates: returned.some(c => !!c.treaty_zone),
       any_poor_sigma: returned.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
       n_promising: candidate_count_by_status.PROMISING ?? 0,
-      nif: _canonNifStation
+      nif: _canonNifStation,
+      isDirectional: /^DA/i.test(pattern_mode),
+      highPower: Number(tpo_kw) >= 25,
     }),
     tower_reference,
     inputs_echo: {
@@ -3254,6 +3269,11 @@ async function scoreCandidate(pt, ctx, warnings){
       land_use_class,
       col_polygon_present: !!community_of_license_polygon,
       parcel_data_present: null,    // parcel / zoning availability not checked at screening
+      // canonical-consistency-audit-followup, Phase 4 item 1: threads this
+      // candidate's own treaty-zone membership (already computed above,
+      // not a new measurement) into canonical.schedule's FCC-processing
+      // timeline extension.
+      treaty_zone_present: !!treaty_zone,
       near_airport_trigger: null,   // §17.7(c) airport prong not checked at screening
     },
     propagation: {
@@ -4582,11 +4602,22 @@ async function scoreCandidate(pt, ctx, warnings){
         blocking: true
       });
 
-      const maxWeeks = steps.reduce((acc, s) => {
+      // estimated_weeks_min/estimated_weeks_to_filing rewired to
+      // canonical.schedule.timeToFiling (canonical-consistency-audit-
+      // followup, Phase 4 item 1) instead of summing every step above
+      // sequentially with no parallel treatment (e.g. ASR/FAA coordination
+      // and the NIF study could run in parallel with each other, per
+      // canonical.schedule's environmental-review/FAA-ASR parallel pair).
+      // This is genuinely a "time to filing" figure (steps run
+      // SITE_INVESTIGATION..FCC_FILING, never FCC processing or
+      // construction), so canonical.schedule.timeToFiling is the correct
+      // canonical figure to point at -- not totalProjectDuration.
+      const _schedCp = canonical?.schedule?.timeToFiling?.value;
+      const maxWeeks = _schedCp ? _schedCp.high : steps.reduce((acc, s) => {
         const wks = s.timeline_weeks.split('–');
         return acc + (parseInt(wks[wks.length - 1], 10) || 0);
       }, 0);
-      const minWeeks = steps.reduce((acc, s) => {
+      const minWeeks = _schedCp ? _schedCp.low : steps.reduce((acc, s) => {
         const wks = s.timeline_weeks.split('–');
         return acc + (parseInt(wks[0], 10) || 0);
       }, 0);
@@ -7280,9 +7311,18 @@ async function scoreCandidate(pt, ctx, warnings){
         }
       ];
 
-      // Total optimistic/conservative (sum of phases)
-      const totalLow  = p1Low + p2Low + p3Low + p4Low + p5Low;
-      const totalHigh = (p1High + p1TreatyExtra) + p2High + (p3High + p3TreatyExtra) + (p4High + p4AsrExtra) + p5High;
+      // Total optimistic/conservative -- rewired to canonical.schedule.
+      // totalProjectDuration (canonical-consistency-audit-followup, Phase
+      // 4 item 1) instead of a flat sequential sum of all 5 phases, which
+      // contradicted this guide's OWN comments above ("ASR approval...
+      // typically runs concurrent with FCC processing") by adding every
+      // phase's duration sequentially anyway. canonical.schedule combines
+      // its parallel phase pair (environmental review / FAA-ASR) with
+      // max(), not +. Falls back to the local sequential sum only if
+      // canonical is unavailable.
+      const _schedTotalLt = canonical?.schedule?.totalProjectDuration?.value;
+      const totalLow  = _schedTotalLt ? _schedTotalLt.low  : p1Low + p2Low + p3Low + p4Low + p5Low;
+      const totalHigh = _schedTotalLt ? _schedTotalLt.high : (p1High + p1TreatyExtra) + p2High + (p3High + p3TreatyExtra) + (p4High + p4AsrExtra) + p5High;
 
       // Risk multiplier for conservative
       const risk_tier = hasTreaty_lt ? 'VERY_HIGH'
@@ -9003,8 +9043,19 @@ async function scoreCandidate(pt, ctx, warnings){
       const parallelMaxHigh = Math.max(...phases.filter(p => p.parallel).map(p => p.weeks_high));
       const sequentialLow   = phases.filter(p => !p.parallel).reduce((s, p) => s + p.weeks_low,  0);
       const sequentialHigh  = phases.filter(p => !p.parallel).reduce((s, p) => s + p.weeks_high, 0);
-      const total_weeks_low  = parallelMaxLow  + sequentialLow;
-      const total_weeks_high = parallelMaxHigh + sequentialHigh;
+      // total_weeks_* rewired to canonical.schedule.totalProjectDuration
+      // (canonical-consistency-audit-followup, Phase 4 item 1). This
+      // guide's own parallel-max + sequential-sum math (above) was
+      // already methodologically correct -- unlike several other timeline
+      // guides in this file -- but it still produced a DIFFERENT NUMBER
+      // than the other guides due to independent multiplier choices,
+      // recreating the "N different totals in one row" problem at the
+      // top level even though each guide's internal arithmetic was
+      // locally sound. parallel_path_weeks_*/sequential_weeks_* below
+      // remain this guide's own supplementary phase-critical-path detail.
+      const _schedTotalMt = canonical?.schedule?.totalProjectDuration?.value;
+      const total_weeks_low  = _schedTotalMt ? _schedTotalMt.low  : parallelMaxLow  + sequentialLow;
+      const total_weeks_high = _schedTotalMt ? _schedTotalMt.high : parallelMaxHigh + sequentialHigh;
       const total_months_low  = round2(total_weeks_low  / 4.33);
       const total_months_high = round2(total_weeks_high / 4.33);
 
@@ -9608,8 +9659,25 @@ async function scoreCandidate(pt, ctx, warnings){
       const license_grant_days_low  = 30;
       const license_grant_days_high = 90;
 
-      const total_timeline_low  = nepa_days_low  + fcc_processing_low  + proof_days_low  + license_grant_days_low;
-      const total_timeline_high = nepa_days_high + fcc_processing_high + proof_days_high + license_grant_days_high;
+      // total_timeline_days_* rewired to canonical.schedule (canonical-
+      // consistency-audit-followup, Phase 4 item 1). This guide's own
+      // definition of "total" deliberately EXCLUDES construction_days
+      // (tracked separately below as the 3-year §73.3598 allowance, not
+      // summed in) -- that semantic is preserved: the canonical-sourced
+      // figure below is timeToFiling + fccProcessingTime +
+      // proofAndLicensePeriod (construction excluded), converted
+      // weeks->days (x7), not canonical.schedule.totalProjectDuration
+      // (which DOES include construction and answers a different
+      // question -- see am_relocation_master_timeline_guide/
+      // licensing_timeline_estimate/regulatory_timeline_estimate above,
+      // which all now source the construction-inclusive total).
+      const _schedFcc = canonical?.schedule;
+      const total_timeline_low  = _schedFcc
+        ? Math.round((_schedFcc.timeToFiling.value.low  + _schedFcc.fccProcessingTime.value.low  + _schedFcc.proofAndLicensePeriod.value.low)  * 7)
+        : nepa_days_low  + fcc_processing_low  + proof_days_low  + license_grant_days_low;
+      const total_timeline_high = _schedFcc
+        ? Math.round((_schedFcc.timeToFiling.value.high + _schedFcc.fccProcessingTime.value.high + _schedFcc.proofAndLicensePeriod.value.high) * 7)
+        : nepa_days_high + fcc_processing_high + proof_days_high + license_grant_days_high;
 
       // Total soft cost (excluding construction)
       const total_soft_low  = total_fcc_fees + atty_low  + eng_low;
@@ -20871,8 +20939,16 @@ async function scoreCandidate(pt, ctx, warnings){
         { milestone: 'Equipment install + ATU commissioning',   month_start: 18, month_end: 21, parallel: false },
         { milestone: 'Proof of performance + Form 302-AM',      month_start: 21, month_end: 24, parallel: false },
       ];
-      const total_timeline_months_low  = 18;
-      const total_timeline_months_high = 30;
+      // Rewired to canonical.schedule.totalProjectDuration (canonical-
+      // consistency-audit-followup, Phase 4 item 1) instead of a hardcoded
+      // 18/30-month constant that never varied with frequency, class, ASR
+      // requirement, treaty zone, or antenna mode -- unlike every other
+      // timeline figure in this file, which does vary with those inputs.
+      // canonical.schedule is in WEEKS; converted to months (÷4.345,
+      // same conversion buildRegulatoryTimeline already uses, ~4.3).
+      const _schedTotal = canonical?.schedule?.totalProjectDuration?.value;
+      const total_timeline_months_low  = _schedTotal ? Math.round(_schedTotal.low / 4.345) : 18;
+      const total_timeline_months_high = _schedTotal ? Math.round(_schedTotal.high / 4.345) : 30;
 
       // Financing guidance.
       const financing_options = [
@@ -25833,8 +25909,16 @@ async function scoreCandidate(pt, ctx, warnings){
         }
       ];
 
-      const totalOptimisticWeeks  = phases.reduce((s, p) => s + p.weeks_optimistic, 0);
-      const totalConservativeWeeks= phases.reduce((s, p) => s + p.weeks_conservative, 0);
+      // total_*_weeks rewired to canonical.schedule.totalProjectDuration
+      // (canonical-consistency-audit-followup, Phase 4 item 1) instead of
+      // a flat sequential sum of all 6 phases, which (unlike
+      // am_relocation_master_timeline_guide above) never marked any phase
+      // as running in parallel with another at all -- despite this same
+      // guide's own milestone notes elsewhere saying things like "start
+      // as early as possible (parallel with FCC)" for local zoning.
+      const _schedCpt = canonical?.schedule?.totalProjectDuration?.value;
+      const totalOptimisticWeeks   = _schedCpt ? _schedCpt.low  : phases.reduce((s, p) => s + p.weeks_optimistic, 0);
+      const totalConservativeWeeks = _schedCpt ? _schedCpt.high : phases.reduce((s, p) => s + p.weeks_conservative, 0);
       const totalMilestones = phases.reduce((s, p) => s + p.milestones.length, 0);
 
       // Critical path items (items that directly gate FCC CP issuance)
@@ -33693,7 +33777,8 @@ function buildMinimumSpacingReference({ fcc_class, channel_class }){
 // Weeks are realistic ranges based on FCC processing times (2022-2025 data) and
 // typical consulting/construction durations.  Not a legal guarantee.
 function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
-  asr_required, has_treaty_candidates, any_poor_sigma, n_promising, nif = null }){
+  asr_required, has_treaty_candidates, any_poor_sigma, n_promising, nif = null,
+  isDirectional = false, highPower = false }){
 
   const isClear = channel_class === 'clear_channel';
   const isLocal = channel_class === 'local';
@@ -33776,12 +33861,25 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
     }
   ];
 
-  const activePhasesWeeks = phases
-    .filter(p => p.blocking)
-    .map(p => p.weeks.split('–').map(Number));
-
-  const totalMin = activePhasesWeeks.reduce((a, r) => a + (r[0] || 0), 0);
-  const totalMax = activePhasesWeeks.reduce((a, r) => a + (r[r.length - 1] || 0), 0);
+  // Total -- rewired to canonical/schedule.js's deriveSchedule()
+  // (canonical-consistency-audit-followup, Phase 4 item 1) instead of
+  // naively summing every `blocking:true` phase above sequentially
+  // (which included TREATY_COORD, conditionally blocking, added straight
+  // into the total regardless of what else was already running in
+  // parallel). deriveSchedule() combines its parallel phase pair
+  // (environmental review / FAA-ASR) with max(), not +, and keeps FCC
+  // processing time distinct from pre-filing time-to-filing. The `phases`
+  // array above remains the station-level narrative breakdown (kept for
+  // its labels/descriptions), but the TOTAL is the single canonical figure.
+  const _sched = deriveSchedule({
+    isDirectional,
+    isClearChannel: isClear,
+    asrRequired: asr_required === true,
+    treatyZonePresent: has_treaty_candidates === true,
+    highPower,
+  });
+  const totalMin = _sched.totalProjectDuration.value.low;
+  const totalMax = _sched.totalProjectDuration.value.high;
 
   const totalMonthsMin = Math.round(totalMin / 4.3);
   const totalMonthsMax = Math.round(totalMax / 4.3);
