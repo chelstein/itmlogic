@@ -2,6 +2,7 @@ import React from 'react';
 import StatusChip from './StatusChip.jsx';
 import ScoreBreakdownChart from './ScoreBreakdownChart.jsx';
 import CanonicalStatusBanner from './CanonicalStatusBanner.jsx';
+import TruthModePanel from './TruthModePanel.jsx';
 import { fmtCoord, fmtBlanketPct, stateColor, requirementColor, passFailColor, violationColor, STATE_COLORS } from './format.js';
 import { approxString, costRangeString, scoreString } from '../../../engine/am/canonical/formatters.js';
 
@@ -225,10 +226,17 @@ function DeltaRow({ label, candidateVal, baselineVal, higherIsBetter, fmt }){
 // from the chip row when status_category already carries the key signal.
 const ADMIN_LABELS = new Set(['SCREENING ONLY', 'ENGINEER REVIEW REQUIRED']);
 
-export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw, fcc_class, pattern_mode }){
+export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw, fcc_class, pattern_mode, rankingDiagnostics }){
   if (!candidate) return null;
   const e = candidate.explanation || {};
   const isInfra = candidate.source === 'INFRASTRUCTURE';
+  // canonical-consistency-audit-followup, Phase 5: developer truth-mode
+  // panel is gated behind ?debug=1 -- NOT visible in the normal
+  // candidate-review UI by default, since it is internal diagnostic
+  // tooling, not a customer-facing feature. Read once per render; safe in
+  // any environment without a `window` (SSR/tests) since it's guarded.
+  const debugMode = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('debug') === '1';
   // When status_category is set, only show non-admin supplemental labels.
   const supplementalLabels = candidate.status_category
     ? (candidate.status_labels || []).filter(s => !ADMIN_LABELS.has(s))
@@ -370,6 +378,13 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
       <section className="px-4 py-4 space-y-5">
         {/* Canonical result status — confidence / readiness / studies / consistency */}
         <CanonicalStatusBanner canonical={candidate.canonical} />
+
+        {/* Developer truth-mode panel (canonical-consistency-audit-followup,
+            Phase 5) — internal diagnostic only, opt-in via ?debug=1, never
+            rendered by default. Read-only: inspection, not editing. */}
+        {debugMode && (
+          <TruthModePanel candidate={candidate} rankingDiagnostics={rankingDiagnostics} />
+        )}
 
         {/* FCC Filing Auto-Fill Preview */}
         {(() => {
