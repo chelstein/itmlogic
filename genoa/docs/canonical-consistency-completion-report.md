@@ -11,7 +11,7 @@ alternative labeling, and baseline-vs-candidate delta framing. Guide-internal
 (namespaced sub-object) duplicates remain explicitly out of scope — see
 "What was NOT fixed" below.
 
-**Final commit on this branch (through Phase 3):** `7307127` (report commit
+**Final commit on this branch (through Phase 4):** `191a6f4` (report commit
 follows this addendum).
 
 Commits in this effort, in order:
@@ -27,7 +27,121 @@ df5d47e  docs: add canonical-consistency-audit-followup completion report (draft
 7032583  Phase 2 item 3: RF exposure evaluationMethod + expose all 4 boundaries to consumers
 e3efdbc  docs: add Phase 2 addendum to completion report + final verified test counts
 7307127  Phase 3: ranking diagnostics/tie-grouping, ground-system status labels, baseline-vs-candidate framing
+a9ed382  docs: add Phase 3 addendum to completion report + final verified test counts
+191a6f4  Phase 4 item 1: consolidate timeline/schedule estimates into canonical.schedule
 ```
+
+## Phase 4 addendum (schedule consolidation; narrative-generation safety investigated)
+
+**Item 1 — timeline/schedule consolidation** (commit `191a6f4`). Investigated
+first, as instructed. **Found serious, not cosmetic, divergence** — at
+least six independent timeline/schedule computations exist in
+`siteOptimizer.js` (`regulatory_timeline_estimate`,
+`licensing_timeline_estimate`, `compliance_pathway`,
+`am_relocation_master_timeline_guide`,
+`am_fcc_application_filing_cost_and_timeline_guide`,
+`construction_permit_timeline_optimizer`), in three different units
+(weeks/days/months), with disagreeing phase breakdowns. Worst of all:
+`station_total_project_cost_pro_forma_guide`'s `total_timeline_months_low/
+high` were **hardcoded literal constants (18/30 months)** that never
+varied with frequency, class, ASR requirement, treaty zone, or antenna
+mode — unlike every other timeline figure in the file, which does vary
+with those inputs. Most of the "total" computations also summed **every**
+phase sequentially despite several guides' own code comments explicitly
+noting phases run in parallel (e.g. "ASR approval... typically runs
+concurrent with FCC processing") — the total simply ignored what the
+guide's own prose said. This was the "diverge, build ONE schedule model"
+branch of the instructions, not the lighter-touch branch — the guides did
+not substantially agree.
+
+New `src/engine/am/canonical/schedule.js`, `deriveSchedule()` — decision-free
+(same discipline as `groundSystem.js`), 8 phases (pre-filing due
+diligence, engineering studies, environmental review, FAA/ASR, FCC
+application prep, FCC processing, construction, proof/license-to-cover)
+with `blocking`/`parallelWith` flags per phase. **Reused the exact
+duration multipliers `licensing_timeline_estimate` (the most complete
+pre-existing guide) already used** for DA/treaty/ASR/high-power/
+clear-channel — no new figures were invented, only the phase graph and
+the total-duration arithmetic were corrected:
+- `timeToFiling` = pre-filing + engineering + `max(environmental,
+  FAA/ASR)` [the one genuinely parallel pair] + application prep.
+- `fccProcessingTime` — a **distinct** figure, never merged into a total.
+- `constructionPeriod` / `proofAndLicensePeriod` — separate figures.
+- `totalProjectDuration` = `timeToFiling + fccProcessingTime +
+  constructionPeriod + proofAndLicensePeriod` — all genuinely sequential
+  end-to-end (this is the one place a straight sum is actually correct:
+  you cannot build before CP grant, cannot prove performance before
+  construction, cannot get the covering license before proof).
+
+Wired into `buildCanonicalCandidateResult.js` as `canonical.schedule`
+(stage 8c), reusing `isDirectional`/`asr.required` already derived
+earlier in the pipeline plus a new optional `candidate.treaty_zone_present`
+input threaded from `siteOptimizer.js`'s already-computed `treaty_zone`
+(not a new measurement).
+
+Rewired 6 duplicate headline totals (each guide's own phase-breakdown
+detail left as supplementary, same pattern as cost in Phase 1):
+`station_total_project_cost_pro_forma_guide` (hardcoded constant gone),
+`licensing_timeline_estimate`, `regulatory_timeline_estimate` (response-
+level, via `buildRegulatoryTimeline`, extended with `isDirectional`/
+`highPower` params), `am_relocation_master_timeline_guide` (its own
+parallel-max + sequential math was **already methodologically correct**
+— unlike the others — but still produced a different number than every
+other guide due to independent multiplier choices, so it was repointed
+for cross-guide consistency), `am_fcc_application_filing_cost_and_
+timeline_guide` (preserved this guide's own deliberate "excludes
+construction" semantic: `timeToFiling + fccProcessingTime +
+proofAndLicensePeriod` only, not `totalProjectDuration`), and
+`construction_permit_timeline_optimizer` (a flat 6-phase sequential sum
+with **no** parallel treatment at all — the worst of the bunch after the
+hardcoded constant). `compliance_pathway.estimated_weeks_min/
+estimated_weeks_to_filing` — genuinely a time-to-filing figure (its steps
+run `SITE_INVESTIGATION`..`FCC_FILING` only) — now reads
+`canonical.schedule.timeToFiling`, not `totalProjectDuration`.
+`candidate_comparison_table` gains 8 new canonical-sourced columns
+(`schedule_time_to_filing_weeks_low/high`, `schedule_fcc_processing_
+weeks_low/high`, `schedule_construction_weeks_low/high`, `schedule_
+total_project_weeks_low/high`) — `fcc_processing` kept distinct from
+`time_to_filing` per the model's own design, never merged.
+
+Two `amSiteOptimizer.test.js` assertions hardcoded the OLD, now-superseded
+numbers (300/840 days pinned to one guide's independent day-based sum;
+82 weeks pinned to another guide's own parallel+sequential arithmetic
+before it was repointed at the single canonical figure). Both were
+updated to compute their expected values FROM `canonical.schedule`
+directly (not re-hardcoded to a new magic number), with inline
+documentation of why the prior pinned value is now stale.
+
+**Item 2 — narrative generation safety** (investigated, commit `191a6f4`,
+no code changes). Confirmed **no LLM is involved anywhere** in generating
+AM site-optimizer candidate text. `candidate_narrative_summary` and every
+similar field (`top_candidates_summary`, `candidate_shortlist` summaries,
+etc.) are pure template/string-interpolation code — verified directly by
+reading the implementation (plain JS ternaries building strings, e.g.
+`candidate_narrative_summary` at `siteOptimizer.js`) and confirming
+`siteOptimizer.js`/`colocationOpportunities.js` have **zero** AI/LLM/
+OpenAI/Anthropic imports (`grep -n "^import"` on both files, cross-checked
+against a repo-wide case-insensitive search for `openai|anthropic|llm|gpt-`
+in the AM engine path). The only LLM integration anywhere in this
+codebase, `src/api/services/rfAgentClient.js` (a DigitalOcean GenAI
+"rfengineer" agent, OpenAI-compatible API), is used exclusively by the
+separate `/api/advisory/review` endpoint
+(`src/api/routes/advisoryReview.js`) for FCC filing-disposition
+(block/legacy/waiver) review — an unrelated feature that is never
+imported by, or reachable from, the AM site-optimizer path. **The spec's
+LLM-narrative-guardrail requirement does not apply**; nothing was touched
+for this item, per the instruction to report and stop rather than modify
+a live LLM-call path without review.
+
+## Phase 4 test counts
+
+| Suite | Result |
+|---|---|
+| `src/tests/canonicalSchedule.test.js` (new) | 6/6 pass |
+| `src/tests/canonicalReconciliation/Schedule/Core/Pipeline/Rules/Contract/Scenario/RankingDiagnostics` combined | 149/149 pass |
+| `src/tests/amSiteOptimizer.test.js` timeline/schedule-focused subset | 55/55 pass |
+| `src/tests/amSiteOptimizer.test.js` (full re-run after Phase 4) | 1901/1901 pass |
+| **Full repo suite**, re-run after Phase 4 | 4523 total — 4493 pass, 23 fail, 7 skipped. Same 23 pre-existing `countyBoundary.test.js` docker-fixture failures as every prior run (`api.test.js` fully passed/skipped this run, no environment-timing failures this time); confirmed none of the 23 touch `siteOptimizer.js`, `colocationOpportunities.js`, any `canonical/*` file, or any file changed in Phase 4. |
 
 ## Phase 3 addendum (ranking diagnostics, ground-system labeling, baseline framing)
 
