@@ -272,6 +272,22 @@ test('groundSystem — Terman loss matches the siteOptimizer formula; unknown sc
     RangeError);
 });
 
+test('groundSystem — recommendationStatus labels selected vs alternative scenarios (canonical-consistency-audit-followup, Phase 3 item 2)', () => {
+  const gs = deriveGroundSystem({ frequency_khz: 780, sigma_msm: 2, selectedScenarioKey: 'COMPACT' });
+  assert.equal(gs.selectedScenario.recommendationStatus, 'SELECTED');
+  assert.equal(gs.selectedScenario.role, 'SELECTED');
+  assert.equal(gs.scenarios.length, Object.keys(GROUND_SCENARIOS).length - 1,
+    'scenarios[] must exclude the selected scenario (it is materialized separately as selectedScenario)');
+  for (const alt of gs.scenarios) {
+    assert.equal(alt.recommendationStatus, 'ALTERNATIVE');
+    assert.equal(alt.role, 'ALTERNATIVE');
+    assert.notEqual(alt.key, 'COMPACT', 'the selected scenario must never also appear in scenarios[]');
+    // NOT_RECOMMENDED is never emitted -- this module is decision-free and
+    // has no rule basis to disqualify COMPACT or EXTENDED as scenarios.
+    assert.notEqual(alt.recommendationStatus, 'NOT_RECOMMENDED');
+  }
+});
+
 test('costModel — refuses a missing TPO instead of silently defaulting', () => {
   const antennaDesign = deriveAntennaDesign({ frequency_khz: 780, fcc_class: 'D' });
   const groundSystem = deriveGroundSystem({ frequency_khz: 780, sigma_msm: 2 });

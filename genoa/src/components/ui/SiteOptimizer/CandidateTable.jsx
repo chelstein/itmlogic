@@ -311,7 +311,49 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                           style={{ background: rankColor(c.rank) }}
                           aria-hidden="true"
                         />
-                        <span className="text-cream">{c.rank}</span>
+                        {/* canonical-consistency-audit-followup, Phase 3 item 3:
+                            is_baseline (sourced from canonical.scenario.
+                            operatingScenario === CURRENT_AUTHORIZED_BASELINE)
+                            flags the current/authorized-site row, which is
+                            scored and ranked through the same pipeline as
+                            every relocation candidate and can otherwise land
+                            at any rank -- including #1 -- indistinguishable
+                            from a genuine "we found a better site" result. */}
+                        {c.is_baseline ? (
+                          <span
+                            className="text-cream"
+                            title={`Rank #${c.rank} is the CURRENT/AUTHORIZED site (baseline), not a relocation candidate -- it is included for comparison, not as a "move to" recommendation.`}
+                          >
+                            {c.rank}
+                            <span className="ml-1 font-mono text-[8px] uppercase tracking-rack border rounded-sm px-1 py-0.5"
+                              style={{ color: '#7ec8e3', borderColor: 'rgba(126,200,227,0.45)', background: 'rgba(126,200,227,0.10)' }}>
+                              baseline
+                            </span>
+                          </span>
+                        ) : /* canonical-consistency-audit-followup, Phase 3 item 1:
+                               c.tie_group_size/tied_within_model_precision are
+                               canonical/scoring.js's per-candidate tie fields
+                               (same +/-2pt epsilon as ranking_diagnostics). A
+                               3-way-or-more tie means this position number is
+                               display order, not a meaningful 1st/2nd/3rd
+                               engineering rank -- flag it instead of silently
+                               implying one candidate beat the others. */
+                        c.tied_within_model_precision && (c.tie_group_size ?? 0) >= 3 ? (
+                          <span
+                            className="text-cream"
+                            title={`TIED SCREENING GROUP: ${c.tie_group_size} candidates score within +/-2 pts of each other at this screening resolution. "#${c.rank}" reflects display order only, not a meaningful individual rank.`}
+                          >
+                            {c.rank}
+                            <span className="ml-1 font-mono text-[8px] uppercase tracking-rack border rounded-sm px-1 py-0.5"
+                              style={{ color: '#ffb347', borderColor: 'rgba(255,179,71,0.45)', background: 'rgba(255,179,71,0.10)' }}>
+                              tied×{c.tie_group_size}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-cream" title={c.tied_within_model_precision ? `Tied with ${(c.tie_group_size ?? 1) - 1} other candidate(s) within +/-2 pts.` : undefined}>
+                            {c.rank}
+                          </span>
+                        )}
                       </span>
                     </td>
                     <td className="px-2 py-1.5 text-right text-cream">{fmt('score', c.score)}</td>

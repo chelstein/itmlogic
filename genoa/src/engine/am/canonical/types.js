@@ -109,6 +109,41 @@ export const RECOMMENDATION_LEVELS = Object.freeze({
   REJECT:                        'REJECT',
 });
 
+/**
+ * Which of the several mixed configurations a candidate report is
+ * actually about — a NAMING/labeling layer over the already-selected
+ * antenna mode/height/NIF facts (canonical/scenario.js), not a new
+ * selection mechanism.
+ * @typedef {'CURRENT_AUTHORIZED_BASELINE'|'RELOCATION_NDA_DAY_ONLY'|'RELOCATION_NDA_WITH_NIGHT_AUTHORITY'|'RELOCATION_DA_NIGHT'|'RELOCATION_DA_FULL_TIME'|'POWER_UPGRADE_STUDY'} OperatingScenario
+ */
+
+/** @type {Readonly<Record<OperatingScenario, OperatingScenario>>} */
+export const OPERATING_SCENARIOS = Object.freeze({
+  CURRENT_AUTHORIZED_BASELINE:      'CURRENT_AUTHORIZED_BASELINE',
+  RELOCATION_NDA_DAY_ONLY:          'RELOCATION_NDA_DAY_ONLY',
+  RELOCATION_NDA_WITH_NIGHT_AUTHORITY: 'RELOCATION_NDA_WITH_NIGHT_AUTHORITY',
+  RELOCATION_DA_NIGHT:              'RELOCATION_DA_NIGHT',
+  RELOCATION_DA_FULL_TIME:          'RELOCATION_DA_FULL_TIME',
+  POWER_UPGRADE_STUDY:              'POWER_UPGRADE_STUDY',
+});
+
+/**
+ * Formalized antenna-structure category, derived from
+ * canonical.antenna.selectionBasis and the selected height's fraction of
+ * wavelength — never a new selection mechanism, just a name for what
+ * deriveAntennaDesign() already picked.
+ * @typedef {'QUARTER_WAVE'|'COMPACT'|'FIVE_EIGHTHS_WAVE'|'EXISTING_STRUCTURE_COLOCATION'|'CUSTOM_DA_ARRAY'} AntennaDesignCategory
+ */
+
+/** @type {Readonly<Record<AntennaDesignCategory, AntennaDesignCategory>>} */
+export const ANTENNA_DESIGN_CATEGORIES = Object.freeze({
+  QUARTER_WAVE:                  'QUARTER_WAVE',
+  COMPACT:                       'COMPACT',
+  FIVE_EIGHTHS_WAVE:             'FIVE_EIGHTHS_WAVE',
+  EXISTING_STRUCTURE_COLOCATION: 'EXISTING_STRUCTURE_COLOCATION',
+  CUSTOM_DA_ARRAY:               'CUSTOM_DA_ARRAY',
+});
+
 /* ── Constructors ────────────────────────────────────────────────────── */
 
 /**

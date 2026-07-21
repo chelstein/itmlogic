@@ -90,6 +90,18 @@ function materializeScenario(spec, { lambda, sigma_msm, towersCount, role }) {
   return Object.freeze({
     key: spec.key,
     role,
+    // recommendationStatus (canonical-consistency-audit-followup, Phase 3
+    // item 2): an explicit alias of `role` using the spec's requested
+    // field name, so any consumer checking for
+    // 'SELECTED'/'ALTERNATIVE'/'NOT_RECOMMENDED' finds it without a
+    // rename of the existing `role` field. NOT_RECOMMENDED is never
+    // emitted here: this module is deliberately DECISION-FREE (see file
+    // header) and has no rule basis to flag any of the three scenarios as
+    // unsuitable -- COMPACT and EXTENDED are legitimate alternatives
+    // requiring their own showings, not disqualified options. Inventing a
+    // NOT_RECOMMENDED judgment without a rule basis was explicitly out of
+    // scope for this pass.
+    recommendationStatus: role,
     basis: spec.basis,
     radialCount: spec.radialCount,
     radialLengthWavelengths: spec.radialLengthWavelengths,

@@ -2,6 +2,7 @@ import React from 'react';
 import StatusChip from './StatusChip.jsx';
 import ScoreBreakdownChart from './ScoreBreakdownChart.jsx';
 import CanonicalStatusBanner from './CanonicalStatusBanner.jsx';
+import TruthModePanel from './TruthModePanel.jsx';
 import { fmtCoord, fmtBlanketPct, stateColor, requirementColor, passFailColor, violationColor, STATE_COLORS } from './format.js';
 import { approxString, costRangeString, scoreString } from '../../../engine/am/canonical/formatters.js';
 
@@ -225,10 +226,17 @@ function DeltaRow({ label, candidateVal, baselineVal, higherIsBetter, fmt }){
 // from the chip row when status_category already carries the key signal.
 const ADMIN_LABELS = new Set(['SCREENING ONLY', 'ENGINEER REVIEW REQUIRED']);
 
-export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw, fcc_class, pattern_mode }){
+export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw, fcc_class, pattern_mode, rankingDiagnostics }){
   if (!candidate) return null;
   const e = candidate.explanation || {};
   const isInfra = candidate.source === 'INFRASTRUCTURE';
+  // canonical-consistency-audit-followup, Phase 5: developer truth-mode
+  // panel is gated behind ?debug=1 -- NOT visible in the normal
+  // candidate-review UI by default, since it is internal diagnostic
+  // tooling, not a customer-facing feature. Read once per render; safe in
+  // any environment without a `window` (SSR/tests) since it's guarded.
+  const debugMode = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('debug') === '1';
   // When status_category is set, only show non-admin supplemental labels.
   const supplementalLabels = candidate.status_category
     ? (candidate.status_labels || []).filter(s => !ADMIN_LABELS.has(s))
@@ -275,6 +283,19 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               {fmtCoord(candidate.lat, candidate.lon)}
             </span>
           </div>
+          {/* Scenario label — candidate.canonical.scenario.primaryScenarioLabel
+              (canonical-consistency-audit-followup, Phase 2 item 2): names
+              which of the several mixed configurations this report is
+              actually about, e.g. "5 kW daytime NDA relocation using a
+              144.23 m compact radiator". Prominent, immediately under the
+              rank/coordinates line. */}
+          {candidate.canonical?.scenario?.primaryScenarioLabel && (
+            <div className="font-display text-[13px] text-cream mt-1"
+              title={[candidate.canonical.scenario.operatingScenarioBasis, candidate.canonical.scenario.antennaDesignCategoryBasis].filter(Boolean).join(' ')}
+            >
+              {candidate.canonical.scenario.primaryScenarioLabel}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5 mt-2">
             {candidate.status_category && (
               <StatusChip status={candidate.status_category} dense />
@@ -294,11 +315,22 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           {onPromoteToStudio && candidate.status_category !== 'NON_COMPLIANT' && (
             <button
               onClick={() => {
+                // Auto-fill height/radial figures are sourced from
+                // candidate.canonical (the single source of truth) instead
+                // of the per-guide am_tower_lighting_and_painting_compliance_guide
+                // / am_ground_radial_system_design_guide objects, which can
+                // disagree with canonical and with each other — this feeds a
+                // real FCC filing autofill, so it must not carry a stale or
+                // contradicted figure (canonical-consistency-audit-followup,
+                // Group 2 item 6).
                 const ltg = candidate.am_tower_lighting_and_painting_compliance_guide;
                 const gnd = candidate.am_ground_radial_system_design_guide;
                 const imp = candidate.am_antenna_system_impedance_and_base_current_guide;
                 const gw  = candidate.am_propagation_groundwave_field_strength_estimate_guide;
                 const env = candidate.am_site_environmental_impact_and_permitting_guide;
+                const antenna = candidate.canonical?.antenna;
+                const ground  = candidate.canonical?.groundSystem?.selectedScenario;
+                const heightM = antenna?.selectedDesignHeightM?.value ?? null;
                 onPromoteToStudio({
                   lat: candidate.lat, lon: candidate.lon,
                   callsign, frequency_khz, tpo_kw,
@@ -306,16 +338,16 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   pattern_mode: pattern_mode ?? candidate.pattern_mode,
                   rank: candidate.rank,
                   status_category: candidate.status_category,
-                  // Auto-fill values derived from engine guides
+                  // Auto-fill values — canonical for height/radials/ASR, guide-derived for the rest
                   autofill: {
-                    tower_overall_height_agl_m:  ltg?.tower_height_m   ?? null,
-                    tower_overall_height_agl_ft: ltg?.tower_height_ft  ?? null,
-                    asr_required:                ltg?.asr_required     ?? null,
+                    tower_overall_height_agl_m:  heightM,
+                    tower_overall_height_agl_ft: heightM != null ? Math.round(heightM * 3.28084 * 100) / 100 : null,
+                    asr_required:                candidate.canonical?.regulatory?.asr?.required ?? null,
                     tower_lighting_type:         ltg?.lighting_type    ?? null,
-                    tower_painting_standard:     ltg?.asr_required     ? 'AC 70/7460-1L Chapter 3' : null,
+                    tower_painting_standard:     candidate.canonical?.regulatory?.asr?.required ? 'AC 70/7460-1L Chapter 3' : null,
                     faa_notification_required:   ltg?.faa_notification_required ?? null,
-                    n_radials_recommended:       gnd?.n_radials_full   ?? null,
-                    radial_length_ft:            gnd?.quarter_wave_ft  ?? null,
+                    n_radials_recommended:       ground?.radialCount   ?? null,
+                    radial_length_ft:            ground?.radialLengthM != null ? Math.round(ground.radialLengthM * 3.28084 * 100) / 100 : null,
                     ground_conductivity_msm:     gw?.conductivity_msm  ?? null,
                     base_current_a:              imp?.base_current_a   ?? null,
                     ct_rating_a:                 imp?.ct_rating_a      ?? null,
@@ -347,6 +379,13 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* Canonical result status — confidence / readiness / studies / consistency */}
         <CanonicalStatusBanner canonical={candidate.canonical} />
 
+        {/* Developer truth-mode panel (canonical-consistency-audit-followup,
+            Phase 5) — internal diagnostic only, opt-in via ?debug=1, never
+            rendered by default. Read-only: inspection, not editing. */}
+        {debugMode && (
+          <TruthModePanel candidate={candidate} rankingDiagnostics={rankingDiagnostics} />
+        )}
+
         {/* FCC Filing Auto-Fill Preview */}
         {(() => {
           const ltg = candidate.am_tower_lighting_and_painting_compliance_guide;
@@ -356,12 +395,23 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           if (!ltg && !gnd && !imp) return null;
           const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
           const fmtN = (n) => n != null ? Number(n).toLocaleString() : '—';
+          // Tower height, ASR requirement, and radial count/length are
+          // sourced from candidate.canonical — the single source of truth —
+          // instead of the per-guide objects, which can silently disagree
+          // with canonical (canonical-consistency-audit-followup, Group 2
+          // item 6). This preview feeds a real FCC filing autofill.
+          const antenna = candidate.canonical?.antenna;
+          const ground  = candidate.canonical?.groundSystem?.selectedScenario;
+          const asrRequired = candidate.canonical?.regulatory?.asr?.required ?? null;
+          const heightM = antenna?.selectedDesignHeightM?.value ?? null;
+          const heightFt = heightM != null ? heightM * 3.28084 : null;
+          const radialLengthFt = ground?.radialLengthM != null ? ground.radialLengthM * 3.28084 : null;
           const fields = [
-            { label: 'Tower height AGL', value: ltg ? `${fmtF(ltg.tower_height_m)} m (${fmtF(ltg.tower_height_ft, 0)} ft)` : '—', auto: !!ltg },
-            { label: 'ASR required (§17.7)', value: ltg ? (ltg.asr_required ? 'YES' : 'No') : '—', auto: !!ltg, warn: ltg?.asr_required },
+            { label: 'Tower height AGL', value: heightM != null ? `${fmtF(heightM)} m (${fmtF(heightFt, 0)} ft)` : '—', auto: heightM != null },
+            { label: 'ASR required (§17.7)', value: asrRequired != null ? (asrRequired ? 'YES' : 'No') : '—', auto: asrRequired != null, warn: asrRequired },
             { label: 'Tower lighting', value: ltg?.lighting_type?.replace(/_/g, ' ') ?? '—', auto: !!ltg },
-            { label: 'Tower painting', value: ltg?.asr_required ? 'AC 70/7460-1L Ch. 3' : 'Not required', auto: !!ltg },
-            { label: 'Radials recommended', value: gnd ? `${gnd.n_radials_full} × ${fmtF(gnd.quarter_wave_ft, 0)} ft` : '—', auto: !!gnd },
+            { label: 'Tower painting', value: asrRequired != null ? (asrRequired ? 'AC 70/7460-1L Ch. 3' : 'Not required') : '—', auto: asrRequired != null },
+            { label: 'Radials recommended', value: ground ? `${ground.radialCount} × ${fmtF(radialLengthFt, 0)} ft` : '—', auto: !!ground },
             { label: 'Base current (RMS)', value: imp ? `${fmtF(imp.base_current_a, 2)} A` : '—', auto: !!imp },
             { label: 'CT rating required', value: imp ? `${imp.ct_rating_a} A` : '—', auto: !!imp },
             { label: 'Ground conductivity', value: gw ? `${fmtF(gw.conductivity_msm, 1)} mS/m` : '—', auto: !!gw },
@@ -1442,28 +1492,42 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
-        {/* MPE RF exposure summary */}
-        {candidate.mpe_rf_exposure_summary && (() => {
-          const mpe = candidate.mpe_rf_exposure_summary;
+        {/* MPE RF exposure summary — the four distance figures are sourced
+            from candidate.canonical.rfExposure (canonical-consistency-
+            audit-followup, Phase 2 item 3) instead of this guide's own
+            near_field_boundary_m/far_field_exclusion_m/
+            recommended_fence_distance_m, which could silently disagree
+            with the canonical-sourced fence_m used elsewhere (comparison
+            table, filing autofill). The reactive near-field boundary is
+            explicitly labeled as NOT a fence/exclusion distance, matching
+            canonical's own labeling. mpe_limit_mw_cm2 (a regulatory limit
+            VALUE, not a distance) has no canonical equivalent and stays
+            guide-sourced. */}
+        {(candidate.mpe_rf_exposure_summary || candidate.canonical?.rfExposure) && (() => {
+          const mpe = candidate.mpe_rf_exposure_summary ?? {};
+          const rf = candidate.canonical?.rfExposure;
+          const reactiveNearField = rf?.reactiveNearFieldBoundaryM?.value_m ?? mpe.near_field_boundary_m;
+          const uncontrolledMpe   = rf?.uncontrolledMpeBoundaryM?.value_m ?? mpe.far_field_exclusion_m;
+          const fenceDistance     = rf?.recommendedFenceDistanceM?.value_m ?? mpe.recommended_fence_distance_m;
           return (
             <div>
               <div className="rack-eyebrow mb-1">RF exposure / MPE</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px]">
                 <div>
-                  <span className="text-textDim">Near-field boundary</span>{' '}
-                  <span className="text-cream">{mpe.near_field_boundary_m != null ? `${mpe.near_field_boundary_m} m` : '—'}</span>
+                  <span className="text-textDim">Reactive near-field boundary (NOT a fence distance)</span>{' '}
+                  <span className="text-cream">{reactiveNearField != null ? `${reactiveNearField} m` : '—'}</span>
                 </div>
                 <div>
-                  <span className="text-textDim">Far-field exclusion</span>{' '}
-                  <span className="text-cream">{mpe.far_field_exclusion_m != null ? `${mpe.far_field_exclusion_m} m` : '—'}</span>
+                  <span className="text-textDim">Uncontrolled (public) MPE distance</span>{' '}
+                  <span className="text-cream">{uncontrolledMpe != null ? `${uncontrolledMpe} m` : '—'}</span>
                 </div>
                 <div>
                   <span className="text-textDim">MPE limit</span>{' '}
                   <span className="text-cream">{mpe.mpe_limit_mw_cm2 != null ? `${mpe.mpe_limit_mw_cm2} mW/cm²` : '—'}</span>
                 </div>
                 <div>
-                  <span className="text-textDim">Fence distance</span>{' '}
-                  <span className="text-amber font-semibold">{mpe.recommended_fence_distance_m != null ? `${mpe.recommended_fence_distance_m} m` : '—'}</span>
+                  <span className="text-textDim">Recommended fence distance</span>{' '}
+                  <span className="text-amber font-semibold">{fenceDistance != null ? `${fenceDistance} m` : '—'}</span>
                 </div>
                 <div className="col-span-2 text-textDim/60 text-[9px] leading-tight mt-0.5">
                   {mpe.rule}
@@ -3534,14 +3598,24 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b', background: '#1e293b', borderRadius: 3, padding: '2px 6px' }}>SCREENING-GRADE</span>
               </div>
 
-              {/* Grand total banner */}
+              {/* Grand total banner — the ONE headline "Total Project Cost"
+                  figure is sourced from candidate.canonical.costs.total
+                  (canonical-consistency-audit-followup, Group 4 item 8),
+                  not this guide's own grand_total_*_usd. The line-items
+                  breakdown below remains as supplementary guide detail. */}
               <div style={{ background: '#1e293b', borderRadius: 6, padding: '10px 14px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', marginBottom: 2 }}>GRAND TOTAL (incl. contingency)</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', marginBottom: 2 }}>TOTAL PROJECT COST (incl. contingency)</div>
                   <div style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>
-                    {fmtRange(pf.grand_total_low_usd, pf.grand_total_high_usd)}
+                    {candidate.canonical?.costs?.total
+                      ? fmtRange(candidate.canonical.costs.total.low, candidate.canonical.costs.total.high)
+                      : fmtRange(pf.grand_total_low_usd, pf.grand_total_high_usd)}
                   </div>
-                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', marginTop: 2 }}>midpoint {fmtK(pf.grand_total_midpoint_usd)}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                    {candidate.canonical?.costs?.total
+                      ? `midpoint ${fmtK((candidate.canonical.costs.total.low + candidate.canonical.costs.total.high) / 2)}`
+                      : `midpoint ${fmtK(pf.grand_total_midpoint_usd)}`}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b' }}>Class {pf.fcc_class} · {pf.frequency_khz} kHz</div>
@@ -5342,12 +5416,20 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 ))}
               </div>
               <div style={{ borderTop: '1px solid #1e3a5f', paddingTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12 }}>
-                <span style={{ color: '#bae6fd', fontWeight: 600 }}>Grand total:</span>
+                <span style={{ color: '#bae6fd', fontWeight: 600 }}>Grand total (this guide, supplementary):</span>
                 <span style={{ color: '#e0f2fe', fontWeight: 600 }}>{fmtRange(g.grand_total_low_usd, g.grand_total_high_usd)}</span>
                 <span style={{ color: '#bae6fd' }}>+ {g.contingency_pct}% contingency:</span>
                 <span style={{ color: '#e0f2fe' }}>{fmt(g.contingency_low_usd)} – {fmt(g.contingency_high_usd)}</span>
-                <span style={{ color: '#7dd3fc', fontWeight: 700, fontSize: 13 }}>TOTAL (w/ contingency):</span>
-                <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 13 }}>{fmtRange(g.total_with_contingency_low_usd, g.total_with_contingency_high_usd)}</span>
+                {/* Headline "Total Project Cost" — sourced from
+                    candidate.canonical.costs.total (canonical-consistency-
+                    audit-followup, Group 4 item 8), not this guide's own
+                    total_with_contingency_*_usd. */}
+                <span style={{ color: '#7dd3fc', fontWeight: 700, fontSize: 13 }}>TOTAL PROJECT COST (canonical):</span>
+                <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 13 }}>
+                  {candidate.canonical?.costs?.total
+                    ? fmtRange(candidate.canonical.costs.total.low, candidate.canonical.costs.total.high)
+                    : fmtRange(g.total_with_contingency_low_usd, g.total_with_contingency_high_usd)}
+                </span>
               </div>
               {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#7dd3fc', fontStyle: 'italic' }}>{g.note}</div>}
             </div>
@@ -7859,15 +7941,24 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* Station Total Project Cost Pro Forma Guide */}
         {candidate.station_total_project_cost_pro_forma_guide && (() => {
           const g = candidate.station_total_project_cost_pro_forma_guide;
+          // Headline Total (low/high/typical) sourced from
+          // candidate.canonical.costs.total (canonical-consistency-audit-
+          // followup, Group 4 item 8) instead of this guide's own
+          // total_project_*_usd; the per-category breakdown table below
+          // remains as supplementary guide detail.
+          const canonTotal = candidate.canonical?.costs?.total;
+          const totalLow  = canonTotal?.low  ?? g.total_project_low_usd;
+          const totalHigh = canonTotal?.high ?? g.total_project_high_usd;
+          const totalTyp  = canonTotal ? (canonTotal.low + canonTotal.high) / 2 : g.total_project_typ_usd;
           return (
             <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #7dd3fc' }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#0c4a6e', marginBottom: 8 }}>
-                Station Relocation Pro Forma — Total Project Cost
+                Station Relocation Pro Forma — Total Project Cost{canonTotal ? ' (canonical)' : ''}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
-                <div><span style={{ color: '#6b7280' }}>Total (low):</span> <strong>${g.total_project_low_usd?.toLocaleString()}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Total (high):</span> <strong>${g.total_project_high_usd?.toLocaleString()}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Typical estimate:</span> <strong style={{ color: '#0369a1' }}>${g.total_project_typ_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Total (low):</span> <strong>${totalLow?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Total (high):</span> <strong>${totalHigh?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Typical estimate:</span> <strong style={{ color: '#0369a1' }}>${totalTyp?.toLocaleString()}</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Contingency:</span> <strong>{g.contingency_pct}%</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Timeline:</span> <strong>{g.total_timeline_months_low}–{g.total_timeline_months_high} months</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Tower height (λ/4):</span> <strong>{g.tower_height_m} m / {g.tower_height_ft} ft</strong></div>
@@ -13930,14 +14021,25 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   </div>
                 ))}
               </div>
-              {/* Scenarios */}
-              <div className="font-mono text-[9px] text-textDim mb-1">Radial System Scenarios</div>
+              {/* Scenarios — this guide's own illustrative radial-system
+                  options (canonical-consistency-audit-followup, Phase 3
+                  item 2). NONE of these rows is the canonical selected
+                  ground-system design (candidate.canonical.groundSystem.
+                  selectedScenario, whose radialCount/radialLengthM already
+                  drive the comparison table, filing autofill, and
+                  tower_reference elsewhere in this file) — labeled
+                  "ALTERNATIVE (supplementary)" throughout so none of them
+                  reads as if it were the selected/authoritative design. */}
+              <div className="font-mono text-[9px] text-textDim mb-1">
+                Radial System Scenarios <span className="text-textDim/60">(supplementary — see canonical ground system for the selected design)</span>
+              </div>
               <div className="space-y-1 mb-2">
                 {gs.scenarios.map((s, i) => (
-                  <div key={s.label} className={`border rounded p-1.5 ${i === 0 ? 'border-blue-300/30 bg-blue-300/5' : 'border-rule bg-surface/50'}`}>
+                  <div key={s.label} className="border rounded p-1.5 border-rule bg-surface/50">
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="font-mono text-[8px] font-semibold text-textBright">{s.label}</span>
                       <div className="flex gap-2">
+                        <span className="font-mono text-[7px] uppercase tracking-rack text-textDim border border-rule rounded-sm px-1">ALTERNATIVE</span>
                         <span className="font-mono text-[8px] text-textDim">R_gnd={s.ground_loss_ohm} Ω</span>
                         <span className="font-mono text-[8px] text-blue-300 font-bold">{s.antenna_efficiency_pct}% eff</span>
                       </div>

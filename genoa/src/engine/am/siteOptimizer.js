@@ -36,6 +36,9 @@ import { buildCanonicalCandidateResult } from './canonical/buildCanonicalCandida
 import { deriveScoringContext, TIE_LABEL } from './canonical/scoring.js';
 import { advisoryFromCanonical, ladderRank } from './canonical/recommendation.js';
 import { RECOMMENDATION_LEVELS } from './canonical/types.js';
+import { isDirectionalMode } from './canonical/rules/antennaMode.js';
+import { computeRankingDiagnostics } from './canonical/rankingDiagnostics.js';
+import { deriveSchedule } from './canonical/schedule.js';
 import {
   amAnnualRegFeeUsd,
   ANNUAL_REG_FEES_1153,
@@ -452,6 +455,21 @@ export async function runSiteOptimizer(body = {}){
   // Baseline = the score row for the current site (search by coord match).
   const baseline = scored.find((c) => coordsEqual(c, current_site)) || null;
 
+  // is_baseline (canonical-consistency-audit-followup, Phase 3 item 3):
+  // the current/authorized site is scored and ranked through the exact
+  // same grid-search pipeline as every relocation candidate (by design --
+  // it is how score_delta_vs_baseline etc. below are computed at all) and
+  // can therefore appear as an ordinary numbered row in candidates[]/
+  // candidate_comparison_table, including at rank 1, with nothing to
+  // distinguish it from a genuine relocation recommendation. Stamp an
+  // explicit flag (object-identity match against the same baseline
+  // reference canonical.scenario.operatingScenario already classifies as
+  // CURRENT_AUTHORIZED_BASELINE at the per-candidate level -- this is the
+  // same fact, exposed as a plain boolean for cheap consumer checks).
+  for (const c of scored){
+    c.is_baseline = baseline != null && c === baseline;
+  }
+
   // Stamp deltas vs baseline on every candidate (null if baseline unknown).
   if (baseline){
     const bBd = baseline.explanation?.score_breakdown ?? {};
@@ -493,6 +511,29 @@ export async function runSiteOptimizer(body = {}){
         daytime_reach_km:  (c.daytime_reach_km != null && baseline.daytime_reach_km != null)
           ? round2(c.daytime_reach_km - baseline.daytime_reach_km)
           : null,
+        // Extended (canonical-consistency-audit-followup, Phase 3 item 3)
+        // -- cost/timeline/confidence deltas, using values ALREADY
+        // computed elsewhere (candidate.canonical.costs.total,
+        // compliance_pathway.estimated_weeks_to_filing, score_confidence)
+        // rather than inventing a new measurement.
+        distance_km: c.distance_from_current_km ?? null,
+        cost_low_usd_delta: (c.canonical?.costs?.total?.low != null && baseline.canonical?.costs?.total?.low != null)
+          ? round2(c.canonical.costs.total.low - baseline.canonical.costs.total.low)
+          : null,
+        cost_high_usd_delta: (c.canonical?.costs?.total?.high != null && baseline.canonical?.costs?.total?.high != null)
+          ? round2(c.canonical.costs.total.high - baseline.canonical.costs.total.high)
+          : null,
+        timeline_weeks_to_filing_delta: (c.compliance_pathway?.estimated_weeks_to_filing != null && baseline.compliance_pathway?.estimated_weeks_to_filing != null)
+          ? round2(c.compliance_pathway.estimated_weeks_to_filing - baseline.compliance_pathway.estimated_weeks_to_filing)
+          : null,
+        // Confidence tiers are ORDINAL, not numeric -- report a
+        // change flag + both tiers rather than fabricating a numeric
+        // delta between category labels (LOW/MEDIUM/HIGH).
+        confidence_tier_changed: (c.score_confidence != null && baseline.score_confidence != null)
+          ? c.score_confidence !== baseline.score_confidence
+          : null,
+        confidence_tier_baseline: baseline.score_confidence ?? null,
+        confidence_tier_candidate: c.score_confidence ?? null,
       };
     }
   }
@@ -517,6 +558,14 @@ export async function runSiteOptimizer(body = {}){
       if (c.canonical) c.canonical.scoring = sc;
     }
   }
+
+  // ---- Ranking diagnostics (canonical-consistency-audit-followup,
+  // Phase 3 item 1) — computed ONCE across the full scored set, not
+  // per-candidate (contrast with tied_within_model_precision/tie_group_size
+  // above, which answer "is THIS candidate tied"). Uses the SAME tie
+  // epsilon canonical/scoring.js defaults to, so "tied" means one thing
+  // across both.
+  const ranking_diagnostics = computeRankingDiagnostics({ scored });
 
   // Stamp col_coverage_gap_pct on candidates that fall below the 80% hard floor.
   // Tells the engineer how much additional coverage is needed to clear §73.24(i).
@@ -577,6 +626,24 @@ export async function runSiteOptimizer(body = {}){
   const asr_required_design = _canonAsr
     ? _canonAsr.required === true
     : design_h_m_top > ASR_THRESHOLD_M;
+  // Station-level canonical NIF decision (canonical-consistency-audit-
+  // followup, Phase 2 item 1) — reused by buildProtectionAdvisory(),
+  // buildProtectionRequirements(), buildRegulatoryTimeline(), and
+  // buildForm301Checklist() below instead of each independently
+  // re-deriving "is NIF required" from channel_class/fcc_class (which
+  // missed the canonical rule's Class-C-on-local-channel exemption nuance
+  // — every OTHER class on a local channel still requires NIF).  Station-
+  // level facts are identical across candidates, so any candidate's
+  // canonical.regulatory.nif is representative.
+  const _canonNifStation = scored[0]?.canonical?.regulatory?.nif ?? null;
+  // Station-level canonical proof-of-performance facts (candidate.
+  // canonical.proof, canonical/rules/proofOfPerformance.js) — reused by
+  // buildForm301Checklist()'s ANTENNA_STUDY item below instead of the
+  // hardcoded pre-audit text ("72 radials at 5° increments" for DA / "8
+  // radials at 45° intervals" for NDA), which conflated the §73.150
+  // pattern-table azimuth count with §73.151(a)/§73.186(a)(1) measurement
+  // radial counts (canonical-consistency-audit-followup, Phase 2 item 1).
+  const _canonProofStation = scored[0]?.canonical?.proof ?? null;
   const tower_reference = {
     wavelength_m:            lambda_m,
     quarter_wave_m,
@@ -597,7 +664,7 @@ export async function runSiteOptimizer(body = {}){
   // Human-readable §73.182 skywave and protection class guidance for the operator.
   const chanClass = frequencyChannelClass(frequency_khz);
   const { protection_class_advisory, skywave_risk_level } = buildProtectionAdvisory({
-    fcc_class, frequency_khz, channel_class: chanClass, pattern_mode
+    fcc_class, frequency_khz, channel_class: chanClass, pattern_mode, nif: _canonNifStation
   });
 
   // ---- 10b. Enrich nif_status with station-level skywave risk ----
@@ -637,16 +704,26 @@ export async function runSiteOptimizer(body = {}){
     // that depend on whether ANY promising candidate triggers a given requirement.
     has_treaty_candidates: scored.some(c => !!c.treaty_zone),
     any_poor_conductivity:  scored.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
-    any_zone_table_sigma:   scored.some(c => c.ground_sigma_filing_grade !== 'filing')
+    any_zone_table_sigma:   scored.some(c => c.ground_sigma_filing_grade !== 'filing'),
+    nif: _canonNifStation,
+    proof: _canonProofStation
   });
 
   // ---- 13. Candidate shortlist — top 3 PROMISING (or best available) candidates ----
   // A compact summary for display and handoff to the engineering team.  Each entry
   // gets a 2-sentence action statement synthesized from the screening metrics.
   const candidate_shortlist = (() => {
+    // Exclude the current-site baseline row (canonical-consistency-audit-
+    // followup, Phase 3 item 3): the baseline can legitimately score
+    // PROMISING (the station may already be well-sited), but "Advance to
+    // full §73.182 NIF study and parcel investigation" / "Initiate treaty
+    // coordination" is nonsensical relocation advice for a site the
+    // station already occupies. is_baseline is sourced from
+    // canonical.scenario.operatingScenario (Phase 2) -- not a new judgment.
+    const relocationCandidates = returned.filter(c => !c.is_baseline);
     // Prefer PROMISING candidates; fall back to any non-NON_COMPLIANT if none exist.
-    const promising = returned.filter(c => c.status_category === 'PROMISING');
-    const pool = promising.length > 0 ? promising : returned.filter(c => c.status_category !== 'NON_COMPLIANT');
+    const promising = relocationCandidates.filter(c => c.status_category === 'PROMISING');
+    const pool = promising.length > 0 ? promising : relocationCandidates.filter(c => c.status_category !== 'NON_COMPLIANT');
     return pool.slice(0, 3).map(c => {
       const dist = c.distance_from_current_km != null ? `${c.distance_from_current_km.toFixed(1)} km ${c.cardinal_direction ?? ''}` : 'unknown distance';
       const col  = c.col_coverage_pct != null ? `${(c.col_coverage_pct * 100).toFixed(0)}%` : '?%';
@@ -830,6 +907,36 @@ export async function runSiteOptimizer(body = {}){
   // Supplements `candidates` (which has full details) with a lighter structure.
   const candidate_comparison_table = returned.map(c => ({
     rank:                   c.rank,
+    // Single canonical-sourced scenario label (candidate.canonical.scenario
+    // — canonical-consistency-audit-followup, Phase 2 item 2): names which
+    // of the several mixed configurations this row is actually about, e.g.
+    // "5 kW daytime NDA relocation using a 144.23 m compact radiator".
+    primary_scenario_label: c.canonical?.scenario?.primaryScenarioLabel ?? null,
+    operating_scenario:     c.canonical?.scenario?.operatingScenario ?? null,
+    // canonical-consistency-audit-followup, Phase 3 item 3: true only for
+    // the current/authorized-site row (see is_baseline above) -- so this
+    // row can be excluded/labeled instead of read as an ordinary
+    // relocation candidate.
+    is_baseline:            c.is_baseline === true,
+    // canonical-consistency-audit-followup, Phase 3 item 1: 3+ candidates
+    // tied within the screening-resolution epsilon (canonical/scoring.js)
+    // -- "#rank" for these rows is display order, not a meaningful
+    // individual engineering rank.
+    tied_screening_group:   c.tied_within_model_precision === true && (c.tie_group_size ?? 0) >= 3,
+    tie_group_size:         c.tie_group_size ?? null,
+    antenna_design_category: c.canonical?.scenario?.antennaDesignCategory ?? null,
+    // Single canonical-sourced schedule columns (candidate.canonical.
+    // schedule -- canonical-consistency-audit-followup, Phase 4 item 1).
+    // time_to_filing and fcc_processing are kept DISTINCT (never merged),
+    // per the schedule model's own design.
+    schedule_time_to_filing_weeks_low:  c.canonical?.schedule?.timeToFiling?.value?.low ?? null,
+    schedule_time_to_filing_weeks_high: c.canonical?.schedule?.timeToFiling?.value?.high ?? null,
+    schedule_fcc_processing_weeks_low:  c.canonical?.schedule?.fccProcessingTime?.value?.low ?? null,
+    schedule_fcc_processing_weeks_high: c.canonical?.schedule?.fccProcessingTime?.value?.high ?? null,
+    schedule_construction_weeks_low:    c.canonical?.schedule?.constructionPeriod?.value?.low ?? null,
+    schedule_construction_weeks_high:   c.canonical?.schedule?.constructionPeriod?.value?.high ?? null,
+    schedule_total_project_weeks_low:   c.canonical?.schedule?.totalProjectDuration?.value?.low ?? null,
+    schedule_total_project_weeks_high:  c.canonical?.schedule?.totalProjectDuration?.value?.high ?? null,
     go_no_go:               c.site_viability_summary?.go_no_go ?? null,
     viability_confidence:   c.site_viability_summary?.confidence ?? null,
     lat:                    c.lat,
@@ -857,8 +964,33 @@ export async function runSiteOptimizer(body = {}){
     min_tpo_for_col_kw:     c.minimum_tpo_for_col_coverage_kw ?? null,
     nighttime_eligibility:  c.nighttime_classification?.eligibility ?? null,
     nif_complexity:         c.nighttime_classification?.nif_complexity ?? null,
-    spacing_verdict:        c.co_channel_spacing_estimate?.screening_verdict ?? null,
-    fence_m:                c.mpe_rf_exposure_summary?.recommended_fence_distance_m ?? null,
+    // Single canonical-sourced NIF-required column (candidate.canonical.
+    // regulatory.nif.required, echoed at c.nif_required) — collapses
+    // int_nighttime_nif, du_nif_required, sky_nif_required, fsc_nif_required,
+    // and cpe_nif_required (5 independent duplicates, deleted below).
+    nif_required:           c.nif_required ?? null,
+    // Rewired to canonical.transition.constructionOverlapRisk (candidate.
+    // canonical.transition) — this is a TRANSITION-PLANNING risk tier
+    // (construction overlap with the station's OWN current site), never a
+    // §73.37 external-spacing eligibility verdict; canonical deliberately
+    // does not produce that verdict (externalSpacingStudy stays
+    // NOT_EVALUATED until a real co/adjacent-channel study runs).
+    spacing_verdict:        c.canonical?.transition?.constructionOverlapRisk ?? null,
+    // canonical.rfExposure carries FOUR distinct boundaries (canonical-
+    // consistency-audit-followup, Phase 2 item 3) — each exposed as its
+    // own column so no consumer can conflate them:
+    //   rf_reactive_near_field_m — physics regime boundary (λ/2π); NEVER
+    //     a fence/exclusion distance.
+    //   rf_controlled_mpe_m — occupational MPE compliance distance.
+    //   rf_uncontrolled_mpe_m — general-population MPE compliance distance.
+    //   fence_m — the recommended fence (uncontrolled MPE distance, 3 m
+    //     practical minimum) — the ONE figure meant to be read as a
+    //     fence/exclusion recommendation.
+    rf_reactive_near_field_m: c.canonical?.rfExposure?.reactiveNearFieldBoundaryM?.value_m ?? null,
+    rf_controlled_mpe_m:    c.canonical?.rfExposure?.controlledMpeBoundaryM?.value_m ?? null,
+    rf_uncontrolled_mpe_m:  c.canonical?.rfExposure?.uncontrolledMpeBoundaryM?.value_m ?? null,
+    rf_evaluation_method:   c.canonical?.rfExposure?.evaluationMethod ?? null,
+    fence_m:                c.canonical?.rfExposure?.recommendedFenceDistanceM?.value_m ?? null,
     blanket_km:             c.blanket_1000mvm_km ?? null,
     field_at_col_mvm:       c.field_at_col_centroid_mvm ?? null,
     people_per_kw:          c.power_efficiency_metrics?.people_per_kw ?? null,
@@ -874,21 +1006,32 @@ export async function runSiteOptimizer(body = {}){
     density_factor:         c.land_use_classification?.density_factor ?? null,
     overlap_fraction:       c.coverage_overlap_analysis?.overlap_fraction ?? null,
     coverage_continuity:    c.coverage_overlap_analysis?.coverage_continuity ?? null,
-    cost_tier:              c.tower_cost_estimate?.cost_tier ?? null,
-    cost_low_usd:           c.tower_cost_estimate?.total_low_usd ?? null,
-    cost_high_usd:          c.tower_cost_estimate?.total_high_usd ?? null,
+    // Rewired to canonical.costs.total (candidate.canonical.costs) — the ONE
+    // canonical total-cost figure; cost_tier is derived from it locally
+    // (canonical does not compute a tier, only the total) using the same
+    // VERY_HIGH/HIGH/MODERATE/LOW thresholds as total_project_cost_estimate.
+    cost_tier:              c.canonical?.costs?.total?.high == null ? null
+      : c.canonical.costs.total.high > 800000 ? 'VERY_HIGH'
+      : c.canonical.costs.total.high > 400000 ? 'HIGH'
+      : c.canonical.costs.total.high > 150000 ? 'MODERATE'
+      : 'LOW',
+    cost_low_usd:           c.canonical?.costs?.total?.low ?? null,
+    cost_high_usd:          c.canonical?.costs?.total?.high ?? null,
     seasonal_variability:   c.seasonal_conductivity_note?.seasonal_variability ?? null,
     seasonal_risk:          c.seasonal_conductivity_note?.risk_level ?? null,
     power_upgrade_verdict:  c.power_upgrade_analysis?.verdict ?? null,
     headroom_kw:            c.power_upgrade_analysis?.headroom_kw ?? null,
-    da_study_recommended:   c.directional_antenna_study_guide?.recommended ?? null,
+    // Rewired to canonical.antenna.patternModeRequired (candidate.canonical.antenna)
+    // — collapses da_study_recommended and the duplicate ap_da_recommended
+    // boolean (deleted below) into the one canonical-sourced value.
+    da_study_recommended:   c.canonical?.antenna?.patternModeRequired?.mode != null
+      ? isDirectionalMode(c.canonical.antenna.patternModeRequired.mode) : null,
     da_study_type:          c.directional_antenna_study_guide?.study_type ?? null,
     skywave_advisory_level: c.skywave_protection_advisory?.advisory_level ?? null,
     feedline_loss_db:       c.transmission_line_analysis?.feedline_options?.find(f => f.id === (c.transmission_line_analysis?.recommended_feedline_id))?.total_loss_db_at_60m ?? null,
     erp_at_antenna_kw:      c.transmission_line_analysis?.feedline_options?.find(f => f.id === (c.transmission_line_analysis?.recommended_feedline_id))?.erp_at_antenna_kw ?? null,
     soft_cost_low_usd:      c.permit_and_engineering_cost_estimate?.total_soft_cost_low_usd ?? null,
     soft_cost_high_usd:     c.permit_and_engineering_cost_estimate?.total_soft_cost_high_usd ?? null,
-    soft_cost_tier:         c.permit_and_engineering_cost_estimate?.cost_tier ?? null,
     gate_verdict:           c.regulatory_gate_summary?.overall_verdict ?? null,
     gate_fail_count:        c.regulatory_gate_summary?.fail_count ?? null,
     gate_warn_count:        c.regulatory_gate_summary?.warn_count ?? null,
@@ -908,14 +1051,11 @@ export async function runSiteOptimizer(body = {}){
     power_headroom_kw:      c.fcc_class_power_ceiling_analysis?.headroom_kw ?? null,
     upgrade_feasibility:    c.fcc_class_power_ceiling_analysis?.upgrade_feasibility ?? null,
     proof_antenna_mode:     c.technical_proof_guide?.antenna_mode ?? null,
-    tpg_proof_radials:      c.technical_proof_guide?.n_proof_radials ?? null,  // renamed: was clobbered by the later proof_radials key
     proof_field_days_min:   c.technical_proof_guide?.estimated_field_days?.[0] ?? null,
     acq_critical_items:     c.site_acquisition_checklist?.critical_count ?? null,
     acq_min_parcel_ha:      c.site_acquisition_checklist?.min_parcel_area_ha ?? null,
-    acq_asr_required:       c.site_acquisition_checklist?.asr_required ?? null,
     int_risk_tier:          c.spectrum_interference_summary?.interference_risk_tier ?? null,
     int_protected_radius_km: c.spectrum_interference_summary?.protected_contour_radius_km ?? null,
-    int_nighttime_nif:      c.spectrum_interference_summary?.nighttime_nif_required ?? null,
     coloc_best_host:        c.colocation_compatibility_score?.best_host_type ?? null,
     coloc_best_score:       c.colocation_compatibility_score?.best_host_score ?? null,
     coloc_best_tier:        c.colocation_compatibility_score?.best_host_tier ?? null,
@@ -928,7 +1068,6 @@ export async function runSiteOptimizer(body = {}){
     fin_payback_optimistic: c.financial_feasibility_summary?.payback_years_optimistic ?? null,
     ap_col_bearing_deg:     c.antenna_pattern_optimization_guide?.col_bearing_deg ?? null,
     ap_col_field_nda_mvm:   c.antenna_pattern_optimization_guide?.field_at_col_nda_mvm ?? null,
-    ap_da_recommended:      c.antenna_pattern_optimization_guide?.da_recommended ?? null,
     prop_confidence:        c.propagation_confidence_interval?.confidence_level ?? null,
     prop_reach_unc_pct:     c.propagation_confidence_interval?.reach_uncertainty_pct ?? null,
     prop_reach_low_km:      c.propagation_confidence_interval?.daytime_reach_bounds_km?.low ?? null,
@@ -949,7 +1088,6 @@ export async function runSiteOptimizer(body = {}){
     gnd_eff_std_pct:        c.ground_system_design_guide?.scenarios?.[0]?.antenna_efficiency_pct ?? null,
     gnd_rho_ohm_m:          c.ground_system_design_guide?.soil_resistivity_ohm_m ?? null,
     twr_wind_ice_zone:      c.tower_structural_assessment_guide?.wind_ice_zone ?? null,
-    twr_asr_required:       c.tower_structural_assessment_guide?.asr_registration_required ?? null,
     twr_faa_type:           c.tower_structural_assessment_guide?.faa_requirements?.type ?? null,
     col_geo_tier:           c.community_of_license_profile?.geographic_tier ?? null,
     col_dist_km:            c.community_of_license_profile?.candidate_to_col_dist_km ?? null,
@@ -957,7 +1095,12 @@ export async function runSiteOptimizer(body = {}){
     noise_class:            c.atmospheric_noise_analysis?.site_noise_class ?? null,
     noise_fa_day:           c.atmospheric_noise_analysis?.effective_noise_fa_day ?? null,
     noise_min_field_mvm:    c.atmospheric_noise_analysis?.minimum_detectable_field_day_mvm ?? null,
-    proof_radials:          c.proof_of_performance_requirements?.traversal_spec?.radial_count ?? null,
+    // Single canonical-sourced proof-radial-count column (candidate.canonical.
+    // proof.radialCount, from the now-corrected canonical proof-of-performance
+    // rule — 6-12 DA measurement radials per §73.151(a), or 6+ NDA radials
+    // per §73.186(a)(1); never the §73.150 72-azimuth pattern-table count).
+    // Collapses tpg_proof_radials (deleted above).
+    proof_radials:          c.canonical?.proof?.radialCount ?? null,
     proof_wks_low:          c.proof_of_performance_requirements?.proof_timeline_weeks_low ?? null,
     proof_mpe_required:     c.proof_of_performance_requirements?.mpe_requirements?.required ?? null,
     ops_nighttime_limit_kw: c.operational_monitoring_requirements?.nighttime_power?.nighttime_tpo_limit_kw ?? null,
@@ -969,9 +1112,10 @@ export async function runSiteOptimizer(body = {}){
     trans_contour_check:    c.am_fm_translator_opportunity?.translator_contour_check ?? null,
     trans_60dbu_km:         c.am_fm_translator_opportunity?.fm_60dbu_radius_screening_km ?? null,
     trans_am_2mvm_km:       c.am_fm_translator_opportunity?.am_2mvm_contour_km ?? null,
-    spacing_risk_tier:      c.spacing_rule_compliance_guide?.spacing_risk_tier ?? null,
-    spacing_n_required:     c.spacing_rule_compliance_guide?.n_checklist_required ?? null,
-    spacing_chan_class:      c.spacing_rule_compliance_guide?.channel_class ?? null,
+    // spacing_risk_tier/spacing_n_required/spacing_chan_class deleted: a
+    // third independent §73.37 mileage-table verdict against the station's
+    // OWN current site — the same mis-framing as spacing_verdict above,
+    // which now carries the single canonical overlap-risk value instead.
     class_upg_feasibility:  c.license_class_upgrade_analysis?.primary_feasibility ?? null,
     class_upg_n_paths:      c.license_class_upgrade_analysis?.n_upgrade_paths ?? null,
     class_upg_to_class:     c.license_class_upgrade_analysis?.upgrade_paths?.[0]?.to_class ?? null,
@@ -987,8 +1131,9 @@ export async function runSiteOptimizer(body = {}){
     iboc_applicable:        c.iboc_hd_radio_analysis?.applicable ?? null,
     iboc_digital_reach_km:  c.iboc_hd_radio_analysis?.iboc_digital_reach_km ?? null,
     iboc_night_risk:        c.iboc_hd_radio_analysis?.nighttime_interference_risk ?? null,
-    du_cc_spacing_km:       c.co_channel_interference_budget?.required_cc_spacing_km ?? null,
-    du_nif_required:        c.co_channel_interference_budget?.nif_study_required ?? null,
+    // du_cc_spacing_km deleted: third independent §73.37 mileage-table
+    // figure against the station's own current site (see spacing_verdict).
+    // du_nif_required deleted: duplicate of the single nif_required column above.
     du_n_mitigations:       c.co_channel_interference_budget?.n_applicable_mitigations ?? null,
     cpt_optimistic_months:  c.construction_permit_timeline_optimizer?.total_optimistic_months ?? null,
     cpt_conservative_months:c.construction_permit_timeline_optimizer?.total_conservative_months ?? null,
@@ -998,17 +1143,21 @@ export async function runSiteOptimizer(body = {}){
     radial_cost_usd:        c.radial_system_engineering_guide?.material_cost_usd_estimate ?? null,
     sky_50pct_km:           c.skywave_coverage_analysis?.skywave_dist_50pct_km ?? null,
     sky_1pct_km:            c.skywave_coverage_analysis?.skywave_dist_1pct_km ?? null,
-    sky_nif_required:       c.skywave_coverage_analysis?.nif_required ?? null,
+    // sky_nif_required deleted: duplicate of the single nif_required column above.
     eas_participation:      c.eas_acp_compliance_guide?.eas_participation ?? null,
     eas_n_equipment:        c.eas_acp_compliance_guide?.n_required_equipment ?? null,
     eas_ipaws_required:     c.eas_acp_compliance_guide?.ipaws_required ?? null,
     tower_height_est_m:     c.tower_lighting_marking_guide?.tower_height_estimate_m ?? null,
-    tower_asr_required:     c.tower_lighting_marking_guide?.asr_required ?? null,
+    // tower_asr_required deleted: duplicate of asr_required_design below.
     tower_faa_tier:         c.tower_lighting_marking_guide?.faa_lighting_tier ?? null,
-    mpe_compliance_status:  c.rf_exposure_mpe_analysis?.compliance_status ?? null,
-    mpe_excl_radius_m:      c.rf_exposure_mpe_analysis?.exclusion_radius_m ?? null,
-    mpe_analysis_eval_required: c.rf_exposure_mpe_analysis?.evaluation_required ?? null,  // renamed: was clobbered by the later mpe_eval_required key
-    reloc_cost_low:         c.station_relocation_cost_estimator?.total_low ?? null,
+    // mpe_compliance_status/mpe_excl_radius_m/mpe_analysis_eval_required
+    // deleted: canonical never claims an MPE compliance PASS/FAIL verdict
+    // (only a routine-evaluation-required decision) — the single
+    // canonical-sourced MPE figure is the fence_m column above
+    // (canonical.rfExposure.recommendedFenceDistanceM).
+    // reloc_cost_low deleted: not a component of canonical.costs.total
+    // (station relocation, not new-site construction) — see cost_low_usd/
+    // cost_high_usd above for the single canonical total-cost figure.
     reloc_cost_high:        c.station_relocation_cost_estimator?.total_high ?? null,
     reloc_cost_midpoint:    c.station_relocation_cost_estimator?.total_midpoint ?? null,
     pline_min_dist_m:       c.power_line_interference_analysis?.recommended_min_distance_m ?? null,
@@ -1043,7 +1192,7 @@ export async function runSiteOptimizer(body = {}){
     stl_total_cost_usd:     c.stl_network_link_guide?.total_stl_cost_usd ?? null,
     fsc_channel_class:      c.frequency_spectrum_coordination?.channel_class ?? null,
     fsc_coord_zone_km:      c.frequency_spectrum_coordination?.coordination_zone_km ?? null,
-    fsc_nif_required:       c.frequency_spectrum_coordination?.nif_required ?? null,
+    // fsc_nif_required deleted: duplicate of the single nif_required column above.
     gci_baseline_sigma:     c.ground_conductivity_improvement?.baseline_sigma_msm ?? null,
     gci_sigma_improved:     c.ground_conductivity_improvement?.sigma_after_improvement_msm ?? null,
     gci_coverage_gain_pct:  c.ground_conductivity_improvement?.coverage_gain_pct ?? null,
@@ -1055,7 +1204,7 @@ export async function runSiteOptimizer(body = {}){
     ssp_capex_usd:          c.site_security_perimeter_guide?.total_capex_usd ?? null,
     ins_total_value_usd:    c.insurance_liability_analysis?.total_insured_value_usd ?? null,
     ins_annual_premium_usd: c.insurance_liability_analysis?.total_annual_premium_usd ?? null,
-    ins_asr_required:       c.insurance_liability_analysis?.asr_required ?? null,
+    // ins_asr_required deleted: duplicate of asr_required_design below.
     dapg_applicable:        c.directional_antenna_proof_guide?.applicable ?? null,
     dapg_n_radials:         c.directional_antenna_proof_guide?.recommended_proof?.radials ?? null,
     dapg_proof_cost_usd:    c.directional_antenna_proof_guide?.estimated_total_proof_cost_usd ?? null,
@@ -1111,7 +1260,15 @@ export async function runSiteOptimizer(body = {}){
     tcsg_tower_height_m:    c.tower_climbing_safety_plan_guide?.estimated_tower_height_m ?? null,
     tcsg_rf_ppe_required:   c.tower_climbing_safety_plan_guide?.rf_ppe_required ?? null,
     tcsg_n_rf_required:     c.tower_climbing_safety_plan_guide?.n_required_rf_measures ?? null,
-    asr_required_height:    c.asr_registration_update_guide?.asr_required_by_height ?? null,
+    // Single canonical-sourced ASR-registration-required column (candidate.
+    // canonical.regulatory.asr.required — same rule/height basis as the
+    // station-level asr_required_design used elsewhere in this file).
+    // Collapses acq_asr_required, twr_asr_required, tower_asr_required,
+    // f301_asr_required, faa_ltg_asr_required, ltg_asr_required,
+    // cpe_asr_required, rdb_asr_required, faa_asr_required, ins_asr_required,
+    // asr_required_height, asr_requires_asr, and tia_asr_triggered_qw (13
+    // independent booleans, one still quarter-wave-basis) — all deleted below.
+    asr_required_design:    c.canonical?.regulatory?.asr?.required ?? null,
     asr_tower_height_m:     c.asr_registration_update_guide?.estimated_tower_height_m ?? null,
     asr_faa_notify:         c.asr_registration_update_guide?.faa_notification_likely ?? null,
     fmpg_freq_tolerance_hz: c.frequency_monitoring_plan_guide?.carrier_frequency_monitoring?.max_deviation_hz ?? null,
@@ -1178,7 +1335,8 @@ export async function runSiteOptimizer(body = {}){
     gric_cost_typ_usd:          c.ground_radial_installation_cost_guide?.total_estimated_cost_usd?.typical ?? null,
     gric_upgrade_cost_usd:      c.ground_radial_installation_cost_guide?.half_wave_upgrade_cost_usd ?? null,
     tccg_tower_height_ft:       c.tower_construction_contract_guide?.tower_height_ft ?? null,
-    tccg_cost_typ_usd:          c.tower_construction_contract_guide?.total_estimated_cost_usd?.typical ?? null,
+    // tccg_cost_typ_usd deleted: duplicate total-cost figure — see
+    // cost_low_usd/cost_high_usd above (candidate.canonical.costs.total).
     tccg_timeline_weeks_typ:    c.tower_construction_contract_guide?.timeline_weeks_typ ?? null,
     atug_base_resistance_ohm:   c.antenna_tuning_unit_commissioning_guide?.base_resistance_ohm_typical ?? null,
     atug_efficiency_pct:        c.antenna_tuning_unit_commissioning_guide?.antenna_efficiency_pct ?? null,
@@ -1200,8 +1358,9 @@ export async function runSiteOptimizer(body = {}){
     acobth_max_coverage_gain_pct: c.am_coverage_optimization_by_tower_height_guide?.max_coverage_gain_pct ?? null,
     tpupg_day_headroom_kw:      c.transmitter_power_upgrade_pathway_guide?.day_headroom_kw ?? null,
     tpupg_coverage_gain_pct:    c.transmitter_power_upgrade_pathway_guide?.coverage_gain_pct ?? null,
-    tpupg_total_low_usd:        c.transmitter_power_upgrade_pathway_guide?.total_project_low_usd ?? null,
-    pfg_total_low_usd:          c.station_total_project_cost_pro_forma_guide?.total_project_low_usd ?? null,
+    // tpupg_total_low_usd and pfg_total_low_usd deleted: duplicate
+    // total-cost figures — see cost_low_usd/cost_high_usd above
+    // (candidate.canonical.costs.total).
     pfg_total_typ_usd:          c.station_total_project_cost_pro_forma_guide?.total_project_typ_usd ?? null,
     pfg_n_cost_categories:      c.station_total_project_cost_pro_forma_guide?.n_cost_categories ?? null,
     atu_r_base_typ_ohm:         c.antenna_base_impedance_and_atu_design_guide?.r_base_typ_ohm ?? null,
@@ -1212,7 +1371,7 @@ export async function runSiteOptimizer(body = {}){
     epcg_payback_years:         c.electrical_power_consumption_guide?.upgrade_payback_years ?? null,
     f301_n_required:            c.fcc_form_301_exhibit_checklist_guide?.n_exhibits_required ?? null,
     f301_n_da_specific:         c.fcc_form_301_exhibit_checklist_guide?.n_exhibits_da_specific ?? null,
-    f301_asr_required:          c.fcc_form_301_exhibit_checklist_guide?.asr_required ?? null,
+    // f301_asr_required deleted: duplicate of asr_required_design above.
     sprg_6mo_rev_loss_low_usd:  c.silent_period_revenue_impact_and_audience_retention_guide?.typical_6mo_revenue_loss_low_usd ?? null,
     sprg_6mo_audience_ret_pct:  c.silent_period_revenue_impact_and_audience_retention_guide?.typical_6mo_audience_retained_pct ?? null,
     sprg_monthly_net_low_usd:   c.silent_period_revenue_impact_and_audience_retention_guide?.monthly_net_revenue_low_usd ?? null,
@@ -1256,7 +1415,7 @@ export async function runSiteOptimizer(body = {}){
     gnd_total_cost_low_usd:     c.am_grounding_system_and_rf_safety_guide?.total_cost_low_usd ?? null,
     gnd_exclusion_zone_m:       c.am_grounding_system_and_rf_safety_guide?.exclusion_zone_m ?? null,
     ltg_type:                   c.am_antenna_tower_lighting_and_faa_guide?.lighting_type ?? null,
-    faa_ltg_asr_required:       c.am_antenna_tower_lighting_and_faa_guide?.asr_required ?? null,  // renamed: was clobbered by the later ltg_asr_required key
+    // faa_ltg_asr_required deleted: duplicate of asr_required_design above.
     ltg_total_initial_cost_low: c.am_antenna_tower_lighting_and_faa_guide?.total_initial_cost_low_usd ?? null,
     acq_site_class:             c.am_site_acquisition_and_real_property_guide?.site_class ?? null,
     acq_purchase_low_usd:       c.am_site_acquisition_and_real_property_guide?.total_purchase_low_usd ?? null,
@@ -1390,9 +1549,19 @@ export async function runSiteOptimizer(body = {}){
     txp_tx_type:                c.am_transmitter_procurement_and_upgrade_guide?.tx_type ?? null,
     txp_total_low_usd:          c.am_transmitter_procurement_and_upgrade_guide?.total_tx_low_usd ?? null,
     txp_tx_cost_low_usd:        c.am_transmitter_procurement_and_upgrade_guide?.tx_cost_low_usd ?? null,
-    gnd_radial_length_ft:       c.am_ground_system_installation_and_maintenance_guide?.radial_length_ft ?? null,
+    // Single canonical-sourced ground-system columns (candidate.canonical.
+    // groundSystem.selectedScenario). Collapses grd_num_radials_ideal,
+    // gnd_total_radials, gnd_std_n_radials, grs_std_n_radials (radial
+    // count); grd_radial_length_ft, grs_radial_length_m,
+    // gnd_insp_radial_length_ft, gnd_std_radial_len_m (radial length) —
+    // all deleted below — plus a single canonical height column,
+    // design_h_m (candidate.canonical.antenna.selectedDesignHeightM),
+    // collapsing the non-canonical teh_qwave_height_m (deleted below).
+    gnd_radial_length_ft:       c.canonical?.groundSystem?.selectedScenario?.radialLengthM != null
+      ? round2(c.canonical.groundSystem.selectedScenario.radialLengthM * 3.28084) : null,
     gnd_total_low_usd:          c.am_ground_system_installation_and_maintenance_guide?.total_low_usd ?? null,
-    gnd_recommended_radials:    c.am_ground_system_installation_and_maintenance_guide?.recommended_radials ?? null,
+    gnd_recommended_radials:    c.canonical?.groundSystem?.selectedScenario?.radialCount ?? null,
+    design_h_m:                 c.canonical?.antenna?.selectedDesignHeightM?.value ?? null,
     rfr_exclusion_zone_m:       c.am_rf_radiation_safety_and_compliance_guide?.exclusion_zone_m ?? null,
     rfr_total_compliance_low:   c.am_rf_radiation_safety_and_compliance_guide?.total_compliance_low_usd ?? null,
     rfr_evaluation_type:        c.am_rf_radiation_safety_and_compliance_guide?.evaluation_type ?? null,
@@ -1435,7 +1604,7 @@ export async function runSiteOptimizer(body = {}){
     ltp_total_low_usd:          c.am_grounding_and_lightning_protection_guide?.total_low_usd ?? null,
     ltp_ground_ring_ft:         c.am_grounding_and_lightning_protection_guide?.ground_ring_ft ?? null,
     ltp_num_ground_rods:        c.am_grounding_and_lightning_protection_guide?.num_ground_rods ?? null,
-    asr_requires_asr:           c.am_fcc_asr_tower_registration_guide?.requires_asr ?? null,
+    // asr_requires_asr deleted: duplicate of asr_required_design above.
     asr_total_low_usd:          c.am_fcc_asr_tower_registration_guide?.total_low_usd ?? null,
     asr_tower_height_ft:        c.am_fcc_asr_tower_registration_guide?.tower_height_ft ?? null,
     acc_total_low_usd:          c.am_site_access_and_road_construction_guide?.total_low_usd ?? null,
@@ -1459,13 +1628,16 @@ export async function runSiteOptimizer(body = {}){
     re_min_acres:               c.am_real_estate_and_land_acquisition_guide?.min_acres ?? null,
     re_total_purchase_low_usd:  c.am_real_estate_and_land_acquisition_guide?.total_purchase_low_usd ?? null,
     re_lease_low_per_month:     c.am_real_estate_and_land_acquisition_guide?.lease_low_per_month ?? null,
-    tpc_grand_total_low_usd:    c.am_total_project_cost_summary_guide?.grand_total_low_usd ?? null,
+    // tpc_grand_total_low_usd deleted: duplicate of cost_low_usd above
+    // (candidate.canonical.costs.total).
     tpc_grand_total_high_usd:   c.am_total_project_cost_summary_guide?.grand_total_high_usd ?? null,
     tpc_total_with_contingency: c.am_total_project_cost_summary_guide?.total_with_contingency_low_usd ?? null,
     cis_dist_to_col_km:         c.am_community_impact_and_coverage_shift_guide?.dist_candidate_to_col_km ?? null,
     cis_col_dist_delta_km:      c.am_community_impact_and_coverage_shift_guide?.col_dist_delta_km ?? null,
     cis_col_proximity_improves: c.am_community_impact_and_coverage_shift_guide?.col_proximity_improves ?? null,
-    dcom_total_low_usd:         c.am_transmitter_decommission_and_site_remediation_guide?.total_low_usd ?? null,
+    // dcom_total_low_usd deleted: decommissioning cost is not a component
+    // of candidate.canonical.costs.total (new-site construction) — see
+    // cost_low_usd/cost_high_usd above for the single canonical figure.
     dcom_total_demo_low_usd:    c.am_transmitter_decommission_and_site_remediation_guide?.total_demo_low_usd ?? null,
     dcom_num_towers:            c.am_transmitter_decommission_and_site_remediation_guide?.num_towers ?? null,
     ipc_du_cochannel_db:        c.am_interference_protection_contour_guide?.du_cochannel_db ?? null,
@@ -1474,8 +1646,8 @@ export async function runSiteOptimizer(body = {}){
     tpm_requires_painting:      c.am_tower_painting_and_marking_guide?.requires_painting ?? null,
     tpm_paint_low_usd:          c.am_tower_painting_and_marking_guide?.paint_low_usd ?? null,
     tpm_num_bands:              c.am_tower_painting_and_marking_guide?.num_bands ?? null,
-    grd_num_radials_ideal:      c.am_ground_system_radial_design_guide?.num_radials_ideal ?? null,
-    grd_radial_length_ft:       c.am_ground_system_radial_design_guide?.radial_length_ft ?? null,
+    // grd_num_radials_ideal/grd_radial_length_ft deleted: duplicates of
+    // gnd_recommended_radials/gnd_radial_length_ft above.
     grd_total_low_usd:          c.am_ground_system_radial_design_guide?.total_low_usd ?? null,
     tae_eta_excellent:          c.am_tpo_and_antenna_efficiency_guide?.eta_excellent ?? null,
     tae_erp_excellent_kw:       c.am_tpo_and_antenna_efficiency_guide?.erp_excellent_kw ?? null,
@@ -1619,7 +1791,7 @@ export async function runSiteOptimizer(body = {}){
     gw_05mvm_radius_km:                 c.am_propagation_groundwave_field_strength_estimate_guide?.contour_05mvm_radius_km ?? null,
     gw_01mvm_radius_km:                 c.am_propagation_groundwave_field_strength_estimate_guide?.contour_01mvm_radius_km ?? null,
     gw_study_cost_low_usd:              c.am_propagation_groundwave_field_strength_estimate_guide?.study_cost_low_usd ?? null,
-    ltg_asr_required:                   c.am_tower_lighting_and_painting_compliance_guide?.asr_required ?? null,
+    // ltg_asr_required deleted: duplicate of asr_required_design above.
     ltg_lighting_type:                  c.am_tower_lighting_and_painting_compliance_guide?.lighting_type ?? null,
     ltg_total_lighting_low_usd:         c.am_tower_lighting_and_painting_compliance_guide?.total_lighting_low_usd ?? null,
     gnd_n_radials_full:                 c.am_ground_radial_system_design_guide?.n_radials_full ?? null,
@@ -1666,7 +1838,8 @@ export async function runSiteOptimizer(body = {}){
     lu_lease_low_per_month_usd:         c.am_site_access_and_land_use_guide?.lease_low_per_month_usd ?? null,
     lu_site_control_weeks_low:          c.am_site_access_and_land_use_guide?.site_control_weeks_low ?? null,
     lu_faa_study_trigger:               c.am_site_access_and_land_use_guide?.faa_study_trigger ?? null,
-    pf_grand_total_low_usd:             c.am_station_relocation_total_project_cost_proforma?.grand_total_low_usd ?? null,
+    // pf_grand_total_low_usd deleted: duplicate of cost_low_usd above
+    // (candidate.canonical.costs.total).
     pf_grand_total_high_usd:            c.am_station_relocation_total_project_cost_proforma?.grand_total_high_usd ?? null,
     pf_grand_total_midpoint_usd:        c.am_station_relocation_total_project_cost_proforma?.grand_total_midpoint_usd ?? null,
     pf_tower_height_ft:                 c.am_station_relocation_total_project_cost_proforma?.tower_height_ft ?? null,
@@ -1736,12 +1909,13 @@ export async function runSiteOptimizer(body = {}){
     tbs_gen_std_kw:                     c.am_transmitter_building_specification_guide?.generator?.recommended_std_kw ?? null,
     tbs_bldg_cost_low_usd:              c.am_transmitter_building_specification_guide?.building_cost_usd?.low ?? null,
     tbs_heat_w:                         c.am_transmitter_building_specification_guide?.heat_dissipation_w ?? null,
-    grs_radial_length_m:                c.am_ground_radial_system_cost_and_specification_guide?.radial_length_m ?? null,
-    grs_std_n_radials:                  c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.n_radials ?? null,
+    // grs_radial_length_m/grs_std_n_radials deleted: duplicates of
+    // gnd_radial_length_ft/gnd_recommended_radials above.
     grs_std_wire_m:                     c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.total_wire_m ?? null,
     grs_std_cost_low_usd:               c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.cost_usd?.low ?? null,
     grs_std_efficiency_pct:             c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.efficiency_pct ?? null,
-    teh_qwave_height_m:                 c.am_tower_electrical_height_and_efficiency_guide?.quarter_wave_height_m ?? null,
+    // teh_qwave_height_m deleted: non-canonical height column — see
+    // design_h_m above (candidate.canonical.antenna.selectedDesignHeightM).
     teh_elec_height_deg:                c.am_tower_electrical_height_and_efficiency_guide?.electrical_height_deg ?? null,
     teh_radiation_r_ohm:                c.am_tower_electrical_height_and_efficiency_guide?.radiation_resistance_ohm ?? null,
     teh_eff_typical_pct:                c.am_tower_electrical_height_and_efficiency_guide?.efficiency_pct?.typical_ground ?? null,
@@ -1754,9 +1928,9 @@ export async function runSiteOptimizer(body = {}){
     lcm_col_at_risk:                    c.am_licensed_contour_migration_guide?.city_of_license_at_risk ?? null,
     lcm_col_dist_km:                    c.am_licensed_contour_migration_guide?.city_to_candidate_distance_km ?? null,
     cpe_n_required_exhibits:            c.am_construction_permit_exhibit_requirements_guide?.n_required_exhibits ?? null,
-    cpe_asr_required:                   c.am_construction_permit_exhibit_requirements_guide?.asr_required ?? null,
+    // cpe_asr_required deleted: duplicate of asr_required_design above.
     cpe_ea_required:                    c.am_construction_permit_exhibit_requirements_guide?.environmental_assessment_required ?? null,
-    cpe_nif_required:                   c.am_construction_permit_exhibit_requirements_guide?.nif_required ?? null,
+    // cpe_nif_required deleted: duplicate of nif_required above.
     cpe_total_cost_low_usd:             c.am_construction_permit_exhibit_requirements_guide?.total_filing_cost_low_usd ?? null,
     pop_proof_required:                 c.am_proof_of_performance_guide?.proof_required ?? null,
     pop_n_radials:                      c.am_proof_of_performance_guide?.n_radials_required ?? null,
@@ -1797,14 +1971,16 @@ export async function runSiteOptimizer(body = {}){
     tia_tower_height_ft:                c.am_tia222_tower_structural_certification_guide?.tower_height_ft ?? null,
     tia_wind_speed_mph:                 c.am_tia222_tower_structural_certification_guide?.wind_speed_mph ?? null,
     tia_ice_thickness_in:               c.am_tia222_tower_structural_certification_guide?.ice_thickness_in ?? null,
-    tia_asr_triggered_qw:               c.am_tia222_tower_structural_certification_guide?.asr_triggered_qw ?? null,
+    // tia_asr_triggered_qw deleted: quarter-wave-basis duplicate of
+    // asr_required_design above (which uses the canonical selected design
+    // height, not a quarter-wave-only basis).
     tia_total_pe_low_usd:               c.am_tia222_tower_structural_certification_guide?.total_pe_analysis_low_usd ?? null,
     lsa_max_total_stations:             c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.market_station_limits?.total ?? null,
     lsa_tba_threshold_pct:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.tba_threshold?.attributable_threshold_pct ?? null,
     lsa_min_licensee_hours:             c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.min_licensee_hours_per_week ?? null,
     lsa_n_agreement_types:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.n_agreement_types ?? null,
     lsa_lma_legal_low_usd:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.lma_legal_review_usd?.low ?? null,
-    rdb_asr_required:                   c.am_fcc_registration_and_database_management_guide?.asr_required ?? null,
+    // rdb_asr_required deleted: duplicate of asr_required_design above.
     rdb_one_time_total_usd:             c.am_fcc_registration_and_database_management_guide?.one_time_registration_costs?.total_usd ?? null,
     rdb_annual_total_low_usd:           c.am_fcc_registration_and_database_management_guide?.annual_maintenance_costs?.total_annual_low_usd ?? null,
     rdb_n_annual_obligations:           c.am_fcc_registration_and_database_management_guide?.n_annual_obligations ?? null,
@@ -1844,8 +2020,8 @@ export async function runSiteOptimizer(body = {}){
     rep_fuel_reserve_gal:               c.am_rural_electric_and_standby_power_guide?.fuel_reserve_gal ?? null,
     rep_total_power_low_usd:            c.am_rural_electric_and_standby_power_guide?.cost_estimates?.total_power_low_usd ?? null,
     rep_total_load_kw:                  c.am_rural_electric_and_standby_power_guide?.total_load_kw ?? null,
-    gnd_total_radials:                  c.am_rf_ground_system_inspection_and_maintenance_guide?.total_radials ?? null,
-    gnd_insp_radial_length_ft:          c.am_rf_ground_system_inspection_and_maintenance_guide?.radial_length_ft ?? null,
+    // gnd_total_radials/gnd_insp_radial_length_ft deleted: duplicates of
+    // gnd_recommended_radials/gnd_radial_length_ft above.
     gnd_rehab_low_usd:                  c.am_rf_ground_system_inspection_and_maintenance_guide?.rehabilitation_cost?.total_rehab_low_usd ?? null,
     gnd_annual_low_usd:                 c.am_rf_ground_system_inspection_and_maintenance_guide?.annual_cost?.total_annual_low_usd ?? null,
     gnd_n_inspection_tasks:             c.am_rf_ground_system_inspection_and_maintenance_guide?.n_inspection_tasks ?? null,
@@ -1921,11 +2097,11 @@ export async function runSiteOptimizer(body = {}){
     ada_is_staffed:                     c.am_site_accessibility_and_ada_compliance_guide?.is_likely_staffed ?? null,
     ada_access_low_usd:                 c.am_site_accessibility_and_ada_compliance_guide?.cost_estimates?.accessibility_low_usd ?? null,
     ltg_tower_height_ft:                c.am_faa_tower_lighting_and_obstruction_marking_guide?.tower_height_ft ?? null,
-    faa_asr_required:                   c.am_faa_tower_lighting_and_obstruction_marking_guide?.asr_required ?? null,
+    // faa_asr_required deleted: duplicate of asr_required_design above.
     faa_lighting_type:                  c.am_faa_tower_lighting_and_obstruction_marking_guide?.lighting_type ?? null,
     faa_lighting_install_low_usd:       c.am_faa_tower_lighting_and_obstruction_marking_guide?.cost_estimates?.lighting_install_low_usd ?? null,
-    gnd_std_n_radials:                  c.am_ground_system_and_radial_field_installation_guide?.std_n_radials ?? null,
-    gnd_std_radial_len_m:               c.am_ground_system_and_radial_field_installation_guide?.std_radial_len_m ?? null,
+    // gnd_std_n_radials/gnd_std_radial_len_m deleted: duplicates of
+    // gnd_recommended_radials/gnd_radial_length_ft above.
     rfi_total_system_low_usd:           c.am_ground_system_and_radial_field_installation_guide?.cost_estimates?.total_system_low_usd ?? null,
     gnd_proof_required:                 c.am_ground_system_and_radial_field_installation_guide?.proof_of_performance_required ?? null
   }));
@@ -2172,7 +2348,16 @@ export async function runSiteOptimizer(body = {}){
         col_pct: c.col_coverage_pct != null ? Math.round(c.col_coverage_pct * 100) : null,
         gate_verdict: c.regulatory_gate_summary?.overall_verdict ?? 'UNKNOWN',
         gate_fail_count: c.regulatory_gate_summary?.fail_count ?? 0,
-        cost_tier: c.permit_and_engineering_cost_estimate?.cost_tier ?? null,
+        // Rewired to candidate.canonical.costs.total (canonical-consistency-
+        // audit-followup, Group 4 item 6) instead of
+        // permit_and_engineering_cost_estimate's soft-cost-only tier, which
+        // was being used as the primary cost signal for a top-level
+        // recommendation despite excluding hard construction costs.
+        cost_tier: c.canonical?.costs?.total?.high == null ? null
+          : c.canonical.costs.total.high > 800000 ? 'VERY_HIGH'
+          : c.canonical.costs.total.high > 400000 ? 'HIGH'
+          : c.canonical.costs.total.high > 150000 ? 'MODERATE'
+          : 'LOW',
         skywave_advisory: c.skywave_protection_advisory?.advisory_level ?? 'UNKNOWN',
         quadrant: c.bearing_deg != null ? (['NE','SE','SW','NW'][Math.floor((((c.bearing_deg % 360) + 360) % 360) / 90)]) : null,
         tied_within_model_precision: c.tied_within_model_precision ?? null,
@@ -2405,24 +2590,24 @@ export async function runSiteOptimizer(body = {}){
     };
   })();
 
+  // Rewired to candidate.canonical.costs.total (canonical-consistency-audit-
+  // followup, Group 4 item 5) instead of summing permit_and_engineering_cost_
+  // estimate (soft) + tower_cost_estimate (hard) independently — those two
+  // guide totals are not guaranteed to reconcile with the single canonical
+  // cost model, which already sums ALL cost components (tower, ground
+  // system, transmitter building, transmitter/ATU, electrical/generator,
+  // site access/utilities, engineering, legal/filing, environmental,
+  // contingency) against the canonical selected design height and ground
+  // scenario. cost_tier thresholds unchanged.
   const total_project_cost_estimate = (() => {
     const rows = returned.slice(0, 5).map(c => {
-      const soft   = c.permit_and_engineering_cost_estimate;
-      const hard   = c.tower_cost_estimate;
-      if (!soft && !hard) return null;
-      const soft_low  = soft?.total_soft_cost_low_usd ?? 0;
-      const soft_high = soft?.total_soft_cost_high_usd ?? 0;
-      const hard_low  = hard?.total_low_usd ?? 0;
-      const hard_high = hard?.total_high_usd ?? 0;
-      const total_low  = Math.round(soft_low  + hard_low);
-      const total_high = Math.round(soft_high + hard_high);
+      const total = c.canonical?.costs?.total;
+      if (!total) return null;
+      const total_low  = Math.round(total.low);
+      const total_high = Math.round(total.high);
       return {
         rank:           c.rank,
         status:         c.status_category,
-        soft_cost_low:  soft_low,
-        soft_cost_high: soft_high,
-        hard_cost_low:  hard_low,
-        hard_cost_high: hard_high,
         total_low_usd:  total_low,
         total_high_usd: total_high,
         range_label:    `$${(total_low / 1000).toFixed(0)}k–$${(total_high / 1000).toFixed(0)}k`,
@@ -2440,7 +2625,7 @@ export async function runSiteOptimizer(body = {}){
       lowest_cost_candidate_rank: best?.rank ?? null,
       lowest_total_low_usd:  best?.total_low_usd ?? null,
       lowest_total_high_usd: best?.total_high_usd ?? null,
-      note: 'All figures 2024 USD, screening-grade. Does not include land/lease costs, transmitter equipment, or facility upgrades. Add 20–35% contingency for accurate project budgeting.'
+      note: 'All figures sourced from candidate.canonical.costs.total (canonical/costModel.js), screening-grade. Add contingency already folded into the canonical total (15% low / 25% high).'
     };
   })();
 
@@ -2460,6 +2645,10 @@ export async function runSiteOptimizer(body = {}){
     // never true here — but the flag now reads that real gate instead of
     // being a hardcoded constant that could silently drift from it.
     filing_ready:    scored.some((c) => c.canonical?.filingReadiness?.ready === true),
+    // canonical-consistency-audit-followup, Phase 3 item 1: how much of
+    // the 1..N ranking is actually meaningful at this screening
+    // resolution — see src/engine/am/canonical/rankingDiagnostics.js.
+    ranking_diagnostics,
     input: {
       callsign, frequency_khz, current_site, search_radius_km,
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
@@ -2504,7 +2693,7 @@ export async function runSiteOptimizer(body = {}){
     recommended_actions,
     form_301_checklist,
     protection_requirements: buildProtectionRequirements({
-      fcc_class, frequency_khz, channel_class: chanClass
+      fcc_class, frequency_khz, channel_class: chanClass, nif: _canonNifStation
     }),
     minimum_spacing_reference: buildMinimumSpacingReference({ fcc_class, channel_class: chanClass }),
     regulatory_timeline_estimate: buildRegulatoryTimeline({
@@ -2512,7 +2701,10 @@ export async function runSiteOptimizer(body = {}){
       asr_required: asr_required_design,
       has_treaty_candidates: returned.some(c => !!c.treaty_zone),
       any_poor_sigma: returned.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
-      n_promising: candidate_count_by_status.PROMISING ?? 0
+      n_promising: candidate_count_by_status.PROMISING ?? 0,
+      nif: _canonNifStation,
+      isDirectional: /^DA/i.test(pattern_mode),
+      highPower: Number(tpo_kw) >= 25,
     }),
     tower_reference,
     inputs_echo: {
@@ -3077,6 +3269,11 @@ async function scoreCandidate(pt, ctx, warnings){
       land_use_class,
       col_polygon_present: !!community_of_license_polygon,
       parcel_data_present: null,    // parcel / zoning availability not checked at screening
+      // canonical-consistency-audit-followup, Phase 4 item 1: threads this
+      // candidate's own treaty-zone membership (already computed above,
+      // not a new measurement) into canonical.schedule's FCC-processing
+      // timeline extension.
+      treaty_zone_present: !!treaty_zone,
       near_airport_trigger: null,   // §17.7(c) airport prong not checked at screening
     },
     propagation: {
@@ -4405,11 +4602,22 @@ async function scoreCandidate(pt, ctx, warnings){
         blocking: true
       });
 
-      const maxWeeks = steps.reduce((acc, s) => {
+      // estimated_weeks_min/estimated_weeks_to_filing rewired to
+      // canonical.schedule.timeToFiling (canonical-consistency-audit-
+      // followup, Phase 4 item 1) instead of summing every step above
+      // sequentially with no parallel treatment (e.g. ASR/FAA coordination
+      // and the NIF study could run in parallel with each other, per
+      // canonical.schedule's environmental-review/FAA-ASR parallel pair).
+      // This is genuinely a "time to filing" figure (steps run
+      // SITE_INVESTIGATION..FCC_FILING, never FCC processing or
+      // construction), so canonical.schedule.timeToFiling is the correct
+      // canonical figure to point at -- not totalProjectDuration.
+      const _schedCp = canonical?.schedule?.timeToFiling?.value;
+      const maxWeeks = _schedCp ? _schedCp.high : steps.reduce((acc, s) => {
         const wks = s.timeline_weeks.split('–');
         return acc + (parseInt(wks[wks.length - 1], 10) || 0);
       }, 0);
-      const minWeeks = steps.reduce((acc, s) => {
+      const minWeeks = _schedCp ? _schedCp.low : steps.reduce((acc, s) => {
         const wks = s.timeline_weeks.split('–');
         return acc + (parseInt(wks[0], 10) || 0);
       }, 0);
@@ -7103,9 +7311,18 @@ async function scoreCandidate(pt, ctx, warnings){
         }
       ];
 
-      // Total optimistic/conservative (sum of phases)
-      const totalLow  = p1Low + p2Low + p3Low + p4Low + p5Low;
-      const totalHigh = (p1High + p1TreatyExtra) + p2High + (p3High + p3TreatyExtra) + (p4High + p4AsrExtra) + p5High;
+      // Total optimistic/conservative -- rewired to canonical.schedule.
+      // totalProjectDuration (canonical-consistency-audit-followup, Phase
+      // 4 item 1) instead of a flat sequential sum of all 5 phases, which
+      // contradicted this guide's OWN comments above ("ASR approval...
+      // typically runs concurrent with FCC processing") by adding every
+      // phase's duration sequentially anyway. canonical.schedule combines
+      // its parallel phase pair (environmental review / FAA-ASR) with
+      // max(), not +. Falls back to the local sequential sum only if
+      // canonical is unavailable.
+      const _schedTotalLt = canonical?.schedule?.totalProjectDuration?.value;
+      const totalLow  = _schedTotalLt ? _schedTotalLt.low  : p1Low + p2Low + p3Low + p4Low + p5Low;
+      const totalHigh = _schedTotalLt ? _schedTotalLt.high : (p1High + p1TreatyExtra) + p2High + (p3High + p3TreatyExtra) + (p4High + p4AsrExtra) + p5High;
 
       // Risk multiplier for conservative
       const risk_tier = hasTreaty_lt ? 'VERY_HIGH'
@@ -8826,8 +9043,19 @@ async function scoreCandidate(pt, ctx, warnings){
       const parallelMaxHigh = Math.max(...phases.filter(p => p.parallel).map(p => p.weeks_high));
       const sequentialLow   = phases.filter(p => !p.parallel).reduce((s, p) => s + p.weeks_low,  0);
       const sequentialHigh  = phases.filter(p => !p.parallel).reduce((s, p) => s + p.weeks_high, 0);
-      const total_weeks_low  = parallelMaxLow  + sequentialLow;
-      const total_weeks_high = parallelMaxHigh + sequentialHigh;
+      // total_weeks_* rewired to canonical.schedule.totalProjectDuration
+      // (canonical-consistency-audit-followup, Phase 4 item 1). This
+      // guide's own parallel-max + sequential-sum math (above) was
+      // already methodologically correct -- unlike several other timeline
+      // guides in this file -- but it still produced a DIFFERENT NUMBER
+      // than the other guides due to independent multiplier choices,
+      // recreating the "N different totals in one row" problem at the
+      // top level even though each guide's internal arithmetic was
+      // locally sound. parallel_path_weeks_*/sequential_weeks_* below
+      // remain this guide's own supplementary phase-critical-path detail.
+      const _schedTotalMt = canonical?.schedule?.totalProjectDuration?.value;
+      const total_weeks_low  = _schedTotalMt ? _schedTotalMt.low  : parallelMaxLow  + sequentialLow;
+      const total_weeks_high = _schedTotalMt ? _schedTotalMt.high : parallelMaxHigh + sequentialHigh;
       const total_months_low  = round2(total_weeks_low  / 4.33);
       const total_months_high = round2(total_weeks_high / 4.33);
 
@@ -9431,8 +9659,25 @@ async function scoreCandidate(pt, ctx, warnings){
       const license_grant_days_low  = 30;
       const license_grant_days_high = 90;
 
-      const total_timeline_low  = nepa_days_low  + fcc_processing_low  + proof_days_low  + license_grant_days_low;
-      const total_timeline_high = nepa_days_high + fcc_processing_high + proof_days_high + license_grant_days_high;
+      // total_timeline_days_* rewired to canonical.schedule (canonical-
+      // consistency-audit-followup, Phase 4 item 1). This guide's own
+      // definition of "total" deliberately EXCLUDES construction_days
+      // (tracked separately below as the 3-year §73.3598 allowance, not
+      // summed in) -- that semantic is preserved: the canonical-sourced
+      // figure below is timeToFiling + fccProcessingTime +
+      // proofAndLicensePeriod (construction excluded), converted
+      // weeks->days (x7), not canonical.schedule.totalProjectDuration
+      // (which DOES include construction and answers a different
+      // question -- see am_relocation_master_timeline_guide/
+      // licensing_timeline_estimate/regulatory_timeline_estimate above,
+      // which all now source the construction-inclusive total).
+      const _schedFcc = canonical?.schedule;
+      const total_timeline_low  = _schedFcc
+        ? Math.round((_schedFcc.timeToFiling.value.low  + _schedFcc.fccProcessingTime.value.low  + _schedFcc.proofAndLicensePeriod.value.low)  * 7)
+        : nepa_days_low  + fcc_processing_low  + proof_days_low  + license_grant_days_low;
+      const total_timeline_high = _schedFcc
+        ? Math.round((_schedFcc.timeToFiling.value.high + _schedFcc.fccProcessingTime.value.high + _schedFcc.proofAndLicensePeriod.value.high) * 7)
+        : nepa_days_high + fcc_processing_high + proof_days_high + license_grant_days_high;
 
       // Total soft cost (excluding construction)
       const total_soft_low  = total_fcc_fees + atty_low  + eng_low;
@@ -20694,8 +20939,16 @@ async function scoreCandidate(pt, ctx, warnings){
         { milestone: 'Equipment install + ATU commissioning',   month_start: 18, month_end: 21, parallel: false },
         { milestone: 'Proof of performance + Form 302-AM',      month_start: 21, month_end: 24, parallel: false },
       ];
-      const total_timeline_months_low  = 18;
-      const total_timeline_months_high = 30;
+      // Rewired to canonical.schedule.totalProjectDuration (canonical-
+      // consistency-audit-followup, Phase 4 item 1) instead of a hardcoded
+      // 18/30-month constant that never varied with frequency, class, ASR
+      // requirement, treaty zone, or antenna mode -- unlike every other
+      // timeline figure in this file, which does vary with those inputs.
+      // canonical.schedule is in WEEKS; converted to months (÷4.345,
+      // same conversion buildRegulatoryTimeline already uses, ~4.3).
+      const _schedTotal = canonical?.schedule?.totalProjectDuration?.value;
+      const total_timeline_months_low  = _schedTotal ? Math.round(_schedTotal.low / 4.345) : 18;
+      const total_timeline_months_high = _schedTotal ? Math.round(_schedTotal.high / 4.345) : 30;
 
       // Financing guidance.
       const financing_options = [
@@ -25656,8 +25909,16 @@ async function scoreCandidate(pt, ctx, warnings){
         }
       ];
 
-      const totalOptimisticWeeks  = phases.reduce((s, p) => s + p.weeks_optimistic, 0);
-      const totalConservativeWeeks= phases.reduce((s, p) => s + p.weeks_conservative, 0);
+      // total_*_weeks rewired to canonical.schedule.totalProjectDuration
+      // (canonical-consistency-audit-followup, Phase 4 item 1) instead of
+      // a flat sequential sum of all 6 phases, which (unlike
+      // am_relocation_master_timeline_guide above) never marked any phase
+      // as running in parallel with another at all -- despite this same
+      // guide's own milestone notes elsewhere saying things like "start
+      // as early as possible (parallel with FCC)" for local zoning.
+      const _schedCpt = canonical?.schedule?.totalProjectDuration?.value;
+      const totalOptimisticWeeks   = _schedCpt ? _schedCpt.low  : phases.reduce((s, p) => s + p.weeks_optimistic, 0);
+      const totalConservativeWeeks = _schedCpt ? _schedCpt.high : phases.reduce((s, p) => s + p.weeks_conservative, 0);
       const totalMilestones = phases.reduce((s, p) => s + p.milestones.length, 0);
 
       // Critical path items (items that directly gate FCC CP issuance)
@@ -33516,11 +33777,20 @@ function buildMinimumSpacingReference({ fcc_class, channel_class }){
 // Weeks are realistic ranges based on FCC processing times (2022-2025 data) and
 // typical consulting/construction durations.  Not a legal guarantee.
 function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
-  asr_required, has_treaty_candidates, any_poor_sigma, n_promising }){
+  asr_required, has_treaty_candidates, any_poor_sigma, n_promising, nif = null,
+  isDirectional = false, highPower = false }){
 
   const isClear = channel_class === 'clear_channel';
   const isLocal = channel_class === 'local';
   const highNif  = isClear || skywave_risk_level === 'HIGH';
+  // NIF requirement (whether the NIF_STUDY phase blocks at all) is read
+  // from canonical.regulatory.nif instead of !isLocal, which missed that
+  // non-Class-C stations on a local channel still require NIF
+  // (canonical-consistency-audit-followup, Phase 2 item 1). highNif above
+  // stays a separate COMPLEXITY signal (clear-channel/HIGH-skywave-risk
+  // studies take longer than a straightforward regional/local one) — it
+  // is not a duplicate of the requirement predicate.
+  const nifRequired = nif ? nif.required === true : !isLocal;
 
   const phases = [
     {
@@ -33549,13 +33819,15 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
     {
       id:    'NIF_STUDY',
       label: `§73.182 NIF protection study`,
-      weeks: highNif ? '8–20' : isLocal ? '0–2' : '4–10',
-      description: highNif
+      weeks: !nifRequired ? '0–2' : highNif ? '8–20' : '4–10',
+      description: !nifRequired
+        ? 'Local channel Class C — §73.182(o) exemption applies; NIF not required.'
+        : highNif
         ? `Clear-channel NIF study — complex skywave modeling required. Budget 8–20 weeks for consultant.`
         : isLocal
-        ? 'Local channel — §73.182 NIF not required.'
+        ? `Local channel — the §73.182(o) exemption is Class-C-only; NIF study still required for Class ${fcc_class}. Budget 4–10 weeks.`
         : `Regional channel NIF study — moderate complexity. Budget 4–10 weeks.`,
-      blocking: !isLocal
+      blocking: nifRequired
     },
     {
       id:    'TREATY_COORD',
@@ -33589,12 +33861,25 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
     }
   ];
 
-  const activePhasesWeeks = phases
-    .filter(p => p.blocking)
-    .map(p => p.weeks.split('–').map(Number));
-
-  const totalMin = activePhasesWeeks.reduce((a, r) => a + (r[0] || 0), 0);
-  const totalMax = activePhasesWeeks.reduce((a, r) => a + (r[r.length - 1] || 0), 0);
+  // Total -- rewired to canonical/schedule.js's deriveSchedule()
+  // (canonical-consistency-audit-followup, Phase 4 item 1) instead of
+  // naively summing every `blocking:true` phase above sequentially
+  // (which included TREATY_COORD, conditionally blocking, added straight
+  // into the total regardless of what else was already running in
+  // parallel). deriveSchedule() combines its parallel phase pair
+  // (environmental review / FAA-ASR) with max(), not +, and keeps FCC
+  // processing time distinct from pre-filing time-to-filing. The `phases`
+  // array above remains the station-level narrative breakdown (kept for
+  // its labels/descriptions), but the TOTAL is the single canonical figure.
+  const _sched = deriveSchedule({
+    isDirectional,
+    isClearChannel: isClear,
+    asrRequired: asr_required === true,
+    treatyZonePresent: has_treaty_candidates === true,
+    highPower,
+  });
+  const totalMin = _sched.totalProjectDuration.value.low;
+  const totalMax = _sched.totalProjectDuration.value.high;
 
   const totalMonthsMin = Math.round(totalMin / 4.3);
   const totalMonthsMax = Math.round(totalMax / 4.3);
@@ -33612,15 +33897,43 @@ function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
 }
 
 // Protection class advisory — §73.182 skywave risk guidance based on the
-// station's FCC class and channel type.  Returns { protection_class_advisory, skywave_risk_level }.
-function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, pattern_mode }){
+// station's FCC class and channel type.  Returns
+// { protection_class_advisory, skywave_risk_level, nif_required }.
+//
+// nif_required is read from canonical.regulatory.nif (candidate.canonical,
+// station-level — see _canonNifStation) instead of re-derived from
+// channel_class alone, which missed the canonical rule's nuance: the
+// §73.182(o) local-channel NIF exemption applies ONLY to Class C stations
+// — a Class A/B/D station on a local channel still requires NIF, even
+// though its skywave RISK LEVEL (a separate, qualitative propagation-risk
+// concept) is LOW at typical local-channel power (canonical-consistency-
+// audit-followup, Phase 2 item 1).
+function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, pattern_mode, nif = null }){
   const isDa = /DA/i.test(pattern_mode);
-  if (channel_class === 'local'){
+  const nifRequired = nif ? nif.required === true : (channel_class !== 'local');
+  if (channel_class === 'local' && !nifRequired){
     return {
       skywave_risk_level: 'LOW',
+      nif_required: false,
       protection_class_advisory:
         `Class ${fcc_class} on local channel (${frequency_khz} kHz, §73.27). ` +
-        `Maximum 250 W ERP. Skywave (§73.182) nighttime interference is minimal at this power level. ` +
+        `Maximum 250 W ERP. §73.182(o) local-channel exemption applies to Class C — no individual ` +
+        `nighttime interference showing (NIF) is required. ` +
+        `Focus engineering effort on §73.24(i) principal-community 5 mV/m daytime coverage.`
+    };
+  }
+  if (channel_class === 'local'){
+    // Non-Class-C station on a local channel: the §73.182(o) exemption
+    // does NOT apply, so canonical.regulatory.nif.required is true even
+    // though skywave risk is still low at typical local-channel power.
+    return {
+      skywave_risk_level: 'LOW',
+      nif_required: true,
+      protection_class_advisory:
+        `Class ${fcc_class} on local channel (${frequency_khz} kHz, §73.27). ` +
+        `Skywave interference risk is low at typical local-channel power, but the §73.182(o) local-` +
+        `channel NIF exemption applies only to Class C — a §73.182 nighttime interference showing ` +
+        `is still required for Class ${fcc_class}. ` +
         `Focus engineering effort on §73.24(i) principal-community 5 mV/m daytime coverage.`
     };
   }
@@ -33628,6 +33941,7 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
     if (fcc_class === 'A'){
       return {
         skywave_risk_level: 'HIGH',
+        nif_required: nifRequired,
         protection_class_advisory:
           `Class A dominant station on clear channel ${frequency_khz} kHz (§73.25). ` +
           `A full §73.182 nighttime skywave NIF contour study is required at the new site — ` +
@@ -33639,6 +33953,7 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
     }
     return {
       skywave_risk_level: 'HIGH',
+      nif_required: nifRequired,
       protection_class_advisory:
         `Class ${fcc_class} secondary station on clear channel ${frequency_khz} kHz (§73.25). ` +
         `The dominant Class A retains protected skywave status; your new site must NOT increase ` +
@@ -33650,6 +33965,7 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
   // Regional channel.
   return {
     skywave_risk_level: 'MODERATE',
+    nif_required: nifRequired,
     protection_class_advisory:
       `Class ${fcc_class} on regional channel ${frequency_khz} kHz (§73.26). ` +
       `Standard §73.182 nighttime interference screening required to show no increase in ` +
@@ -33662,7 +33978,7 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
 // Protection requirements summary — §73.182 co-channel / adjacent-channel rules.
 // Returns a structured object describing what protection the station receives
 // and what it must demonstrate before filing.
-function buildProtectionRequirements({ fcc_class, frequency_khz, channel_class }){
+function buildProtectionRequirements({ fcc_class, frequency_khz, channel_class, nif = null }){
   const isLocal = channel_class === 'local';
   const isClear = channel_class === 'clear_channel';
   const isRegional = channel_class === 'regional';
@@ -33727,10 +34043,16 @@ function buildProtectionRequirements({ fcc_class, frequency_khz, channel_class }
     });
   }
 
-  // NIF study requirement.
-  const nif_study_required = !isLocal;
-  const nif_study_notes = isLocal
-    ? 'Local channel stations do not typically require a §73.182 NIF study.'
+  // NIF study requirement — read from canonical.regulatory.nif (the ONE
+  // predicate: required for all classes except Class C on a §73.27 local
+  // channel) instead of !isLocal, which missed that non-Class-C stations
+  // on a local channel still require NIF (canonical-consistency-audit-
+  // followup, Phase 2 item 1).
+  const nif_study_required = nif ? nif.required === true : !isLocal;
+  const nif_study_notes = nif_study_required === false
+    ? 'Local channel Class C stations do not require a §73.182 NIF study (§73.182(o) exemption).'
+    : isLocal
+    ? `Local channel — the §73.182(o) exemption applies only to Class C, so a §73.182 NIF study is still required for Class ${fcc_class}.`
     : isClear && isClassA
     ? 'Full §73.182 NIF contour study required at new site to demonstrate dominant 0.5 mV/m skywave coverage is maintained.'
     : isClear
@@ -33922,7 +34244,7 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
   channel_class, skywave_risk_level, asr_registration_required,
   community_of_license_polygon, col_centroid,
   has_treaty_candidates = false, any_poor_conductivity = false,
-  any_zone_table_sigma = false }){
+  any_zone_table_sigma = false, nif = null, proof = null }){
   const items = [];
   const isDa = /DA/i.test(pattern_mode);
 
@@ -33934,14 +34256,26 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
     note: null
   });
 
+  // Proof-of-performance radial figures are read from canonical.proof
+  // (canonical/rules/proofOfPerformance.js) instead of hardcoded text —
+  // the pre-audit text here conflated the §73.150 72-azimuth PATTERN
+  // TABLE with §73.151(a)/§73.186(a)(1) MEASUREMENT radial counts, and
+  // stated an NDA proof radial count ("8 radials at 45° intervals") that
+  // does not match either rule (canonical-consistency-audit-followup,
+  // Phase 2 item 1).
+  const proofNote = proof && proof.proofType === 'DA_FULL_PROOF'
+    ? `§73.150(a) DA pattern required: theoretical horizontal radiation pattern table (§73.150), plus a full directional proof of performance — field-strength measurements on ${proof.radialCount}–12 radials per §73.151(a) (NOT the §73.150 72-azimuth pattern table, which is tabulated pattern data, not measurement radials), filed with FCC Form 302-AM.`
+    : proof && proof.proofType === 'NDA_FIELD_PROOF'
+    ? `Non-directional antenna — §73.45 antenna efficiency certification and an NDA field-strength proof of performance — measurements on ${proof.radialCount}+ radials, at least 15 measurements per radial, per §73.186(a)(1) — filed with FCC Form 302-AM.`
+    : isDa
+    ? '§73.150(a) DA pattern required: theoretical horizontal radiation pattern table, plus a full directional proof of performance per §73.151(a) (6-12 measurement radials, not the §73.150 72-azimuth pattern table).'
+    : 'Non-directional antenna — §73.45 antenna efficiency certification and an NDA field-strength proof of performance per §73.186(a)(1) (6+ radials, ≥15 measurements per radial) required.';
   items.push({
     id: 'ANTENNA_STUDY',
     description: `Design and model AM vertical antenna system for ${frequency_khz} kHz`,
     status: 'REQUIRED',
-    rule: isDa ? '47 CFR §73.150 / §73.154' : '47 CFR §73.45 / §73.154',
-    note: isDa
-      ? '§73.150(a) DA pattern required: horizontal radiation pattern table at 5° increments (72 radials, 0°–355°), theoretical and measured patterns (§73.154 proof)'
-      : 'Non-directional antenna — §73.45 antenna efficiency certification and §73.154 proof-of-performance (8 radials at 45° intervals) required'
+    rule: isDa ? '47 CFR §73.150 / §73.151(a)' : '47 CFR §73.45 / §73.186(a)(1)',
+    note: proofNote
   });
 
   const asrNote = asr_registration_required
@@ -33999,6 +34333,14 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
     note: null
   });
 
+  // NIF requirement (whether this item appears as REQUIRED at all) is
+  // read from canonical.regulatory.nif instead of channel_class/
+  // skywave_risk_level alone, which — being LOW risk for every local-
+  // channel station regardless of class — silently omitted this item
+  // entirely for a non-Class-C station on a local channel (canonical-
+  // consistency-audit-followup, Phase 2 item 1). skywave_risk_level still
+  // drives the note's complexity language.
+  const nifRequiredForChecklist = nif ? nif.required === true : (channel_class !== 'local');
   if (channel_class === 'clear_channel' || skywave_risk_level === 'HIGH'){
     items.push({
       id: 'SKYWAVE_NIF',
@@ -34016,6 +34358,17 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
       status: 'CONDITIONAL',
       rule: '47 CFR §73.182',
       note: `MODERATE skywave risk for Class ${fcc_class} on ${channel_class} channel — consult §73.182 protection ratios`
+    });
+  } else if (nifRequiredForChecklist){
+    // LOW skywave risk (e.g. local-channel power levels) but canonical
+    // still requires a NIF study — the §73.182(o) local-channel exemption
+    // is Class-C-only.
+    items.push({
+      id: 'SKYWAVE_NIF',
+      description: 'Prepare skywave interference analysis (NIF study) for nighttime operations',
+      status: 'REQUIRED',
+      rule: '47 CFR §73.182',
+      note: `Class ${fcc_class} on ${channel_class} channel — the §73.182(o) local-channel NIF exemption applies only to Class C, so a NIF study is still required even though skywave risk is LOW.`
     });
   }
 
@@ -34188,7 +34541,13 @@ function buildTopSummary(top, baseline, nEvaluated){
   const distStr = r1.distance_from_current_km < 0.5
     ? 'at current location'
     : `${r1.distance_from_current_km.toFixed(0)} km ${card1 ? `${card1} of` : 'from'} current site`;
-  parts.push(`Rank 1 scores ${r1.score.toFixed(1)} (${r1.status_category || 'REVIEW_REQUIRED'}), ${distStr}, σ=${r1.ground_sigma_mS_m} mS/m (${r1.ground_sigma_quality || '—'})`);
+  // canonical-consistency-audit-followup, Phase 3 item 3: when the
+  // top-scoring row IS the current/authorized-site baseline, say so
+  // explicitly instead of letting "Rank 1 scores X.X" read as "this
+  // screening found a new site to move to."
+  parts.push(r1.is_baseline
+    ? `Current site (baseline) scores ${r1.score.toFixed(1)} (${r1.status_category || 'REVIEW_REQUIRED'}) — no relocation candidate in this search beat the status quo, σ=${r1.ground_sigma_mS_m} mS/m (${r1.ground_sigma_quality || '—'})`
+    : `Rank 1 scores ${r1.score.toFixed(1)} (${r1.status_category || 'REVIEW_REQUIRED'}), ${distStr}, σ=${r1.ground_sigma_mS_m} mS/m (${r1.ground_sigma_quality || '—'})`);
 
   // COL field at rank 1 if available.
   if (r1.field_at_col_centroid_mvm != null){

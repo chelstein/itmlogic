@@ -532,6 +532,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
         tpo_kw={inputs.tpo_kw}
         fcc_class={inputs.fcc_class}
         pattern_mode={inputs.pattern_mode}
+        rankingDiagnostics={result?.ranking_diagnostics ?? null}
       />
     </>
   );

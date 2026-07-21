@@ -24,6 +24,14 @@ export default function TowerReferencePanel({ towerReference, frequency_khz, sky
   if (!towerReference && !frequency_khz) return null;
 
   // Fall back to computing from frequency if engine block isn't present yet.
+  // NOTE: λ/4 and 5/8λ are REFERENCE values only (canonical/antennaDesign.js
+  // quarterWaveReferenceM / fiveEighthsReferenceM) — neither is the selected
+  // design height. The engine's canonical antenna-height rule picks the
+  // design height from requested_height_m / host_structure_height_m / a
+  // class-typical default (5/8λ for A/B, 3/8λ for C/D), none of which this
+  // frequency-only fallback has access to, so it deliberately does NOT
+  // fabricate an ASR verdict — asrRequiredKnown is null until the real
+  // towerReference prop (canonical.regulatory.asr-derived) is available.
   const tr = towerReference || (() => {
     if (!frequency_khz) return null;
     const lam = Math.round(300000 / frequency_khz * 100) / 100;
@@ -32,7 +40,7 @@ export default function TowerReferencePanel({ towerReference, frequency_khz, sky
       quarter_wave_m: Math.round(lam / 4 * 100) / 100,
       half_wave_m:    Math.round(lam / 2 * 100) / 100,
       asr_threshold_m: 60.96,
-      asr_registration_required_at_quarter_wave: lam / 4 > 60.96
+      asr_registration_required_at_design_height: null,
     };
   })();
 
@@ -41,7 +49,13 @@ export default function TowerReferencePanel({ towerReference, frequency_khz, sky
   const qw = tr.quarter_wave_m;
   const hw = tr.half_wave_m;
   const asr = tr.asr_threshold_m;
-  const asrReq = tr.asr_registration_required_at_quarter_wave;
+  // Rewired to the field siteOptimizer.js's tower_reference actually emits
+  // (asr_registration_required_at_design_height, canonical.regulatory.asr-
+  // derived) — the old asr_registration_required_at_quarter_wave name never
+  // matched the real API response, so this label silently always showed
+  // "not required" for real engine data (canonical-consistency-audit-followup,
+  // Group 2 item 7).
+  const asrReq = tr.asr_registration_required_at_design_height;
 
   return (
     <RackPanel
@@ -52,22 +66,37 @@ export default function TowerReferencePanel({ towerReference, frequency_khz, sky
     >
       <div className="space-y-1">
         <Row label="Wavelength (λ)"   value={`${tr.wavelength_m} m`} />
-        <Row label="λ/4 (std. height)" value={`${qw} m (${(qw * 3.28084).toFixed(0)} ft)`} warn={qw > asr} />
-        <Row label="λ/2 (max height)"  value={`${hw} m (${(hw * 3.28084).toFixed(0)} ft)`} warn={hw > asr} />
+        {/* λ/4 is a REFERENCE value only (R_rad ≈ 36.6 Ω physics reference)
+            — canonical never treats it as the selected design height (that
+            is 5/8λ for class A/B or 3/8λ for class C/D, or the operator's
+            requested/host-structure height; see canonical/antennaDesign.js).
+            Label fixed accordingly (canonical-consistency-audit-followup,
+            Group 2 item 7). */}
+        <Row label="λ/4 (reference only)" value={`${qw} m (${(qw * 3.28084).toFixed(0)} ft)`} warn={qw > asr} />
+        <Row label="λ/2 (max reference)"  value={`${hw} m (${(hw * 3.28084).toFixed(0)} ft)`} warn={hw > asr} />
         <div className="border-t border-rule mt-1.5 pt-1.5">
           <Row
             label="ASR threshold (§17.7)"
             value={`${asr} m (200 ft)`}
           />
           <div className="mt-1">
-            <span
-              className="font-mono text-[9px] uppercase tracking-rack border rounded-sm px-1.5 py-0.5"
-              style={asrReq
-                ? { color: '#ffb347', background: 'rgba(255,179,71,0.10)', borderColor: 'rgba(255,179,71,0.45)' }
-                : { color: '#63d471', background: 'rgba(99,212,113,0.08)', borderColor: 'rgba(99,212,113,0.35)' }}
-            >
-              {asrReq ? 'ASR registration likely required' : 'ASR may not be required at λ/4'}
-            </span>
+            {asrReq == null ? (
+              <span
+                className="font-mono text-[9px] uppercase tracking-rack border rounded-sm px-1.5 py-0.5"
+                style={{ color: '#a89c84', background: 'rgba(168,156,132,0.08)', borderColor: 'rgba(168,156,132,0.35)' }}
+              >
+                ASR requirement unknown — depends on the selected design height
+              </span>
+            ) : (
+              <span
+                className="font-mono text-[9px] uppercase tracking-rack border rounded-sm px-1.5 py-0.5"
+                style={asrReq
+                  ? { color: '#ffb347', background: 'rgba(255,179,71,0.10)', borderColor: 'rgba(255,179,71,0.45)' }
+                  : { color: '#63d471', background: 'rgba(99,212,113,0.08)', borderColor: 'rgba(99,212,113,0.35)' }}
+              >
+                {asrReq ? 'ASR registration likely required (selected design height)' : 'ASR not required at the selected design height'}
+              </span>
+            )}
           </div>
         </div>
         <div className="font-mono text-[9px] text-textDim leading-tight mt-1.5">
