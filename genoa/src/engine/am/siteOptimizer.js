@@ -30885,11 +30885,13 @@ async function scoreCandidate(pt, ctx, warnings){
       //   ANSI/TIA-222-H (2017); ASCE 7-16; 47 CFR §73.1 (general technical rules)
       //   FCC Form 854 (ASR); 47 CFR §17.7 (ASR height threshold)
 
-      // Quarter-wave tower height at this frequency (typical AM tower)
-      const lambda_m      = Number.isFinite(frequency_khz) ? round2(300000 / frequency_khz) : null;
-      const qw_m          = lambda_m ? round2(lambda_m / 4) : null;
+      // lambda_m/qw_m/five_eighth_m rewired to canonical.antenna (guide-
+      // internal migration, Wave 1) instead of re-deriving these physics
+      // reference values locally.
+      const lambda_m      = canonical.antenna.wavelengthM.value;
+      const qw_m          = canonical.antenna.quarterWaveReferenceM.value;
       const qw_ft         = qw_m    ? Math.round(qw_m * 3.28084) : null;
-      const five_eighth_m = lambda_m ? round2(lambda_m * 5 / 8) : null;
+      const five_eighth_m = canonical.antenna.fiveEighthsReferenceM.value;
       const five_eighth_ft = five_eighth_m ? Math.round(five_eighth_m * 3.28084) : null;
 
       // Structural Category (SC) — AM broadcast always SC II
@@ -30938,11 +30940,15 @@ async function scoreCandidate(pt, ctx, warnings){
       const asr_height_trigger = qw_m ? qw_m > ASR_HEIGHT_THRESHOLD_M : null;
       const five_eighth_asr_trigger = five_eighth_m ? five_eighth_m > ASR_HEIGHT_THRESHOLD_M : null;
 
-      // Class-aware standard planning height: 5/8λ for A/B, 3/8λ for C/D.
+      // class_std_h_m_tia/asr_triggered_class_standard rewired to
+      // canonical.antenna.selectedDesignHeightM/canonical.regulatory.asr
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ and re-comparing it against the §17.7 threshold locally.
+      // isHighCls_tia kept only as a note-label helper.
       const isHighCls_tia = /^[AB]$/i.test(fcc_class);
-      const class_std_h_m_tia  = lambda_m ? round2(lambda_m * (isHighCls_tia ? 0.625 : 0.375)) : null;
+      const class_std_h_m_tia  = canonical.antenna.selectedDesignHeightM.value;
       const class_std_h_ft_tia = class_std_h_m_tia ? Math.round(class_std_h_m_tia * 3.28084) : null;
-      const asr_triggered_class_standard = class_std_h_m_tia ? class_std_h_m_tia > ASR_HEIGHT_THRESHOLD_M : null;
+      const asr_triggered_class_standard = canonical.regulatory.asr.required;
 
       // Tower type recommendation
       const tower_type = n_towers > 1 ? 'guyed_vertical_array'
@@ -32175,16 +32181,17 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Full ground rehabilitation (120 radials): $36,000–$96,000
       //   Exothermic weld bus upgrade: $5,000–$15,000
 
-      const is_da  = /^DA/i.test(pattern_mode);
+      const is_da  = isDirectionalMode(canonical.antenna.patternModeModeled.value);
       const is_da2 = /^DA-2/i.test(pattern_mode);
 
       // Recommended radial count based on class
       const isClassA = fcc_class.toUpperCase() === 'A';
       const rec_radials = 120;  // §73.189(b)(4) standard: 120 radials for all classes
 
-      // 0.35λ standard radial length per §73.189(b)(4) / NBS TN-24 (use exact speed of light to match §73.182(n) calculations)
-      const lambda_m          = round2(299792458 / (frequency_khz * 1000));
-      const std_radial_len_m  = round2(lambda_m * 0.35);   // FCC standard: 0.35λ per §73.189(b)(4) / NBS TN-24
+      // std_radial_len_m rewired to canonical.groundSystem.selectedScenario
+      // .radialLengthM (guide-internal migration, Wave 1) instead of
+      // re-deriving 0.35λ locally.
+      const std_radial_len_m  = canonical.groundSystem.selectedScenario.radialLengthM;   // FCC standard: 0.35λ per §73.189(b)(4) / NBS TN-24
       const std_radial_len_ft = round2(std_radial_len_m * 3.28084);
 
       // Number of towers (DA-2 = 2, DA-N ≥ 3, NDA = 1)
@@ -32305,7 +32312,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Monitor point establishment:       $1,000–$2,500 per point
       //   FCC Form 302-AM license-to-cover filing fee: $755 (§1.1104 (90 FR 17013, eff. Apr. 23, 2025))
 
-      const is_da  = /^DA/i.test(pattern_mode);
+      // is_da rewired to canonical.antenna.patternModeModeled (guide-
+      // internal migration, Wave 1) instead of re-parsing pattern_mode.
+      const is_da  = isDirectionalMode(canonical.antenna.patternModeModeled.value);
       const is_da2 = /^DA-2/i.test(pattern_mode);
 
       const NDA_STEPS = [
@@ -32347,6 +32356,17 @@ async function scoreCandidate(pt, ctx, warnings){
       return {
         n_commissioning_steps: all_steps.length,
         commissioning_steps: all_steps,
+        // formal_proof_required/proof_radials_required: NOT rewired to
+        // canonical.proof (guide-internal migration, Wave 1) -- flagged
+        // instead of auto-fixed. canonical.proof.constructionProofRequired
+        // is TRUE for NDA too (an NDA field-strength proof is required per
+        // §73.186(a)(1), radialCount=6), but this guide's NDA_STEPS
+        // checklist and cost model (PROOF_LOW/HIGH=0 for NDA) assume NDA
+        // needs NO formal proof at all -- a real contradiction with
+        // canonical, not a simple numeric duplicate. Fixing it correctly
+        // requires adding an NDA proof checklist step and NDA proof cost
+        // line, which is a content change beyond this pass's "read from
+        // canonical instead of recomputing" scope. See Wave 1 report.
         formal_proof_required: is_da,
         n_monitor_points,
         proof_radials_required: is_da ? 8 : 0,
@@ -33461,19 +33481,18 @@ async function scoreCandidate(pt, ctx, warnings){
       // For AM towers: 3/8λ for Class C/D (e.g., ~369 ft at 1000 kHz); 5/8λ for Class A/B.
       const freq_khz   = frequency_khz ?? 1000;
       const tpo        = tpo_kw ?? 1;
-      const isDA       = /^DA/i.test(pattern_mode ?? '');
-
-      // Tower height by class: 5/8λ for Class A/B (FCC optimum), 3/8λ for Class C/D (standard design).
-      // Used for FAA obstruction-marking analysis only — actual licensed height governs construction.
-      const lambda_faa         = Math.round(300000 / freq_khz);  // full wavelength, m
-      const h_frac_faa_lt      = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
-      const tower_height_m     = Math.round(lambda_faa * h_frac_faa_lt);
+      // isDA/tower_height_m/asr_required rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-parsing pattern_mode and re-deriving the design height and
+      // ASR threshold comparison locally.
+      const isDA       = isDirectionalMode(canonical.antenna.patternModeModeled.value);
+      const tower_height_m     = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft    = Math.round(tower_height_m * 3.28084);
 
       // §17.7(a): ASR registration required for towers >60.96 m (200 ft) AGL, or towers near airports
       const asr_required_height_m  = ASR_THRESHOLD_17_7.height_m;  // 200 ft
       const asr_required_height_ft = 200;
-      const asr_required           = tower_height_m > asr_required_height_m;
+      const asr_required           = canonical.regulatory.asr.required;
 
       // §17.21: Medium intensity lighting required 200–499 ft; High intensity 500+ ft (daytime)
       // §17.23: Red obstruction lights for towers ≤200 ft in certain situations
