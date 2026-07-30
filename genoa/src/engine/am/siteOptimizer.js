@@ -3873,10 +3873,13 @@ async function scoreCandidate(pt, ctx, warnings){
     //   Site work / civil: $50–150k depending on terrain.
     // All ranges are 2024 USD SCREENING ESTIMATES — not for budgeting.
     tower_cost_estimate: (() => {
-      const lambdaM    = 300000 / frequency_khz;
+      // planH_m/asrNeeded rewired to canonical.antenna.selectedDesignHeightM /
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the class-typical design height and re-comparing it
+      // against the §17.7 threshold locally.
+      const planH_m    = canonical.antenna.selectedDesignHeightM.value;
+      const asrNeeded  = canonical.regulatory.asr.required;
       const isHighClass_tce = /^[AB]$/i.test(fcc_class);
-      const planH_m    = isHighClass_tce ? lambdaM * 0.625 : lambdaM * 0.375;
-      const asrNeeded  = planH_m > ASR_THRESHOLD_17_7.height_m;
 
       // Tower steel — guyed monopole rule of thumb (lower for shorter towers)
       const towerLow  = Math.round(planH_m * 50  / 1000) * 1000;
@@ -3981,8 +3984,13 @@ async function scoreCandidate(pt, ctx, warnings){
     // Based on standard FCC groundwave efficiency table (FCC R-4) for λ/4 = 0 dB ref.
     // Ref: FCC OET Bulletin 69; AM antenna efficiency curves vs. electrical height.
     antenna_height_options: (() => {
-      const lambdaM = 300000 / frequency_khz;
-      const qwM     = lambdaM / 4;
+      // lambdaM/qwM rewired to canonical.antenna.wavelengthM/
+      // quarterWaveReferenceM (guide-internal migration, Wave 1) instead of
+      // re-deriving these physics reference values locally. Numerically
+      // identical (same λ = 300000/f_kHz convention); improves consistency
+      // with canonical's reference values only.
+      const lambdaM = canonical.antenna.wavelengthM.value;
+      const qwM     = canonical.antenna.quarterWaveReferenceM.value;
 
       // Efficiency gain in dB relative to a λ/4 monopole (standard reference).
       // 5/8λ: approx +1.7 dB gain over λ/4 (empirical from AM engineering tables)
@@ -3993,12 +4001,12 @@ async function scoreCandidate(pt, ctx, warnings){
           id:              '5_8_LAMBDA',
           label:           '5/8 λ (optimum)',
           electrical_deg:  225,
-          height_m:        round2(lambdaM * 0.625),
-          height_ft:       Math.round(lambdaM * 0.625 * 3.28084),
+          height_m:        canonical.antenna.fiveEighthsReferenceM.value,
+          height_ft:       Math.round(canonical.antenna.fiveEighthsReferenceM.value * 3.28084),
           gain_vs_qw_db:   1.7,
           erp_vs_tpo_ratio: round2(tpo_kw * Math.pow(10, 1.7 / 10) / tpo_kw),
           estimated_erp_kw: round2(tpo_kw * Math.pow(10, 1.7 / 10)),
-          asr_required:    (lambdaM * 0.625) > ASR_THRESHOLD_17_7.height_m,
+          asr_required:    canonical.antenna.fiveEighthsReferenceM.value > ASR_THRESHOLD_17_7.height_m,
           pros:            '~1.7 dB ERP gain over λ/4; maximum groundwave efficiency for most soil types.',
           cons:            'Taller physical structure; always triggers §17.7 ASR + FAA study at all AM frequencies (5/8λ ≥ 97 m at max 1710 kHz). Higher construction cost.'
         },
@@ -4200,9 +4208,12 @@ async function scoreCandidate(pt, ctx, warnings){
     //   R_total = R_r + R_g
     //   Efficiency = R_r / R_total
     antenna_base_impedance: (() => {
-      const lambdaM = 300000 / frequency_khz;
-      const qwM     = lambdaM / 4;
-      const feM     = lambdaM * 5 / 8;
+      // lambdaM/qwM/feM/L_radial_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving these physics reference values locally.
+      const lambdaM = canonical.antenna.wavelengthM.value;
+      const qwM     = canonical.antenna.quarterWaveReferenceM.value;
+      const feM     = canonical.antenna.fiveEighthsReferenceM.value;
 
       // Radiation resistance for vertical monopole (per NEC / FCC engineering model).
       // At λ/4 (90°): R_r = 36.6 Ω (lossless monopole over perfect infinite ground).
@@ -4221,7 +4232,7 @@ async function scoreCandidate(pt, ctx, warnings){
       // but the dominant term is the soil resistivity.
       const rho_ohm_m   = 1000 / sigma_msm;         // soil resistivity (Ω·m) from σ
       const N_radials   = 120;
-      const L_radial_m  = round2(lambdaM * 0.35);   // 0.35λ per §73.189(b)(4) / NBS TN-24
+      const L_radial_m  = canonical.groundSystem.selectedScenario.radialLengthM;   // 0.35λ per §73.189(b)(4) / NBS TN-24
       const rg_formula  = round2(Math.min(30, (120 * rho_ohm_m) / (N_radials * L_radial_m)));
 
       // Extended ground system (180 radials at 1.5×0.35λ) reduces R_g further.
@@ -4281,10 +4292,12 @@ async function scoreCandidate(pt, ctx, warnings){
     // costs (see tower_cost_estimate for those).  All figures are 2024 USD screening
     // estimates; actual costs depend on consultant selection and filing complexity.
     permit_and_engineering_cost_estimate: (() => {
-      const lambdaM_pe = 300000 / frequency_khz;
-      const isHighClass_pe = /^[AB]$/i.test(fcc_class);
-      const planH_pe   = lambdaM_pe * (isHighClass_pe ? 0.625 : 0.375);
-      const asrRequired = planH_pe > ASR_THRESHOLD_17_7.height_m;
+      // planH_pe/asrRequired rewired to canonical.antenna.selectedDesignHeightM /
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the class-typical design height and re-comparing it
+      // against the §17.7 threshold locally.
+      const planH_pe   = canonical.antenna.selectedDesignHeightM.value;
+      const asrRequired = canonical.regulatory.asr.required;
       const daRecommended = coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR
         || blanket_population_pct != null && blanket_population_pct >= 0.8
         || !!treaty_zone
@@ -4424,9 +4437,10 @@ async function scoreCandidate(pt, ctx, warnings){
     per_candidate_engineering_checklist: (() => {
       const items = [];
       const asrThresh = ASR_THRESHOLD_17_7.height_m; // 200 ft in metres — 47 CFR §17.7
-      const lambdaM         = 300000 / frequency_khz;
-      const isHighClass_chk = /^[AB]$/i.test(fcc_class);
-      const planH_chk       = lambdaM * (isHighClass_chk ? 0.625 : 0.375);
+      // planH_chk rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const planH_chk       = canonical.antenna.selectedDesignHeightM.value;
       // 1. Soil resistivity — always required if conductivity is screening-grade or poor.
       if (ground_sigma_filing_grade !== 'filing'){
         items.push({
@@ -4450,7 +4464,7 @@ async function scoreCandidate(pt, ctx, warnings){
         id: 'MPE_STUDY',
         priority: 'REQUIRED',
         label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)',
-        note: `AM stations must file an RF exposure evaluation (OET Bulletin 65, §3.B near-field study). Near-field boundary λ/(2π) ≈ ${Math.round(lambdaM / (2 * Math.PI))} m at ${frequency_khz} kHz.`
+        note: `AM stations must file an RF exposure evaluation (OET Bulletin 65, §3.B near-field study). Near-field boundary λ/(2π) ≈ ${Math.round(canonical.rfExposure.reactiveNearFieldBoundaryM.value_m)} m at ${frequency_khz} kHz.`
       });
       // 4. Treaty zone.
       if (treaty_zone){
@@ -4526,10 +4540,11 @@ async function scoreCandidate(pt, ctx, warnings){
       });
 
       // Step 3 — ASR/FAA coordination (if height triggers §17.7)
-      const lambdaM_cp = 300000 / frequency_khz;
-      const isHighClass_cp = /^[AB]$/i.test(fcc_class);
-      const planH_cp = lambdaM_cp * (isHighClass_cp ? 0.625 : 0.375);
-      if (planH_cp > ASR_THRESHOLD_17_7.height_m){
+      // planH_cp rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const planH_cp = canonical.antenna.selectedDesignHeightM.value;
+      if (canonical.regulatory.asr.required){
         steps.push({
           step: 3,
           phase: 'ASR_FAA_COORDINATION',
@@ -4697,15 +4712,18 @@ async function scoreCandidate(pt, ctx, warnings){
     // reduced antenna heights lower radiation efficiency approximately as sin²(h/λ·360°).
     antenna_height_profile: (() => {
       const ASR_M = ASR_THRESHOLD_17_7.height_m;           // 200 ft — §17.7 ASR trigger
-      const lambdaM = 300000 / frequency_khz;
-      const qw  = round2(lambdaM / 4);       // 90° — standard, optimal radiation resistance
+      // lambdaM/qw/fe/std_h_ahp rewired to canonical.antenna (guide-internal
+      // migration, Wave 1) instead of re-deriving these physics reference
+      // values and the class-typical design height locally.
+      const lambdaM = canonical.antenna.wavelengthM.value;
+      const qw  = canonical.antenna.quarterWaveReferenceM.value;       // 90° — standard, optimal radiation resistance
       const hw  = round2(lambdaM / 2);       // 180° — null pattern above; rarely used
-      const fe  = round2(lambdaM * 5 / 8);  // 225° — maximum gain, used on some Class A clear-channel
+      const fe  = canonical.antenna.fiveEighthsReferenceM.value;  // 225° — maximum gain, used on some Class A clear-channel
 
       // Class-specific standard planning height: 5/8λ for A/B, 3/8λ for C/D.
       // At all AM frequencies, this height exceeds 60.96 m → ASR always required.
       const isHighCls_ahp = /^[AB]$/i.test(fcc_class);
-      const std_h_ahp = round2(lambdaM * (isHighCls_ahp ? 0.625 : 0.375));
+      const std_h_ahp = canonical.antenna.selectedDesignHeightM.value;
 
       // Relative radiation efficiency vs. quarter-wave baseline.
       // M3 groundwave tables assume 90° (λ/4) electrical height.
@@ -4875,23 +4893,20 @@ async function scoreCandidate(pt, ctx, warnings){
     // near-field study with the specific antenna and ground system design.
     mpe_evaluation_required: true,
     mpe_rf_exposure_summary: (() => {
-      const lambdaM_mpe = 300000 / frequency_khz;
-      // Near-field boundary (reactive near-field): r < λ/(2π)
-      const near_field_boundary_m = round2(lambdaM_mpe / (2 * Math.PI));
+      // near_field_boundary_m/exclusion_m/fence_distance_m rewired to
+      // canonical.rfExposure (guide-internal migration, Wave 1) instead of
+      // re-deriving the OET-65 near-field/far-field/fence distances
+      // locally -- canonical.rfExposure is the single source of truth for
+      // these boundaries (see canonical/rules/rfExposure.js).
+      const near_field_boundary_m = canonical.rfExposure.reactiveNearFieldBoundaryM.value_m;
       // Far-field MPE limit for general public (uncontrolled environment) per OET Bulletin 65, Table 1:
       //   0.3–1.34 MHz: 100 mW/cm²  (flat — includes entire lower AM broadcast band)
       //   1.34–30 MHz:  180/f² mW/cm² (decreasing — covers upper AM band to 1.71 MHz)
       const freq_mhz = frequency_khz / 1000;
       const mpe_limit_mw_cm2 = freq_mhz < 1.34 ? MPE_GP_LO.s_mw_cm2 : round2(MPE_GP_HI.s_numerator_mw_cm2 / (freq_mhz * freq_mhz));
-      // Power density at distance r (far-field, free-space):
-      // S = P_ERP / (4π r²) × unit_conversions
-      // Exclusion distance where S = MPE_LIMIT:
-      // r = sqrt(P_W / (4π × MPE_W_m2)) where MPE_W_m2 = mpe_limit_mw_cm2 × 10
-      const erp_w    = tpo_kw * 1000;  // assume ERP ≈ TPO for vertical monopole (screening)
-      const mpe_w_m2 = mpe_limit_mw_cm2 * 10;  // convert mW/cm² → W/m²
-      const exclusion_m = round2(Math.sqrt(erp_w / (4 * Math.PI * mpe_w_m2)));
-      // Practical minimum fence distance: max of near-field boundary and exclusion radius.
-      const fence_distance_m = round2(Math.max(near_field_boundary_m, exclusion_m));
+      const exclusion_m = canonical.rfExposure.uncontrolledMpeBoundaryM.value_m;
+      // Practical minimum fence distance: canonical's recommended fence distance.
+      const fence_distance_m = canonical.rfExposure.recommendedFenceDistanceM.value_m;
       return {
         evaluation_required: true,
         rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
@@ -5036,10 +5051,12 @@ async function scoreCandidate(pt, ctx, warnings){
     // NIF complexity, and DA pattern requirements.  Designed so a PROMISING site with
     // high regulatory risk still gets flagged for early mitigation planning.
     regulatory_risk_score: (() => {
-      const lambdaM_r = 300000 / frequency_khz;
-      const isHighClass_r = /^[AB]/i.test(fcc_class);
-      const planH_r = lambdaM_r * (isHighClass_r ? 0.625 : 0.375);  // 5/8λ A/B, 3/8λ C/D
-      const asrRequired = planH_r > ASR_THRESHOLD_17_7.height_m;
+      // planH_r/asrRequired rewired to canonical.antenna.selectedDesignHeightM /
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the class-typical design height and re-comparing it
+      // against the §17.7 threshold locally.
+      const planH_r = canonical.antenna.selectedDesignHeightM.value;  // 5/8λ A/B, 3/8λ C/D
+      const asrRequired = canonical.regulatory.asr.required;
       const risks = [];
       let total = 0;
 
@@ -5516,12 +5533,14 @@ async function scoreCandidate(pt, ctx, warnings){
       // WARN when class-appropriate design height > 60.96m (certain — 3/8λ C/D, 5/8λ A/B).
       // WARN when design height ≤ 60.96m but max practical height (5/8λ) > 60.96m (possible).
       // PASS when even 5/8λ < 60.96m (extremely high frequency — practically never in AM band).
-      const lambdaM_g = 300000 / frequency_khz;
-      const isHighClass_g = /^[AB]/i.test(fcc_class);
-      const qwM_g  = lambdaM_g / 4;   // λ/4 physics reference
-      const planH_g = lambdaM_g * (isHighClass_g ? 0.625 : 0.375);  // design height
-      const hwM_g  = lambdaM_g * 0.625;  // 5/8λ practical maximum
-      const asrCertain  = planH_g > ASR_THRESHOLD_17_7.height_m;
+      // qwM_g/planH_g/hwM_g/asrCertain rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving these physics reference values and the ASR decision
+      // locally.
+      const qwM_g  = canonical.antenna.quarterWaveReferenceM.value;   // λ/4 physics reference
+      const planH_g = canonical.antenna.selectedDesignHeightM.value;  // design height
+      const hwM_g  = canonical.antenna.fiveEighthsReferenceM.value;  // 5/8λ practical maximum
+      const asrCertain  = canonical.regulatory.asr.required;
       const asrPossible = !asrCertain && hwM_g > ASR_THRESHOLD_17_7.height_m;
       const asrStatus   = (asrCertain || asrPossible) ? WARN : PASS;
       gates.push({
@@ -5538,7 +5557,9 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Gate 4: §1.1307 RF exposure (MPE)
       const freq_mhz_g = frequency_khz / 1000;
-      const nf_boundary_m = Math.round((300000 / frequency_khz) / (2 * Math.PI));
+      // nf_boundary_m rewired to canonical.rfExposure.reactiveNearFieldBoundaryM
+      // (guide-internal migration, Wave 1) instead of re-deriving λ/(2π) locally.
+      const nf_boundary_m = Math.round(canonical.rfExposure.reactiveNearFieldBoundaryM.value_m);
       gates.push({
         id: 'RF_EXPOSURE_MPE', label: '§1.1307 RF exposure (MPE) evaluation',
         status: WARN,
@@ -5609,11 +5630,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM ground system design per FCC §73.189(b)(4) / NBS TN-24 / Terman textbook.
       // §73.189(b)(4) specifies the standard: 120 radials × 0.35λ buried copper.
       // Prescribes radial count, length, conductor gauge, and burial depth.
-      const lambdaM_gs = 300000 / frequency_khz;
-      const qwM_gs = round2(lambdaM_gs / 4);  // λ/4 physics reference only (R_rad = 36.6 Ω)
+      // qwM_gs/idealRadialLengthM rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving these physics reference values locally.
+      const qwM_gs = canonical.antenna.quarterWaveReferenceM.value;  // λ/4 physics reference only (R_rad = 36.6 Ω)
 
       // Ideal radial length is 0.35λ per §73.189(b)(4) / NBS TN-24; λ/4 is only the antenna physics reference.
-      const idealRadialLengthM = round2(lambdaM_gs * 0.35); // 0.35λ per §73.189(b)(4)
+      const idealRadialLengthM = canonical.groundSystem.selectedScenario.radialLengthM; // 0.35λ per §73.189(b)(4)
       const minRadialLengthM   = round2(qwM_gs * 0.5);  // NBS TN-24: 50% of λ/4 still effective
       const practicalLengthM   = round2(Math.min(idealRadialLengthM, 120)); // lot constraint proxy
 
@@ -5750,10 +5773,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // Each item carries a status (REQUIRED / CONDITIONAL / INFORMATIONAL), the responsible
       // party, LMS form/exhibit code, and rule cite.  This is a screening-grade checklist —
       // consult FCC communications counsel before filing.
-      const lambdaM_fl  = 300000 / frequency_khz;
-      const isHighClass_fl = /^[AB]/i.test(fcc_class);
-      const towerH_fl   = lambdaM_fl * (isHighClass_fl ? 0.625 : 0.375);
-      const asrNeeded  = towerH_fl > ASR_THRESHOLD_17_7.height_m;
+      // towerH_fl/asrNeeded rewired to canonical.antenna.selectedDesignHeightM /
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the class-typical design height and re-comparing it
+      // against the §17.7 threshold locally.
+      const towerH_fl   = canonical.antenna.selectedDesignHeightM.value;
+      const asrNeeded  = canonical.regulatory.asr.required;
       const hasTreaty  = !!treaty_zone;
       const isCC_fl    = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const chanClass_fl = frequencyChannelClass(frequency_khz);
@@ -6174,13 +6199,16 @@ async function scoreCandidate(pt, ctx, warnings){
       // Structured due-diligence checklist for AM transmitter site land/lease acquisition.
       // Covers zoning, title, environmental, tower setback, utility, and lease terms.
       // ALL items are REQUIRED before signing a lease or purchase agreement.
-      const lambdaM_sa     = 300000 / frequency_khz;
-      const radialLen_sa   = round2(lambdaM_sa * 0.35);  // 0.35λ standard radial per §73.189(b)(4)/NBS TN-24
+      // radialLen_sa/towerH_sa/asrRequired_sa rewired to canonical.antenna/
+      // canonical.groundSystem/canonical.regulatory.asr (guide-internal
+      // migration, Wave 1) instead of re-deriving the radial length,
+      // class-typical design height, and ASR decision locally.
+      const radialLen_sa   = canonical.groundSystem.selectedScenario.radialLengthM;  // 0.35λ standard radial per §73.189(b)(4)/NBS TN-24
       const isHighClass_sa = /^[AB]/i.test(fcc_class);
-      const towerH_sa      = round2(isHighClass_sa ? lambdaM_sa * 0.625 : lambdaM_sa * 0.375);
+      const towerH_sa      = canonical.antenna.selectedDesignHeightM.value;
       const minParcelRadius_m = round2(radialLen_sa * 1.1);  // radial extent + 10% buffer
       const minParcelArea_ha  = round2(Math.PI * (minParcelRadius_m / 100) * (minParcelRadius_m / 100));
-      const asrRequired_sa    = towerH_sa > ASR_THRESHOLD_17_7.height_m;
+      const asrRequired_sa    = canonical.regulatory.asr.required;
       const hasTreaty_sa      = !!treaty_zone;
 
       const items = [
@@ -6561,10 +6589,12 @@ async function scoreCandidate(pt, ctx, warnings){
     // No GIS database lookup performed — the operator must verify each item with
     // the appropriate federal/state agency.
     environmental_risk_matrix: (() => {
-      const lambdaM_env  = 300000 / frequency_khz;
-      const isHighClass_env = /^[AB]/i.test(fcc_class);
-      const towerH_env = round2(isHighClass_env ? lambdaM_env * 0.625 : lambdaM_env * 0.375);
-      const asrReq    = towerH_env > ASR_THRESHOLD_17_7.height_m;
+      // towerH_env/asrReq rewired to canonical.antenna.selectedDesignHeightM /
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the class-typical design height and re-comparing it
+      // against the §17.7 threshold locally.
+      const towerH_env = canonical.antenna.selectedDesignHeightM.value;
+      const asrReq    = canonical.regulatory.asr.required;
       const nearBorder = treaty_zone != null;
       const isHighPow_env = tpo_kw >= 25;
 
@@ -6770,10 +6800,14 @@ async function scoreCandidate(pt, ctx, warnings){
     // All figures are 2024-dollar screening estimates — actual costs vary
     // significantly by region, contractor, site conditions, and market.
     financial_feasibility_summary: (() => {
-      const lambdaM_ff = 300000 / frequency_khz;
-      const qwM_ff    = round2(lambdaM_ff / 4);  // λ/4 physics reference (kept for tower note display)
-      const designH_ff = round2(lambdaM_ff * (/^[AB]$/i.test(fcc_class) ? 0.625 : 0.375)); // class-aware design height
-      const asrReq_ff = designH_ff > ASR_THRESHOLD_17_7.height_m;     // use design height for ASR decision per §17.7
+      // qwM_ff/designH_ff/asrReq_ff/radialLenStd_m rewired to canonical.antenna/
+      // canonical.groundSystem/canonical.regulatory.asr (guide-internal
+      // migration, Wave 1) instead of re-deriving these physics reference
+      // values, the class-typical design height, the ASR decision, and the
+      // standard radial length locally.
+      const qwM_ff    = canonical.antenna.quarterWaveReferenceM.value;  // λ/4 physics reference (kept for tower note display)
+      const designH_ff = canonical.antenna.selectedDesignHeightM.value; // class-aware design height
+      const asrReq_ff = canonical.regulatory.asr.required;     // use design height for ASR decision per §17.7
       const isClear_ff = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const isDA_ff    = /^DA/i.test(pattern_mode);  // NDA starts with N, not DA
       const isLocal_ff = LOCAL_CHANNEL_KHZ.has(frequency_khz);
@@ -6781,7 +6815,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const isMedPow_ff  = tpo_kw >= 5 && tpo_kw < 25;
 
       // Standard radial length per §73.189(b)(4) / NBS TN-24 — drives parcel size
-      const radialLenStd_m = round2(lambdaM_ff * 0.35); // 0.35λ per §73.189(b)(4)
+      const radialLenStd_m = canonical.groundSystem.selectedScenario.radialLengthM; // 0.35λ per §73.189(b)(4)
 
       // Land / Site
       // Parcel purchase or lease — AM requires significant land for radial system (0.35λ radius + 10%)
@@ -7517,9 +7551,11 @@ async function scoreCandidate(pt, ctx, warnings){
     regulatory_compliance_checklist: (() => {
       const ASR_M = ASR_THRESHOLD_17_7.height_m;   // §17.7 200-ft threshold
       const MPE_ERP_THRESHOLD_KW = 5.0;  // conservative formal-exhibit trigger; §1.1307(b) Table 1 actual AM threshold is > 1 kW
-      const lambda_rc = 300000 / frequency_khz;
+      // designH_rc rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const designH_rc      = canonical.antenna.selectedDesignHeightM.value;
       const isHighClass_rc  = /^[AB]$/i.test(fcc_class);
-      const designH_rc      = lambda_rc * (isHighClass_rc ? 0.625 : 0.375);
       const isDA_rc   = /^DA/i.test(pattern_mode);
       const isClear_rc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const isLocal_rc = LOCAL_CHANNEL_KHZ.has(frequency_khz);

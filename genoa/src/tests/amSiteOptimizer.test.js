@@ -2927,13 +2927,25 @@ test('mpe_rf_exposure_summary.near_field_boundary_m ≈ lambda/(2*pi) at station
   }
 });
 
-test('mpe_rf_exposure_summary.recommended_fence_distance_m >= near_field_boundary_m', async () => {
+test('mpe_rf_exposure_summary.recommended_fence_distance_m is a positive practical minimum', async () => {
+  // recommended_fence_distance_m now reads canonical.rfExposure.recommendedFenceDistanceM
+  // directly (guide-internal migration, Wave 1) instead of re-deriving it
+  // locally as max(near_field_boundary_m, far_field_exclusion_m). That local
+  // formula was one of the "ad hoc fence-distance formulas" and the
+  // "λ/2π-as-fence conflation" canonical/rules/rfExposure.js was built to
+  // replace: canonical explicitly documents that the reactive near-field
+  // boundary (λ/2π) is a physics regime boundary, NOT a fence distance, and
+  // must never be folded into it. canonical's recommended fence distance is
+  // instead max(uncontrolled MPE compliance distance, 3 m practical
+  // minimum), which can legitimately be smaller than near_field_boundary_m
+  // at low TPO -- so the old "fence >= near_field_boundary" invariant no
+  // longer holds and has been replaced with a shape check.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   assert.equal(out.available, true);
   for (const c of out.candidates){
     const mpe = c.mpe_rf_exposure_summary;
-    assert.ok(mpe.recommended_fence_distance_m >= mpe.near_field_boundary_m,
-      `fence distance must be >= near_field_boundary (rank ${c.rank}): ${mpe.recommended_fence_distance_m} < ${mpe.near_field_boundary_m}`);
+    assert.ok(typeof mpe.recommended_fence_distance_m === 'number' && mpe.recommended_fence_distance_m >= 3,
+      `recommended_fence_distance_m must be a number >= the 3 m practical minimum (rank ${c.rank}): got ${mpe.recommended_fence_distance_m}`);
   }
 });
 
@@ -13301,7 +13313,12 @@ test('am_tower_guy_wire_and_anchor_system_guide present on KAZM candidate', asyn
 test('KAZM guy wire system configuration (473 ft tower)', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
-  assert.strictEqual(g.tower_height_ft,       472.87, 'KAZM 780 kHz Class D tower should be 472.87 ft');
+  // tower_height_ft: previously the guide rounded the wavelength first and
+  // then derived 3/8λ from that rounded value; it now reads
+  // canonical.antenna.selectedDesignHeightM directly (guide-internal
+  // migration, Wave 1), which is unrounded and slightly more precise
+  // (473.2 vs the old 472.87).
+  assert.strictEqual(g.tower_height_ft,       473.2,  'KAZM 780 kHz Class D tower should be 473.2 ft (canonical.antenna.selectedDesignHeightM)');
   assert.strictEqual(g.num_guy_levels,        3,      '473 ft tower should have 3 guy levels (< 500 ft threshold)');
   assert.strictEqual(g.num_anchors_per_level, 3,      'should have 3 anchors per level');
   assert.strictEqual(g.num_total_anchors,     9,      '3 levels × 3 = 9 total anchors');
@@ -13310,10 +13327,12 @@ test('KAZM guy wire system configuration (473 ft tower)', async () => {
 test('KAZM guy wire cost components', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
-  assert.strictEqual(g.guy_wire_low_usd,  4255.83, 'guy_wire_low should be $4,255.83');
+  // guy_wire_low_usd/install_low_usd cascade from the canonical (unrounded)
+  // tower height above -- same rounding-drift rationale.
+  assert.strictEqual(g.guy_wire_low_usd,  4258.8,  'guy_wire_low should be $4,258.80 (canonical design height)');
   assert.strictEqual(g.anchor_low_usd,    18000,   'anchor_low = 9 × $2,000 = $18,000');
   assert.strictEqual(g.insulator_low_usd, 4500,    'insulator_low = 9 × $500 = $4,500');
-  assert.strictEqual(g.install_low_usd,   23643.5, 'install_low = 472.87 × 50 = $23,643.5');
+  assert.strictEqual(g.install_low_usd,   23660,   'install_low = 473.2 × 50 = $23,660 (canonical design height)');
 });
 
 test('KAZM guy wire system total cost', async () => {
@@ -13350,7 +13369,12 @@ test('am_transmission_loss_budget_guide present on KAZM candidate', async () => 
 test('KAZM coax run and diameter', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmission_loss_budget_guide;
-  assert.strictEqual(g.coax_run_ft,    286.43,       'KAZM coax_run_ft should be 286.43');
+  // coax_run_ft derives from tower_height_m, which now reads
+  // canonical.antenna.selectedDesignHeightM directly (guide-internal
+  // migration, Wave 1) instead of re-deriving 3/8λ from a locally
+  // rounded-first wavelength -- same rounding-drift rationale as the
+  // guy-wire-system tests above.
+  assert.strictEqual(g.coax_run_ft,    286.6,        'KAZM coax_run_ft should be 286.6 (canonical design height)');
   assert.strictEqual(g.coax_diameter,  '1_5_8_inch', 'KAZM 5 kW should use 1-5/8 inch coax');
   assert.strictEqual(g.loss_per_100ft, 0.025,        '1-5/8 inch coax loss should be 0.025 dB/100ft');
 });
@@ -13369,7 +13393,9 @@ test('KAZM power at antenna and system cost', async () => {
   const g = out.candidates[0].am_transmission_loss_budget_guide;
   assert.strictEqual(g.power_fraction_at_antenna, 0.9462, 'power_fraction should be 0.9462');
   assert.strictEqual(g.power_at_antenna_kw,        4.73,  'power_at_antenna_kw should be 4.73');
-  assert.strictEqual(g.total_low_usd,              4869.31, 'total_low should be $4,869.31');
+  // total_low_usd cascades from coax_run_ft (canonical design height,
+  // guide-internal migration Wave 1) -- same rounding-drift rationale.
+  assert.strictEqual(g.total_low_usd,              4872.2, 'total_low should be $4,872.20 (canonical design height)');
 });
 
 test('am_transmission_loss_budget_guide comparison table columns present', async () => {
@@ -13440,7 +13466,11 @@ test('am_fcc_asr_tower_registration_guide present on KAZM candidate', async () =
 test('KAZM 473 ft tower requires ASR and FAA notice', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_asr_tower_registration_guide;
-  assert.strictEqual(g.tower_height_ft,    472.87, 'KAZM tower_height_ft should be 472.87 (3/8λ Class D)');
+  // tower_height_ft now reads canonical.antenna.selectedDesignHeightM
+  // directly (guide-internal migration, Wave 1) instead of a locally
+  // rounded-first 3/8λ derivation -- same rounding-drift rationale as the
+  // guy-wire-system tests above.
+  assert.strictEqual(g.tower_height_ft,    473.2,  'KAZM tower_height_ft should be 473.2 (canonical.antenna.selectedDesignHeightM)');
   assert.strictEqual(g.requires_asr,        true,  'KAZM 473 ft tower requires ASR');
   assert.strictEqual(g.requires_faa_notice, true,  'KAZM 473 ft tower requires FAA notice');
 });
@@ -13885,7 +13915,11 @@ test('am_transmitter_decommission_and_site_remediation_guide present on KAZM can
 test('KAZM NDA 473 ft tower demolition cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmitter_decommission_and_site_remediation_guide;
-  assert.strictEqual(g.tower_height_ft,      472.87, 'KAZM tower_height_ft should be 472.87 (3/8λ Class D)');
+  // tower_height_ft now reads canonical.antenna.selectedDesignHeightM
+  // directly (guide-internal migration, Wave 1) instead of a locally
+  // rounded-first 3/8λ derivation -- same rounding-drift rationale as the
+  // guy-wire-system tests above. Demo cost bracket (>400 ft) is unaffected.
+  assert.strictEqual(g.tower_height_ft,      473.2,  'KAZM tower_height_ft should be 473.2 (canonical.antenna.selectedDesignHeightM)');
   assert.strictEqual(g.num_towers,            1,     'NDA has 1 tower');
   assert.strictEqual(g.tower_demo_low_usd,   100000, '473 ft tower demo low should be 100000 (>400 ft bracket)');
 });
@@ -14026,22 +14060,40 @@ test('am_ground_system_radial_design_guide present on KAZM candidate', async () 
 test('KAZM 780 kHz radial design specifications', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_radial_design_guide;
-  assert.strictEqual(g.wavelength_m,      384.35, 'KAZM wavelength_m should be 384.35');
-  assert.strictEqual(g.radial_length_ft,  441.34, 'KAZM radial_length_ft should be 441.34 (0.35λ per §73.189(b)(4))');
+  // wavelength_m/radial_length_m now read canonical.antenna.wavelengthM /
+  // canonical.groundSystem.selectedScenario.radialLengthM directly
+  // (guide-internal migration, Wave 1). canonical.antenna.wavelengthM uses
+  // λ = 300000 / f_kHz (c ≈ 3×10⁸ m/s), the engine-wide convention
+  // documented in canonical/antennaDesign.js -- NOT the precise physical
+  // speed of light (299792458 m/s) the guide previously used to compute
+  // its own wavelength locally. Reading canonical here is correct: it
+  // makes this guide consistent with every other canonical-sourced
+  // wavelength in the engine (e.g. am_tower_base_insulator_and_rf_isolation_
+  // guide's wavelength_m, also 384.62 for 780 kHz -- see test above), even
+  // though 384.62 is less physically precise than the old 384.35. Sibling
+  // radial_length_ft (gnd_radial_length_ft, 441.67) was already updated to
+  // this canonical value in the "am_ground_system_radial_design_guide
+  // comparison table columns present" test above.
+  assert.strictEqual(g.wavelength_m,      384.62, 'KAZM wavelength_m should be 384.62 (canonical.antenna.wavelengthM, engine-wide λ=300000/f convention)');
+  assert.strictEqual(g.radial_length_ft,  441.67, 'KAZM radial_length_ft should be 441.67 (0.35λ per §73.189(b)(4), canonical-sourced)');
   assert.strictEqual(g.num_radials_ideal, 120,    'num_radials_ideal should be 120');
 });
 
 test('KAZM total radial wire length', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_radial_design_guide;
-  assert.strictEqual(g.total_radial_length_mi, 10.03, 'KAZM total_radial_length_mi should be 10.03 (120 × 0.35λ per §73.189(b)(4))');
+  // Cascades from the canonical-sourced radial_length_ft above.
+  assert.strictEqual(g.total_radial_length_mi, 10.04, 'KAZM total_radial_length_mi should be 10.04 (120 × 0.35λ per §73.189(b)(4), canonical-sourced)');
 });
 
 test('KAZM ground system radial total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_radial_design_guide;
-  assert.strictEqual(g.total_low_usd,  43839.03,  'KAZM total_low_usd should be 43839.03 (120×441.34 ft × ($0.18+$0.61)/ft + $2k bus ring, RS Means 2024)');
-  assert.strictEqual(g.total_high_usd, 122513.76, 'KAZM total_high_usd should be 122513.76 (120×441.34 ft × ($0.37+$1.83)/ft + $6k bus ring, RS Means 2024)');
+  // Cascades from the canonical-sourced radial_length_ft above; matches
+  // the grd_total_low_usd value already asserted in the comparison-table
+  // test (43870.31).
+  assert.strictEqual(g.total_low_usd,  43870.31,  'KAZM total_low_usd should be 43870.31 (120×441.67 ft × ($0.18+$0.61)/ft + $2k bus ring, RS Means 2024, canonical-sourced)');
+  assert.strictEqual(g.total_high_usd, 122600.88, 'KAZM total_high_usd should be 122600.88 (120×441.67 ft × ($0.37+$1.83)/ft + $6k bus ring, RS Means 2024, canonical-sourced)');
 });
 
 test('am_ground_system_radial_design_guide comparison table columns present', async () => {
