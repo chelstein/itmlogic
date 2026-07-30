@@ -10350,10 +10350,13 @@ async function scoreCandidate(pt, ctx, warnings){
       //     Connectors      ≈ $8–$15 / radial
       //     Total installed ≈ sum above per 120-radial "full" system
 
-      const lambda_m           = 299792.458 / frequency_khz;        // wavelength in metres
-      const quarter_wave_m     = lambda_m / 4;                       // λ/4 physics reference (36.5 Ω R_rad)
+      // lambda_m/quarter_wave_m/standard_radial_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving these physics reference values locally.
+      const lambda_m           = canonical.antenna.wavelengthM.value;
+      const quarter_wave_m     = canonical.antenna.quarterWaveReferenceM.value;   // λ/4 physics reference (36.5 Ω R_rad)
       const quarter_wave_ft    = round2(quarter_wave_m * 3.28084);   // in feet
-      const standard_radial_m  = round2(lambda_m * 0.35);            // 0.35λ FCC standard per §73.189(b)(4) / NBS TN-24
+      const standard_radial_m  = canonical.groundSystem.selectedScenario.radialLengthM;   // 0.35λ FCC standard per §73.189(b)(4) / NBS TN-24
       const standard_radial_ft = round2(standard_radial_m * 3.28084); // in feet
 
       // Standard system sizes: economy (60), standard (120), full (120) – choose by conductivity
@@ -14470,14 +14473,16 @@ async function scoreCandidate(pt, ctx, warnings){
       // Optimum system: 120 radials at 0.35λ length per §73.189(b)(4) / NBS TN-24.
       // Class D stations are encouraged but not mandated; 90–120 radials at 0.35λ are best practice.
       // Radial length: 0.35λ (per §73.189(b)(4) / NBS TN-24); λ/4 is sometimes used as a minimum fallback.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m      = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      // wavelength_m/radial_length_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving the wavelength and 0.35λ radial length locally.
+      const wavelength_m      = canonical.antenna.wavelengthM.value;
       const is_class_ab_gr    = /^[AB]$/i.test(fcc_class);
       const is_class_cd_gr    = /^[CD]$/i.test(fcc_class);
       // Recommended radial counts:
       const num_radials_ideal  = 120;
       const num_radials_min    = is_class_ab_gr ? 120 : 90;  // FCC minimum or best practice
-      const radial_length_m    = round2(wavelength_m * 0.35); // 0.35λ per §73.189(b)(4) / NBS TN-24
+      const radial_length_m    = canonical.groundSystem.selectedScenario.radialLengthM; // 0.35λ per §73.189(b)(4) / NBS TN-24
       const radial_length_ft   = round2(radial_length_m * 3.28084);
       const radial_length_mi   = round2(radial_length_m / 1609.34);
       // Total copper wire length:

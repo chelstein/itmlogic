@@ -14048,8 +14048,16 @@ test('am_ground_system_radial_design_guide comparison table columns present', as
   // grd_num_radials_ideal/grd_radial_length_ft removed (canonical-
   // consistency-audit-followup, Group 2 item 5): duplicates of
   // gnd_recommended_radials/gnd_radial_length_ft, now sourced from
-  // candidate.canonical.groundSystem.selectedScenario. grd_total_low_usd was
-  // not named in the audit's duplicate-column list and is left as-is.
+  // candidate.canonical.groundSystem.selectedScenario.
+  //
+  // am_ground_system_radial_design_guide's own radial_length_m/wavelength_m
+  // were subsequently rewired to canonical too (guide-internal migration,
+  // Wave 1), which changes grd_total_low_usd: previously this guide derived
+  // its own cost total from a locally-recomputed (and very slightly
+  // different) radial length than the one already shown in
+  // gnd_radial_length_ft -- an internal inconsistency within the same
+  // guide's data, now resolved so both derive from the same canonical
+  // radial length (441.67 ft).
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {
     assert.ok('gnd_recommended_radials' in row, 'gnd_recommended_radials missing from comparison table');
@@ -14059,7 +14067,7 @@ test('am_ground_system_radial_design_guide comparison table columns present', as
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.gnd_recommended_radials, 120,      'rank-1 gnd_recommended_radials should be 120');
   assert.strictEqual(r0.gnd_radial_length_ft,    441.67,   'rank-1 gnd_radial_length_ft should be 441.67 (0.35λ per §73.189(b)(4), canonical-sourced)');
-  assert.strictEqual(r0.grd_total_low_usd,       43839.03, 'rank-1 grd_total_low_usd should be 43839.03 (120×0.35λ per §73.189(b)(4), RS Means 2024 rates)');
+  assert.strictEqual(r0.grd_total_low_usd,       43870.31, 'rank-1 grd_total_low_usd should be 43870.31 (120×0.35λ per §73.189(b)(4), canonical-sourced radial length, RS Means 2024 rates)');
 });
 
 test('am_tpo_and_antenna_efficiency_guide present on KAZM candidate', async () => {
