@@ -23263,11 +23263,17 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Zoning: AM tower sites often require conditional use permits (CUP) or special exceptions
       //   - Environmental: If wetland or floodplain is present, EIS may be required (§1.1307)
 
-      // Estimate site area requirements based on tower height
-      const _lambda_gl    = 300000 / frequency_khz;
-      const tower_height_m = Math.round(_lambda_gl * (['A', 'B'].includes(fcc_class) ? 0.625 : 0.375));  // 5/8λ A/B, 3/8λ C/D design height
+      // Estimate site area requirements based on tower height.
+      // tower_height_m/ground_radial_radius_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead of
+      // re-deriving the design height and 0.35λ radial length locally --
+      // this guide's bespoke field names (tower_height_m,
+      // ground_radial_radius_m) were hiding a duplicate of
+      // canonical.antenna.selectedDesignHeightM and
+      // canonical.groundSystem.selectedScenario.radialLengthM.
+      const tower_height_m = Math.round(canonical.antenna.selectedDesignHeightM.value);
       const guy_radius_m = Math.round(tower_height_m * 0.7); // approximate guy wire radius
-      const ground_radial_radius_m = Math.round(_lambda_gl * 0.35); // 0.35λ per §73.189(b)(4) / NBS TN-24
+      const ground_radial_radius_m = Math.round(canonical.groundSystem.selectedScenario.radialLengthM); // 0.35λ per §73.189(b)(4) / NBS TN-24
       const fence_buffer_m = 3; // 3m minimum buffer inside fence
       const min_site_radius_m = Math.max(guy_radius_m, ground_radial_radius_m) + fence_buffer_m;
       const min_site_area_acres = parseFloat((Math.PI * (min_site_radius_m / 1000) ** 2 * 247.105).toFixed(2));
@@ -23837,16 +23843,16 @@ async function scoreCandidate(pt, ctx, warnings){
       // Existing ASR for the current site does NOT transfer — a new ASR filing (FCC Form 854) is required.
       // FAA coordination under 14 CFR §77 is typically required before ASR can be granted.
 
-      // Tower height: 0.625λ for Class A/B (FCC optimum), 3/8λ for C/D (design height)
-      const c_mps_asr = 299792458;
-      const wavelength_m_asr = c_mps_asr / (frequency_khz * 1000);
-      const h_frac_asr = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D
-      const three_eights_m_asr = round2(wavelength_m_asr * h_frac_asr);  // class-dependent design height (3/8λ for C/D)
-      const quarter_wave_m_asr = round2(wavelength_m_asr * 0.25);
+      // three_eights_m_asr/quarter_wave_m_asr/asr_required_by_height rewired
+      // to canonical.antenna/canonical.regulatory.asr (guide-internal
+      // migration, Wave 1) instead of re-deriving the design height and
+      // re-comparing it against the §17.7 threshold locally.
+      const three_eights_m_asr = canonical.antenna.selectedDesignHeightM.value;  // class-dependent design height (3/8λ for C/D)
+      const quarter_wave_m_asr = canonical.antenna.quarterWaveReferenceM.value;
 
       // ASR registration threshold: 60.96 m (200 ft) AGL (above ground level — §17.7(a))
       const ASR_HEIGHT_THRESHOLD_M = ASR_THRESHOLD_17_7.height_m;
-      const asr_required_by_height = three_eights_m_asr > ASR_HEIGHT_THRESHOLD_M;
+      const asr_required_by_height = canonical.regulatory.asr.required;
       // Airport proximity: would need actual airport database lookup; flag as "evaluate"
       const asr_airport_check_required = true; // always evaluate for any new tower site
 
@@ -26238,16 +26244,16 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.1213 (FCC: antenna structure maintenance)
       // ASR (Antenna Structure Registration) required for towers ≥ 61m AGL
 
-      // Tower height estimation: class standard planning height —
-      // 5/8λ for Class A/B (max gain), 3/8λ for Class C/D
-      const lambda_tl   = round2(300000 / frequency_khz); // m
-      const qwave_tl    = round2(lambda_tl / 4);           // m
-      const towerHeightEst_m  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_tl);  // 5/8λ Class A/B, 3/8λ Class C/D design height
+      // towerHeightEst_m/asrRequired_tl rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the design height and re-comparing it against the
+      // §17.7 threshold locally.
+      const towerHeightEst_m  = canonical.antenna.selectedDesignHeightM.value;
       const towerHeightEst_ft = round2(towerHeightEst_m * 3.28084);
 
       // ASR threshold: 60.96 m (200 ft) AGL per §17.7 (catalog value)
       const ASR_THRESHOLD_M = ASR_THRESHOLD_17_7.height_m;
-      const asrRequired_tl = towerHeightEst_m >= ASR_THRESHOLD_M;
+      const asrRequired_tl = canonical.regulatory.asr.required;
 
       // FAA AC 70/7460-1M lighting tiers based on height AGL
       // < 152 m (500 ft): L-810 red lights (medium intensity)
@@ -27031,8 +27037,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Key authorities: local zoning codes, FCC preemption (47 USC §332), ARPA, SEQR
       // Tower height determines zoning review burden; §1.1307 NEPA environmental filing
 
-      const lambda_zl    = round2(300000 / frequency_khz);
-      const towerH_m_zl  = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_zl); // 5/8λ Class A/B, 3/8λ Class C/D
+      // towerH_m_zl rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const towerH_m_zl  = canonical.antenna.selectedDesignHeightM.value;
       const towerH_ft_zl = round2(towerH_m_zl * 3.28084);
 
       // Zoning district compatibility tiers
@@ -27792,7 +27800,10 @@ async function scoreCandidate(pt, ctx, warnings){
     site_security_perimeter_guide: (() => {
       // §73.49 requires a substantial fence or other enclosure around the base of each AM antenna.
       // OET Bulletin 65 / §1.1310 MPE zones require RF warning signage at perimeter.
-      const towerH_ssp = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D design height
+      // towerH_ssp rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const towerH_ssp = canonical.antenna.selectedDesignHeightM.value;
       // Minimum fence radius: FCC requires enclosure that prevents casual contact; typically 3–5m radius from base
       const fenceRadius_m = Math.max(5, round2(towerH_ssp * 0.05));
       const perimeterCirc_m = round2(2 * Math.PI * fenceRadius_m);
