@@ -11032,10 +11032,12 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // --- tower height for triggering ---
       // Class-aware design height: 5/8λ for Class A/B, 3/8λ for Class C/D
-      const lambda_m         = 299792.458 / frequency_khz;
-      const quarter_wave_m   = lambda_m / 4;   // λ/4 — physics reference
-      const isHighClass_env2 = /^[AB]$/i.test(fcc_class);
-      const design_h_env_m   = lambda_m * (isHighClass_env2 ? 0.625 : 0.375);
+      // lambda_m/quarter_wave_m/design_h_env_m rewired to canonical.antenna
+      // (guide-internal migration, Wave 1) instead of re-deriving these
+      // physics reference values and the class-typical design height
+      // locally with an imprecise/inconsistent speed-of-light constant.
+      const quarter_wave_m   = canonical.antenna.quarterWaveReferenceM.value;   // λ/4 — physics reference
+      const design_h_env_m   = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft  = round2(design_h_env_m * 3.28084);
       const height_exceeds_450ft = tower_height_ft > 450;
 
@@ -14771,11 +14773,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // This IIFE is evaluated AFTER all cost IIFEs are already computed in the outer scope
       // using the same variables — so we re-derive line-item totals here using the same formulas.
       // (We cannot reference sibling IIFE results, so we replicate the low totals.)
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd_t  = /^[CD]$/i.test(fcc_class);
+      // tower_h_m rewired to canonical.antenna.selectedDesignHeightM (guide-
+      // internal migration, Wave 1) instead of re-deriving the class-typical
+      // design height locally with an imprecise/inconsistent speed-of-light
+      // constant.
       const isDA_t         = /^DA/i.test(pattern_mode);
-      const tower_h_m      = round2(is_class_cd_t ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      const tower_h_m      = canonical.antenna.selectedDesignHeightM.value;
       const tower_h_ft     = round2(tower_h_m * 3.28084);
       const distance_km    = pt.distance_from_current_km ?? 0;
       const distance_mi    = round2(distance_km * 0.621371);
@@ -15503,10 +15506,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // Standalone guyed AM monopole vs. colocation on an existing structure.
       // Colocation avoids construction cost but requires structural analysis and
       // ongoing lease payments; 10-year NPV comparison helps choose the better option.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally with an imprecise/inconsistent
+      // speed-of-light constant.
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft = round2(tower_height_m * 3.28084);
       let standalone_tower_low_usd, standalone_tower_high_usd;
       if (tower_height_ft <= 200) {
@@ -15606,10 +15610,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // 47 CFR Part 17 / 14 CFR Part 77 / FAA AC 70/7460-1M:
       // Towers > 200 ft AGL (60.96 m) require FAA notice (Form 7460-1) and
       // FCC ASR registration.  AM towers always exceed 200 ft at class standard height (3/8λ Class C/D, 5/8λ Class A/B).
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      // tower_height_m/needs_faa_notice rewired to canonical.antenna.
+      // selectedDesignHeightM (guide-internal migration, Wave 1) instead of
+      // re-deriving the class-typical design height locally with an
+      // imprecise/inconsistent speed-of-light constant.
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const needs_faa_notice = tower_height_ft > 200;
       const needs_asr        = needs_faa_notice;
@@ -15754,10 +15759,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC-standard AM ground system: 120 buried radials at 0.35λ length per §73.189(b)(4) / NBS TN-24.
       // Longer/more radials (160+) improve efficiency and are typical for DA or
       // Class A/B stations; shorter legacy systems may need upgrade to meet efficiency targets.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const radial_length_m  = round2(wavelength_m * 0.35); // 0.35λ per §73.189(b)(4) / NBS TN-24
+      // radial_length_m rewired to canonical.groundSystem.selectedScenario.
+      // radialLengthM (guide-internal migration, Wave 1) instead of
+      // re-deriving the wavelength and 0.35λ radial length locally with an
+      // imprecise/inconsistent speed-of-light constant.
+      const radial_length_m  = canonical.groundSystem.selectedScenario.radialLengthM; // 0.35λ per §73.189(b)(4) / NBS TN-24
       const radial_length_ft = round2(radial_length_m * 3.28084);
+      const wavelength_m     = canonical.antenna.wavelengthM.value;
       const num_radials_standard = 120;
       const num_radials_enhanced = 160; // DA or high-efficiency systems
       const is_da = /^DA/i.test(pattern_mode);
@@ -16634,10 +16642,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC/FAA notifications.  These costs offset against any site sale proceeds.
 
       // Tower height from frequency and class (for demolition cost scaling)
-      const lambda_demo_m = 300000 / frequency_khz;
-      const tower_demo_m  = ['A','B'].includes(fcc_class)
-        ? round2(lambda_demo_m * 0.625)
-        : round2(lambda_demo_m * 0.375);
+      // tower_demo_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const tower_demo_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_demo_ft = Math.round(tower_demo_m * 3.281);
 
       // Tower demolition cost: scales with height and configuration
@@ -16836,10 +16844,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // to within ±10% of design per TIA-222-H §8.2.
 
       // Tower height from frequency and class
-      const lambda_insp_m = 300000 / frequency_khz;
-      const tower_insp_m  = ['A','B'].includes(fcc_class)
-        ? round2(lambda_insp_m * 0.625)
-        : round2(lambda_insp_m * 0.375);
+      // tower_insp_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const tower_insp_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_insp_ft = Math.round(tower_insp_m * 3.281);
 
       // Annual visual inspection (ground-level + drone or limited climbing)
@@ -16952,10 +16960,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // 3 guy anchor foundations.  Sizing and cost scale with tower height.
 
       // Derive tower height from frequency and class
-      const lambda_fnd_m = 300000 / frequency_khz;
-      const tower_fnd_m  = ['A','B'].includes(fcc_class)
-        ? round2(lambda_fnd_m * 0.625)
-        : round2(lambda_fnd_m * 0.375);
+      // tower_fnd_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const tower_fnd_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_fnd_ft = Math.round(tower_fnd_m * 3.281);
 
       // Base pier (drilled): diameter and depth scale with tower height
@@ -17014,10 +17022,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // maintenance cycles of 5–7 years are the industry standard.
 
       // Derive tower height from frequency and class: 0.625λ for A/B (FCC optimum), 3/8λ for C/D
-      const lambda_pnt_m   = 300000 / frequency_khz;
-      const tower_pnt_m    = ['A','B'].includes(fcc_class)
-        ? round2(lambda_pnt_m * 0.625)
-        : round2(lambda_pnt_m * 0.375);
+      // tower_pnt_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const tower_pnt_m    = canonical.antenna.selectedDesignHeightM.value;
       const tower_pnt_ft   = Math.round(tower_pnt_m * 3.281);
 
       // FAA obstruction marking threshold: 200 ft AGL (61 m)
