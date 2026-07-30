@@ -6062,12 +6062,20 @@ async function scoreCandidate(pt, ctx, warnings){
       // NDA proof: §73.186 — measurements on six or more radials (8 at 45° is common practice)
       // DA proof: §73.151 — full measurement or moment-method proof; §73.154 partial proofs
       //   + monitor point measurements + base current readings.
-      const isDA_pg  = CLEAR_CHANNEL_KHZ.has(frequency_khz) && fcc_class !== 'A';
+      // isDA_pg rewired to canonical.antenna.patternModeRequired (guide-
+      // internal migration, canonical-consistency-guide-internal-migration
+      // Wave 1): the local heuristic here (`isClearChannel && class!=='A'`)
+      // was reinventing canonical/rules/antennaMode.js's own
+      // clear-channel-secondary "likely DA required" resolution under a
+      // different name -- now reads the single canonical source instead.
+      const isDA_pg  = isDirectionalMode(canonical.antenna.patternModeRequired.mode);
       const isClearD_pg = isDA_pg && fcc_class === 'D';
       const isLocal_pg  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
-      const qwM_pg   = round2((300000 / frequency_khz) / 4);
-      const nfBoundary_pg = round2((300000 / frequency_khz) / (2 * Math.PI));
-      const lambdaM_pg = round2(300000 / frequency_khz);
+      // quarter_wave_m / near_field_boundary_m rewired to canonical.antenna/
+      // canonical.rfExposure (the single reference-value sources).
+      const qwM_pg   = canonical.antenna.quarterWaveReferenceM.value;
+      const nfBoundary_pg = canonical.rfExposure.reactiveNearFieldBoundaryM.value_m;
+      const lambdaM_pg = canonical.antenna.wavelengthM.value;
       // OET-65 Table 1 GP/uncontrolled MPE: 100 mW/cm² for 0.3–1.34 MHz; 180/f² for 1.34–30 MHz
       const f_mhz_pg = frequency_khz / 1000;
       const mpe_gp_pg = f_mhz_pg < 1.34 ? MPE_GP_LO.s_mw_cm2 : round2(MPE_GP_HI.s_numerator_mw_cm2 / (f_mhz_pg * f_mhz_pg));
@@ -6137,7 +6145,13 @@ async function scoreCandidate(pt, ctx, warnings){
         });
       }
 
-      const n_radials_proof = isDA_pg ? 72 : 8;
+      // n_radials_proof rewired to canonical.proof.radialCount (guide-
+      // internal migration Wave 1): the prior 72/8 figures conflated the
+      // sec73.150 pattern-table azimuth count with sec73.151(a)/
+      // sec73.186(a)(1) measurement-radial counts -- the same factual
+      // error the top-level ANTENNA_STUDY checklist item had before it
+      // was fixed to read canonical.proof.
+      const n_radials_proof = canonical.proof.radialCount ?? null;
       const estimated_days = isDA_pg ? [3, 5] : [1, 2];
 
       return {
@@ -6907,10 +6921,13 @@ async function scoreCandidate(pt, ctx, warnings){
     // For NDA stations: provides non-directional coverage summary and
     // note on when DA could improve COL coverage or reduce blanket population.
     antenna_pattern_optimization_guide: (() => {
-      const isDA_ap  = /^DA/i.test(pattern_mode);   // NDA starts with N, not DA
+      // isDA_ap/quarter_wave_m/wavelength_m rewired to canonical.antenna
+      // (guide-internal migration, Wave 1) instead of re-parsing the raw
+      // pattern_mode string and recomputing lambda/4 locally.
+      const isDA_ap  = isDirectionalMode(canonical.antenna.patternModeModeled.value);
       const isClear_ap = CLEAR_CHANNEL_KHZ.has(frequency_khz);
-      const qwM_ap   = round2((300000 / frequency_khz) / 4);
-      const lambdaM  = round2(300000 / frequency_khz);
+      const qwM_ap   = canonical.antenna.quarterWaveReferenceM.value;
+      const lambdaM  = canonical.antenna.wavelengthM.value;
 
       // COL bearing — azimuth from candidate to COL centroid (or current site proxy).
       // Used to orient the DA pattern toward the community of license.
@@ -7092,26 +7109,31 @@ async function scoreCandidate(pt, ctx, warnings){
     // requirements.  Complements tower_cost_estimate with the transmission
     // engineering perspective.
     transmission_system_design_guide: (() => {
-      const isDA_ts  = /^DA/i.test(pattern_mode);
+      // isDA_ts/quarter_wave_m/wavelength_m rewired to canonical.antenna
+      // (guide-internal migration, Wave 1).
+      const isDA_ts  = isDirectionalMode(canonical.antenna.patternModeModeled.value);
       const isLocal_ts = LOCAL_CHANNEL_KHZ.has(frequency_khz);
-      const qwM_ts   = round2((300000 / frequency_khz) / 4);
-      const lambdaM_ts = round2(300000 / frequency_khz);
+      const qwM_ts   = canonical.antenna.quarterWaveReferenceM.value;
+      const lambdaM_ts = canonical.antenna.wavelengthM.value;
 
       // Antenna radiation resistance at resonance (ideal λ/4 monopole over perfect ground ≈ 36.6 Ω)
       // Actual R_r varies with height; we use the ideal value as a screening reference.
       const R_RADIATION_IDEAL = 36.6;
 
-      // Ground loss resistance — Terman/Belrose formula (§73.189(b)(4) / NBS TN-24 reference)
-      // R_ground ≈ 1.65 / (N_radials × σ_msm) for N >= 120 radials, λ/4 length.
-      // Simplified for screening:
-      const N_RADIALS_STANDARD = 120;
-      const R_ground_ohm = round2(1.65 / (N_RADIALS_STANDARD * Math.max(sigma_msm, 1) * 0.001));
+      // Ground loss resistance / base impedance / efficiency rewired to
+      // canonical.groundSystem (guide-internal migration, Wave 1): this
+      // guide's own "N=120, simplified 1.65/(N*sigma*0.001)" formula was a
+      // SECOND, different ground-loss formula from the one canonical/
+      // groundSystem.js already uses (the Terman estimate,
+      // R_g = min(30, 120*rho/(N*L))) -- producing a different efficiency
+      // figure for the same physical fact.
+      const R_ground_ohm = canonical.groundSystem.selectedScenario.groundLossOhm.value;
 
       // Total base impedance estimate (screening only)
       const R_total = round2(R_RADIATION_IDEAL + R_ground_ohm);
 
       // Antenna efficiency η = R_r / (R_r + R_g)
-      const efficiency_pct = round2((R_RADIATION_IDEAL / R_total) * 100);
+      const efficiency_pct = round2(canonical.groundSystem.efficiencyEstimate.value * 100);
 
       // Base current (I_base) = sqrt(P / R_r) for ideal case
       // At actual efficiency: I_base = sqrt(P_tx / R_r) where P_tx = TPO / efficiency
@@ -7646,24 +7668,36 @@ async function scoreCandidate(pt, ctx, warnings){
     // §73.190 governs the conductivity map and certification process; §73.189(b)(4) describes the standard ground system.
     ground_system_design_guide: (() => {
       const P_watts_gs  = tpo_kw * 1000;
-      const lambda_gs_m = round2(300000 / frequency_khz);   // full wavelength in meters
-      const qwave_gs_m  = round2(lambda_gs_m * 0.35);         // 0.35λ standard radial length per §73.189(b)(4) / NBS TN-24
+      // lambda_gs_m/qwave_gs_m rewired to canonical.antenna/canonical.
+      // groundSystem.selectedScenario (guide-internal migration, Wave 1):
+      // the "Standard (120 radials)" scenario below is exactly canonical's
+      // default STANDARD_120 selected scenario (120 radials @ 0.35lambda),
+      // so it now reads canonical directly instead of recomputing it with
+      // a second ground-loss formula. The "Reduced (60)" and "Urban-
+      // constrained (30)" rows below are genuinely guide-specific
+      // alternative illustrations with no matching canonical.groundSystem
+      // scenario (canonical's own COMPACT alternative is 60 radials @
+      // 0.25lambda, not the 0.35lambda this guide uses for "Reduced") --
+      // left as this guide's own content per the migration methodology
+      // ("not a duplicate of anything canonical produces -> leave alone").
+      const lambda_gs_m = canonical.antenna.wavelengthM.value;
+      const qwave_gs_m  = canonical.groundSystem.selectedScenario.radialLengthM;
       const min_radial_len_m = round2(lambda_gs_m / 8);      // λ/8 minimum practical radial length
 
       // Standard and minimal radial counts per ARRL/FCC practice
-      const N_STD  = 120;  // industry standard: essentially achieves ideal ground for σ > ~4 mS/m
+      const N_STD  = canonical.groundSystem.selectedScenario.radialCount;  // canonical STANDARD_120
       const N_MIN  = 60;   // minimum for reasonable efficiency (50–60 radials commonly practical)
       const N_REDUCED = 30; // urban-constrained minimum (rooftop/limited-land sites)
 
       // Terman/Belrose ground resistance formula for 120 radials
-      const R_gnd_std   = round2(1.65 / (N_STD     * Math.max(sigma_msm, 1) * 0.001));
+      const R_gnd_std   = canonical.groundSystem.selectedScenario.groundLossOhm.value;
       const R_gnd_60    = round2(1.65 / (N_MIN     * Math.max(sigma_msm, 1) * 0.001));
       const R_gnd_30    = round2(1.65 / (N_REDUCED * Math.max(sigma_msm, 1) * 0.001));
       const R_rad_ideal = 36.6;  // Ω, ideal λ/4 monopole radiation resistance
 
       // Antenna efficiency for each radial count scenario
       const eff = (Rg) => round2((R_rad_ideal / (R_rad_ideal + Rg)) * 100);
-      const eff_std     = eff(R_gnd_std);
+      const eff_std     = round2(canonical.groundSystem.efficiencyEstimate.value * 100);
       const eff_60      = eff(R_gnd_60);
       const eff_30      = eff(R_gnd_30);
 

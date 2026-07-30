@@ -4995,15 +4995,21 @@ test('technical_proof_guide has expected shape', async () => {
   assert.ok(typeof pg.n_proof_radials === 'number', 'n_proof_radials must be a number');
 });
 
-test('technical_proof_guide NDA mode has 8 radials', async () => {
+test('technical_proof_guide NDA mode reads canonical.proof.radialCount', async () => {
   // KAZM/780 is clear channel, so DA is expected. Use local channel for NDA test.
+  // n_proof_radials rewired to canonical.proof.radialCount (guide-internal
+  // migration Wave 1): the regulatory MINIMUM per sec73.186(a)(1) is 6
+  // radials ("six or more"), not the prior hardcoded 8 -- that 8 conflated
+  // an engineering-practice traverse plan (8 azimuths at 45 degree spacing,
+  // still reflected below in nda_radial_plan, a genuinely distinct,
+  // guide-specific detail) with the regulatory minimum count.
   const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1490, fcc_class: 'C', candidate_limit: 2 });
   const pg = out.candidates[0].technical_proof_guide;
-  // 1490 kHz is a local channel — NDA, 8 radials
+  // 1490 kHz is a local channel — NDA
   assert.equal(pg.antenna_mode, 'NDA', 'local channel must be NDA mode');
-  assert.equal(pg.n_proof_radials, 8, 'NDA must have 8 proof radials');
+  assert.equal(pg.n_proof_radials, 6, 'NDA proof radial count must equal canonical.proof.radialCount (sec73.186(a)(1) minimum: 6)');
   assert.ok(Array.isArray(pg.nda_radial_plan), 'NDA must have nda_radial_plan');
-  assert.equal(pg.nda_radial_plan.length, 8, 'nda_radial_plan must have 8 entries');
+  assert.equal(pg.nda_radial_plan.length, 8, 'nda_radial_plan (engineering-practice traverse azimuths) is unrelated to the regulatory minimum and stays 8');
 });
 
 test('technical_proof_guide each measurement has id, label, rule', async () => {
