@@ -7809,13 +7809,17 @@ async function scoreCandidate(pt, ctx, warnings){
     // All structural values are screening-grade; a licensed structural engineer
     // and FAA aeronautical study are required before construction.
     tower_structural_assessment_guide: (() => {
+      // ASR_M_ts/qwave_ts/tower_h_ts/hwave_ts/asrReq_ts rewired to
+      // canonical.antenna/canonical.regulatory.asr (guide-internal
+      // migration, Wave 1) instead of recomputing the design height and
+      // ASR threshold comparison locally.
       const ASR_M_ts   = ASR_THRESHOLD_17_7.height_m;  // §17.7 ASR threshold (200 ft)
-      const lambda_ts  = 300000 / frequency_khz;   // wavelength m
-      const qwave_ts   = round2(lambda_ts / 4);     // λ/4 physics reference only
-      const isHighClass_ts = /^[AB]/i.test(fcc_class);
-      const tower_h_ts = round2(isHighClass_ts ? lambda_ts * 0.625 : lambda_ts * 0.375);  // design height: 5/8λ A/B, 3/8λ C/D
-      const hwave_ts   = round2(lambda_ts * 0.625); // 5/8λ practical maximum for any class
-      const asrReq_ts  = tower_h_ts > ASR_M_ts;
+      const isHighClass_ts = /^[AB]/i.test(fcc_class);  // for the 5/8λ-vs-3/8λ note label only
+      const lambda_ts  = canonical.antenna.wavelengthM.value;
+      const qwave_ts   = canonical.antenna.quarterWaveReferenceM.value;     // λ/4 physics reference only
+      const tower_h_ts = canonical.antenna.selectedDesignHeightM.value;  // canonical selected design height
+      const hwave_ts   = canonical.antenna.fiveEighthsReferenceM.value; // 5/8λ physics reference
+      const asrReq_ts  = canonical.regulatory.asr.required;
 
       // TIA-222-H Wind/Ice zones based on candidate latitude (approximate, CONUS).
       // Zone I: Gulf Coast / Southern (lat < 35°) — high wind, low ice
@@ -8596,25 +8600,31 @@ async function scoreCandidate(pt, ctx, warnings){
       const e_limit_ctrl_vm   = freq_mhz < 3.0  ? MPE_OC.e_v_per_m    : round2(MPE_OC.above_3_mhz.e_numerator_v_per_m / freq_mhz);
       const e_limit_unctrl_vm = freq_mhz < 1.34 ? MPE_GP_LO.e_v_per_m : round2(MPE_GP_HI.e_numerator_v_per_m / freq_mhz);
 
-      // Safe-distance calculation (OET Bulletin 65 far-field formula):
-      //   d (m) = sqrt(30 × P_eff_W × G_isotropic) / E_limit
-      //   G_isotropic for AM monopole ≈ 1.5 (half-wave dipole equivalent)
-      const G_iso      = 1.5;
-      const P_eff_W    = erp_kw * 1000;
-      const d_ctrl_m   = mpe_required ? round2(Math.sqrt(30 * P_eff_W * G_iso) / e_limit_ctrl_vm) : null;
-      const d_unctrl_m = mpe_required ? round2(Math.sqrt(30 * P_eff_W * G_iso) / e_limit_unctrl_vm) : null;
+      // Safe-distance / near-field boundary rewired to canonical.rfExposure
+      // (guide-internal migration, Wave 1): this guide previously ran its
+      // own independent E-field-limit formula (d = sqrt(30*P*G_iso)/E_limit,
+      // G_iso=1.5, no ground-reflection factor) which is NOT the same
+      // physics as canonical/rules/rfExposure.js's OET-65 power-density
+      // formula (S = 52.20 * ERP * F^2 / R^2, WITH the 4x ground-reflection
+      // factor) -- the two formulas give different numeric answers for the
+      // same physical boundary. canonical is now the single source; the
+      // e_limit_*_vm E-field limits above are kept as guide-specific
+      // informational display values since canonical does not expose them.
+      const d_ctrl_m   = mpe_required ? canonical.rfExposure.controlledMpeBoundaryM.value_m : null;
+      const d_unctrl_m = mpe_required ? canonical.rfExposure.uncontrolledMpeBoundaryM.value_m : null;
 
       const d_ctrl_ft   = d_ctrl_m   ? Math.round(d_ctrl_m   * 3.28084) : null;
       const d_unctrl_ft = d_unctrl_m ? Math.round(d_unctrl_m * 3.28084) : null;
 
-      // Reactive near-field boundary: λ / (2π)
-      const lambda_m_mpe  = 3e8 / (frequency_khz * 1e3);   // full wavelength in meters
-      const near_field_m  = round2(lambda_m_mpe / (2 * Math.PI));
+      // Reactive near-field boundary: λ / (2π) — canonical.rfExposure.reactiveNearFieldBoundaryM
+      const near_field_m  = canonical.rfExposure.reactiveNearFieldBoundaryM.value_m;
       const near_field_ft = Math.round(near_field_m * 3.28084);
 
       // Evaluation type
       let eval_type, eval_weeks_low, eval_weeks_high, eval_cost_low_usd, eval_cost_high_usd;
-      const isDA_mpe = /^DA/i.test(pattern_mode);
+      // isDA_mpe rewired to canonical.antenna.patternModeModeled (guide-
+      // internal migration, Wave 1) instead of re-parsing pattern_mode locally.
+      const isDA_mpe = isDirectionalMode(canonical.antenna.patternModeModeled.value);
 
       if (!mpe_required) {
         eval_type = 'CE';   // Categorically Excluded
@@ -9281,9 +9291,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //     Interest Airspace Review (NIAR); significant EA trigger probability.
 
       const is_da_ne    = /^DA/i.test(pattern_mode);
-      const lambda_ne   = round2(300000 / frequency_khz);
-      const h_frac_ne   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D design height
-      const h_m_ne      = round2(h_frac_ne * lambda_ne);
+      // h_m_ne/h_ft_ne rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // design height locally from a class-based lambda fraction.
+      const h_m_ne      = canonical.antenna.selectedDesignHeightM.value;
       const h_ft_ne     = Math.round(h_m_ne * 3.28084);
 
       const density_ne  = pt.land_use_classification?.density_per_km2 ?? 200;
@@ -9428,9 +9439,10 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ── Environmental triggers (§1.1307) ──
       const is_da_lu = /^DA/i.test(pattern_mode);
-      const lambda_lu = round2(300000 / frequency_khz);
-      const h_frac_lu = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D design height
-      const h_m_lu    = round2(h_frac_lu * lambda_lu);
+      // h_m_lu/h_ft_lu rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // design height locally from a class-based lambda fraction.
+      const h_m_lu    = canonical.antenna.selectedDesignHeightM.value;
       const h_ft_lu   = Math.round(h_m_lu * 3.28084);
 
       // Tower > 450 ft (137 m) triggers an EA per Note to §1.1307(d) (plus FAA OES)
@@ -9902,10 +9914,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //     Foundation (spread footing or drilled pier): $20,000–$80,000
       //     Guy anchors (each): $2,000–$6,000  (6 total for 2-level guys)
 
-      const lambda_m       = 299792.458 / frequency_khz;
-      // Class A/B use 0.625λ (FCC optimum); C/D use 3/8λ (0.375λ) planning height
+      // h_m/h_ft rewired to canonical.antenna.selectedDesignHeightM (guide-
+      // internal migration, Wave 1) instead of re-deriving the design
+      // height locally from a class-based lambda fraction. h_frac_st is
+      // kept only as a display label in the note string below.
       const h_frac_st      = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
-      const h_m            = round2(h_frac_st * lambda_m);
+      const h_m            = canonical.antenna.selectedDesignHeightM.value;
       const h_ft           = round2(h_m * 3.28084);  // round meters first to match lighting guide
 
       // Wind load parameters (TIA-222-H / ASCE 7-22, Exposure C, V=115 mph, Z≈315ft)
@@ -10478,17 +10492,18 @@ async function scoreCandidate(pt, ctx, warnings){
       //   FAA/FCC light outage notification service (automated monitor): $300–$800/yr
       //   Lighting inspection log + recordkeeping: engineer time, $500–$1,500/yr
 
-      // tower height: Class A/B use 0.625λ (FCC optimum), C/D use 3/8λ (0.375λ) planning height
-      const lambda_m           = 299792.458 / frequency_khz;
-      const h_frac_lt          = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
-      const tower_height_m_lt  = round2(h_frac_lt * lambda_m);
+      // tower_height_m_lt/ft and asr_required rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the design height and re-comparing it against the
+      // §17.7 threshold locally.
+      const tower_height_m_lt  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft    = round2(tower_height_m_lt * 3.28084);
 
       // --- ASR threshold ---
       // 47 CFR §17.7: > 200 ft (60.96 m) AGL requires ASR
       const asr_threshold_ft   = 200;
       const asr_threshold_m    = ASR_THRESHOLD_17_7.height_m;
-      const asr_required       = tower_height_ft > asr_threshold_ft;
+      const asr_required       = canonical.regulatory.asr.required;
 
       // --- FAA lighting determination ---
       // Based on AC 70/7460-1L Table 1 (unmarked, no aviation use)
@@ -12170,8 +12185,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // Distance-based proxy: pt.distance_from_current_km used to estimate urban vs rural tier.
       //   < 20 km from current: assume same-tier market (similar lease cost)
       //   ≥ 20 km: may be different market; use conservative estimate.
-      const lambda_m      = 300000 / frequency_khz;
-      const radial_m      = round2(lambda_m * 0.35);  // 0.35λ per §73.189(b)(4) / NBS TN-24
+      // radial_m rewired to canonical.groundSystem.selectedScenario.radialLengthM
+      // (guide-internal migration, Wave 1) instead of re-deriving 0.35λ locally.
+      const radial_m      = canonical.groundSystem.selectedScenario.radialLengthM;
       const circle_m2     = round2(Math.PI * radial_m * radial_m);
       const buffer_factor = 1.20;
       const site_m2       = round2(circle_m2 * buffer_factor);
@@ -13194,9 +13210,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Foundation/anchor inspection: $3,000–$8,000
       //   FAA paint/lighting inspection: $2,000–$5,000 (if applicable per 47 CFR §17.50)
       const f_khz        = frequency_khz;
-      const lambda_m     = 300000 / f_khz;                       // free-space wavelength, metres
-      const isHighCls_tsw = /^[AB]$/i.test(fcc_class);
-      const H_m          = round2((isHighCls_tsw ? 0.625 : 0.375) * lambda_m); // 5/8λ Class A/B, 3/8λ Class C/D
+      const isHighCls_tsw = /^[AB]$/i.test(fcc_class);   // note-label only
+      // H_m rewired to canonical.antenna.selectedDesignHeightM (guide-
+      // internal migration, Wave 1) instead of re-deriving 5/8λ or 3/8λ locally.
+      const H_m          = canonical.antenna.selectedDesignHeightM.value;
       const V_mph        = 90;                                    // 3-sec gust, ASCE 7-22 Risk Cat II
       const V_ms         = round2(V_mph * 0.44704);              // m/s
       const rho_air      = 1.225;                                 // kg/m³ at sea level
@@ -13571,10 +13588,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   200–499 ft:   Medium-intensity white strobes (day); red steady/flashing (night)
       //   ≥ 500 ft:     High-intensity white strobes (day); red medium-intensity (night)
       // Paint scheme: Aviation orange and white alternate bands (7 CFR §17.23)
-      const freq_mhz_ltg = frequency_khz / 1000;
-      const lambda_m_ltg = 299.792458 / freq_mhz_ltg;
-      const isHighClass_ltg = /^[AB]/i.test(fcc_class);
-      const tower_height_m_ltg   = round2(isHighClass_ltg ? lambda_m_ltg * 0.625 : lambda_m_ltg * 0.375);
+      // tower_height_m_ltg rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const tower_height_m_ltg   = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft_ltg  = round2(tower_height_m_ltg * 3.28084);
       const lighting_required = tower_height_ft_ltg > 200;
       const lighting_category = tower_height_ft_ltg >= 500
@@ -13771,10 +13788,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // effective locked fences or other enclosures (the rule specifies no height;
       // 8 ft is the industry/insurance standard used for costing here).
       // Fence perimeter: based on site area required for guy anchor radius at tower height.
-      const freq_mhz_sec = frequency_khz / 1000;
-      const lambda_m_sec = 299.792458 / freq_mhz_sec;
-      const isHighClass_sec = /^[AB]/i.test(fcc_class);
-      const tower_height_m_sec = round2(isHighClass_sec ? lambda_m_sec * 0.625 : lambda_m_sec * 0.375);
+      // tower_height_m_sec rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const tower_height_m_sec = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft_sec = round2(tower_height_m_sec * 3.28084);
       // Guy anchor radius: typically 70–80% of tower height for guyed AM monopoles
       const guy_radius_ft_low  = round2(tower_height_ft_sec * 0.70);
@@ -13819,10 +13836,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // EIA/TIA-222-H (2017): current standard for structural design of antenna support structures.
       // Replaces EIA/TIA-222-G. Key changes: new exposure categories, revised ice/wind maps.
       // AM monopole structural design driven by: tower height, wind zone, ice zone, antenna loading.
-      const freq_mhz_str = frequency_khz / 1000;
-      const lambda_m_str = 299.792458 / freq_mhz_str;
-      const isHighClass_str = /^[AB]/i.test(fcc_class);
-      const tower_height_m_str = round2(isHighClass_str ? lambda_m_str * 0.625 : lambda_m_str * 0.375);
+      // tower_height_m_str rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const tower_height_m_str = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft_str = round2(tower_height_m_str * 3.28084);
       // Design wind speed (ASCE 7-22, 3-sec gust, Risk Category II): CONUS range 90–115 mph
       const design_wind_speed_mph_low  = 90;
@@ -13867,10 +13884,10 @@ async function scoreCandidate(pt, ctx, warnings){
     am_insurance_and_liability_guide: (() => {
       // AM broadcast tower insurance: property (tower + equipment), general liability, workers' comp.
       // Tower property value: replacement cost of a guyed AM monopole at typical market rates.
-      const freq_mhz_ins = frequency_khz / 1000;
-      const lambda_m_ins = 299.792458 / freq_mhz_ins;
-      const isHighClass_ins = /^[AB]/i.test(fcc_class);
-      const tower_height_m_ins = round2(isHighClass_ins ? lambda_m_ins * 0.625 : lambda_m_ins * 0.375);
+      // tower_height_m_ins rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const tower_height_m_ins = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft_ins = round2(tower_height_m_ins * 3.28084);
       // Tower replacement cost: ~$800–$1,500 per foot for guyed AM monopole (Rohn/Valmont grade)
       const tower_replacement_cost_per_ft_low  = 800;
