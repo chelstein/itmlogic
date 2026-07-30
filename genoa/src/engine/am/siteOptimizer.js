@@ -13990,10 +13990,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Typical process: conditional use permit (CUP), special use permit (SUP), or variance.
       // Tower height and setbacks: most jurisdictions require setback = tower height × 1.0–1.5
       // from property lines; some require setback from residences.
-      const freq_mhz_z = frequency_khz / 1000;
-      const lambda_m_z = 299.792458 / freq_mhz_z;
-      const isHighClass_z = /^[AB]/i.test(fcc_class);
-      const tower_height_m_z = round2(isHighClass_z ? lambda_m_z * 0.625 : lambda_m_z * 0.375);
+      // tower_height_m_z rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const tower_height_m_z = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft_z = round2(tower_height_m_z * 3.28084);
       // Setback requirement: 1.0× tower height (most common), 1.5× in some jurisdictions
       const setback_factor_typical = 1.0;
@@ -14091,13 +14091,14 @@ async function scoreCandidate(pt, ctx, warnings){
       // or any structure within certain distances of airports regardless of height.
       // 14 CFR Part 77 (Objects Affecting Navigable Airspace) governs obstruction thresholds.
       // FCC ASR (47 CFR §17.7) requires study for >200 ft AGL towers.
-      const freq_mhz_faa = frequency_khz / 1000;
-      const lambda_m_faa = 299.792458 / freq_mhz_faa;
-      const isHighClass_faa = /^[AB]/i.test(fcc_class);
-      const tower_height_m_faa = round2(isHighClass_faa ? lambda_m_faa * 0.625 : lambda_m_faa * 0.375);
+      // tower_height_m_faa/notice_required rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the design height and re-comparing it against the
+      // §17.7 threshold locally.
+      const tower_height_m_faa = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft_faa = round2(tower_height_m_faa * 3.28084);
       const faa_notice_threshold_ft = 200;
-      const notice_required = tower_height_ft_faa > faa_notice_threshold_ft;
+      const notice_required = canonical.regulatory.asr.required;
       // Marking/lighting: AC 70/7460-1M criteria
       // Towers 200–499 ft: medium-intensity lights (aviation orange + white)
       // Towers 500+ ft: high-intensity lights
@@ -14519,10 +14520,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Towers > 200 ft AGL: required to display aviation orange/white paint bands
       // and obstruction lighting per FAA standards.
       // Shorter towers near airports may also need marking.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd_tp = /^[CD]$/i.test(fcc_class);
-      const tower_h_m      = round2(is_class_cd_tp ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      // tower_h_m rewired to canonical.antenna.selectedDesignHeightM (guide-
+      // internal migration, Wave 1) instead of re-deriving 3/8λ or 5/8λ
+      // from a locally-recomputed wavelength.
+      const tower_h_m      = canonical.antenna.selectedDesignHeightM.value;
       const tower_h_ft     = round2(tower_h_m * 3.28084);
       // Painting requirements per §17.23:
       // Towers ≤200 ft: no paint required (unless near airport)
@@ -14616,11 +14617,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // When an AM station relocates, the old transmitter site must be decommissioned.
       // This includes tower demolition, building removal, ground system removal,
       // soil remediation (if fuel spills or hazmat present), and FCC license modification.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd_dc = /^[CD]$/i.test(fcc_class);
-      const isDA_dc        = /^DA/i.test(pattern_mode);
-      const tower_h_m      = round2(is_class_cd_dc ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      // tower_h_m/isDA_dc rewired to canonical.antenna (guide-internal
+      // migration, Wave 1) instead of re-deriving the design height from a
+      // locally-recomputed wavelength and re-parsing pattern_mode.
+      const isDA_dc        = isDirectionalMode(canonical.antenna.patternModeModeled.value);
+      const tower_h_m      = canonical.antenna.selectedDesignHeightM.value;
       const tower_h_ft     = round2(tower_h_m * 3.28084);
       // Tower demolition cost varies by height:
       // <200 ft: $15,000–$50,000; 200–400 ft: $40,000–$150,000; >400 ft: $100,000–$400,000
@@ -20522,15 +20523,19 @@ async function scoreCandidate(pt, ctx, warnings){
       //
       // Source: FCC Form 301-AM instructions (rev. 2024-01); 47 CFR §73.1 et seq.
 
-      const isDA_ch = /^DA/i.test(pattern_mode);
+      // isDA_ch/design_h_m_ch/asr_required_ch rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-parsing pattern_mode and re-deriving the design height and
+      // ASR threshold comparison locally.
+      const isDA_ch = isDirectionalMode(canonical.antenna.patternModeModeled.value);
       const is_clear_ch = CLEAR_CHANNEL_KHZ.has(frequency_khz);
       const is_local_ch  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
-      const lambda_m_ch  = 300000 / frequency_khz;
-      const lambda_q_m_ch = lambda_m_ch / 4;   // λ/4 — physics reference only
-      const isHighClass_ch = /^[AB]$/i.test(fcc_class);
-      const design_h_m_ch  = lambda_m_ch * (isHighClass_ch ? 0.625 : 0.375); // 5/8λ A/B, 3/8λ C/D
+      const lambda_m_ch  = canonical.antenna.wavelengthM.value;
+      const lambda_q_m_ch = canonical.antenna.quarterWaveReferenceM.value;   // λ/4 — physics reference only
+      const isHighClass_ch = /^[AB]$/i.test(fcc_class);   // note-label only
+      const design_h_m_ch  = canonical.antenna.selectedDesignHeightM.value;
       const tower_ft_ch   = Math.round(design_h_m_ch * 3.28084);
-      const asr_required_ch = design_h_m_ch > ASR_THRESHOLD_17_7.height_m;   // §17.7: >200 ft AGL
+      const asr_required_ch = canonical.regulatory.asr.required;   // §17.7: >200 ft AGL
 
       const exhibits_A = [
         { id: 'A1', section: 'A', title: 'FCC Form 301-AM main application (fully completed)', required: true, cfr: '§73.3533; §73.3536', notes: 'All sections completed; signed by applicant; Section I: ownership, Section III: technical specs' },

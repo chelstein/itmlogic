@@ -13975,17 +13975,20 @@ test('am_tower_painting_and_marking_guide present on KAZM candidate', async () =
 test('KAZM 473 ft tower requires painting with 7 bands', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_painting_and_marking_guide;
-  assert.strictEqual(g.tower_height_ft,   472.87, 'KAZM tower_height_ft should be 472.87 (3/8λ Class D)');
+  // tower_height_ft rewired to canonical.antenna.selectedDesignHeightM (guide-
+  // internal migration Wave 1) -- 473.2 is canonical's unrounded design height
+  // in feet, replacing the guide's prior round-wavelength-then-multiply value.
+  assert.strictEqual(g.tower_height_ft,   473.2,  'KAZM tower_height_ft should be 473.2 (canonical.antenna.selectedDesignHeightM, 3/8λ Class D)');
   assert.strictEqual(g.requires_painting,  true,  '473 ft tower requires FAA painting');
   assert.strictEqual(g.num_bands,          7,     'should have 7 orange/white bands');
-  assert.strictEqual(g.band_height_ft,     67.55, 'band_height_ft should be 67.55');
+  assert.strictEqual(g.band_height_ft,     67.6,  'band_height_ft should be 67.6');
 });
 
 test('KAZM tower paint cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_painting_and_marking_guide;
-  assert.strictEqual(g.paint_low_usd,         9457.4, 'KAZM paint_low_usd should be 9457.4 (473 ft × $20/ft)');
-  assert.strictEqual(g.total_initial_low_usd, 9957.4, 'KAZM total_initial_low should be 9957.4');
+  assert.strictEqual(g.paint_low_usd,         9464, 'KAZM paint_low_usd should be 9464 (canonical 473.2 ft × $20/ft)');
+  assert.strictEqual(g.total_initial_low_usd, 9964, 'KAZM total_initial_low should be 9964');
   assert.strictEqual(g.repaint_cycle_years,   3,      'repaint cycle should be 3 years');
 });
 
@@ -14005,7 +14008,7 @@ test('am_tower_painting_and_marking_guide comparison table columns present', asy
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.tpm_requires_painting, true,   'rank-1 tpm_requires_painting should be true');
-  assert.strictEqual(r0.tpm_paint_low_usd,     9457.4, 'rank-1 tpm_paint_low_usd should be 9457.4 (3/8λ)');
+  assert.strictEqual(r0.tpm_paint_low_usd,     9464,   'rank-1 tpm_paint_low_usd should be 9464 (canonical.antenna.selectedDesignHeightM, 3/8λ)');
   assert.strictEqual(r0.tpm_num_bands,         7,      'rank-1 tpm_num_bands should be 7');
 });
 
