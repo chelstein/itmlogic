@@ -17552,9 +17552,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const N_g_adj    = is_monsoon ? round2(N_g * 1.5) : N_g;
 
       // ---- Tower effective collection area (NFPA 780 Annex A) ----
-      const lambda_m_lp     = round2(299792.458 / frequency_khz);
-      // 0.625λ for Class A/B (FCC optimum); 3/8λ for C/D (planning design height)
-      const tower_h_m_lp    = round2(lambda_m_lp * (['A','B'].includes(fcc_class) ? 0.625 : 0.375));
+      // tower_h_m_lp rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally with an imprecise/inconsistent
+      // speed-of-light constant.
+      const tower_h_m_lp    = canonical.antenna.selectedDesignHeightM.value;
       const tower_h_ft_lp   = Math.round(tower_h_m_lp * 3.28084);
       // A_e = π × (3H)² per NFPA 780 simplified model (H in km)
       const A_e_km2         = round2(Math.PI * Math.pow(tower_h_m_lp * 3 / 1000, 2));
@@ -17720,10 +17722,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM tower at this candidate site per 47 CFR §§1.1301–1.1319 (FCC environmental
       // rules), the FCC/ACHP/NCSHPO Nationwide Programmatic Agreement (NPA), and
       // the Endangered Species Act §7 consultation process.
-      const lambda_m_env        = round2(299792.458 / frequency_khz);
-      // 0.625λ for Class A/B (FCC optimum); 3/8λ for C/D (planning design height)
-      const hf_env              = ['A','B'].includes(fcc_class) ? 0.625 : 0.375;
-      const tower_height_m_env  = round2(lambda_m_env * hf_env);
+      // tower_height_m_env rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally with an imprecise/inconsistent
+      // speed-of-light constant.
+      const tower_height_m_env  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft_env = Math.round(tower_height_m_env * 3.28084);
       // FCC ASR threshold = 200 ft; towers above this height trigger Section 106
       // (NHPA) review and require FCC concurrence before construction.
@@ -17790,13 +17793,17 @@ async function scoreCandidate(pt, ctx, warnings){
       // site under TIA-222-H (Rev. H, 2017) and ASCE 7-22 loading criteria.
       // Determines wind zone, ice zone, structural class, and estimated tower costs
       // for a guyed and self-supporting configuration at the recommended height.
-      const lambda_m        = round2(299792.458 / frequency_khz);
-      const quarter_wave_m  = round2(lambda_m / 4);
+      // lambda_m/quarter_wave_m/tower_height_m rewired to canonical.antenna
+      // (guide-internal migration, Wave 1) instead of re-deriving these
+      // physics reference values and the class-typical design height
+      // locally with an imprecise/inconsistent speed-of-light constant.
+      const lambda_m        = canonical.antenna.wavelengthM.value;
+      const quarter_wave_m  = canonical.antenna.quarterWaveReferenceM.value;
       const quarter_wave_ft = Math.round(quarter_wave_m * 3.28084);
       // 0.625λ for Class A/B (5/8 wave, FCC optimum ~36.6 Ω radiation resistance);
       // 3/8λ (0.375λ) for Class C/D (standard planning/design height).
       const height_fraction = ['A','B'].includes(fcc_class) ? 0.625 : 0.375;
-      const tower_height_m  = round2(lambda_m * height_fraction);
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft = Math.round(tower_height_m * 3.28084);
       // Wind zone per ASCE 7-22 Figure 26.5-1D (simplified by latitude/longitude)
       const is_gulf_coast  = pt.lat < 31 && pt.lon > -98 && pt.lon < -80;
@@ -19742,9 +19749,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_local_ch_str = LOCAL_CHANNEL_KHZ.has(frequency_khz);
 
       // Tower height: 3/8λ for Class C/D, 5/8λ for Class A/B (FCC planning optimum)
-      const lambda_m_str    = Math.round(299792 / frequency_khz);
-      const isHighClass_str = /^[AB]$/i.test(fcc_class);
-      const tower_height_m  = Math.round(lambda_m_str * (isHighClass_str ? 0.625 : 0.375));
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally with an imprecise/inconsistent
+      // speed-of-light constant.
+      const tower_height_m  = Math.round(canonical.antenna.selectedDesignHeightM.value);
       const tower_height_ft = Math.round(tower_height_m * 3.28084);
 
       // Geographic wind zone from candidate latitude/longitude
@@ -19999,7 +20008,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_local_ch_terr = LOCAL_CHANNEL_KHZ.has(frequency_khz);
 
       // Wavelength
-      const lambda_m = 299792 / frequency_khz;
+      // lambda_m rewired to canonical.antenna.wavelengthM (guide-internal
+      // migration, Wave 1) instead of re-deriving it locally with an
+      // imprecise/inconsistent speed-of-light constant.
+      const lambda_m = canonical.antenna.wavelengthM.value;
 
       // Terrain roughness estimate from sigma_msm (if available) or default
       // sigma_msm is the std dev of terrain elevation in the analysis area
@@ -20214,9 +20226,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_local_ch_env = LOCAL_CHANNEL_KHZ.has(frequency_khz);
 
       // Tower height: 3/8λ for Class C/D, 5/8λ for Class A/B (FCC planning optimum)
-      const wavelength_m    = 299792 / frequency_khz;
-      const isHighClass_env = /^[AB]$/i.test(fcc_class);
-      const tower_height_m  = Math.round(wavelength_m * (isHighClass_env ? 0.625 : 0.375));
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally with an imprecise/inconsistent
+      // speed-of-light constant.
+      const tower_height_m  = Math.round(canonical.antenna.selectedDesignHeightM.value);
       const tower_height_ft = Math.round(tower_height_m * 3.28084);
 
       // Antenna array complexity
@@ -20930,13 +20944,15 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA_pf     = /^DA/i.test(pattern_mode);
       const is_clear_ch = CLEAR_CHANNEL_KHZ.has(frequency_khz);
-      const lambda_m    = 300000 / frequency_khz;
-      // Tower height: Class A/B use 0.625λ (FCC optimum); C/D use 3/8λ planning height
+      // lambda_q_m/radial_len_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving the class-dependent tower height and 0.35λ radial
+      // length locally.
+      const lambda_q_m  = canonical.antenna.selectedDesignHeightM.value;  // class-dependent tower height (m)
       const h_frac_pf   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
-      const lambda_q_m  = lambda_m * h_frac_pf;        // class-dependent tower height (m)
       const tower_ft    = Math.round(lambda_q_m * 3.28084);
       const n_radials   = 120;                          // standard AM ground system
-      const radial_len_m = Math.round(lambda_m * 0.35); // 0.35λ per §73.189(b)(4) / NBS TN-24
+      const radial_len_m = Math.round(canonical.groundSystem.selectedScenario.radialLengthM); // 0.35λ per §73.189(b)(4) / NBS TN-24
 
       // 1. FCC Filing and Regulatory Fees (application fees per §1.1104, 90 FR 17013, eff. Apr. 23, 2025;
       //    annual regulatory fee per §1.1153, 89 FR 78509 — population-tiered per class).
@@ -21264,7 +21280,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   θ = 225° (5λ/8)  → G ≈ 1.16 (+16%)
 
       const freq_khz          = frequency_khz;           // 780
-      const wavelength_m      = 300000 / freq_khz;       // 384.615...
+      // wavelength_m rewired to canonical.antenna.wavelengthM (guide-
+      // internal migration, Wave 1) instead of re-deriving it locally.
+      const wavelength_m      = canonical.antenna.wavelengthM.value;       // 384.62
       const lambda_eighth_m   = Math.round(wavelength_m / 8);   //  48 m
       const lambda_quarter_m  = Math.round(wavelength_m / 4);   //  96 m
       const lambda_half_m     = Math.round(wavelength_m / 2);   // 192 m
@@ -21537,10 +21555,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Sites with existing tower infrastructure (colocation) reduce zoning burden
       //   - Avoid residential zones: most stringent and most likely to generate opposition
 
-      const wavelength_m     = 300000 / frequency_khz;
-      // Tower height: 0.625λ for Class A/B (FCC optimum), 3/8λ for C/D (design height)
-      const h_frac_zn        = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
-      const tower_height_m   = Math.round(wavelength_m * h_frac_zn);
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const tower_height_m   = Math.round(canonical.antenna.selectedDesignHeightM.value);
       const tower_height_ft  = Math.round(tower_height_m * 3.281);
 
       // Typical zoning permit timeline for AM tower in rural/agricultural zone
@@ -21638,10 +21656,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Lighting conductor must be RF-decoupled (choke coil) to prevent
       //     current from flowing on lighting cable into the RF ground system
 
-      const wavelength_m     = 300000 / frequency_khz;
-      // Tower height: 0.625λ for Class A/B (FCC optimum), 3/8λ for C/D (planning height)
-      const h_frac_faa       = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
-      const tower_height_m   = Math.round(wavelength_m * h_frac_faa);
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const tower_height_m   = Math.round(canonical.antenna.selectedDesignHeightM.value);
       const tower_height_ft  = Math.round(tower_height_m * 3.281);
 
       // ASR requirement: structures > 60.96m (200ft) require registration

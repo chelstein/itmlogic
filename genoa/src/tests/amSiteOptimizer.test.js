@@ -10236,7 +10236,12 @@ test('rf_propagation_terrain_roughness_guide present on KAZM candidate', async (
   const g = out.candidates[0].rf_propagation_terrain_roughness_guide;
   assert.ok(g, 'terrain roughness guide must be present');
   assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
-  assert.strictEqual(g.lambda_m, 384, 'wavelength must be 384m at 780 kHz');
+  // lambda_m now reads canonical.antenna.wavelengthM directly (guide-
+  // internal migration, Wave 1) instead of a locally recomputed wavelength
+  // with an imprecise/inconsistent speed-of-light constant; canonical uses
+  // λ = 300000/f_kHz (c ≈ 3×10⁸ m/s), the engine-wide convention, which
+  // rounds to 385 m rather than 384 m at 780 kHz.
+  assert.strictEqual(g.lambda_m, 385, 'wavelength must be 385m at 780 kHz (canonical.antenna.wavelengthM, rounded)');
   assert.strictEqual(g.fcc_r50_50_contour_uvm, 100, 'FCC R(50,50) standard contour must be 100 mV/m');
 });
 
@@ -11248,8 +11253,14 @@ test('am_tower_structural_and_wind_loading_guide present on KAZM candidate', asy
 test('am_tower_structural_and_wind_loading_guide KAZM wavelength and tower height', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_structural_and_wind_loading_guide;
-  // 780 kHz: λ = 299792.458/780 = 384.35 m; λ/4 = 96.09 m = 315 ft; 3/8λ = 144.13 m = 473 ft
-  assert.strictEqual(g.lambda_m, 384.35, 'lambda_m should be 384.35 m for 780 kHz');
+  // lambda_m/quarter_wave_m/tower_height_m now read canonical.antenna
+  // directly (guide-internal migration, Wave 1) instead of a locally
+  // recomputed wavelength with an imprecise/inconsistent speed-of-light
+  // constant. canonical uses λ = 300000/f_kHz (c ≈ 3×10⁸ m/s), the
+  // engine-wide convention -- same rationale as the ground-radial-design
+  // guide wavelength fix.
+  // 780 kHz: λ = 300000/780 = 384.62 m; λ/4 = 96.15 m = 315 ft; 3/8λ = 144.23 m = 473 ft
+  assert.strictEqual(g.lambda_m, 384.62, 'lambda_m should be 384.62 m for 780 kHz (canonical.antenna.wavelengthM)');
   assert.strictEqual(g.quarter_wave_ft, 315, 'quarter_wave_ft should be 315 ft (physics λ/4 reference)');
   assert.strictEqual(g.tower_height_ft, 473, 'Class D uses 3/8λ = 473 ft planning tower height');
   assert.strictEqual(g.tia_class, 'Class II', '473 ft tower is TIA-222-H Class II (200–500 ft)');
