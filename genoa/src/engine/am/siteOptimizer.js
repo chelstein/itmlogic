@@ -21769,7 +21769,9 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA_atu   = /^DA/i.test(pattern_mode);
       const n_towers   = isDA_atu ? 2 : 1;
-      const wavelength_m = 300000 / frequency_khz;
+      // wavelength_m rewired to canonical.antenna.wavelengthM (guide-
+      // internal migration, Wave 1) instead of re-deriving it locally.
+      const wavelength_m = canonical.antenna.wavelengthM.value;
       const lambda_quarter_m = Math.round(wavelength_m / 4);
 
       // ATU component cost model (2024 US market)
@@ -21881,10 +21883,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   Painting+lighting: $25,000; ATU building: $40,000; Site prep: $15,000
       //   Subtotal tower: ~$215,000 (excludes ground radials, which are separate)
 
-      const wavelength_m     = 300000 / frequency_khz;
-      // Tower height: 0.625λ for Class A/B (FCC optimum), 3/8λ for C/D (design height)
-      const h_frac_cc        = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
-      const tower_height_m   = Math.round(wavelength_m * h_frac_cc);
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const tower_height_m   = Math.round(canonical.antenna.selectedDesignHeightM.value);
       const tower_height_ft  = Math.round(tower_height_m * 3.281);
 
       const isDA_cc  = /^DA/i.test(pattern_mode);
@@ -21961,7 +21963,7 @@ async function scoreCandidate(pt, ctx, warnings){
         timeline_weeks_typ,
         nate_certification_preferred: true,
         reference: 'OSHA 1926 Subpart R; ANSI/TIA-222-H; 47 CFR §17.23; FAA AC 70/7460-1; NATE tower industry standards; FCC Form 301-AM / CP requirements (§73.3533)',
-        note: `${isDA_cc ? 'DA' : 'NDA'} ${frequency_khz} kHz, tower height ~${tower_height_ft}ft (λ/4). Construction cost estimate: $${total_cost_low.toLocaleString()}–$${total_cost_high.toLocaleString()} (typ. $${total_cost_typ.toLocaleString()}) excluding ground radials (~$${Math.round(120 * (0.35 * 300000 / frequency_khz) * 4.45).toLocaleString()} — 120 radials at 0.35λ, $4.45/m installed) and proof engineering. Timeline: ${timeline_weeks_low}–${timeline_weeks_high} weeks (typ. ${timeline_weeks_typ}).`
+        note: `${isDA_cc ? 'DA' : 'NDA'} ${frequency_khz} kHz, tower height ~${tower_height_ft}ft (λ/4). Construction cost estimate: $${total_cost_low.toLocaleString()}–$${total_cost_high.toLocaleString()} (typ. $${total_cost_typ.toLocaleString()}) excluding ground radials (~$${Math.round(120 * canonical.groundSystem.selectedScenario.radialLengthM * 4.45).toLocaleString()} — 120 radials at 0.35λ, $4.45/m installed, canonical-sourced) and proof engineering. Timeline: ${timeline_weeks_low}–${timeline_weeks_high} weeks (typ. ${timeline_weeks_typ}).`
       };
     })(),
 
@@ -21992,7 +21994,10 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Shared ground between DA towers is possible if towers are close enough
       //   - Cost roughly scales with number of towers (n_towers × single-tower cost × 0.7 overlap)
 
-      const wavelength_m       = 300000 / frequency_khz;
+      // wavelength_m/radial_length_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving the wavelength and 0.35λ radial length locally.
+      const wavelength_m       = canonical.antenna.wavelengthM.value;
       const lambda_quarter_m   = Math.round(wavelength_m / 4);
       const lambda_half_m      = Math.round(wavelength_m / 2);
 
@@ -22001,7 +22006,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Ground system specifications (standard: 120 radials × 0.35λ per §73.189(b)(4) / NBS TN-24)
       const n_radials            = 120;
-      const radial_length_m      = Math.round(wavelength_m * 0.35);  // 0.35λ per §73.189(b)(4) / NBS TN-24
+      const radial_length_m      = Math.round(canonical.groundSystem.selectedScenario.radialLengthM);  // 0.35λ per §73.189(b)(4) / NBS TN-24
       const total_wire_length_m  = n_radials * radial_length_m;
 
       // Per-meter costs (2024 US market estimates)
@@ -22391,7 +22396,9 @@ async function scoreCandidate(pt, ctx, warnings){
       //   4. 200m clearance from industrial facilities with large variable-frequency drives
       //   5. Evaluate power line quality via utility distribution maps
 
-      const wavelength_m      = 300000 / frequency_khz;
+      // wavelength_m rewired to canonical.antenna.wavelengthM (guide-
+      // internal migration, Wave 1) instead of re-deriving it locally.
+      const wavelength_m      = canonical.antenna.wavelengthM.value;
       const lambda_quarter_m  = Math.round(wavelength_m / 4);
 
       // RFI sensitivity scale: lower frequency = more susceptible (longer wavelength catches more)
@@ -23079,7 +23086,9 @@ async function scoreCandidate(pt, ctx, warnings){
       const n_monitoring_points = n_patterns * n_points_per_pattern;
 
       // Distance range for monitoring points
-      const wavelength_m = 300000 / frequency_khz; // meters
+      // wavelength_m rewired to canonical.antenna.wavelengthM (guide-
+      // internal migration, Wave 1) instead of re-deriving it locally.
+      const wavelength_m = canonical.antenna.wavelengthM.value; // meters
       const min_distance_m = Math.round(wavelength_m * 0.5); // ≥0.5λ from tower
       const typical_distance_m = Math.round(wavelength_m * 1.5); // 1–2λ typical
       const max_useful_distance_m = Math.round(wavelength_m * 5); // beyond 5λ accuracy degrades
@@ -24005,10 +24014,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const rf_ppe_required = tpo_kw > safe_work_power_threshold_kw;
 
       // Tower height: 0.625λ for Class A/B (FCC optimum), 0.375λ (3/8λ) for C/D
-      const c_mps = 299792458;
-      const wavelength_m_tc = c_mps / (frequency_khz * 1000);
-      const h_frac_tc = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
-      const three_eights_height_m = round2(wavelength_m_tc * h_frac_tc);  // class-dependent height
+      // three_eights_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally with an imprecise/inconsistent
+      // speed-of-light constant.
+      const three_eights_height_m = canonical.antenna.selectedDesignHeightM.value;  // class-dependent height
 
       // Fall protection zones and requirements per OSHA §1910.268 / ANSI/TIA-1019-A
       const FALL_PROTECTION_ZONES = [
@@ -27355,7 +27365,10 @@ async function scoreCandidate(pt, ctx, warnings){
 
       const isDA_rc     = /^DA/i.test(pattern_mode);
       const isClear_rc  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
-      const needsASR_rc = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz) > ASR_THRESHOLD_17_7.height_m; // §17.7: > 60.96 m (200 ft); class-dependent design height (3/8λ C/D, 5/8λ A/B)
+      // needsASR_rc rewired to canonical.regulatory.asr (guide-internal
+      // migration, Wave 1) instead of re-deriving the class-typical design
+      // height and re-comparing it against the §17.7 threshold locally.
+      const needsASR_rc = canonical.regulatory.asr.required;
 
       // Pre-filing requirements
       const PRE_FILING = [
@@ -27773,7 +27786,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC §1.1306/§1.1307: NEPA checklist required for all construction permit applications
       // Categorical exclusions in §1.1306 cover most standard AM sites
 
-      const towerH_eia    = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D design height
+      // towerH_eia rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const towerH_eia    = canonical.antenna.selectedDesignHeightM.value; // 5/8λ Class A/B, 3/8λ Class C/D design height
 
       // NEPA categorical exclusion analysis (§1.1306)
       // These conditions REMOVE the site from categorical exclusion (require full EA)
@@ -27959,8 +27975,12 @@ async function scoreCandidate(pt, ctx, warnings){
     insurance_liability_analysis: (() => {
       // AM broadcast tower insurance: property, liability, E&O, cyber
       // §17.7 ASR non-compliance increases premium and voids aviation-related claims
-      const towerH_ins = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D design height
-      const asr_required = towerH_ins > ASR_THRESHOLD_17_7.height_m; // >200 ft requires ASR registration per §17.7
+      // towerH_ins/asr_required rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the class-typical design height and re-comparing it
+      // against the §17.7 threshold locally.
+      const towerH_ins = canonical.antenna.selectedDesignHeightM.value; // 5/8λ Class A/B, 3/8λ Class C/D design height
+      const asr_required = canonical.regulatory.asr.required; // >200 ft requires ASR registration per §17.7
 
       // Replacement cost value: tower structure + equipment + transmitter building
       // FCC Class D AM: 5 kW, modest infrastructure
@@ -28118,7 +28138,10 @@ async function scoreCandidate(pt, ctx, warnings){
         required: true,
         cfr: '47 CFR §73.154',
         description: 'Comparison of directional vs non-directional field strength on measured radials (one §73.154 partial-proof method)',
-        standard_monitoring_point_m: round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz * 0.02),
+        // standard_monitoring_point_m rewired to canonical.antenna.
+        // selectedDesignHeightM (guide-internal migration, Wave 1) instead
+        // of re-deriving the class-typical design height locally.
+        standard_monitoring_point_m: round2(canonical.antenna.selectedDesignHeightM.value * 0.02),
         base_current_tolerance_pct: 5
       };
 
@@ -28577,10 +28600,14 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA = /^DA/i.test(pattern_mode);
 
       // Quarter-wave height: kept as reference field (physics baseline)
-      const quarter_wave_height_m = round2(75000 / frequency_khz);
+      // quarter_wave_height_m/design_height_cpe rewired to canonical.antenna
+      // (guide-internal migration, Wave 1) instead of re-deriving these
+      // physics reference values and the class-typical design height
+      // locally.
+      const quarter_wave_height_m = canonical.antenna.quarterWaveReferenceM.value;
       // Design height drives ASR — 3/8λ Class C/D, 5/8λ Class A/B
       const isHighClass_cpe   = /^[AB]$/i.test(fcc_class);
-      const design_height_cpe = round2((isHighClass_cpe ? 0.625 : 0.375) * 300000 / frequency_khz);
+      const design_height_cpe = canonical.antenna.selectedDesignHeightM.value;
       // ASR registration threshold: 200 feet = 60.96 m (47 CFR §17.7)
       const asr_required          = design_height_cpe > ASR_THRESHOLD_17_7.height_m;
 
