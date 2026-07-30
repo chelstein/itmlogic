@@ -28085,8 +28085,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // Structural analysis for AM broadcast towers per TIA-222-H (2018) and ANSI/TIA-222
       // §73.49 requires substantial structure; §17.7 ASR requires PE-stamped structural analysis
       // Key: wind zone, ice loading, antenna weight, and foundation capacity all drive tower selection
-      const towerH_tsa = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D
-      const asr_required_tsa = towerH_tsa > ASR_THRESHOLD_17_7.height_m;
+      // towerH_tsa/asr_required_tsa rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the design height and re-comparing it against the
+      // §17.7 threshold locally.
+      const towerH_tsa = canonical.antenna.selectedDesignHeightM.value;
+      const asr_required_tsa = canonical.regulatory.asr.required;
 
       // TIA-222-H wind speed exposure categories (ASCE 7-16 basis)
       // Basic wind speed by exposure: urban/suburban (B), open terrain (C), coastal/exposed (D)
@@ -28167,13 +28171,15 @@ async function scoreCandidate(pt, ctx, warnings){
       const MPE_LIMIT_GP_mwcm2  = MPE_GP_LO.s_mw_cm2; // general population / uncontrolled (0.3–3 MHz)
       const MPE_LIMIT_OCC_mwcm2 = MPE_OC.s_mw_cm2;    // occupational / controlled (0.3–3 MHz) per §1.1310 Table 1
 
-      // Near-field estimate: approximate exclusion zones
-      // Simplified: at r metres, S = (30 * P_kW) / r²  [mW/cm² approximation at AM freq]
-      // Distance for limit: S = limit → r_m = sqrt(30 * P_kW / limit_mw_cm2)
-      // Worked example: 5 kW at 100 mW/cm² → sqrt(150/100) = 1.22 m
-      const p_kw_rf = tpo_kw;
-      const r_gp_m  = round2(Math.sqrt(30 * p_kw_rf / MPE_LIMIT_GP_mwcm2));
-      const r_occ_m = round2(Math.sqrt(30 * p_kw_rf / MPE_LIMIT_OCC_mwcm2));
+      // Exclusion-zone distances rewired to canonical.rfExposure (guide-
+      // internal migration, Wave 1): this guide's own simplified S = 30*P/r²
+      // approximation (no ground-reflection factor) is NOT the same physics
+      // as canonical/rules/rfExposure.js's OET-65 power-density formula
+      // (S = 52.20 * ERP * F^2 / R^2, WITH the 4x ground-reflection factor)
+      // -- the same two-different-formulas-for-the-same-boundary issue
+      // already fixed in am_rf_exposure_mpe_guide.
+      const r_gp_m  = canonical.rfExposure.uncontrolledMpeBoundaryM.value_m;
+      const r_occ_m = canonical.rfExposure.controlledMpeBoundaryM.value_m;
 
       const EXPOSURE_ZONES = [
         {
@@ -28243,7 +28249,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Land acquisition guidance for AM transmitter site relocation
       // §1.65 requires notification of changes in circumstances during pending applications
       // FCC Form 301-AM requires legal description of transmitter site; clean title is essential
-      const towerH_pag = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * 300000 / frequency_khz); // 5/8λ Class A/B, 3/8λ Class C/D design height
+      // towerH_pag rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const towerH_pag = canonical.antenna.selectedDesignHeightM.value;
 
       // Minimum site area: tower height + guy wire span + buffer
       // For a guyed tower: guy radius ≈ 0.5 × tower height; buffer 15m for fence + access
@@ -28796,8 +28805,15 @@ async function scoreCandidate(pt, ctx, warnings){
       //   - Standard: 90 radials (typical new construction)
       //   - Optimum: 120 radials (FCC-recommended, maximum efficiency)
 
-      const lambda_m      = round2(300000 / frequency_khz);
-      const radial_length_m = round2(lambda_m * 0.35);  // 0.35λ per §73.189(b)(4) / NBS TN-24
+      // lambda_m/radial_length_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving the wavelength and 0.35λ radial length locally. The
+      // guide-specific economy(60)/standard(90) alternative configurations
+      // below are left as their own guide-specific figures -- only the
+      // 120-radial "optimum" config's radial length matches
+      // canonical.groundSystem's STANDARD_120 scenario.
+      const lambda_m      = canonical.antenna.wavelengthM.value;
+      const radial_length_m = canonical.groundSystem.selectedScenario.radialLengthM;  // 0.35λ per §73.189(b)(4) / NBS TN-24
 
       const CONFIGS = [
         { label: 'economy',  n_radials: 60,  r_loss_ohm: 5.0 },
@@ -28885,8 +28901,14 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC §73.150 prohibits series-fed towers above 190 electrical degrees
       // without a shunt antenna or special design.
 
-      const lambda_m     = round2(300000 / frequency_khz);
-      const qwave_h_m    = round2(lambda_m / 4);
+      // lambda_m/qwave_h_m rewired to canonical.antenna (guide-internal
+      // migration, Wave 1) instead of re-deriving the wavelength and λ/4
+      // reference locally. This guide deliberately evaluates efficiency at
+      // exactly λ/4 regardless of the class-based selected design height,
+      // so it reads canonical's physics-reference values, not
+      // selectedDesignHeightM.
+      const lambda_m     = canonical.antenna.wavelengthM.value;
+      const qwave_h_m    = canonical.antenna.quarterWaveReferenceM.value;
       const theta_deg    = round2(360 * qwave_h_m / lambda_m); // should be ~90°
 
       // Radiation resistance at exactly quarter-wave (θ=90°):
