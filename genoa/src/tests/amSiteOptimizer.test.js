@@ -13319,8 +13319,11 @@ test('KAZM guy wire cost components', async () => {
 test('KAZM guy wire system total cost', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
-  assert.strictEqual(g.total_low_usd,  50399.33,  'total_low should be $50,399.33');
-  assert.strictEqual(g.total_high_usd, 155697.99, 'total_high should be $155,697.99');
+  // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+  // (guide-internal migration Wave 1) -- 473.2 ft is canonical's unrounded
+  // design height, replacing the guide's prior round-wavelength-first value.
+  assert.strictEqual(g.total_low_usd,  50418.8,   'total_low should be $50,418.8 (canonical design height)');
+  assert.strictEqual(g.total_high_usd, 155756.4,  'total_high should be $155,756.4 (canonical design height)');
 });
 
 test('am_tower_guy_wire_and_anchor_system_guide comparison table columns present', async () => {
@@ -13332,8 +13335,8 @@ test('am_tower_guy_wire_and_anchor_system_guide comparison table columns present
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.gwy_num_total_anchors, 9,         'rank-1 gwy_num_total_anchors should be 9');
-  assert.strictEqual(r0.gwy_total_low_usd,     50399.33,  'rank-1 gwy_total_low_usd should be $50,399.33');
-  assert.strictEqual(r0.gwy_tower_height_ft,   472.87,    'rank-1 gwy_tower_height_ft should be 472.87');
+  assert.strictEqual(r0.gwy_total_low_usd,     50418.8,   'rank-1 gwy_total_low_usd should be $50,418.8 (canonical design height)');
+  assert.strictEqual(r0.gwy_tower_height_ft,   473.2,     'rank-1 gwy_tower_height_ft should be 473.2 (canonical.antenna.selectedDesignHeightM)');
 });
 
 test('am_transmission_loss_budget_guide present on KAZM candidate', async () => {
@@ -13378,8 +13381,8 @@ test('am_transmission_loss_budget_guide comparison table columns present', async
   }
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.txl_total_loss_db, 0.24,    'rank-1 txl_total_loss_db should be 0.24');
-  assert.strictEqual(r0.txl_total_low_usd, 4869.31, 'rank-1 txl_total_low_usd should be $4,869.31');
-  assert.strictEqual(r0.txl_coax_run_ft,   286.43,  'rank-1 txl_coax_run_ft should be 286.43');
+  assert.strictEqual(r0.txl_total_low_usd, 4872.2,  'rank-1 txl_total_low_usd should be $4,872.2 (canonical design height)');
+  assert.strictEqual(r0.txl_coax_run_ft,   286.6,   'rank-1 txl_coax_run_ft should be 286.6 (canonical.antenna.selectedDesignHeightM)');
 });
 
 test('am_grounding_and_lightning_protection_guide present on KAZM candidate', async () => {
@@ -13471,7 +13474,7 @@ test('am_fcc_asr_tower_registration_guide comparison table columns present', asy
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.asr_required_design, true,   'rank-1 asr_required_design should be true');
   assert.strictEqual(r0.asr_total_low_usd,   5000,   'rank-1 asr_total_low_usd should be 5000 (Form 854 ASR: no FCC filing fee under the current §1.1102 schedule)');
-  assert.strictEqual(r0.asr_tower_height_ft, 472.87, 'rank-1 asr_tower_height_ft should be 472.87');
+  assert.strictEqual(r0.asr_tower_height_ft, 473.2,  'rank-1 asr_tower_height_ft should be 473.2 (canonical.antenna.selectedDesignHeightM)');
 });
 
 test('am_site_access_and_road_construction_guide present on KAZM candidate', async () => {

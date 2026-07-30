@@ -15154,14 +15154,15 @@ async function scoreCandidate(pt, ctx, warnings){
     am_fcc_asr_tower_registration_guide: (() => {
       // 47 CFR §17.7: structures > 60.96 m (200 ft) AGL require FCC ASR registration.
       // Antenna Structure Registration (ASR) is required BEFORE construction or modification.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      // tower_height_m/requires_asr rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the design height and re-comparing it against the
+      // §17.7 threshold locally.
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const asr_threshold_m  = ASR_THRESHOLD_17_7.height_m;   // 47 CFR §17.7 height trigger
       const asr_threshold_ft = 200;
-      const requires_asr    = tower_height_m > asr_threshold_m;
+      const requires_asr    = canonical.regulatory.asr.required;
       // Aviation obstruction lighting: FAA Form 7460-1 (Notice of Proposed Construction)
       // required for structures > 200 ft AGL or within airport approach zones.
       const requires_faa_notice = tower_height_ft > 200;
@@ -15200,10 +15201,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // NFPA 780 / IEEE Std 142: AM towers are prime lightning targets.
       // System includes a ground ring around the tower base, driven ground rods,
       // building air terminals, and TVSS at service entrance.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const ground_ring_ft  = round2(Math.PI * 30); // ~30 ft radius buried copper ring
       const ground_ring_low_usd  = round2(ground_ring_ft * 20);
@@ -15237,10 +15238,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // RF link budget from transmitter output to antenna feed point.
       // AM coax loss at MF frequencies is very low (0.02-0.06 dB per 100 ft);
       // total system loss typically 0.15-0.5 dB including ATU, connectors, and arrester.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const coax_run_ft     = round2(tower_height_m * 3.28084 * 0.5 + 50);
       const coax_diameter   = tpo_kw >= 50 ? '3_inch' : tpo_kw >= 5 ? '1_5_8_inch' : '7_8_inch';
       const loss_per_100ft  = coax_diameter === '3_inch' ? 0.018 : coax_diameter === '1_5_8_inch' ? 0.025 : 0.04;
@@ -15277,10 +15278,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Standard: 3 guy levels (4 for towers > 500 ft); 3 anchor points per level.
       // Guy wires must be broken with insulators at λ/8 intervals to prevent
       // pattern distortion from re-radiating conductors.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving 5/8λ or
+      // 3/8λ locally.
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft = round2(tower_height_m * 3.28084);
       const num_guy_levels  = tower_height_ft > 500 ? 4 : 3;
       const num_anchors_per_level = 3;
