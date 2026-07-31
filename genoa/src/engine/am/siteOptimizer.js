@@ -5007,7 +5007,7 @@ async function scoreCandidate(pt, ctx, warnings){
     ground_sigma_quality:      sigmaQuality(sigma_msm),
     ground_sigma_source,
     ground_sigma_filing_grade,
-    ground_radial_advisory:  buildGroundRadialAdvisory(sigma_msm, frequency_khz),
+    ground_radial_advisory:  buildGroundRadialAdvisory(sigma_msm, frequency_khz, canonical.groundSystem.selectedScenario.radialLengthM),
     // Per-candidate scoring confidence based on available data layers.
     // HIGH: filing-grade σ raster AND polygon provided.
     // MEDIUM: one of the two present.
@@ -33923,12 +33923,23 @@ function frequencyChannelClass(frequency_khz){
 //   - FCC Form 302-AM: Ground system certification
 //   - Terman (1943) / Belrose (1975) radial length / count tradeoff empirical data
 //   - NBS Tech. Note 300 (Wait & Spies, 1969): effect of radial count on ERP
-function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
+//
+// canonicalRadialLengthM (guide-internal migration, Wave 1): this is a
+// module-level helper called from scoreCandidate()'s outer closure, where
+// canonical.groundSystem.selectedScenario.radialLengthM (the single source
+// of truth for the 0.35λ standard radial length) IS available -- so the
+// real call site threads it through here instead of letting this function
+// re-derive its own wavelength/radial-length locally. The parameter stays
+// optional (falls back to the local 300000/f_kHz computation) so the
+// existing standalone __test__ unit tests -- which call this function
+// directly with just (sigma_msm, frequency_khz) -- keep working unchanged.
+function buildGroundRadialAdvisory(sigma_msm, frequency_khz, canonicalRadialLengthM = null){
   if (sigma_msm == null || !Number.isFinite(sigma_msm)) return null;
 
   // Standard radial length per §73.189(b)(4) / NBS TN-24: 0.35λ for optimum ground system.
-  const lambda_m   = frequency_khz ? round2(300000 / frequency_khz) : null;
-  const fcc_std_radial_m = lambda_m ? round2(lambda_m * 0.35) : null;  // 0.35λ per §73.189(b)(4) / NBS TN-24
+  const fcc_std_radial_m = canonicalRadialLengthM != null
+    ? canonicalRadialLengthM
+    : (frequency_khz ? round2(0.35 * 300000 / frequency_khz) : null);  // 0.35λ per §73.189(b)(4) / NBS TN-24
 
   // Standard system: 120 radials at 0.35λ length buried ≥5 cm (§73.189(b)(4) / NBS TN-24).
   // Extended system: 120–180 radials at 0.35λ–0.5λ, + deep-driven rods, for poor σ.
