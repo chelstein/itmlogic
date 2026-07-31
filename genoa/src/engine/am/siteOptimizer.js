@@ -5836,7 +5836,7 @@ async function scoreCandidate(pt, ctx, warnings){
           status:      'REQUIRED',
           rule:        '47 CFR §1.1307',
           responsible: 'Licensed broadcast engineer',
-          note:        `Near-field boundary λ/(2π) ≈ ${round2(300000 / (frequency_khz * 2 * Math.PI))} m at ${frequency_khz} kHz. Fence distance and restricted-zone perimeter must be documented.`
+          note:        `Near-field boundary λ/(2π) ≈ ${canonical.rfExposure.reactiveNearFieldBoundaryM.value_m} m at ${frequency_khz} kHz. Fence distance and restricted-zone perimeter must be documented.`
         },
         {
           id:          'LMS_NEPA',
