@@ -13402,10 +13402,12 @@ async function scoreCandidate(pt, ctx, warnings){
       //   λ/4 → R_rad ≈ 36.6 Ω; 0.2λ (short) → R_rad ≈ 10 Ω; 0.6λ → R_rad ≈ 74 Ω.
       // ATU re-tuning trigger: base current deviation > 2% or SWR change > 10%.
       const is_da_bcim = /^DA/i.test(pattern_mode);
-      // Electrical length fraction using class-specific planning height: 5/8λ for A/B, 3/8λ for C/D.
-      const lambda_m_bcim = round2(300000 / frequency_khz);
+      // standard_height_m_bcim rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
       const isHighCls_bcim = /^[AB]$/i.test(fcc_class);
-      const standard_height_m_bcim = round2(lambda_m_bcim * (isHighCls_bcim ? 0.625 : 0.375));
+      const standard_height_m_bcim = canonical.antenna.selectedDesignHeightM.value;
+      const lambda_m_bcim = canonical.antenna.wavelengthM.value;
       const elec_deg_bcim = isHighCls_bcim ? 225 : 135; // 5/8λ = 225° for A/B, 3/8λ = 135° for C/D
       // R_rad screening estimate: λ/4 monopole reference (36.6 Ω); actual R_rad varies with height.
       const r_rad_est_ohm = 36.6;
@@ -15371,10 +15373,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // Ballpark total capital cost for a complete AM site relocation.
       // Aggregates major cost categories (tower, ground system, transmitter,
       // soft costs, site prep) into a single investment summary.
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
-      const is_class_cd     = /^[CD]$/i.test(fcc_class);
-      const tower_height_ft = round2((is_class_cd ? wavelength_m * 0.375 : wavelength_m * 0.625) * 3.28084);
+      // tower_height_ft rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally with an imprecise/inconsistent
+      // speed-of-light constant.
+      const tower_height_ft = round2(canonical.antenna.selectedDesignHeightM.value * 3.28084);
       let tower_cap_low, tower_cap_high;
       if      (tower_height_ft <= 200) { tower_cap_low = 20000;  tower_cap_high = 60000; }
       else if (tower_height_ft <= 400) { tower_cap_low = 60000;  tower_cap_high = 180000; }
@@ -15919,9 +15922,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM tower insurance covers property/casualty, liability, and E&O.
       // Construction surety bond protects the owner if contractor defaults.
       // Workers' comp is required during tower erection and ground system installation.
-      const wavelength_m   = round2(300000 / frequency_khz);
-      const is_cd = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving it locally.
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft = round2(tower_height_m * 3.28084);
 
       // Annual tower property and liability insurance (scales with tower height and power)
@@ -18049,8 +18052,13 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_local_ch_eff = LOCAL_CHANNEL_KHZ.has(frequency_khz);
 
       // Wavelength and quarter-wave physical height
-      const lambda_m          = round2(300000 / frequency_khz);
-      const physical_height_m = round2(lambda_m * 0.25);
+      // lambda_m/physical_height_m rewired to canonical.antenna (guide-
+      // internal migration, Wave 1) instead of re-deriving these physics
+      // reference values locally. This guide deliberately evaluates at
+      // exactly λ/4 regardless of class, so it reads canonical's
+      // quarterWaveReferenceM reference field, not selectedDesignHeightM.
+      const lambda_m          = canonical.antenna.wavelengthM.value;
+      const physical_height_m = canonical.antenna.quarterWaveReferenceM.value;
       const electrical_height_deg = 90; // standard quarter-wave resonant monopole
 
       // Radiation resistance for a resonant quarter-wave monopole over
@@ -24987,8 +24995,11 @@ async function scoreCandidate(pt, ctx, warnings){
         };
       }
 
-      const lambda_da   = round2(300000 / frequency_khz);   // full wavelength, m
-      const qwave_da    = round2(lambda_da / 4);             // λ/4, m
+      // lambda_da/qwave_da rewired to canonical.antenna (guide-internal
+      // migration, Wave 1) instead of re-deriving these physics reference
+      // values locally.
+      const lambda_da   = canonical.antenna.wavelengthM.value;   // full wavelength, m
+      const qwave_da    = canonical.antenna.quarterWaveReferenceM.value;             // λ/4, m
       const qwave_ft_da = round2(qwave_da * 3.28084);
 
       const daMode       = pattern_mode.toUpperCase();
@@ -26740,24 +26751,35 @@ async function scoreCandidate(pt, ctx, warnings){
       // §73.150: FCC specifies antenna efficiency by electrical height (degrees)
       // Optimum electrical height: 180–225° (5/8λ to 5/8λ + 1/8λ)
       // Ground wave efficiency vs. electrical height per Ballantine (1924) / Belrose model
-      const lambda_ah    = round2(300000 / frequency_khz);
-      const qwave_ah     = round2(lambda_ah / 4);
-      const fiveEightsL  = round2(0.625 * lambda_ah); // 225° — near-optimum for groundwave
+      // lambda_ah/qwave_ah/fiveEightsL rewired to canonical.antenna (guide-
+      // internal migration, Wave 1) instead of re-deriving these physics
+      // reference values locally.
+      const lambda_ah    = canonical.antenna.wavelengthM.value;
+      const qwave_ah     = canonical.antenna.quarterWaveReferenceM.value;
+      const fiveEightsL  = canonical.antenna.fiveEighthsReferenceM.value; // 225° — near-optimum for groundwave
 
       // Electrical height tiers and their efficiency relative to optimum (5/8λ)
       // FCC §73.150(a): radiation efficiency tables
       const HEIGHT_TIERS_ah = [
-        { elec_deg: 90,  frac_lambda: 0.25,  label: 'Quarter-wave (λ/4)',    eff_rel: 0.78, height_m: round2(0.25  * lambda_ah), height_ft: round2(0.25  * lambda_ah * 3.28084), note: 'Standard NDA height; acceptable for most AM. Low sky wave, good ground wave.' },
+        // height_m for the 0.25 and 0.625 tiers reads canonical's own
+        // quarterWaveReferenceM/fiveEighthsReferenceM fields directly
+        // (computed from the unrounded wavelength) instead of re-rounding
+        // from the already-rounded lambda_ah, avoiding a double-rounding
+        // drift against fiveEightsL below (both must agree exactly).
+        { elec_deg: 90,  frac_lambda: 0.25,  label: 'Quarter-wave (λ/4)',    eff_rel: 0.78, height_m: qwave_ah, height_ft: round2(qwave_ah * 3.28084), note: 'Standard NDA height; acceptable for most AM. Low sky wave, good ground wave.' },
         { elec_deg: 120, frac_lambda: 0.33,  label: 'One-third wave',        eff_rel: 0.88, height_m: round2(0.33  * lambda_ah), height_ft: round2(0.33  * lambda_ah * 3.28084), note: 'Good compromise; useful when site limits full 5/8λ.' },
         { elec_deg: 135, frac_lambda: 0.375, label: 'Three-eighth wave',     eff_rel: 0.93, height_m: round2(0.375 * lambda_ah), height_ft: round2(0.375 * lambda_ah * 3.28084), note: 'Common FCC standard; strong ground wave, acceptable skywave.' },
         { elec_deg: 180, frac_lambda: 0.50,  label: 'Half-wave (λ/2)',       eff_rel: 0.97, height_m: round2(0.50  * lambda_ah), height_ft: round2(0.50  * lambda_ah * 3.28084), note: 'Near-optimum for groundwave; diminishing skywave benefit.' },
-        { elec_deg: 225, frac_lambda: 0.625, label: '5/8-wave (optimum)',    eff_rel: 1.00, height_m: round2(0.625 * lambda_ah), height_ft: round2(0.625 * lambda_ah * 3.28084), note: 'Peak radiation efficiency per §73.150. Maximum ground wave. Used by Class A 50 kW stations.' },
+        { elec_deg: 225, frac_lambda: 0.625, label: '5/8-wave (optimum)',    eff_rel: 1.00, height_m: fiveEightsL, height_ft: round2(fiveEightsL * 3.28084), note: 'Peak radiation efficiency per §73.150. Maximum ground wave. Used by Class A 50 kW stations.' },
         { elec_deg: 270, frac_lambda: 0.75,  label: 'Three-quarter wave',    eff_rel: 0.95, height_m: round2(0.75  * lambda_ah), height_ft: round2(0.75  * lambda_ah * 3.28084), note: 'Slight reduction vs 5/8λ; requires top-loading or series reactance.' }
       ];
 
       // Typical Class D and Class A physical height targets
+      // standardHeightM rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
       const standardHeightFrac = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
-      const standardHeightM    = round2(standardHeightFrac * lambda_ah);
+      const standardHeightM    = canonical.antenna.selectedDesignHeightM.value;
       const standardHeightFt   = round2(standardHeightM * 3.28084);
       const standardElecDeg    = round2(standardHeightFrac * 360);
 
@@ -26814,7 +26836,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // FCC uses Irregular Terrain Model (ITM / Longley-Rice) for AM propagation
       // Beyond-smooth-earth correction expressed as additional path loss (dB)
 
-      const lambda_tp = round2(300000 / frequency_khz); // m
+      // lambda_tp rewired to canonical.antenna.wavelengthM (guide-internal
+      // migration, Wave 1) instead of re-deriving it locally.
+      const lambda_tp = canonical.antenna.wavelengthM.value; // m
 
       // Ground wave attenuation function approximation (smooth earth, FCC curves)
       // Base attenuation at distance d_km for given conductivity (smooth earth reference)
@@ -31329,9 +31353,12 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ASR requirement: tower height from class-dependent design height.
       // 5/8λ for Class A/B (FCC optimum); 3/8λ for C/D (planning design height).
-      const lambda_m      = 300000 / frequency_khz;   // speed of light / freq
-      const qw_m          = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_m);
-      const asr_required  = qw_m > ASR_THRESHOLD_17_7.height_m;             // > 60.96 m (200 ft) AGL triggers ASR (47 CFR §17.7)
+      // qw_m/asr_required rewired to canonical.antenna.selectedDesignHeightM /
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving the class-typical design height and re-comparing it
+      // against the §17.7 threshold locally.
+      const qw_m          = canonical.antenna.selectedDesignHeightM.value;
+      const asr_required  = canonical.regulatory.asr.required;             // > 60.96 m (200 ft) AGL triggers ASR (47 CFR §17.7)
 
       // Annual database maintenance cost estimates (USD)
       const OPIF_ANNUAL_USD       = 0;         // no FCC fee, internal labor ~$200
@@ -32775,8 +32802,11 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Radial reference dimensions — FCC standard is 120 × 0.35λ per §73.190 / NBS TN-24
       // λ/4 shown here for comparison with tower electrical height
-      const wavelength_m    = round2(300000 / freq_khz);
-      const quarter_wave_m  = round2(wavelength_m / 4);
+      // wavelength_m/quarter_wave_m rewired to canonical.antenna (guide-
+      // internal migration, Wave 1) instead of re-deriving these physics
+      // reference values locally.
+      const wavelength_m    = canonical.antenna.wavelengthM.value;
+      const quarter_wave_m  = canonical.antenna.quarterWaveReferenceM.value;
       const quarter_wave_ft = round2(quarter_wave_m * 3.28084);
 
       // Minimum radials for licensed class per §73.189(b)(4) / NBS TN-24 best practice
