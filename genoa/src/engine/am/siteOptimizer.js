@@ -10069,6 +10069,19 @@ async function scoreCandidate(pt, ctx, warnings){
       // Near-field correction: At distances < 0.16λ, E-field falls as 1/r² (reactive
       // near-field); the 1/r model overestimates risk at very close range.  For fencing
       // purposes, the OET Bulletin 65 formula is the FCC-accepted method.
+      //
+      // guide-internal migration Wave 1: investigated whether r_gp_m/r_oc_m
+      // (exclusion_zone_m) should be rewired to canonical.rfExposure.
+      // uncontrolledMpeBoundaryM/controlledMpeBoundaryM instead of this
+      // local formula. Conclusion: NOT a duplicate -- do not rewire.
+      // canonical.rfExposure uses OET-65's FAR-FIELD power-density formula
+      // (src/engine/regulatory/oet65.js), whose own header comment states
+      // it is NOT accurate inside the near-field boundary (≈λ/2π, often
+      // 50+ m for AM) and that OET-65 §3.B requires near-field analysis
+      // via the antenna's current distribution there instead -- which is
+      // exactly what this guide's E(r)=60·I_base/r formula is. See the
+      // "Wave 1" addendum in docs/canonical-consistency-completion-report.md
+      // for the full investigation.
 
       const f_mhz     = frequency_khz / 1000;
       const lambda_m  = 299792.458 / frequency_khz;  // wavelength in metres
@@ -18923,6 +18936,17 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Uncontrolled exclusion zone at base of tower (OET-65 Supplement B, AM
       // ground-wave near-field; induction-zone dominance reduces far-field estimate)
+      //
+      // guide-internal migration Wave 1: investigated whether this
+      // TPO-bracket step function should be rewired to canonical.rfExposure.
+      // uncontrolledMpeBoundaryM. Conclusion: NOT a duplicate -- do not
+      // rewire. canonical.rfExposure uses OET-65's far-field power-density
+      // formula, which its own header comment says is inaccurate inside
+      // the near-field boundary -- exactly the AM-tower-base regime this
+      // step function targets. See the "Wave 1" addendum in
+      // docs/canonical-consistency-completion-report.md for the full
+      // investigation (same conclusion as am_rf_exposure_mpe_evaluation_
+      // guide's exclusion_zone_m, above).
       let exclusion_zone_m = 10;
       if      (tpo_kw >= 50) exclusion_zone_m = 100;
       else if (tpo_kw >= 25) exclusion_zone_m =  60;

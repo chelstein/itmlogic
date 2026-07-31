@@ -1152,11 +1152,12 @@ Numerically identical to the old value at all standard-scenario
 frequencies, so no test values changed — pure architecture fix.
 
 **`am_rf_exposure_mpe_evaluation_guide` and
-`am_grounding_system_and_rf_safety_guide`'s `exclusion_zone_m`** — invest
-igated per the coordinator's explicit instruction to confirm the correct
-formula before rewiring, same standard as the earlier `am_rf_exposure_
-mpe_guide` fix (batch 2). **Conclusion: do NOT rewire these to
-canonical.rfExposure — left as-is, deliberately.**
+`am_grounding_system_and_rf_safety_guide`'s `exclusion_zone_m`** —
+investigated per the coordinator's explicit instruction to confirm the
+correct formula before rewiring, same standard as the earlier
+`am_rf_exposure_mpe_guide` fix (batch 2). **Conclusion: do NOT rewire
+these to canonical.rfExposure — left as-is, deliberately, with a code
+comment added at each site pointing to this investigation (see below).**
 
 The two guides compute the AM near-field exclusion radius via
 `E(r) = 60 × I_base / r` (V/m), the classical near-field E-field formula
