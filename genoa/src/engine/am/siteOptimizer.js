@@ -9546,9 +9546,11 @@ async function scoreCandidate(pt, ctx, warnings){
       //   current steel / copper / labor indices (ENR CCI Q4 2024).
 
       // ── Tower height (same formula as antenna_height_optimization guide) ──
-      const lambda_pf       = round2(300000 / frequency_khz);        // m
+      // h_m_pf rewired to canonical.antenna.selectedDesignHeightM (guide-
+      // internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
       const h_frac_pf       = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ A/B, 3/8λ C/D design height
-      const h_m_pf          = round2(h_frac_pf * lambda_pf);
+      const h_m_pf          = canonical.antenna.selectedDesignHeightM.value;
       const h_ft_pf         = Math.round(h_m_pf * 3.28084);
       const is_guyed_pf     = h_ft_pf < 400;
 
@@ -9564,7 +9566,10 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // ── 3. Ground radial system (120-radial full system) ──
       const n_rad_pf        = 120;
-      const rad_len_ft_pf   = Math.round(lambda_pf * 0.35 * 3.28084);  // 0.35λ per §73.189(b)(4) / NBS TN-24
+      // rad_len_ft_pf rewired to canonical.groundSystem.selectedScenario.
+      // radialLengthM (guide-internal migration, Wave 1) instead of
+      // re-deriving the 0.35λ radial length locally.
+      const rad_len_ft_pf   = Math.round(canonical.groundSystem.selectedScenario.radialLengthM * 3.28084);  // 0.35λ per §73.189(b)(4) / NBS TN-24
       const total_wire_pf   = n_rad_pf * rad_len_ft_pf;
       const gnd_low_pf      = Math.round(total_wire_pf * 0.53);   // $0.53/ft wire + burial labor
       const gnd_high_pf     = Math.round(total_wire_pf * 0.85);
@@ -13321,7 +13326,10 @@ async function scoreCandidate(pt, ctx, warnings){
       // Lightning: NFPA 780 (2023) governs AM tower lightning protection; §73.1820 (FCC) requires
       //   adequate grounding. AWS D1.1/D1.2 governs structural welded connections to ground ring.
       const n_radials_std = 120;
-      const radial_length_m = round2(300000 / frequency_khz * 0.35); // 0.35λ per §73.189(b)(4) / NBS TN-24
+      // radial_length_m rewired to canonical.groundSystem.selectedScenario.
+      // radialLengthM (guide-internal migration, Wave 1) instead of
+      // re-deriving the wavelength and 0.35λ radial length locally.
+      const radial_length_m = canonical.groundSystem.selectedScenario.radialLengthM; // 0.35λ per §73.189(b)(4) / NBS TN-24
       const radial_length_ft = round2(radial_length_m * 3.281);
       // R_g estimate: standard 120-radial system ≈ 1.5 Ω; fewer radials → higher R_g
       const r_g_std_ohm = 1.5;
@@ -14855,10 +14863,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // Land options: purchase or long-term lease (20–40 yr preferred for broadcast).
       // Site acreage needed: ground radials extend 0.35λ per §73.189(b)(4) / NBS TN-24 (~135 m / 443 ft at 780 kHz).
       // Minimum site: ~1–2 acres for NDA; ~2–5 acres for DA array (multiple towers).
-      const speed_of_light_m_per_s = 299792458;
-      const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      // radial_m rewired to canonical.groundSystem.selectedScenario.
+      // radialLengthM (guide-internal migration, Wave 1) instead of
+      // re-deriving the wavelength and 0.35λ radial length locally with an
+      // imprecise/inconsistent speed-of-light constant.
       const isDA_re        = /^DA/i.test(pattern_mode);
-      const radial_m       = round2(wavelength_m * 0.35); // 0.35λ ground system reach per §73.189(b)(4) / NBS TN-24
+      const wavelength_m   = canonical.antenna.wavelengthM.value;
+      const radial_m       = canonical.groundSystem.selectedScenario.radialLengthM; // 0.35λ ground system reach per §73.189(b)(4) / NBS TN-24
       const radial_ft      = round2(radial_m * 3.28084);
       const min_acres_nda  = 2;
       const min_acres_da   = 5;
@@ -18851,8 +18862,11 @@ async function scoreCandidate(pt, ctx, warnings){
       const is_local_ch_gnd = LOCAL_CHANNEL_KHZ.has(frequency_khz);
 
       // ---- §73.189(b)(4) Ground radial system (FCC standard: 120 × 0.35λ per NBS TN-24) ----
-      const lambda_m        = round2(300000 / frequency_khz);
-      const radial_length_m = round2(lambda_m * 0.35);  // 0.35λ per §73.189(b)(4) / NBS TN-24
+      // lambda_m/radial_length_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving the wavelength and 0.35λ radial length locally.
+      const lambda_m        = canonical.antenna.wavelengthM.value;
+      const radial_length_m = canonical.groundSystem.selectedScenario.radialLengthM;  // 0.35λ per §73.189(b)(4) / NBS TN-24
 
       // Number of buried radials per FCC/industry practice.
       // §73.189(b)(4): 120 radials × 0.35–0.4λ is the 'excellent' standard (minimum 90 radials ≥ λ/4).
@@ -26090,9 +26104,13 @@ async function scoreCandidate(pt, ctx, warnings){
       // AM ground radial system design per §73.189(b)(4) / NBS TN-24 and Terman/Belrose (1966) groundwave efficiency theory
       // §73.189(b)(4) / NBS TN-24: 120 radials × 0.35λ is the FCC standard (reference design for AM ground system certification).
       // Terman (1943): N radials reduces ground loss resistance; Belrose (1966): beyond ~120 radials, marginal benefit diminishes.
-      const lambda_rs   = round2(300000 / frequency_khz);        // wavelength in meters
-      const qwave_rs    = round2(lambda_rs / 4);                  // quarter-wave physics reference
-      const optRadialLen_m = round2(0.35 * lambda_rs);            // 0.35λ per §73.189(b)(4) / NBS TN-24 FCC standard
+      // lambda_rs/qwave_rs/optRadialLen_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving these physics reference values and the 0.35λ radial
+      // length locally.
+      const lambda_rs   = canonical.antenna.wavelengthM.value;        // wavelength in meters
+      const qwave_rs    = canonical.antenna.quarterWaveReferenceM.value;                  // quarter-wave physics reference
+      const optRadialLen_m = canonical.groundSystem.selectedScenario.radialLengthM;            // 0.35λ per §73.189(b)(4) / NBS TN-24 FCC standard
       const optRadialLen_ft= round2(optRadialLen_m * 3.28084);
 
       // Standard FCC radial counts: §73.189(b)(4) / NBS TN-24 specifies 120 radials × 0.35λ for efficient system
@@ -26468,20 +26486,28 @@ async function scoreCandidate(pt, ctx, warnings){
       // Costs scale with TPO and class; Class A/B have larger towers and more radials
       const isDA_cost  = /^DA/i.test(pattern_mode);
       const isClear_cost= CLEAR_CHANNEL_KHZ.has(frequency_khz);
-      const lambda_cost = round2(300000 / frequency_khz);
+      // lambda_cost rewired to canonical.antenna.wavelengthM (guide-
+      // internal migration, Wave 1) instead of re-deriving it locally.
+      const lambda_cost = canonical.antenna.wavelengthM.value;
 
       // 1. Land / site costs
       const landCostLow  = 50000;
       const landCostHigh = 250000; // wide range: rural vs suburban
 
       // 2. Tower costs: class-dependent design height (5/8λ for Class A/B, 3/8λ for C/D)
-      const towerH_m = round2((['A', 'B'].includes(fcc_class) ? 0.625 : 0.375) * lambda_cost);
+      // towerH_m rewired to canonical.antenna.selectedDesignHeightM (guide-
+      // internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
+      const towerH_m = canonical.antenna.selectedDesignHeightM.value;
       const baseTowerCostPerM = 2200; // USD/m installed (guy-wire self-supporting)
       const towerCostLow  = round2(towerH_m * baseTowerCostPerM * 0.8);
       const towerCostHigh = round2(towerH_m * baseTowerCostPerM * 1.6);
 
       // 3. Ground radial system: 120 radials at 0.35λ per §73.189(b)(4) / NBS TN-24, #8 AWG copper
-      const optLen_cost = round2(0.35 * lambda_cost);
+      // optLen_cost rewired to canonical.groundSystem.selectedScenario.
+      // radialLengthM (guide-internal migration, Wave 1) instead of
+      // re-deriving the 0.35λ radial length locally.
+      const optLen_cost = canonical.groundSystem.selectedScenario.radialLengthM;
       const radialTotalLen_cost = round2(120 * optLen_cost);
       const radialMaterial_cost = round2(radialTotalLen_cost * 1.85); // #8 AWG USD/m
       const radialInstall_cost  = round2(radialTotalLen_cost * 1.50); // labor USD/m
@@ -28701,9 +28727,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // ATU + phasor (DA only): $25k–$65k
 
       const isDA = /^DA/i.test(pattern_mode);
-      const lambda_m    = round2(300000 / frequency_khz);
+      // qwave_h_m rewired to canonical.antenna.selectedDesignHeightM (guide-
+      // internal migration, Wave 1) instead of re-deriving the
+      // class-typical design height locally.
       const std_h_frac  = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;  // 5/8λ Class A/B, 3/8λ Class C/D
-      const qwave_h_m   = round2(lambda_m * std_h_frac);
+      const qwave_h_m   = canonical.antenna.selectedDesignHeightM.value;
 
       // Tower cost
       const towerCost = (h) => {
@@ -28720,7 +28748,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const tower_high = primaryTower.high + Math.round(extra_towers * primaryTower.high * 0.6);
 
       // Ground radial system (90-radial standard, 0.35λ per §73.189(b)(4) / NBS TN-24)
-      const radial_length_m = round2(lambda_m * 0.35);
+      // radial_length_m rewired to canonical.groundSystem.selectedScenario.
+      // radialLengthM (guide-internal migration, Wave 1) instead of
+      // re-deriving the 0.35λ radial length locally.
+      const radial_length_m = canonical.groundSystem.selectedScenario.radialLengthM;
       const gnd_wire_m      = 90 * radial_length_m;
       const gnd_low  = Math.round(gnd_wire_m * 2.80);
       const gnd_high = Math.round(gnd_wire_m * 4.20);
@@ -29564,9 +29595,12 @@ async function scoreCandidate(pt, ctx, warnings){
       // ---- Ideal tower height for this station ----
       // Optimal AM antenna height: between λ/4 (90° electrical) and 5/8λ (225° electrical)
       // Practical peak ERP: ~225° (5/8λ) for NDA; pattern needs may force different height for DA
-      const lambda_m_cos = 3e8 / (frequency_khz * 1e3);   // wavelength in meters
-      const opt_height_m = round2(lambda_m_cos * 5 / 8);   // 5/8λ optimal
-      const min_height_m = round2(lambda_m_cos * 1 / 4);   // λ/4 minimum useful
+      // lambda_m_cos/opt_height_m/min_height_m rewired to canonical.antenna
+      // (guide-internal migration, Wave 1) instead of re-deriving these
+      // physics reference values locally.
+      const lambda_m_cos = canonical.antenna.wavelengthM.value;   // wavelength in meters
+      const opt_height_m = canonical.antenna.fiveEighthsReferenceM.value;   // 5/8λ optimal
+      const min_height_m = canonical.antenna.quarterWaveReferenceM.value;   // λ/4 minimum useful
       const opt_height_ft = round2(opt_height_m * 3.28084);
       const min_height_ft = round2(min_height_m * 3.28084);
 
@@ -29629,7 +29663,10 @@ async function scoreCandidate(pt, ctx, warnings){
       const colocation_base_high_usd   = isDA_cos ? greenfield_tower_high_usd
         : Math.round((greenfield_tower_high_usd * 0.45) / 1000) * 1000;
       // Ground system is always required regardless of colocation
-      const ground_system_usd_low      = Math.round(120 * round2(lambda_m_cos * 0.35 * 3.28084) * 1.5 / 1000) * 1000; // 0.35λ per §73.189(b)(4) / NBS TN-24
+      // ground_system_usd_low's radial length rewired to canonical.
+      // groundSystem.selectedScenario.radialLengthM instead of re-deriving
+      // the 0.35λ radial length locally.
+      const ground_system_usd_low      = Math.round(120 * round2(canonical.groundSystem.selectedScenario.radialLengthM * 3.28084) * 1.5 / 1000) * 1000; // 0.35λ per §73.189(b)(4) / NBS TN-24
       const ground_system_usd_high     = Math.round(ground_system_usd_low * 1.8 / 1000) * 1000;
 
       // ---- RF interference checklist ----
@@ -33484,9 +33521,12 @@ async function scoreCandidate(pt, ctx, warnings){
       const sigma_val = sigma_msm ?? 5;   // site soil conductivity (mS/m)
 
       // Wavelength and radial length calculation
-      const wavelength_m      = Math.round(300000 / freq_khz);            // λ in metres (c/f)
+      // wavelength_m/std_radial_len_m rewired to canonical.antenna/
+      // canonical.groundSystem (guide-internal migration, Wave 1) instead
+      // of re-deriving these physics reference values locally.
+      const wavelength_m      = Math.round(canonical.antenna.wavelengthM.value);            // λ in metres (c/f)
       const quarter_wave_m    = Math.round(wavelength_m / 4);
-      const std_radial_len_m  = Math.round(wavelength_m * 0.35);          // FCC std: 0.35λ
+      const std_radial_len_m  = Math.round(canonical.groundSystem.selectedScenario.radialLengthM);          // FCC std: 0.35λ
       const std_radial_len_ft = Math.round(std_radial_len_m * 3.281);
 
       // FCC standard: 120 radials; below-standard counts trigger proof-of-performance requirements

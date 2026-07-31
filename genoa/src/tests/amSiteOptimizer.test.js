@@ -13813,7 +13813,11 @@ test('KAZM NDA site requires 2 acres minimum', async () => {
   const g = out.candidates[0].am_real_estate_and_land_acquisition_guide;
   assert.strictEqual(g.isDA,      false, 'KAZM NDA so isDA should be false');
   assert.strictEqual(g.min_acres, 2,     'NDA requires 2 acres minimum');
-  assert.strictEqual(g.radial_ft, 441.34, 'KAZM radial_ft should be 441.34 (0.35λ per §73.189(b)(4))');
+  // radial_ft now reads canonical.groundSystem.selectedScenario.radialLengthM
+  // directly (guide-internal migration, Wave 1) instead of a locally
+  // recomputed radial length with an imprecise/inconsistent speed-of-light
+  // constant -- same rounding-drift rationale as the guy-wire-system tests.
+  assert.strictEqual(g.radial_ft, 441.67, 'KAZM radial_ft should be 441.67 (0.35λ per §73.189(b)(4), canonical-sourced)');
 });
 
 test('KAZM land purchase total cost', async () => {
