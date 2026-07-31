@@ -8209,11 +8209,14 @@ async function scoreCandidate(pt, ctx, warnings){
     proof_of_performance_requirements: (() => {
       const isDA_pp   = /^DA/i.test(pattern_mode);
       const isLocal_pp = LOCAL_CHANNEL_KHZ.has(frequency_khz);
-      const lambda_pp = round2(300000 / frequency_khz);
-      const qwave_pp  = round2(lambda_pp / 4);  // λ/4 physics reference
-      const isHighClass_pp = /^[AB]/i.test(fcc_class);
-      const towerH_pp = round2(isHighClass_pp ? lambda_pp * 0.625 : lambda_pp * 0.375);
-      const asrReq_pp = towerH_pp > ASR_THRESHOLD_17_7.height_m;
+      // lambda_pp/qwave_pp/towerH_pp/asrReq_pp rewired to canonical.antenna/
+      // canonical.regulatory.asr (guide-internal migration, Wave 1) instead
+      // of re-deriving these physics reference values, the class-typical
+      // design height, and the ASR decision locally.
+      const lambda_pp = canonical.antenna.wavelengthM.value;
+      const qwave_pp  = canonical.antenna.quarterWaveReferenceM.value;  // λ/4 physics reference
+      const towerH_pp = canonical.antenna.selectedDesignHeightM.value;
+      const asrReq_pp = canonical.regulatory.asr.required;
 
       // §73.154 traversal requirements
       // NDA: 8 radials at 45° intervals extending to the lesser of 16 km or the
@@ -16212,9 +16215,11 @@ async function scoreCandidate(pt, ctx, warnings){
       // All standard series-fed AM broadcast towers require a base insulator (the tower IS the antenna).
       // RF isolation hardware includes: base insulator, base lightning gap/arrestor, guy wire RF chokes,
       // and an aviation lighting isolation transformer/choke. These are site-specific costs.
-      const wavelength_m   = round2(300000 / frequency_khz);
+      // wavelength_m/tower_height_m rewired to canonical.antenna (guide-
+      // internal migration, Wave 1) instead of re-deriving them locally.
+      const wavelength_m   = canonical.antenna.wavelengthM.value;
       const is_cd = /^[CD]$/i.test(fcc_class);
-      const tower_height_m  = round2(is_cd ? wavelength_m * 0.375 : wavelength_m * 0.625);
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft = round2(tower_height_m * 3.28084);
 
       // Guy wire levels (typically spaced every ~100 ft)
@@ -18261,8 +18266,9 @@ async function scoreCandidate(pt, ctx, warnings){
       // and local opposition risk.
 
       // Wavelength and estimated tower height (3/8λ design height for Class C/D, 5/8λ for A/B)
-      const lambda_m        = round2(300000 / frequency_khz);
-      const tower_height_m  = round2(lambda_m * (['A', 'B'].includes(fcc_class) ? 0.625 : 0.375));
+      // tower_height_m rewired to canonical.antenna.selectedDesignHeightM
+      // (guide-internal migration, Wave 1) instead of re-deriving it locally.
+      const tower_height_m  = canonical.antenna.selectedDesignHeightM.value;
       const tower_height_ft = round2(tower_height_m * 3.28084);
 
       // Distance from COL centroid (urbanization proxy)
