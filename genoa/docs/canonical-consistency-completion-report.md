@@ -1026,3 +1026,297 @@ Be precise about what changed:
   never matched the real API) are gone. The long tail is not.
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+---
+
+# Addendum: Wave 1 — Guide-Internal Duplicate Migration
+
+**Branch:** `canonical-consistency-guide-internal-migration`
+**Scope:** the "long tail" explicitly deferred above — guide-internal
+(namespaced sub-object) recomputation of facts that `candidate.canonical`
+already governs, inside the ~262-330 inline `some_guide: (() => {...})()`
+IIFEs in `scoreCandidate()`'s return object. This is the "one level
+deeper" pass: a guide can independently recompute tower height, wavelength,
+radial count/length, ASR-required, or an RF-exposure boundary purely
+inside its own sub-object — never exposed at the guide's top level, so
+never caught by the audit-followup effort above, but still a real
+"two different answers to the same engineering question" defect if a user
+opens that guide's own detail panel.
+
+**17 commits**, spanning `c57aeac..974d84c` on top of the audit-followup
+branch's final state (`8d73513`):
+
+```
+c57aeac  batch 1: technical_proof_guide, antenna_pattern_optimization_guide,
+         transmission_system_design_guide, ground_system_design_guide
+2a4da19  batch 2: tower-height/ASR/MPE/radial duplicates
+8caccf9  batch 3: more tower-height/ASR duplicates
+869add6  batch 4: bespoke-named tower-height/ASR/radial duplicates
+27b19c5  batch 5: structural/MPE/radial/electrical-height duplicates
+f1780ce  batch 6: final wave1_final.txt candidates (completes the original
+         37-guide scoped list)
+19b861f  batch 7: more tower-height duplicates from the broader candidate pool
+13607b7  batch 8: ground-radial-system duplicates
+a758b7c  fix 9 test failures from rounding-order drift (see "Real bugs
+         found" below)
+906d4df  batch 9: cost/checklist/inspection duplicates
+8a92db6  batch 10: more tower-height/wavelength duplicates
+42b64a6  batch 11: remaining candidate-pool duplicates
+3e2ba13  batch 12: additional radial-length/wavelength duplicates
+36dc6f2  fix missed near-field spot in fcc_lms_filing_checklist
+1459f4f  batch 13: proof_of_performance_requirements, RF-isolation, and
+         site-buildout duplicates
+6af7ef4  batch 14: final 9 straightforward duplicates
+974d84c  thread canonical.groundSystem into buildGroundRadialAdvisory()
+         (architecture fix, not a value swap)
+```
+
+Batches 1–8 were an earlier session on this branch; batches 9–14 plus the
+three follow-up/fix commits (`a758b7c`, `36dc6f2`, `974d84c`) were this
+session.
+
+## Total: ~108 guides migrated
+
+There is no single canonical count because "how many guides" depends on
+whether you count a guide once regardless of how many internal fields it
+had fixed, or count fixes. By guide name, deduplicated:
+
+- **41 guides** in batches 1–8 (enumerated individually in each batch's own
+  commit body — batch commit messages in this effort always name every
+  guide touched, so this is an exact count, not an estimate).
+- **~67 more guides** in batches 9–14 and the two missed-spot fixes
+  (`a758b7c`'s bundled edits, `36dc6f2`). Also exact, tracked the same way.
+- Plus the `buildGroundRadialAdvisory()` architecture fix, which corrects
+  a per-candidate field (`ground_radial_advisory`) fed by a module-level
+  helper rather than a `_guide` IIFE — not counted in the 108 since it
+  isn't itself a "guide."
+
+Every batch was verified with a targeted `node --test --test-name-pattern`
+run immediately after the edits, and the full `amSiteOptimizer.test.js`
+suite (currently 1901/1901) was run to completion at least five times
+across the session, plus the full repo suite (4493/4523 — the 23 failures
+are pre-existing `countyBoundary.test.js` docker-fixture gaps and
+`api.test.js` live-server gaps, unrelated to this branch, confirmed on
+every run).
+
+## Methodology (the original candidate-pool file was lost)
+
+The prior session's scoping produced a `wave1_final.txt` candidate list
+(referenced in the batch-6 commit message: "completes the 37-guide
+wave1_final.txt candidate list") that was never committed — it was a
+scratch file in a now-gone working directory. Rather than guess at its
+contents, this session re-derived candidates directly from the code, each
+round, via systematic greps for the actual duplicate patterns across all
+guide IIFEs in `siteOptimizer.js`:
+
+- `300000 / frequency_khz` and `299792(.458) / frequency_khz` — local
+  wavelength recomputation (canonical's own convention, documented in
+  `canonical/antennaDesign.js`, is λ = 300000/f_kHz; the `299792.458`
+  variant is a *different, more "precise" but engine-inconsistent*
+  constant — guides using it are usually the ones with a real numeric
+  drift once fixed, not just an architecture nit).
+- `0.35 * lambda` / `lambda * 0.35` (any variable name) — local 0.35λ
+  standard-radial-length recomputation per §73.189(b)(4)/NBS TN-24.
+- Class-fraction tower-height formulas:
+  `(fcc_class is A/B ? 0.625 : 0.375) * lambda` in its many local variable-
+  name spellings.
+- `2 * Math.PI` / `(2*Math.PI)` in a wavelength context — local λ/(2π)
+  near-field-boundary recomputation.
+
+This was more exhaustive than a fixed list would have been: each sweep
+kept surfacing a handful more, including a few **missed spots inside
+guides already marked "done"** in earlier batches — e.g.
+`directional_antenna_proof_guide`'s `ND_CHECK.standard_monitoring_point_m`
+(fixed in batch 11) and `fcc_lms_filing_checklist`'s note-string near-field
+computation (fixed in the standalone follow-up commit) — both guides whose
+*other* fields had already been migrated, but one field was overlooked.
+The discovery rate converged from 48 (first sweep) → 13 (second sweep) →
+9 (third sweep, reported to the coordinator) → 0 after finishing those 9,
+which is the basis for calling Wave 1 complete rather than merely paused.
+
+## The 2 architecturally-different fixes
+
+**`buildGroundRadialAdvisory()`** is a module-level helper function
+(`function buildGroundRadialAdvisory(sigma_msm, frequency_khz)`, outside
+`scoreCandidate()`'s closure) called from inside `scoreCandidate()` to
+build the `ground_radial_advisory` per-candidate field. It re-derived its
+own 0.35λ radial length from `(sigma_msm, frequency_khz)` alone because it
+had no access to `canonical` — a real architectural gap, not a
+copy-paste duplicate. Fixed by adding an optional third parameter,
+`canonicalRadialLengthM`, that the real call site (which *does* have
+`canonical` in scope) now passes as
+`canonical.groundSystem.selectedScenario.radialLengthM`; the parameter
+defaults to `null` so the function still works standalone for its existing
+`__test__`-exported unit tests, falling back to the local computation.
+Numerically identical to the old value at all standard-scenario
+frequencies, so no test values changed — pure architecture fix.
+
+**`am_rf_exposure_mpe_evaluation_guide` and
+`am_grounding_system_and_rf_safety_guide`'s `exclusion_zone_m`** —
+investigated per the coordinator's explicit instruction to confirm the
+correct formula before rewiring, same standard as the earlier
+`am_rf_exposure_mpe_guide` fix (batch 2). **Conclusion: do NOT rewire
+these to canonical.rfExposure — left as-is, deliberately, with a code
+comment added at each site pointing to this investigation (see below).**
+
+The two guides compute the AM near-field exclusion radius via
+`E(r) = 60 × I_base / r` (V/m), the classical near-field E-field formula
+for a grounded vertical monopole driven by a known base current, cited by
+both guides as "OET Bulletin 65 §4.2." `am_grounding_system_and_rf_safety_
+guide` additionally uses a cruder step-function lookup by TPO bracket
+(10/20/35/60/100 m), explicitly commented as accounting for
+"induction-zone dominance" reducing the far-field estimate at typical AM
+fence distances.
+
+`canonical.rfExposure` (via `src/engine/regulatory/oet65.js`) instead uses
+the OET-65 **far-field power-density** formula,
+`S(mW/cm²) = 52.20 · ERP_kW · F² / R²(m)` (with the 4× ground-reflection
+factor), converted to a compliance distance. This is the *same* formula
+family that `am_rf_exposure_mpe_guide` used its own (slightly different,
+missing-ground-reflection) variant of in batch 2 — a genuine
+two-formulas-for-the-same-physics duplicate, correctly resolved there by
+picking canonical's version.
+
+This case is different. `oet65.js`'s own header comment says so directly:
+
+> AM-BAND CAVEAT (NEAR-FIELD): For frequencies below ~30 MHz the antenna's
+> near-field zone extends out to ≈ λ/(2π) which can reach 50 m for AM
+> (1 MHz). Within that zone the far-field power-density formula is **not
+> accurate** — OET-65 §3.B **requires near-field analysis using the
+> antenna's current distribution**. We compute the far-field compliance
+> distance and flag NEAR_FIELD_REQUIRED when it falls inside the
+> near-field boundary.
+
+`E(r) = 60·I_base/r` *is* that required near-field, current-distribution
+analysis. For a typical AM tower the relevant fence distance is often
+inside the near-field boundary, which is exactly where `canonical.
+rfExposure`'s own documentation says its far-field formula should not be
+trusted. Swapping these two guides to `canonical.rfExposure.
+uncontrolledMpeBoundaryM` would not be fixing a duplicate-fact bug — it
+would be replacing a physically-appropriate near-field method with a
+method canonical's own code comments say is inaccurate in that regime.
+This is left as an open question for `canonical/rules/rfExposure.js`
+itself (should it grow a near-field branch using the same current-
+distribution method these two guides already implement?), not something
+to paper over with a guide-level swap. Not fixed; flagged here instead.
+
+(`am_rf_exposure_mpe_evaluation_guide` did have one genuinely dead local
+`lambda_m = 299792.458 / frequency_khz` computed and never referenced in
+its return object — left alone since touching it has zero externally
+observable effect and isn't part of the exclusion-zone question above.)
+
+## Real bugs found (not just architecture/style)
+
+- **Rounding-order drift** (the majority of "real" numeric changes this
+  session): many guides rounded the wavelength to 2 decimals *first*,
+  then multiplied by the class height fraction or 0.35 — e.g.
+  `round2(300000/f) * 0.375`. `canonical.antenna.selectedDesignHeightM`
+  multiplies the *unrounded* wavelength by the fraction, then rounds once
+  — e.g. `round2(0.375 * (300000/f))`. Same formula, different rounding
+  order, small but real numeric disagreement (e.g. 472.87 ft vs 473.2 ft
+  for KAZM's 780 kHz Class D tower). Every affected test's expected value
+  was updated with inline documentation of this exact rationale, not
+  silently changed.
+- **Imprecise/inconsistent speed-of-light constant**: several guides used
+  the physically precise `c = 299792458 m/s` (or `299792.458`, or the
+  truncated `299792`) instead of canonical's engine-wide
+  `λ = 300000/f_kHz` convention (`c ≈ 3×10⁸ m/s`, documented in
+  `canonical/antennaDesign.js` as deliberate for cross-guide consistency).
+  The most notable instance: `am_ground_system_radial_design_guide`'s
+  `wavelength_m` test initially looked like a *canonical-is-wrong* bug
+  (384.35 m "precise" vs 384.62 m canonical) — investigated before
+  accepting the fix, per the coordinator's standing instruction to verify
+  rather than assume. Confirmed canonical's convention is the
+  intentional, engine-wide one (matching every other already-migrated
+  guide), and the guide being fixed was the outlier.
+- **Self-inconsistent guide** (`am_ground_system_radial_design_guide`,
+  batch 8): the guide's own cost total (`total_low_usd`) was derived from
+  a locally-recomputed radial length that disagreed with the radial length
+  the *same guide* already displayed in its own comparison-table columns
+  — an internal contradiction within one guide's own output, not just a
+  guide-vs-canonical mismatch.
+- **Conflated near-field-as-fence-distance** (batch 2 and the `a758b7c`
+  fix): `am_rf_exposure_mpe_guide` and `mpe_rf_exposure_summary` both used
+  `max(near_field_boundary_m, far_field_exclusion_m)` as a "recommended
+  fence distance" — folding the λ/2π reactive-near-field *physics regime
+  boundary* into a compliance fence recommendation. `canonical/rules/
+  rfExposure.js`'s own header comment identifies this exact pattern as one
+  of "the five ad hoc fence-distance formulas and the λ/2π-as-fence
+  conflation" it was built to replace. Both guides now read
+  `canonical.rfExposure.recommendedFenceDistanceM` directly (max of the
+  uncontrolled MPE compliance distance and a 3 m practical minimum — no
+  near-field term), and the corresponding invariant test
+  (`fence >= near_field_boundary`) was replaced, since it encoded the very
+  conflation being removed.
+- **NDA proof-of-performance still flagged, not fixed** (batch 6, carried
+  over from the prior session, still open): `am_antenna_commissioning_
+  and_proof_of_performance_guide` models NDA stations as needing no
+  proof of performance (0 radials, $0 line item), but
+  `canonical.proof` (§73.186(a)(1)) requires one (6+ radials) for NDA.
+  This is a real regulatory-requirement contradiction, not a numeric
+  duplicate — the fix needs a new checklist item and cost line, not a
+  value-source swap, and remains explicitly out of Wave 1's mechanical
+  batch methodology.
+
+## Explicit scope note — this is NOT "all 265 guides migrated"
+
+Wave 1's target was never "every guide agrees with canonical on
+everything." It was **the ~5-6 domains where a guide re-deriving its own
+answer creates a real engineering-fact contradiction**: tower design
+height, wavelength/quarter-wave/five-eighths physics references, ground-
+system radial count/length, ASR-required, and RF-exposure boundaries
+(near-field/MPE/fence distance). Guides were migrated only where they
+recomputed one of *those* facts. Guides were deliberately left untouched
+where the content is genuinely the guide's own, not a duplicate of
+anything canonical governs:
+
+- **Cost-breakdown / line-item prose** — a guide's own itemized cost
+  model (e.g. "$15–30/ft paint labor," "$2,000 CUP filing fee") is unique
+  content, not a duplicate fact, even when the guide also happens to use
+  a canonical-governed height or radial length as one input to that cost
+  model (those inputs were fixed; the cost breakdowns themselves were not
+  touched or restructured).
+- **Schedule/timeline guides** — `am_relocation_master_timeline_guide` and
+  `am_skywave_nighttime_guide` were explicitly named as out of scope from
+  the start (a later wave's domain) and were reviewed-and-left-alone even
+  when a stray ASR/height duplicate was spotted inside them.
+- **Checklist-only / narrative content** — guides whose value is a
+  curated list of steps, exhibits, or considerations (not a computed
+  engineering fact) were not restructured, only had their computed inputs
+  (where present) fixed.
+- **`neighboring_landowner_notification_guide`** — reviewed, deliberately
+  left alone. Its `tower_height_m` always uses 3/8λ regardless of
+  `fcc_class`, unlike every other migrated guide's class-aware
+  5/8λ(A/B)/3/8λ(C/D) split. This reads as an intentional
+  conservative-estimate choice for a guide about neighbor notification
+  radii (where erring toward a shorter, "worst case for visibility"
+  estimate for Class A/B stations doesn't have the same correctness
+  stakes as an ASR or proof-of-performance determination) rather than a
+  duplicate of the canonical *selected* design height. Left unfixed;
+  documented here instead of silently changing its behavior for Class A/B
+  candidates.
+- **The 3 remaining `_guide`-suffixed items with an unresolved formula
+  question** (`am_rf_exposure_mpe_evaluation_guide`,
+  `am_grounding_system_and_rf_safety_guide`'s exclusion_zone_m,
+  `am_antenna_commissioning_and_proof_of_performance_guide`'s NDA proof
+  step) — see above; investigated and intentionally not touched.
+
+So: **the 5-6 domains with real engineering-fact duplication risk are now
+migrated (~108 guides)**, not "all 265 guides now defer to canonical for
+everything they compute." A future wave targeting a different domain
+(schedule/timeline, or a deeper audit of cost-model inputs) would still
+find guide-internal content worth reviewing — this pass never claimed
+otherwise.
+
+## Final verification
+
+- `node --test src/tests/amSiteOptimizer.test.js`: **1901/1901**, run to
+  completion (waited for in-turn, not backgrounded past a turn boundary)
+  at least five separate times across this session, most recently after
+  the final `buildGroundRadialAdvisory()` fix.
+- Full repo suite (`node --test src/tests/*.test.js`): **4493/4523**, 23
+  failures, all pre-existing `countyBoundary.test.js` (docker fixtures
+  unavailable in this sandbox) and `api.test.js` (live server required)
+  gaps — confirmed unrelated to this branch on every run this session.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
