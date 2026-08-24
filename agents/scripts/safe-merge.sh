@@ -27,10 +27,17 @@ echo "[safe-merge] gate 2/7: npm test (regression suite + golden curves)"
 # are a known, tracked environmental gap, not a regression signal — allow
 # them through but hard-fail on any failure in any OTHER test file.
 TEST_OUT="$(mktemp)"
+# The ERR trap above fires on ANY non-zero exit regardless of `set +e` —
+# that exemption only applies to -e's own auto-exit, not to the trap
+# (per bash's ERR-trap semantics, which follow -e's exemption list but
+# not its on/off state). Disable the trap too, or the known/tolerated
+# countyBoundary.test.js failure aborts the script right here.
+trap - ERR
 set +e
 ( cd genoa && npm test --silent ) > "${TEST_OUT}" 2>&1
 TEST_EXIT=$?
 set -e
+trap 'echo "[safe-merge] FAILED at line $LINENO" >&2; exit 1' ERR
 tail -10 "${TEST_OUT}"
 if [[ ${TEST_EXIT} -ne 0 ]]; then
   UNEXPECTED_FAILS="$(grep -oE "src/tests/[A-Za-z0-9_]+\.test\.js" "${TEST_OUT}" \
