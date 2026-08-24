@@ -40,7 +40,12 @@ set -e
 trap 'echo "[safe-merge] FAILED at line $LINENO" >&2; exit 1' ERR
 tail -10 "${TEST_OUT}"
 if [[ ${TEST_EXIT} -ne 0 ]]; then
-  UNEXPECTED_FAILS="$(grep -oE "src/tests/[A-Za-z0-9_]+\.test\.js" "${TEST_OUT}" \
+  # Only "location:" lines are diagnostic detail attached to a failing
+  # ("not ok") subtest; scope to those, not to every mention of a test
+  # path anywhere in the TAP output (imports, stack traces, etc. would
+  # otherwise make nearly every file look "unexpectedly" failed).
+  UNEXPECTED_FAILS="$(grep -E '^\s*location:' "${TEST_OUT}" \
+    | grep -oE "src/tests/[A-Za-z0-9_]+\.test\.js" \
     | sort -u | grep -v '^src/tests/countyBoundary\.test\.js$' || true)"
   if [[ -n "${UNEXPECTED_FAILS}" ]]; then
     echo "  FAIL: npm test failures outside the known countyBoundary.test.js gap:" >&2
