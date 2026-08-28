@@ -27,13 +27,25 @@ echo "[safe-merge] gate 2/7: npm test (regression suite + golden curves)"
 # are a known, tracked environmental gap, not a regression signal — allow
 # them through but hard-fail on any failure in any OTHER test file.
 TEST_OUT="$(mktemp)"
+# The ERR trap above fires on ANY non-zero exit regardless of `set +e` —
+# that exemption only applies to -e's own auto-exit, not to the trap
+# (per bash's ERR-trap semantics, which follow -e's exemption list but
+# not its on/off state). Disable the trap too, or the known/tolerated
+# countyBoundary.test.js failure aborts the script right here.
+trap - ERR
 set +e
 ( cd genoa && npm test --silent ) > "${TEST_OUT}" 2>&1
 TEST_EXIT=$?
 set -e
+trap 'echo "[safe-merge] FAILED at line $LINENO" >&2; exit 1' ERR
 tail -10 "${TEST_OUT}"
 if [[ ${TEST_EXIT} -ne 0 ]]; then
-  UNEXPECTED_FAILS="$(grep -oE "src/tests/[A-Za-z0-9_]+\.test\.js" "${TEST_OUT}" \
+  # Only "location:" lines are diagnostic detail attached to a failing
+  # ("not ok") subtest; scope to those, not to every mention of a test
+  # path anywhere in the TAP output (imports, stack traces, etc. would
+  # otherwise make nearly every file look "unexpectedly" failed).
+  UNEXPECTED_FAILS="$(grep -E '^\s*location:' "${TEST_OUT}" \
+    | grep -oE "src/tests/[A-Za-z0-9_]+\.test\.js" \
     | sort -u | grep -v '^src/tests/countyBoundary\.test\.js$' || true)"
   if [[ -n "${UNEXPECTED_FAILS}" ]]; then
     echo "  FAIL: npm test failures outside the known countyBoundary.test.js gap:" >&2
