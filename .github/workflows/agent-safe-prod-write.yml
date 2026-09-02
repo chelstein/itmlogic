@@ -74,8 +74,12 @@ jobs:
           node-version: '20'
 
       - name: install deps
+        # Full install (dev deps included): safe-merge.sh gate 5/7 runs
+        # `npm run build` (vite), which lives in devDependencies. The
+        # npm-audit gate below passes its own --omit=dev flag, so it still
+        # only audits production deps regardless of what's installed here.
         working-directory: genoa
-        run: npm ci --omit=dev
+        run: npm ci
 
       - name: jq present
         run: jq --version
