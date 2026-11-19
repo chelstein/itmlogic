@@ -26,7 +26,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates git build-essential \
-        swig python3 python3-pip python3-numpy python3-dev \
+        python3 python3-pip python3-numpy python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # necpp (upstream, as of its 2026 CMake migration) ships no pyproject.toml
@@ -37,7 +37,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # by one definition"). Upgrade build-time tooling before touching PyNEC's
 # pyproject.toml; this does not affect the runtime image (separate stage,
 # pip/setuptools aren't copied into it).
-RUN pip3 install --break-system-packages --upgrade pip setuptools wheel
+#
+# NOT installing apt's `swig` package here -- Debian Bookworm ships SWIG
+# 4.1.0, which generates C++ wrapper code using legacy CPython macros
+# (PyTuple_GET_ITEM, PyList_SET_ITEM, direct PyTypeObject struct access,
+# etc.) that Python's Limited API (Py_LIMITED_API, which PyNEC's setup.py
+# always builds against for its ABI3 wheel) deliberately hides -- this
+# fails to compile with errors like "'PyTuple_GET_ITEM' was not declared
+# in this scope" and "invalid use of incomplete type 'PyTypeObject'".
+# Verified directly: SWIG 4.1.0 fails this exact build; SWIG 4.5.1
+# (installed via pip below, the current PyPI release as of this fix)
+# generates Limited-API-compatible code and builds cleanly. Installing
+# SWIG via pip instead of apt sidesteps the Debian release's SWIG version
+# entirely, rather than depending on backports or a newer base image.
+RUN pip3 install --break-system-packages --upgrade pip setuptools wheel swig
 
 WORKDIR /build
 
