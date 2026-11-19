@@ -103,30 +103,45 @@ result is treated as external evidence carrying
 
 **The reliable path** (what the Dockerfile in this repo does):
 
+> necpp (the `necpp_src` submodule) migrated its build system from
+> autotools (`Makefile.git`/`./configure`) to CMake upstream, so the
+> `make -f Makefile.git && ./configure ...` steps this section used to
+> document no longer exist in the source tree (that's exactly what broke
+> the Docker build — see the Dockerfile's own comments). This sidecar
+> only ever does `import PyNEC` (never the standalone `nec2++` CLI or
+> `libnecpp` directly), and PyNEC's own `setup.py` compiles `necpp_src`'s
+> `.cpp` sources straight into the Python extension — no separate
+> `cmake`/`make install` of `necpp_src` is needed.
+
 ```bash
 # Build deps
 sudo apt-get install -y \
-    git build-essential autoconf automake libtool \
-    swig pkg-config python3 python3-pip python3-numpy python3-dev
+    git build-essential \
+    swig python3 python3-pip python3-numpy python3-dev
+
+# Debian Bookworm's / Ubuntu Jammy's apt-vintage setuptools (~68.x)
+# cannot parse PyNEC's pyproject.toml (it declares `license =
+# "GPL-3.0-only"` using the PEP 639 SPDX-string form, which only
+# setuptools >=69.3-ish understands) -- upgrade first or `pip install .`
+# fails with "project.license must be valid exactly by one definition".
+sudo pip3 install --break-system-packages --upgrade pip setuptools wheel
 
 # Clone the real source repo (NOT pip).  --recurse-submodules pulls
 # the necpp_src C++ engine.
 git clone --depth=1 --recurse-submodules \
     https://github.com/tmolteno/python-necpp.git
-cd python-necpp/necpp_src
-make -f Makefile.git
-./configure --without-lapack
-make -j$(nproc)
-sudo make install
-sudo ldconfig
-
-cd ../PyNEC
+cd python-necpp/PyNEC
 ln -s ../necpp_src .
 swig -Wall -c++ -python PyNEC.i
 sudo pip3 install --no-build-isolation --break-system-packages .
 
 # Verify
 python3 -c "import PyNEC; print(PyNEC.__file__)"
+
+# Run the sidecar's own regression smoke test (verifies PyNEC import,
+# feedpoint impedance, and the NEC2 grazing-angle-singularity handling
+# below -- not just that the module imports).
+python3 ~/genoa/src/sidecars/nec/smoke_test.py
 
 # Run the sidecar (back in genoa repo)
 cd ~/genoa/src/sidecars/nec
@@ -150,11 +165,33 @@ curl -s -X POST -H 'content-type: application/json' \
 # expect: a row of ~5.08 dBi (textbook quarter-wave monopole gain)
 ```
 
+⚠️ **AM/MF ground-wave note (ground.type=sommerfeld, theta=90):** the PEC
+smoke test above works at the exact horizon (theta=90) because PEC's
+image-theory ground is well-defined there. `ground.type=sommerfeld` —
+the realistic finite-conductivity ground model this sidecar documents
+for AM towers over real soil — is numerically singular at the *exact*
+horizon and returns NEC2's `-999.99` dBi sentinel there, not a real
+field value. The bridge detects this (ground=sommerfeld AND
+theta includes exactly 90) and returns an explicit
+`NEC_GRAZING_ANGLE_SINGULARITY` warning rather than letting a caller
+mistake `-999.99` for "no signal" — for the DA pattern optimizer
+(`--optimize`) specifically, it returns `achieved_suppression_db: null`
+and `converged: false` instead of a fabricated number (this used to
+silently report things like `"achieved_suppression_db": 800.512` — a
+physically impossible suppression figure computed from the sentinel).
+Query theta slightly off 90 (e.g. 89) for a horizontal-plane-adjacent
+real value, or use NEC2's dedicated ground-wave RP-card option if the
+true grazing-incidence groundwave field is needed — this bridge does
+not select that option automatically; see `smoke_test.py` for a worked
+example of both the failing (theta=90) and working (theta=89) cases.
+
 ## Docker (recommended)
 
-The Dockerfile uses a multi-stage build that compiles NEC2++ + PyNEC
-from the `tmolteno/python-necpp` source repo (avoiding both the
-missing `nec` apt package and the broken PyPI sdist).
+The Dockerfile uses a multi-stage build that compiles PyNEC from the
+`tmolteno/python-necpp` source repo (avoiding both the missing `nec`
+apt package and the broken PyPI sdist). It builds only PyNEC's Python
+extension, not the standalone `nec2++` CLI / `libnecpp` (this sidecar
+never uses either -- see the Dockerfile's own comments).
 
 ```bash
 docker build -t genoa-nec-sidecar:0.1.0 .

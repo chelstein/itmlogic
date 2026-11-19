@@ -124,6 +124,18 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
     return result.candidates.find(c => c.rank === selectedRank) || null;
   }, [selectedRank, result]);
 
+  // Replaces one candidate in result.candidates with an updated copy —
+  // used after a real §73.182 NIF study runs (CandidateDetailDrawer),
+  // so the screening-grade placeholder (night_study_present: false) is
+  // replaced with the real study's canonical.regulatory.nif decision,
+  // not just displayed once and discarded.
+  function replaceCandidate(rank, updatedCandidate){
+    setResult(r => {
+      if (!r?.candidates) return r;
+      return { ...r, candidates: r.candidates.map(c => c.rank === rank ? updatedCandidate : c) };
+    });
+  }
+
   const baseline    = result?.current_site_baseline || null;
   const candidates  = result?.candidates || [];
   // Show all structured warnings from the engine (object form with .code/.message).
@@ -527,6 +539,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
         baseline={baseline}
         onClose={() => setSelectedRank(null)}
         onPromoteToStudio={onNavigate ? (params) => onNavigate('contour-studio', params) : null}
+        onRealNifStudyComplete={replaceCandidate}
         callsign={inputs.callsign}
         frequency_khz={inputs.frequency_khz}
         tpo_kw={inputs.tpo_kw}
