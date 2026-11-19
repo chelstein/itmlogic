@@ -25,6 +25,14 @@ import math
 import io
 
 
+# NEC2's -999.99 dBi grazing-angle sentinel (see run_pattern's
+# NEC_GRAZING_ANGLE_SINGULARITY warning) is a normal finite float, not
+# NaN/Inf, so math.isfinite() alone never excludes it. Any gain at or
+# below this threshold is NEC2 "no data", never a real field value a
+# suppression/bearing-factor computation may use.
+NEC_GRAZING_SENTINEL_DBI = -990.0
+
+
 def out(obj):
     sys.stdout.write(json.dumps(obj))
 
@@ -154,7 +162,7 @@ def configure_loads(ctx, loads):
         ctx.ld_card(0, tag, seg, seg, r, l, c)
 
 
-def run_pattern(ctx, p, warnings):
+def run_pattern(ctx, p, warnings, ground_type=None):
     p = p or {}
     th_start = float(p.get("theta_start", 90))
     th_stop  = float(p.get("theta_stop",  90))
@@ -164,11 +172,43 @@ def run_pattern(ctx, p, warnings):
     ph_step  = float(p.get("phi_step",     1))
     n_theta  = max(1, int(round((th_stop - th_start) / th_step)) + 1) if th_stop != th_start else 1
     n_phi    = max(1, int(round((ph_stop - ph_start) / ph_step)) + 1) if ph_stop != ph_start else 1
+    theta_deg = [round(th_start + i * th_step, 4) for i in range(n_theta)]
+    # NEC2's far-field approximation is singular at theta=90 (exactly
+    # grazing/horizon) specifically for Sommerfeld (finite-conductivity)
+    # ground -- it returns a -999.99 dBi sentinel there, NOT a real
+    # computed value. Verified directly against the installed PyNEC build
+    # on BOTH ground types: free_space and pec at theta=90 return real,
+    # correct gains (PEC's image-theory reflection is well-defined at
+    # grazing incidence; e.g. the README's own documented smoke test,
+    # ground.type=pec at theta=90, correctly returns ~5.08 dBi for a
+    # quarter-wave monopole) -- only Sommerfeld's numerical ground-wave
+    # integration is ill-conditioned at the exact horizon. Checking
+    # theta=89/88 under Sommerfeld confirms real finite gains return;
+    # only the exact 90.0 is affected. This is a documented NEC2
+    # limitation, not a bug in this bridge -- but theta=90 is also this
+    # endpoint's DEFAULT, and the azimuthal (horizontal-plane) pattern
+    # over real (Sommerfeld) ground is exactly what AM/MF broadcast work
+    # needs, so silently returning -999.99 at the default angle is a real
+    # trap. Warn loudly rather than guess at a different default or a
+    # ground-wave RP-card convention on the caller's behalf -- which NEC2
+    # ground-wave option to use (e.g. a small grazing offset vs. the RP
+    # card's dedicated ground-wave flag) is an engineering judgment call,
+    # not this bridge's to make silently.
+    if ground_type == "sommerfeld" and any(abs(t - 90.0) < 1e-9 for t in theta_deg):
+        warnings.append(
+            "NEC_GRAZING_ANGLE_SINGULARITY: theta=90 (exact horizon) with ground.type=%s "
+            "returns NEC2's -999.99 dBi sentinel, not a real computed field -- this is a "
+            "documented NEC2 limitation at the exact grazing angle, not a bridge bug. "
+            "Any gain_dbi value of -999.99 at theta=90 is NOT USABLE and must not be read "
+            "as 'no signal'. Query theta slightly off 90 (e.g. 89) for a horizontal-plane-"
+            "adjacent real value, or use NEC2's dedicated ground-wave RP-card option if you "
+            "need the true grazing-incidence groundwave field -- this bridge does not select "
+            "that option automatically." % ground_type
+        )
     ctx.rp_card(0, n_theta, n_phi, 0, 0, 0, 0,
                 th_start, ph_start, th_step, ph_step, 0.0, 0.0)
     rp = ctx.get_radiation_pattern(0)
     gain = rp.get_gain()                                         # ndarray [n_theta, n_phi] dBi
-    theta_deg = [round(th_start + i * th_step, 4) for i in range(n_theta)]
     phi_deg   = [round(ph_start + i * ph_step, 4) for i in range(n_phi)]
     gain_dbi  = [[float(gain[t, ph]) for ph in range(n_phi)] for t in range(n_theta)]
     return {
@@ -219,8 +259,14 @@ def run_near_field(ctx, nf, warnings):
 def get_feedpoint_impedance(ctx, warnings):
     try:
         z = ctx.get_input_parameters(0)
-        zr = float(z.get_impedance_real()[0])
-        zi = float(z.get_impedance_imag()[0])
+        # Current PyNEC (2.4.0+) exposes a single get_impedance() returning
+        # a complex numpy array -- the get_impedance_real()/get_impedance_imag()
+        # methods this used to call no longer exist on nec_antenna_input
+        # (verified directly against the installed PyNEC build: the only
+        # impedance accessor is get_impedance()).
+        z_complex = z.get_impedance()[0]
+        zr = float(z_complex.real)
+        zi = float(z_complex.imag)
         gamma_num = math.sqrt((zr - 50.0) ** 2 + zi ** 2)
         gamma_den = math.sqrt((zr + 50.0) ** 2 + zi ** 2)
         gamma = gamma_num / gamma_den if gamma_den > 0 else 1.0
@@ -322,10 +368,11 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
             })
 
         make_geometry(ctx, wires, warnings_inner)
-        configure_ground(ctx, ground, warnings_inner)
+        ground_meta_inner = configure_ground(ctx, ground, warnings_inner)
         configure_excitations(ctx, excitations, warnings_inner)
         ctx.fr_card(0, 1, freq_mhz, 0)
-        return run_pattern(ctx, pattern_spec, warnings_inner)
+        pattern_inner = run_pattern(ctx, pattern_spec, warnings_inner, ground_type=ground_meta_inner.get("type"))
+        return pattern_inner, warnings_inner
 
     def gain_at_bearing(pattern, bearing_deg):
         """Find gain_dbi at theta=90 (horizon), nearest phi to bearing_deg."""
@@ -359,7 +406,17 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
         return float(row[best_p])
 
     def compute_suppression(pattern):
-        """Suppression = peak_gain_dbi - gain_at_bearing_dbi (at horizon)."""
+        """Suppression = peak_gain_dbi - gain_at_bearing_dbi (at horizon).
+
+        Returns (None, None, bearing_dbi) when the horizon row is NEC2's
+        grazing-angle sentinel (-999.99, see NEC_GRAZING_SENTINEL_DBI) --
+        peak_dbi - (-999.99) silently produces a physically impossible
+        suppression (verified directly: a real 2-tower sommerfeld-ground
+        model at the default theta=90 produced "800.512 dB" this way,
+        which no real antenna array achieves). A None return must be
+        treated by every caller as "this candidate could not be evaluated",
+        never coerced into a number.
+        """
         theta_degs = pattern["theta_deg"]
         phi_degs   = pattern["phi_deg"]
         gain_dbi   = pattern["gain_dbi"]
@@ -374,12 +431,15 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
                 best_t = i
 
         row = gain_dbi[best_t]
-        finite_vals = [v for v in row if math.isfinite(v)]
+        finite_vals = [v for v in row if math.isfinite(v) and v > NEC_GRAZING_SENTINEL_DBI]
         if not finite_vals:
-            return 0.0, 0.0, 0.0
+            return None, None, None
+
+        bearing_dbi = gain_at_bearing(pattern, target_bearing_deg)
+        if not math.isfinite(bearing_dbi) or bearing_dbi <= NEC_GRAZING_SENTINEL_DBI:
+            return None, None, bearing_dbi
 
         peak_dbi = max(finite_vals)
-        bearing_dbi = gain_at_bearing(pattern, target_bearing_deg)
         suppression = peak_dbi - bearing_dbi
         # bearing_factor in field (linear): 10^((bearing_dbi - peak_dbi)/20)
         factor = pow(10.0, (bearing_dbi - peak_dbi) / 20.0)
@@ -404,8 +464,21 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
     if len(towers) < 2:
         # Single tower — run once, report suppression (may be 0 if omni)
         try:
-            pattern = run_candidate(towers)
+            pattern, candidate_warnings = run_candidate(towers)
             suppression, factor, _ = compute_suppression(pattern)
+            if suppression is None:
+                return {
+                    "converged": False,
+                    "optimal_phases_deg": [{"tag": int(towers[0]["tag"]),
+                                            "phase_deg": float(towers[0].get("drive", {}).get("phase_deg", 0))}],
+                    "achieved_suppression_db": None,
+                    "bearing_factor": None,
+                    "pattern": pattern,
+                    "iterations": 1,
+                    "warnings": candidate_warnings,
+                    "error": "NEC_GRAZING_ANGLE_SINGULARITY: horizon-row gain is NEC2's -999.99 "
+                             "sentinel (see pattern warnings) -- suppression is undetermined, not 0."
+                }
             converged = suppression >= desired_suppression_db
             return {
                 "converged": converged,
@@ -414,7 +487,8 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
                 "achieved_suppression_db": round(suppression, 4),
                 "bearing_factor": round(factor, 6),
                 "pattern": pattern,
-                "iterations": 1
+                "iterations": 1,
+                "warnings": candidate_warnings,
             }
         except SystemExit:
             raise
@@ -427,6 +501,9 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
                 "pattern": None,
                 "iterations": 0
             }
+
+    all_warnings = []
+    n_invalid_candidates = 0
 
     for ph in phases_to_try:
         if iterations >= max_iterations:
@@ -444,7 +521,8 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
             candidate.append(tc)
 
         try:
-            pattern = run_candidate(candidate)
+            pattern, candidate_warnings = run_candidate(candidate)
+            all_warnings.extend(candidate_warnings)
         except SystemExit:
             raise
         except Exception:
@@ -453,6 +531,17 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
 
         suppression, factor, _ = compute_suppression(pattern)
         iterations += 1
+
+        # A candidate whose horizon row is the NEC2 grazing-angle sentinel
+        # cannot compete for "best" at all -- suppression is None, not a
+        # low/negative number, so it must never win a `>` comparison
+        # against a real best_suppression, and never silently stand in as
+        # the result if every candidate is invalid (see the all-invalid
+        # check after the loop, instead of defaulting best_suppression's
+        # initial -inf to a fabricated "best").
+        if suppression is None:
+            n_invalid_candidates += 1
+            continue
 
         if suppression > best_suppression:
             best_suppression = suppression
@@ -465,6 +554,29 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
         if suppression >= desired_suppression_db:
             break  # converged — stop early
 
+    # dedupe identical warning strings (the same NEC_GRAZING_ANGLE_SINGULARITY
+    # message repeats once per candidate run).
+    unique_warnings = list(dict.fromkeys(all_warnings))
+
+    if best_pattern is None:
+        # Every candidate hit the grazing-angle singularity (or errored) --
+        # there is no valid suppression result to report. Returning 0.0/1.0
+        # here (the prior behavior) would read as "converged, no
+        # suppression achieved", which is a confident, wrong answer; this
+        # case must be distinguishable from a real non-convergent sweep.
+        return {
+            "converged": False,
+            "optimal_phases_deg": [],
+            "achieved_suppression_db": None,
+            "bearing_factor": None,
+            "pattern": None,
+            "iterations": iterations,
+            "warnings": unique_warnings,
+            "error": "NEC_GRAZING_ANGLE_SINGULARITY: all %d candidate(s) hit NEC2's -999.99 horizon "
+                     "sentinel (ground=%s, theta=90 default) -- no suppression result is valid. "
+                     "See warnings." % (n_invalid_candidates, (ground or {}).get("type"))
+        }
+
     converged = best_suppression >= desired_suppression_db
     return {
         "converged": converged,
@@ -472,7 +584,8 @@ def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
         "achieved_suppression_db": round(best_suppression, 4),
         "bearing_factor": round(best_factor, 6),
         "pattern": best_pattern,
-        "iterations": iterations
+        "iterations": iterations,
+        "warnings": unique_warnings,
     }
 
 
@@ -494,8 +607,15 @@ def main_run():
     configure_loads(ctx, body.get("loads"))
 
     ctx.fr_card(0, 1, f_mhz, 0)
+    # xq_card(0) explicitly triggers the excitation/MoM solve. Without it,
+    # get_input_parameters() (feedpoint impedance) returns None on current
+    # necpp -- verified directly: get_radiation_pattern() happens to trigger
+    # its own internal solve and works either way, but input-parameter
+    # queries do not. Issued once here, before anything that reads solved
+    # results, rather than duplicated into run_pattern/get_feedpoint_impedance.
+    ctx.xq_card(0)
 
-    pattern   = run_pattern(ctx, body.get("pattern"), warnings)
+    pattern   = run_pattern(ctx, body.get("pattern"), warnings, ground_type=ground_meta.get("type"))
     feedpoint = get_feedpoint_impedance(ctx, warnings)
     near_field = run_near_field(ctx, body.get("near_field"), warnings)
 

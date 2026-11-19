@@ -7,10 +7,13 @@
 #   as a separate container that the API talks to over HTTP only.
 #
 # WHY THIS LAYOUT
-#   * Multi-stage: a `necpp-build` stage compiles NEC2++ + PyNEC from
-#     source (the PyPI sdist is broken; the apt `nec` package is no
-#     longer in the default repos).  A slim `runtime` stage copies
-#     only the resulting binaries + .so files + the Express server.
+#   * Multi-stage: a `necpp-build` stage compiles PyNEC from source (the
+#     PyPI sdist is broken; the apt `nec` package is no longer in the
+#     default repos).  A slim `runtime` stage copies only the resulting
+#     PyNEC module/.so + the Express server — nec_bridge.py only ever
+#     does `import PyNEC`, so the standalone nec2++ CLI and libnecpp
+#     (which necpp_src's own CMake build can also produce) are never
+#     built or copied here; they would be dead weight.
 #   * Debian Bookworm: ships Node 18 (the `node:` URI prefix that
 #     server.js uses requires Node 14.13+, so Ubuntu 22.04's apt
 #     Node 12 is not viable).
@@ -22,23 +25,31 @@ FROM debian:bookworm-slim AS necpp-build
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates git build-essential autoconf automake libtool \
-        swig pkg-config python3 python3-pip python3-numpy python3-dev \
+        ca-certificates git build-essential \
+        swig python3 python3-pip python3-numpy python3-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# necpp (upstream, as of its 2026 CMake migration) ships no pyproject.toml
+# the Debian Bookworm-vintage setuptools (~68.x) can parse: it declares
+# `license = "GPL-3.0-only"` using the PEP 639 SPDX-string form, which
+# only setuptools >=69.3-ish understands — an older setuptools' schema
+# validator rejects it outright ("project.license must be valid exactly
+# by one definition"). Upgrade build-time tooling before touching PyNEC's
+# pyproject.toml; this does not affect the runtime image (separate stage,
+# pip/setuptools aren't copied into it).
+RUN pip3 install --break-system-packages --upgrade pip setuptools wheel
 
 WORKDIR /build
 
-# Build NEC2++ + PyNEC from source.  --recurse-submodules pulls
-# necpp_src; ./configure --without-lapack avoids the LAPACK dep
-# (only used for optimization paths Genoa doesn't exercise).
+# Build PyNEC from source. necpp (the `necpp_src` submodule) migrated its
+# build system from autotools (Makefile.git/configure) to CMake upstream;
+# this sidecar only ever consumes it via `import PyNEC` (nec_bridge.py
+# never shells out to the standalone nec2++ CLI or links libnecpp
+# directly), so PyNEC's own setup.py — which compiles necpp_src's .cpp
+# sources straight into the Python extension — is sufficient on its own;
+# no separate `cmake`/`make install` of necpp_src/libnecpp is needed or
+# produced.
 RUN git clone --depth=1 --recurse-submodules https://github.com/tmolteno/python-necpp.git python-necpp
-
-WORKDIR /build/python-necpp/necpp_src
-RUN make -f Makefile.git \
- && ./configure --without-lapack \
- && make -j"$(nproc)" \
- && make install \
- && ldconfig
 
 WORKDIR /build/python-necpp/PyNEC
 RUN ln -s ../necpp_src . \
@@ -55,16 +66,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates python3 python3-numpy nodejs npm wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only the build artifacts; no source, no toolchain.
-COPY --from=necpp-build /usr/local/bin/nec2++           /usr/local/bin/nec2++
-COPY --from=necpp-build /usr/local/lib/libnecpp.so      /usr/local/lib/libnecpp.so
-COPY --from=necpp-build /usr/local/lib/libnecpp.la      /usr/local/lib/libnecpp.la
-COPY --from=necpp-build /usr/local/lib/libnecpp.a       /usr/local/lib/libnecpp.a
+# Copy only the build artifacts; no source, no toolchain. nec_bridge.py
+# only ever does `import PyNEC` — never shells out to a standalone
+# nec2++ CLI or links libnecpp directly — so only PyNEC's own module +
+# compiled extension are needed (neither is produced by this build
+# anymore; see the necpp-build stage comment).
+#
+# PyNEC's setup.py builds an ABI3 (Python stable-ABI) wheel, so the
+# compiled extension is named `_PyNEC.abi3.so` — NOT the
+# `_PyNEC.cpython-311-...so` name an API-version-specific (non-ABI3)
+# build would produce. Verified directly: building PyNEC from this exact
+# upstream commit produces /usr/local/lib/python3.11/dist-packages/
+# {PyNEC.py, _PyNEC.abi3.so} on Python 3.11.
 COPY --from=necpp-build /usr/local/lib/python3.11/dist-packages/PyNEC.py \
                         /usr/local/lib/python3.11/dist-packages/PyNEC.py
-COPY --from=necpp-build /usr/local/lib/python3.11/dist-packages/_PyNEC.cpython-311-x86_64-linux-gnu.so \
-                        /usr/local/lib/python3.11/dist-packages/_PyNEC.cpython-311-x86_64-linux-gnu.so
-RUN ldconfig
+COPY --from=necpp-build /usr/local/lib/python3.11/dist-packages/_PyNEC.abi3.so \
+                        /usr/local/lib/python3.11/dist-packages/_PyNEC.abi3.so
 
 WORKDIR /app
 
