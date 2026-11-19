@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import StatusChip from './StatusChip.jsx';
 import ScoreBreakdownChart from './ScoreBreakdownChart.jsx';
 import CanonicalStatusBanner from './CanonicalStatusBanner.jsx';
 import TruthModePanel from './TruthModePanel.jsx';
 import { fmtCoord, fmtBlanketPct, stateColor, requirementColor, passFailColor, violationColor, STATE_COLORS } from './format.js';
 import { approxString, costRangeString, scoreString } from '../../../engine/am/canonical/formatters.js';
+import { evaluateNighttimeInterferenceRequirement } from '../../../engine/am/canonical/rules/nighttimeInterference.js';
+import { nifStatusFromCanonical } from '../../../engine/am/canonical/nifStatusLabel.js';
 
 // CandidateDetailDrawer — slides up from the bottom (desktop: docked
 // to the right side, but rendered as a fixed overlay so it works at
@@ -226,9 +228,86 @@ function DeltaRow({ label, candidateVal, baselineVal, higherIsBetter, fmt }){
 // from the chip row when status_category already carries the key signal.
 const ADMIN_LABELS = new Set(['SCREENING ONLY', 'ENGINEER REVIEW REQUIRED']);
 
-export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw, fcc_class, pattern_mode, rankingDiagnostics }){
+export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, onRealNifStudyComplete, callsign, frequency_khz, tpo_kw, fcc_class, pattern_mode, rankingDiagnostics }){
+  const [nifStudyState, setNifStudyState] = useState({ status: 'idle', error: null }); // 'idle'|'running'|'error'
   if (!candidate) return null;
   const e = candidate.explanation || {};
+
+  // Runs the REAL 47 CFR §73.182 nighttime interference study for this
+  // candidate via the existing production engine (src/engine/am/
+  // nightOrchestrator.js, through its HTTP route POST /api/am-night/nif —
+  // the same solver the full exhibit/filing pipeline uses, FCCAM Wang
+  // 1985 filing-grade with a Berry 1968 screening-grade fallback). This
+  // replaces the screening placeholder (night_study_present: false,
+  // hardcoded in scoreCandidate()) with a real study result, recomputed
+  // through the SAME canonical rule (evaluateNighttimeInterferenceRequirement)
+  // that decides every other candidate's NIF status, so the result is
+  // not a separate/parallel judgment.
+  async function runRealNifStudy(){
+    setNifStudyState({ status: 'running', error: null });
+    try {
+      const r = await fetch('/api/am-night/nif', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          proposed: {
+            lat: candidate.lat,
+            lon: candidate.lon,
+            freq_khz: frequency_khz,
+            erp_kw: tpo_kw,
+            fcc_class,
+            facility_id: candidate.id ?? undefined,
+            // No DA pattern is modeled at screening (see pattern_mode
+            // warning elsewhere in this app) — canonical.antenna never
+            // carries a pattern table today, so this study is always
+            // run non-directional (omni). A DA-mode candidate's real
+            // study still needs re-running once a real §73.150 pattern
+            // exists; the study response's own `filing_grade`/`engine`
+            // fields and this panel's DA note make that limitation visible
+            // rather than silently treating an omni study as DA-complete.
+            pattern_table: null,
+          },
+          options: {}
+        })
+      });
+      if (!r.ok){
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j?.error || `HTTP ${r.status}`);
+      }
+      const study = await r.json();
+      if (!study.available){
+        setNifStudyState({ status: 'error', error: study.error || 'NIF study engine unavailable' });
+        return;
+      }
+      // Derive PASS/FAIL from the solved contour: any azimuth whose
+      // binding margin fails means the proposed facility cannot clear
+      // §73.182 protection at that azimuth without further mitigation
+      // (pattern/power/site adjustment) — i.e. the study as run FAILS.
+      const night_study_result = study.summary?.n_failing_azimuths === 0 ? 'PASS' : 'FAIL';
+      const updatedNif = evaluateNighttimeInterferenceRequirement({
+        frequency_khz, fcc_class, pattern_mode,
+        night_study_present: true,
+        night_study_result,
+      });
+      const updatedCandidate = {
+        ...candidate,
+        canonical: {
+          ...candidate.canonical,
+          regulatory: { ...candidate.canonical?.regulatory, nif: updatedNif },
+        },
+        nif_status:     nifStatusFromCanonical(updatedNif),
+        nif_required:   updatedNif.required,
+        nif_completion: updatedNif.completion,
+        nif_result:     updatedNif.result,
+        real_nif_study:  study,
+      };
+      setNifStudyState({ status: 'idle', error: null });
+      onRealNifStudyComplete?.(candidate.rank, updatedCandidate);
+    } catch (err) {
+      setNifStudyState({ status: 'error', error: err?.message || 'NIF study request failed' });
+    }
+  }
   const isInfra = candidate.source === 'INFRASTRUCTURE';
   // canonical-consistency-audit-followup, Phase 5: developer truth-mode
   // panel is gated behind ?debug=1 -- NOT visible in the normal
@@ -890,6 +969,74 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             <div><span className="text-textDim">Parcel / zoning</span>         <span className="text-cream">UNKNOWN — verify before site survey</span></div>
           </div>
         </div>
+
+        {/* Real §73.182 NIF study — only offered when canonical says a
+            study is actually required; running one when it isn't would
+            waste a real sidecar call for no regulatory reason. */}
+        {candidate.canonical?.regulatory?.nif?.required === true && (
+          <div className="border border-rule/40 rounded p-2">
+            <div className="rack-eyebrow mb-1">Real §73.182 nighttime interference study</div>
+            {candidate.real_nif_study ? (
+              <div className="font-mono text-[10px] leading-snug space-y-1">
+                <div style={{ color: candidate.nif_result === 'PASS' ? STATE_COLORS.green : STATE_COLORS.red }}>
+                  REAL STUDY RESULT: {candidate.nif_result === 'PASS' ? 'PASS' : 'FAIL'}
+                  {' '}({candidate.real_nif_study.filing_grade ? 'filing-grade' : 'screening-grade'} — {candidate.real_nif_study.skywave_engine})
+                </div>
+                <div className="text-textDim/90">
+                  {candidate.real_nif_study.summary?.n_failing_azimuths ?? '—'} of {candidate.real_nif_study.summary?.n_azimuths ?? '—'} azimuths fail protection
+                  {' · '}worst margin {fmtNum(candidate.real_nif_study.summary?.worst_margin_db, 1)} dB
+                  {' · '}mean radius {fmtNum(candidate.real_nif_study.summary?.mean_radius_km, 1)} km
+                  {' · '}{candidate.real_nif_study.summary?.n_interferers_used ?? 0} interferer(s) modeled
+                </div>
+                {candidate.real_nif_study.fccam_fallback_used && (
+                  <div style={{ color: STATE_COLORS.amber }}>
+                    FCCAM was configured but unreachable — this result used the Berry 1968 screening-grade fallback engine, not the filing-grade FCCAM/Wang 1985 solver.
+                  </div>
+                )}
+                {/^DA/i.test(pattern_mode || '') && (
+                  <div style={{ color: STATE_COLORS.amber }}>
+                    pattern_mode={pattern_mode}: this study was run NON-DIRECTIONAL (no §73.150 DA pattern exists yet at screening) — re-run once a real DA pattern is designed.
+                  </div>
+                )}
+                <div className="text-textDim/70">
+                  fetched {candidate.real_nif_study.fetched_at ? new Date(candidate.real_nif_study.fetched_at).toLocaleString() : '—'}
+                  {' · '}{candidate.real_nif_study.provenance?.upstream_skywave}
+                  {' · '}LMS source: {candidate.real_nif_study.provenance?.upstream_lms}
+                </div>
+                <button
+                  type="button"
+                  onClick={runRealNifStudy}
+                  disabled={nifStudyState.status === 'running'}
+                  className="mt-1 text-[10px] font-mono uppercase tracking-rack border border-rule/60 rounded px-2 py-1 text-textDim hover:text-cream hover:border-rule disabled:opacity-50"
+                >
+                  {nifStudyState.status === 'running' ? 'Re-running…' : 'Re-run study'}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div className="font-mono text-[10px] text-textDim leading-snug">
+                  canonical.regulatory.nif.required is TRUE for this candidate, but no study has been run — screening always
+                  sets night_study_present=false. Run the real §73.182 solver (FCCAM Wang 1985, filing-grade; falls back to
+                  Berry 1968 screening-grade if the FCCAM sidecar is unreachable) against this candidate's actual site and
+                  the station's actual frequency/power/class.
+                </div>
+                <button
+                  type="button"
+                  onClick={runRealNifStudy}
+                  disabled={nifStudyState.status === 'running'}
+                  className="font-mono text-[10px] uppercase tracking-rack border border-rule/60 rounded px-2 py-1 text-textDim hover:text-cream hover:border-rule disabled:opacity-50"
+                >
+                  {nifStudyState.status === 'running' ? 'Running real NIF study…' : 'Run real NIF study'}
+                </button>
+                {nifStudyState.status === 'error' && (
+                  <div className="font-mono text-[10px]" style={{ color: STATE_COLORS.red }}>
+                    {nifStudyState.error}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* vs baseline delta — only when baseline is provided */}
         {baseline && (

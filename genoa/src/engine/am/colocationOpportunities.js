@@ -36,6 +36,7 @@ import { m3LoadStatus } from './m3.js';
 import { deriveScoringContext, TIE_LABEL } from './canonical/scoring.js';
 import { advisoryFromCanonical, ladderRank } from './canonical/recommendation.js';
 import { RECOMMENDATION_LEVELS } from './canonical/types.js';
+import { nifStatusFromCanonical } from './canonical/nifStatusLabel.js';
 import { AM_POWER_LIMITS_73_21 } from '../regulatory/regulatoryConstants.js';
 import { complianceDistance_m, nearFieldBoundary_m } from '../regulatory/oet65.js';
 import {
@@ -854,25 +855,10 @@ function assignStatusCategory(c, scoreCutoff, { current_site }){
   c.nif_status = nifStatusFromCanonical(c.canonical?.regulatory?.nif ?? null);
 }
 
-/**
- * Map the canonical §73.182 NIF RegulatoryDecision to the colocation
- * nif_status display label.  Requirement, completion, and result stay
- * distinct — a required-but-not-run study is 'REQUIRED — NOT EVALUATED',
- * never a compliance claim.
- */
-function nifStatusFromCanonical(nif){
-  if (!nif) return 'SCREENING ONLY';
-  if (nif.required === false) return 'NOT REQUIRED';
-  if (nif.required === true){
-    if (nif.completion === 'RUN'){
-      if (nif.result === 'PASS') return 'REQUIRED — STUDY PASSED';
-      if (nif.result === 'FAIL') return 'REQUIRED — STUDY FAILED';
-      return 'REQUIRED — STUDY INCONCLUSIVE';
-    }
-    return 'REQUIRED — NOT EVALUATED';
-  }
-  return 'REQUIREMENT UNKNOWN';
-}
+// nifStatusFromCanonical() now lives in a single shared module
+// (canonical/nifStatusLabel.js), imported at the top of this file —
+// previously duplicated verbatim here and in siteOptimizer.js; see that
+// module's header comment for why the duplicate was removed.
 
 /**
  * Canonical invariant-validation gate (mirrors siteOptimizer 4b): an

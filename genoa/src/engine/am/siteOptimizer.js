@@ -37,6 +37,7 @@ import { deriveScoringContext, TIE_LABEL } from './canonical/scoring.js';
 import { advisoryFromCanonical, ladderRank } from './canonical/recommendation.js';
 import { RECOMMENDATION_LEVELS } from './canonical/types.js';
 import { isDirectionalMode } from './canonical/rules/antennaMode.js';
+import { nifStatusFromCanonical } from './canonical/nifStatusLabel.js';
 import { computeRankingDiagnostics } from './canonical/rankingDiagnostics.js';
 import { deriveSchedule } from './canonical/schedule.js';
 import {
@@ -33898,28 +33899,10 @@ function baselineSummary(b){
 
 // Qualitative conductivity label based on FCC M3 zone ranges.
 // Guides the engineer on site selection even before the sub-score number.
-/**
- * Map the canonical §73.182 NIF RegulatoryDecision (candidate.canonical.
- * regulatory.nif) to the nif_status display label. Requirement, completion,
- * and result stay distinct — a required-but-not-run study is
- * 'REQUIRED — NOT EVALUATED', never a compliance-category claim.
- * Mirrors colocationOpportunities.js's identical nifStatusFromCanonical() —
- * this is the SINGLE shared mapping; callers must not fork this logic
- * (docs/architecture-contradiction-origins.md §3/§10).
- */
-function nifStatusFromCanonical(nif){
-  if (!nif) return 'SCREENING ONLY';
-  if (nif.required === false) return 'NOT REQUIRED';
-  if (nif.required === true){
-    if (nif.completion === 'RUN'){
-      if (nif.result === 'PASS') return 'REQUIRED — STUDY PASSED';
-      if (nif.result === 'FAIL') return 'REQUIRED — STUDY FAILED';
-      return 'REQUIRED — STUDY INCONCLUSIVE';
-    }
-    return 'REQUIRED — NOT EVALUATED';
-  }
-  return 'REQUIREMENT UNKNOWN';
-}
+// nifStatusFromCanonical() now lives in a single shared module
+// (canonical/nifStatusLabel.js), imported at the top of this file —
+// previously duplicated verbatim here and in colocationOpportunities.js;
+// see that module's header comment for why the duplicate was removed.
 
 function sigmaQuality(sigma_msm){
   if (sigma_msm == null || !Number.isFinite(sigma_msm)) return 'UNKNOWN';
