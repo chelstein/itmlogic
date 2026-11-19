@@ -114,17 +114,27 @@ result is treated as external evidence carrying
 > `cmake`/`make install` of `necpp_src` is needed.
 
 ```bash
-# Build deps
+# Build deps. Deliberately NOT installing apt's `swig` package here --
+# Debian Bookworm / Ubuntu Jammy ship SWIG 4.1.0, which generates C++
+# wrapper code using legacy CPython macros (PyTuple_GET_ITEM,
+# PyList_SET_ITEM, direct PyTypeObject struct access, etc.) that fail to
+# compile against Python's Limited API, which PyNEC's setup.py always
+# builds against for its ABI3 wheel -- errors like "'PyTuple_GET_ITEM'
+# was not declared in this scope" and "invalid use of incomplete type
+# 'PyTypeObject'". Verified directly: SWIG 4.1.0 fails this exact build;
+# a modern SWIG (installed via pip below) generates Limited-API-compatible
+# code and builds cleanly.
 sudo apt-get install -y \
     git build-essential \
-    swig python3 python3-pip python3-numpy python3-dev
+    python3 python3-pip python3-numpy python3-dev
 
 # Debian Bookworm's / Ubuntu Jammy's apt-vintage setuptools (~68.x)
 # cannot parse PyNEC's pyproject.toml (it declares `license =
 # "GPL-3.0-only"` using the PEP 639 SPDX-string form, which only
 # setuptools >=69.3-ish understands) -- upgrade first or `pip install .`
 # fails with "project.license must be valid exactly by one definition".
-sudo pip3 install --break-system-packages --upgrade pip setuptools wheel
+# Also installs a modern SWIG (see above) instead of apt's stale one.
+sudo pip3 install --break-system-packages --upgrade pip setuptools wheel swig
 
 # Clone the real source repo (NOT pip).  --recurse-submodules pulls
 # the necpp_src C++ engine.
