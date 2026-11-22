@@ -9,9 +9,27 @@
 // so the page HUD can surface what the map is actually doing.
 
 import React, { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+// maplibre-gl v6 ships ESM-only with no default export (the package's
+// "exports" map has no "default" condition) -- `import maplibregl from
+// 'maplibre-gl'` throws at build time under v6. Namespace import keeps
+// every existing maplibregl.Foo call site below working unchanged.
+import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+// v6's worker file isn't on a path Vite's bundler can resolve via a plain
+// relative/import.meta.url reference inside maplibre-gl's own source (the
+// migration guide's "setWorkerUrl() is bundler-only" note) -- without this,
+// every vector source silently fails with "Worker failed to load" and no
+// tiles ever render. Vite's `?worker&url` import emits the worker as its
+// own asset and gives us a URL that resolves under this bundler. Verified
+// directly: without setWorkerUrl, a real vector/geojson source throws this
+// error on map.on('error'); with it, the same source loads cleanly.
+import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { Protocol } from 'pmtiles';
+
+if (!globalThis.__genoaMaplibreWorkerUrlSet){
+  maplibregl.setWorkerUrl(mapLibreWorkerUrl);
+  globalThis.__genoaMaplibreWorkerUrlSet = true;
+}
 import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL, TERRAIN_DEM_URL, INTERFERENCE_URL, CONDUCTIVITY_URL } from './config.js';
 import { LAYER_REGISTRY } from './layers.js';
 

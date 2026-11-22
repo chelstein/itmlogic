@@ -51,7 +51,7 @@
     "express": "^4.21.1",
     "geographiclib-geodesic": "^2.2.0",
     "geotiff": "^2.1.3",
-    "maplibre-gl": "^5.24.0",
+    "maplibre-gl": "^6.19.0",
     "mathjs": "^15.2.0",
     "pdfkit": "^0.18.0",
     "pg": "^8.13.1",
