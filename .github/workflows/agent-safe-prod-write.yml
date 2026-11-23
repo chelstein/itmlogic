@@ -46,7 +46,16 @@ jobs:
     # pull_request/pull_request_target), so there is no untrusted-fork-code
     # risk in moving it to a self-hosted runner.
     runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
-    timeout-minutes: 30
+    # Was 30. Run #634 (first time npm audit ever passed, after the gate fix
+    # in #360) got cancelled by this timeout at 29m19s mid-"pre-merge gates"
+    # (npm test + build + lint). Confirmed via the Actions run history that
+    # npm audit has failed in ~30s on every scheduled run for 2.5+ months
+    # (same head_sha, Oct 9 - Nov 1), meaning pre-merge gates never got far
+    # enough to run to completion in that entire window -- this ceiling was
+    # always too tight for the real suite (4536 tests, many doing real PDF
+    # render / FORTRAN parity / golden-suite work), just never exposed.
+    # 60 gives real headroom over the ~29-30min observed runtime.
+    timeout-minutes: 60
     env:
       AGENT_DEPLOY_MODE:                  ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'report_only' }}
       AGENT_TOKEN_MODE:                   ${{ vars.AGENT_TOKEN_MODE || 'balanced' }}
