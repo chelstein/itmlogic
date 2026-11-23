@@ -77,8 +77,25 @@ export const sidecars = Object.freeze({
   // DEM-provisioning state as evidence provenance.
   splat:       makeSplatClient   ({ baseUrl: process.env.SPLAT_SIDECAR_URL    }),
   identity:    makeIdentityClient({ baseUrl: process.env.IDENTITY_SIDECAR_URL }),
-  // Map sidecar is consumed via fetchMapRender() in sidecars/mapClient.js,
-  // not through this registry — no sidecars.map property needed.
+  // Map sidecar is CALLED via fetchMapRender() in sidecars/mapClient.js
+  // (that's the real request path for rendering), but it still needs an
+  // entry here so /readyz actually reports it — this used to say "no
+  // sidecars.map property needed", which was wrong: with no entry here,
+  // probeOne() never produces a `sidecars.map` key at all, so the
+  // ServiceHealthPanel row (ROWS includes 'map') always rendered
+  // `ledFor(undefined)` -> 'offline' regardless of whether the map
+  // sidecar was actually up. A bare `{ baseUrl }` is enough: probeOne()
+  // already falls back to `fetch(baseUrl + '/health')` when a client has
+  // no `.health()` method, and the map sidecar exposes exactly that
+  // endpoint (src/sidecars/map/server.js, `GET /health`).
+  // Every other entry's factory returns `null` outright when its URL is
+  // unset (e.g. makeIdentityClient: `if (!baseUrl) return null;`), which
+  // is what probeOne()'s `if (!c) return { configured: false, ... }`
+  // actually checks -- a bare `{ baseUrl: null }` object is truthy, so it
+  // would have reported configured:true even when MAP_SIDECAR_URL is
+  // unset (verified directly: a unit test against this exact object
+  // caught it). Match the real convention instead of inventing a new one.
+  map:         process.env.MAP_SIDECAR_URL ? { baseUrl: process.env.MAP_SIDECAR_URL } : null,
   // Facility lookup is not a sidecar in the propagation sense — it's a
   // read-only adapter into chelstein/zerotrustradio (and optionally the
   // n8n station/analyze webhook).  Lives here so the same /readyz block
@@ -384,7 +401,12 @@ export function getSidecarMeta(name){
 // Probe one sidecar.  Health() if the client provides it; otherwise GET
 // /health on the baseUrl with a 3-s timeout.  Each probe also returns
 // the elapsed time so the UI can surface "slow but reachable" states.
-async function probeOne(name, c){
+// Exported (previously module-private) so tests can probe a
+// constructed client object directly -- e.g. the `map` entry, which is
+// a bare `{ baseUrl }` rather than a full client class -- without
+// needing to control process.env timing relative to this module's
+// top-level `sidecars` construction.
+export async function probeOne(name, c){
   const meta = REGISTRY_BY_NAME[name];
   if (!c) return [name, {
     configured: false,

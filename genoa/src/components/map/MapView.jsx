@@ -9,9 +9,27 @@
 // so the page HUD can surface what the map is actually doing.
 
 import React, { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+// maplibre-gl v6 ships ESM-only with no default export (the package's
+// "exports" map has no "default" condition) -- `import maplibregl from
+// 'maplibre-gl'` throws at build time under v6. Namespace import keeps
+// every existing maplibregl.Foo call site below working unchanged.
+import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+// v6's worker file isn't on a path Vite's bundler can resolve via a plain
+// relative/import.meta.url reference inside maplibre-gl's own source (the
+// migration guide's "setWorkerUrl() is bundler-only" note) -- without this,
+// every vector source silently fails with "Worker failed to load" and no
+// tiles ever render. Vite's `?worker&url` import emits the worker as its
+// own asset and gives us a URL that resolves under this bundler. Verified
+// directly: without setWorkerUrl, a real vector/geojson source throws this
+// error on map.on('error'); with it, the same source loads cleanly.
+import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { Protocol } from 'pmtiles';
+
+if (!globalThis.__genoaMaplibreWorkerUrlSet){
+  maplibregl.setWorkerUrl(mapLibreWorkerUrl);
+  globalThis.__genoaMaplibreWorkerUrlSet = true;
+}
 import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL, TERRAIN_DEM_URL, INTERFERENCE_URL, CONDUCTIVITY_URL } from './config.js';
 import { LAYER_REGISTRY } from './layers.js';
 
@@ -61,6 +79,15 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
   const [ready, setReady] = useState(false);   // map 'load' fired
+  // WebGL context creation can fail synchronously inside `new
+  // maplibregl.Map()` (no GPU, hardware acceleration disabled, a
+  // sandboxed/VM browser) -- that throw previously propagated straight
+  // out of this component's effect into React's render tree, where the
+  // page-level error boundary caught it and dumped the raw
+  // WebGLContextCreationError JSON. Catch it here instead and show a
+  // plain-language, actionable message in place of the (otherwise
+  // permanently blank) map canvas.
+  const [webglUnavailable, setWebglUnavailable] = useState(null);
   // Latest callbacks via refs so the create-once map handlers always call the
   // current prop without tearing the map down.
   const statusRef    = useRef(onStatus);
@@ -93,13 +120,23 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
     const layerIds = LAYERS.map(L => `${L.id}-${L.type}`);
-    const map = new maplibregl.Map({
-      container:          containerRef.current,
-      style:              MAP_STYLE_URL,
-      center:             INITIAL_VIEW.center,
-      zoom:               INITIAL_VIEW.zoom,
-      attributionControl: { compact: true }
-    });
+    let map;
+    try {
+      map = new maplibregl.Map({
+        container:          containerRef.current,
+        style:              MAP_STYLE_URL,
+        center:             INITIAL_VIEW.center,
+        zoom:               INITIAL_VIEW.zoom,
+        attributionControl: { compact: true }
+      });
+    } catch (e){
+      const text = 'This browser/device could not create a WebGL context, ' +
+        'which the map requires. Try a different browser, a device with ' +
+        'a real GPU, or check that hardware acceleration is enabled.';
+      report({ kind: 'error', text: `WebGL unavailable: ${(e?.message || String(e)).slice(0, 200)}` });
+      setWebglUnavailable(text);
+      return;
+    }
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-left');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }));
@@ -717,6 +754,19 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
 
     return () => { cancelled = true; ac.abort(); };
   }, [ready, selected, soilOn]);
+
+  if (webglUnavailable){
+    return (
+      <div
+        className="absolute inset-0 flex items-center justify-center bg-black font-mono text-center p-8"
+        style={{ position: 'absolute', inset: 0 }}
+      >
+        <div className="max-w-md text-textDim text-xs leading-relaxed">
+          {webglUnavailable}
+        </div>
+      </div>
+    );
+  }
 
   // Inline absolute fill as well, so the canvas is sized even if the
   // utility classes don't resolve a height for any reason.
