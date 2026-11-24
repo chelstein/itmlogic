@@ -160,7 +160,11 @@ test('HTTP /api/exhibit/jobs end-to-end (POST 202 + polling + artifact)', async 
     stdio: ['ignore', 'pipe', 'pipe']
   });
   t.after(() => { try { proc.kill('SIGTERM'); } catch {} });
-  await waitForHealth(baseUrl + '/healthz', 8000);
+  // 8000ms was too tight for the same reason as api.test.js's
+  // waitForHealth budget -- see that file's comment for the full
+  // explanation (graphAtlasLoader.js's module-level fetch to a
+  // hardcoded, ungated default IP, ~9.3s to fail in this environment).
+  await waitForHealth(baseUrl + '/healthz', 15000);
   const authFetch = (url, init = {}) => fetch(url, {
     ...init,
     headers: { ...(init.headers || {}), cookie: sessionCookie }
