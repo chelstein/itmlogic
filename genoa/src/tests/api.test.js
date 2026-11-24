@@ -54,7 +54,16 @@ test.before(async () => {
            FACILITY_DISABLE_FCC_FMQ: '1' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
-  await waitForHealth(baseUrl + '/healthz', 5000);
+  // 5000ms was too tight: the server's module-level graph-atlas fetch
+  // (graphAtlasLoader.js, hardcoded default IP, no env gate to skip it
+  // -- unlike every other sidecar client's "no baseUrl -> null"
+  // convention) blocks real request handling for ~9s in environments
+  // where that IP isn't quickly reachable (confirmed directly: with a
+  // fast-failing GRAPH_ATLAS_URL the server is healthy in ~2.5s; with
+  // the real default, ~9.3s). This is very likely CI/sandbox-only --
+  // production almost certainly reaches that IP fine -- so widening
+  // the test's own budget here, not touching the loader's architecture.
+  await waitForHealth(baseUrl + '/healthz', 15000);
 });
 
 test.after(async () => {
